@@ -2,6 +2,28 @@
 
 Newest first. One line each.
 
+- [x] **PREGNANCY FROM 28 WEEKS, AND PELVIC FLOOR WORK: his "yes fix all four"** (21 Nov 2026), after reading a
+  30-year-old's plan at about 20 weeks. (1)+(2) CSCS, mine: a block that reaches 28 weeks (read at its LAST week's date,
+  so a little early, the safe side) swaps split-stance and single-leg work (lunges, split squats, step-ups, single-leg
+  RDLs) for supported or two-footed versions (single-leg leg press, leg press, low box step-up, goblet squat), and
+  face-down trunk work and push-ups (planks, shoulder taps, Copenhagen plank, mountain climbers, floor/decline/archer/
+  pike push-ups) for incline push-ups, a press, side plank, bird dog, Pallof press. Basis: balance and pelvic comfort
+  worsen as the centre of gravity moves and the joints loosen, and the stretched abdominal wall is loaded face-down.
+  First the person's own pool, then any exercise of the movement both rules allow; only with nothing at all (a
+  bodyweight kit has no upright press) is the slot dropped for the block, never kept. Weeks before keep them ("fine
+  while they feel fine"). (3) The PRINTED plan's weights hold from 28 weeks, as the session screen already does: one
+  pass after every load pass, clamping a lift to its last loading-week number and only ever moving the reference DOWN
+  (a lift that came out lighter in a later block holds there). A first version also held before the weight was worked
+  out; measured redundant once the after-pass ratchets down, and removed (one mechanism). (4) HIS RULING, "yes" to
+  pelvic floor exercises: every training day's warm-up while pregnant, "10 slow squeezes, each held for up to 10
+  seconds, then 10 quick ones", purpose "Recommended for everyone who is pregnant (NHS)". General guidance, no
+  clinical claim; added after every budget pass, so it takes nothing from the session.
+  PROVEN UNTOUCHED: 576 non-pregnant plans byte-identical. CHECKS: `test:pregnancy-rules` §11 (81 checks; 8
+  mutations, 8 caught; four first MISSED: the list check read the list it guards, so names are now literal; the
+  minimalist fallback had no check, so "pressing is kept" is checked; the two holds hid each other, so one was
+  deleted). Re-run green: pregnancy-one-switch, health-conditions, warmup-rules, no-dead-code, bundle, week-shape,
+  older-beginner, advanced-lifter, session-length.
+
 - [x] **FROM 28 WEEKS PREGNANT, ONE NOTCH LOWER, IN EVERY PLAN WEEK (found reading a 30-year-old pregnant woman's plan,
   21 Nov 2026)**. The week's date for his 15 Nov "from 28 weeks the sets cap at RPE 7" was worked out from the week
   inside its BLOCK (1-4), so every block's first week was dated today: a woman 20 weeks pregnant had RPE 7-8 in plan

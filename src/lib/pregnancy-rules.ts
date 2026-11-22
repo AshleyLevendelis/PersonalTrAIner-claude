@@ -59,6 +59,46 @@ export const PREGNANCY_ABDOMINAL_STRAIN = new Set([
 
 export type PregnancyReason = 'impact' | 'lying' | 'abdominal'
 
+// ---------------------------------------------------------------------------
+// FROM 28 WEEKS (his "yes fix all four", 21 Nov 2026; CSCS, mine). Two things grow harder as the bump does: balance
+// (the centre of gravity moves forward, the joints loosen) and holding the trunk face-down (the abdominal wall is at
+// its most stretched). So a block that reaches 28 weeks swaps split-stance and single-leg work for supported or
+// two-footed versions, and front-loaded core and push-ups for incline push-ups and side-on or kneeling trunk work.
+// Earlier weeks keep them: they are fine while they feel fine, which is the guidance.
+// ---------------------------------------------------------------------------
+export const PREGNANCY_LATE_EXCLUDED: ReadonlySet<string> = new Set([
+  // split stance, single leg, wide lunges
+  'Bulgarian Split Squats', 'Walking Lunges', 'Dumbbell Lateral Lunge', 'Lateral Lunge (Bodyweight)', 'Dumbbell Reverse Lunge',
+  'Barbell Reverse Lunge', 'Split Squat (Bodyweight)', 'Smith Machine Split Squat', 'Single-Leg Dumbbell RDL',
+  'Single-Leg RDL (Bodyweight)', 'Step-Down (Eccentric)', 'Step-Ups', 'Pistol Squat Progression',
+  // face-down trunk and push-up positions
+  'Plank', 'Plank Shoulder Taps', 'Copenhagen Plank', 'Mountain Climbers', 'Push-Ups', 'Decline Push-Ups',
+  'Archer Push-Ups', 'Deficit Push-Ups', 'Wide Push-Ups', 'Close-Grip Push-Ups', 'Knee Push-Ups',
+  // head below the hips, weight through the arms
+  'Pike Push-Ups',
+])
+
+/** What takes a late-excluded exercise's place, first one the person's pool allows. */
+export const PREGNANCY_LATE_REPLACEMENTS: Readonly<Record<'legs' | 'push' | 'core', readonly string[]>> = {
+  legs: ['Single-Leg Leg Press', 'Leg Press', 'Low Box Step-Up', 'Goblet Squats', 'Box Squat (Bodyweight)', 'Leg Extensions'],
+  push: ['Incline Push-Ups', 'Chest Press Machine', 'Incline Dumbbell Press', 'Incline Machine Press'],
+  core: ['Side Plank', 'Bird Dog', 'Pallof Press', 'Cable Woodchops', 'Dumbbell Woodchop'],
+}
+
+export function lateReplacementKind(name: string, pattern: string): 'legs' | 'push' | 'core' {
+  if (pattern === 'core' || /plank|mountain/i.test(name)) return 'core'
+  if (/push-up/i.test(name)) return 'push'
+  return 'legs'
+}
+
+/** Pelvic floor exercises in the warm-up of every training day while pregnant (his "yes", 21 Nov 2026). */
+export const PELVIC_FLOOR_WARMUP_ITEM = {
+  name: 'Pelvic Floor Exercises',
+  prescription: '10 slow squeezes, each held for up to 10 seconds, then 10 quick ones',
+  purpose: 'Recommended for everyone who is pregnant (NHS): they support your bladder and bowel, now and after the birth',
+  duration_seconds: 150,
+} as const
+
 // THE WARM-UP TOO (18 Nov 2026): its opening item and mobility drills are not catalogue exercises, so these lists never
 // reached them. A pregnant trainee with no kit opened every session with "Jumping Jacks & High Knees", and a hip day
 // could open with a Glute Bridge. warmup.ts now asks: the opening item has a both-feet-on-the-floor twin

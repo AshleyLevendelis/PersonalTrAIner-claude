@@ -1817,6 +1817,9 @@ menu" stays true when a copy is also left outside it.
 - **Pregnancy also means 8+ reps, no strength or power block, no hard ab moves, and her injuries still apply — his "yes
   fix all three", 21 Nov 2026** (CSCS mine, basis in `pregnancy-rules.ts`): a pregnancy replacement clears the injury
   rule too. `test:pregnancy-rules` §9
+- **From 28 weeks pregnant, supported legs and no face-down work, weights held in the printed plan; pelvic floor
+  exercises in every training day's warm-up while pregnant — his "yes fix all four", 21 Nov 2026** (the pelvic floor
+  half is his ruling; the rest CSCS mine, basis in `pregnancy-rules.ts`). `test:pregnancy-rules` §11
 - **Pregnancy: "Exercise rules only"**: BUILT 15 Nov 2026. No jumping or impact move and no move lying flat on the back or
   front while "Pregnant" is ticked, each replaced by one of the same group (never a wider swap: it brought kettlebell swings);
   the coach is told; calories and food untouched. No due date is stored, so every pregnancy is treated as past week 16

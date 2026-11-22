@@ -10,6 +10,7 @@ import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
 } from './experience-config'
+import { PREGNANCY_LATE_EXCLUDED, PREGNANCY_LATE_REPLACEMENTS, lateReplacementKind, PELVIC_FLOOR_WARMUP_ITEM, pregnancyExclusion as pregnancyExclusionLate } from './pregnancy-rules'
 import { isOlderBeginner, olderBeginnerExclusion, olderAdultExclusion, OLDER_BEGINNER_REASON_TEXT, OLDER_BEGINNER_FOUNDATIONS } from './older-beginner'
 import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields, withBalanceWork } from './warmup'
 import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, isPerSideLoad, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
@@ -8220,6 +8221,8 @@ export function generateMesocycle(
    * floor would pin the next block to a recovery weight.
    */
   const lastWeekDisplayedKgByLift = new Map<string, { kg: number; repLow: number | null }>()
+  /** Each lift's last loading-week weight before 28 weeks pregnant: the number it holds at from then on. */
+  const pregnancyHoldKgByLift = new Map<string, number>()
 
   sequence.forEach((phase, blockIndex) => {
     // MID-BLOCK ONLY — Ashley's wording, and the audit insists on it. A block
@@ -8245,7 +8248,11 @@ export function generateMesocycle(
     }
 
     // Accessory variations rotate ONCE PER BLOCK, never inside one; main lifts do not rotate at all (below).
-    const rotatedBlockDays = baseWeek.map(day => {
+    const lateDrops = new Set<string>()
+    // Does this block reach 28 weeks pregnant? Read at its LAST week's date (weekCounter is the weeks before it): the
+    // whole block takes the late versions, a little early rather than a little late.
+    const blockLate = isPregnant(profile) && lateInPregnancy(profile, getLocalDateString(new Date(getAppNow(profile.id).getTime() + (weekCounter + 3) * 7 * 86_400_000)))
+    const rotatedBlockDays = baseWeek.map((day, dayIdx) => {
       // Per-day dedup: a block rotation is computed independently per
       // exercise, with no visibility into what its day-mates just resolved
       // to. Without this set, a rotation that falls back past a
@@ -8273,9 +8280,28 @@ export function generateMesocycle(
         const avoidFamilies = new Set(
           dayFamiliesByIndex.filter((f, i) => f && i !== exIdx) as string[]
         )
-        const rotated = baseTiers[exIdx] === 'main'
+        const rotatedPlain = baseTiers[exIdx] === 'main'
           ? ex.name
           : rotateVariation(ex.name, blockIndex, poolForRotation(pool, equipmentTierFor(profile)), experience, profile, usedNamesThisDay, avoidFamilies)
+        // FROM 28 WEEKS PREGNANT (pregnancy-rules.ts PREGNANCY_LATE_EXCLUDED): the block's split-stance, single-leg and
+        // face-down work becomes a supported, two-footed or side-on version, the first the person's pool allows.
+        let rotated = rotatedPlain
+        if (blockLate && PREGNANCY_LATE_EXCLUDED.has(rotatedPlain)) {
+          const kind = lateReplacementKind(rotatedPlain, findEntry(rotatedPlain)?.movement_pattern ?? '')
+          const ok = (n: string) => pool.some(e => e.name === n) && !PREGNANCY_LATE_EXCLUDED.has(n) && !pregnancyExclusionLate({ name: n })
+            && !usedNamesThisDay.has(n) && !day.exercises.some((other, j) => j !== exIdx && other.name === n)
+          const fromList = PREGNANCY_LATE_REPLACEMENTS[kind].find(ok)
+          // None of the list in her pool (a minimalist kit, a style filter): any exercise of the same movement both
+          // rules allow, the nearest the pool has; only with nothing at all does the original stay.
+          const pattern = findEntry(rotatedPlain)?.movement_pattern
+          const samePattern = pool.find(e => e.mechanics_tier !== 'primer' && ok(e.name)
+            && (kind === 'legs' ? ['single_leg', 'knee_dominant'].includes(e.movement_pattern)
+              : kind === 'push' ? ['horizontal_push', 'vertical_push'].includes(e.movement_pattern) : e.movement_pattern === pattern))
+          rotated = fromList ?? samePattern?.name ?? rotatedPlain
+          // Nothing both rules allow (a bodyweight kit has no upright press): the slot comes out for the block, never a
+          // head-down or face-down move kept because nothing else fits. Removed below, once the slot map is read.
+          if (rotated === rotatedPlain) lateDrops.add(`${dayIdx}:${exIdx}`)
+        }
         usedNamesThisDay.add(rotated)
         // THE PROXY ABOVE IS ONLY GOOD UNTIL A SLOT HAS ROTATED. One substitution_group can hold several families
         // ('tricep_extension' holds pushdowns, kickbacks and overhead work), so a slot can rotate into a family
@@ -8328,7 +8354,8 @@ export function generateMesocycle(
       const rotatedName = rotatedBlockDays[dayIdx]?.exercises[exIdx]?.name
       if (requiredNames.has(ex.name) && rotatedName) blockRequired.add(rotatedName)
     }))
-    const blockDays = sizeBlockToRestBudget(rotatedBlockDays, phaseConfig.rest_adjust_seconds, totalBudgetSeconds, blockRequired, policy, trimLog)
+    const lateKept = lateDrops.size === 0 ? rotatedBlockDays : rotatedBlockDays.map((d, dayIdx) => ({ ...d, exercises: d.exercises.filter((_, exIdx) => !lateDrops.has(`${dayIdx}:${exIdx}`)) }))
+    const blockDays = sizeBlockToRestBudget(lateKept, phaseConfig.rest_adjust_seconds, totalBudgetSeconds, blockRequired, policy, trimLog)
 
     // Double progression's within-block memory: each exercise's week-1
     // ("baseline") load, keyed by [dayIndex][exerciseIndex] — weeks 2-3 are
@@ -9002,6 +9029,7 @@ export function generateMesocycle(
                 }
               }
             }
+
 
             load = prescribeLoad(dbEntry, profile, {
               targetRpeLabel: intensity,
@@ -9726,7 +9754,29 @@ export function generateMesocycle(
 
       reconcilePerSetLoads(days)
       // Balance from 65, stamped after every budget pass so it takes nothing away (warmup.ts withBalanceWork).
+      // FROM 28 WEEKS PREGNANT THE WEIGHTS HOLD (his "yes fix all four", 21 Nov 2026), so the plan she reads is the plan
+      // the session screen holds her to (PREGNANCY_HOLD_NOTE), on the week as it ships: a lift is clamped to its last loading-week
+      // number, and one first seen after 28 weeks holds at its first. After every load pass (coherence, the frozen-load
+      // rep bump, the floors), so nothing later can raise it again. Weeks before 28 record each lift's number.
+      if (isPregnant(profile) && !isDeload) {
+        const weekLate = lateInPregnancy(profile, getLocalDateString(new Date(getAppNow(profile.id).getTime() + (weekCounter - 1) * 7 * 86_400_000)))
+        for (const d of days) for (const ex of d.exercises) {
+          const entry = findEntry(ex.name)
+          if (!entry || ex.suggested_load_kg == null || entry.mechanics_tier === 'primer') continue
+          const held = pregnancyHoldKgByLift.get(ex.name)
+          if (weekLate && held != null && ex.suggested_load_kg > held) rebuildLoadForExercise(ex, entry, held)
+          // From 28 weeks the reference only ever comes DOWN: a lift that came out lighter in a later block (higher reps)
+          // holds there, rather than climbing back toward its pre-28-week number.
+          pregnancyHoldKgByLift.set(ex.name, weekLate && held != null ? Math.min(held, ex.suggested_load_kg) : ex.suggested_load_kg)
+        }
+      }
       for (let i = 0; i < days.length; i++) days[i] = withBalanceWork(days[i], profile)
+      // Pelvic floor exercises on every training day while pregnant, after every budget pass so they take nothing away.
+      if (isPregnant(profile)) for (let i = 0; i < days.length; i++) {
+        const d = days[i]
+        if (!d.warmup || d.exercises.length === 0 || d.warmup.mobility.some(m => m.name === PELVIC_FLOOR_WARMUP_ITEM.name)) continue
+        days[i] = { ...d, warmup: { ...d.warmup, mobility: [...d.warmup.mobility, { ...PELVIC_FLOOR_WARMUP_ITEM }], total_seconds: d.warmup.total_seconds + PELVIC_FLOOR_WARMUP_ITEM.duration_seconds } }
+      }
       // THE RUNS, last of all, so no lifting pass sizes, trims or balances them (running.ts owns their minutes).
       if (runningGoalOf(profile) && !isStartingOut(profile)) {
         const withRuns = withRunDays(days, ladderWeekOf(weekCounter, profile.running_start_week), profile)

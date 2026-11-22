@@ -6,7 +6,7 @@
 import fs from 'fs'
 import { EXERCISE_DATABASE, getExerciseEntry } from '../src/lib/exercise-db'
 import { generateMesocycle, getConstrainedPool, getExerciseCompatibilityWarnings, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
-import { pregnancyExclusion, pregnancyWarning, PREGNANCY_IMPACT, PREGNANCY_LYING, PREGNANCY_ABDOMINAL_STRAIN, PREGNANCY_REP_FLOOR } from '../src/lib/pregnancy-rules'
+import { PREGNANCY_LATE_EXCLUDED, PELVIC_FLOOR_WARMUP_ITEM, pregnancyExclusion, pregnancyWarning, PREGNANCY_IMPACT, PREGNANCY_LYING, PREGNANCY_ABDOMINAL_STRAIN, PREGNANCY_REP_FLOOR } from '../src/lib/pregnancy-rules'
 import { isContraindicatedFor, INJURED_JOINTS } from '../src/lib/exercise-db'
 import { detectPlanInvalidation } from '../src/lib/plan-invalidation'
 import { pregnancyWeeksOn } from '../src/lib/health-conditions'
@@ -215,6 +215,65 @@ console.log('\n10. From 28 weeks, one notch lower: read at the date each PLAN we
   check('plan weeks past 28 weeks pregnant exist in this fixture', late.length >= 4, late.map(w => w.week_number))
   check('every one of them tops out at RPE 7', late.every(w => topRpe(w) <= 7), late.map(w => `${w.week_number}:${topRpe(w)}`))
   check('...while a week before 28 can still reach RPE 8 (the fixture binds)', early.some(w => topRpe(w) === 8), early.map(w => `${w.week_number}:${topRpe(w)}`))
+}
+
+console.log('\n11. His "yes fix all four", 21 Nov 2026: from 28 weeks, supported legs, no face-down work, weights held; pelvic floor always')
+{
+  const today = getLocalDateString(getAppNow(undefined))
+  const dueIn = (weeks: number) => getLocalDateString(new Date(Date.parse(`${today}T12:00:00Z`) + weeks * 7 * 86_400_000))
+  const weekDate = (n: number) => getLocalDateString(new Date(Date.parse(`${today}T12:00:00Z`) + (n - 1) * 7 * 86_400_000))
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  const mum = (o: Record<string, unknown>) => ({ age: 30, gender: 'female', height_cm: 166, weight_kg: 66, activity_level: 'lightly_active', fitness_goal: 'functional',
+    health_conditions: ['pregnancy'], due_date: dueIn(20), start_preference: 'train', equipment_access: 'full_gym',
+    training_days: DAYS.map(d => ({ day: d, available: ['Monday', 'Wednesday', 'Friday'].includes(d) })), session_duration_preference: '45-60',
+    training_style: 'hybrid', training_experience: 'intermediate', injuries: [], recovery_capacity: 'moderate', workout_split_preference: 'ai_recommendation', ...o } as unknown as UserProfile)
+  const lateLeaks: string[] = [], earlyHeld: number[] = [], rising: string[] = [], noPelvic: string[] = [], missing: string[] = []
+  let earlyHolds = 0
+  for (const eq of ['full_gym', 'home_gym', 'minimalist', 'bodyweight']) for (const style of ['hybrid', 'functional', 'bodybuilding']) for (const exp of ['novice', 'intermediate', 'advanced']) {
+    setRandomSource(seededRngFromKey(`late${eq}${style}${exp}`))
+    const m = generateMesocycle(mum({ equipment_access: eq, training_style: style, training_experience: exp })); resetRandomSource()
+    const lastKg = new Map<string, number>()
+    for (const w of m) {
+      const late = (pregnancyWeeksOn(dueIn(20), weekDate(w.week_number)) ?? 0) >= 28
+      // A block that only REACHES 28 weeks takes the late versions from its start, so "before" means a block wholly before.
+      for (const d of w.days) {
+        if (d.exercises.length > 0 && !d.warmup?.mobility.some(x => x.name === PELVIC_FLOOR_WARMUP_ITEM.name)) noPelvic.push(`${eq}/${style}/${exp} w${w.week_number} ${d.day}`)
+        for (const e of d.exercises) {
+          if (late && PREGNANCY_LATE_EXCLUDED.has(e.name)) lateLeaks.push(`${eq}/${style}/${exp} w${w.week_number} ${e.name}`)
+          if (!late && w.week_number <= 4 && PREGNANCY_LATE_EXCLUDED.has(e.name)) earlyHolds++
+          const kg = (e as { suggested_load_kg?: number }).suggested_load_kg
+          if (late && !w.is_deload && kg != null) { const prev = lastKg.get(e.name); if (prev != null && kg > prev) rising.push(`${eq}/${style}/${exp} w${w.week_number} ${e.name} ${prev}->${kg}`) }
+          if (!w.is_deload && kg != null) lastKg.set(e.name, kg)
+        }
+      }
+      if (!w.is_deload) {
+        const pats = new Set(w.days.flatMap(d => d.exercises.map(e => getExerciseEntry(e.name)?.movement_pattern)))
+        if (!pats.has('knee_dominant') && !pats.has('single_leg')) missing.push(`${eq}/${style}/${exp} w${w.week_number} squat`)
+      }
+    }
+  }
+  check('no split-stance, single-leg or face-down exercise in any week from 28 weeks (36 plans)', lateLeaks.length === 0, lateLeaks.slice(0, 4))
+  check('...while the first block (20-23 weeks) still holds some (the check binds, and early pregnancy is not narrowed)', earlyHolds > 0, earlyHolds)
+  check('from 28 weeks no lift\'s weight rises between loading weeks', rising.length === 0, rising.slice(0, 4))
+  check('pelvic floor exercises in the warm-up of every training day', noPelvic.length === 0, noPelvic.slice(0, 3))
+  check('every loading week still trains the legs', missing.length === 0, missing.slice(0, 3))
+  setRandomSource(seededRngFromKey('pf-none'))
+  const notPreg = generateMesocycle(mum({ health_conditions: [] })); resetRandomSource()
+  check('...and nobody who is not pregnant gets them', notPreg.every(w => w.days.every(d => !d.warmup?.mobility.some(x => x.name === PELVIC_FLOOR_WARMUP_ITEM.name))))
+  // Named here, not read from the list: a check that reads the list it guards cannot see a name taken off it.
+  for (const n of ['Bulgarian Split Squats', 'Walking Lunges', 'Dumbbell Lateral Lunge', 'Dumbbell Reverse Lunge', 'Step-Ups',
+    'Plank', 'Plank Shoulder Taps', 'Copenhagen Plank', 'Push-Ups', 'Decline Push-Ups', 'Pike Push-Ups', 'Mountain Climbers']) {
+    check(`${n}: left out from 28 weeks`, PREGNANCY_LATE_EXCLUDED.has(n))
+  }
+  // A slot is REPLACED where something both rules allow exists, never just dropped: a minimalist kit keeps its pressing.
+  {
+    const pushes = (w: { days: { exercises: { name: string }[] }[] }) => w.days.reduce((n, d) => n + d.exercises.filter(e => ['horizontal_push', 'vertical_push'].includes(getExerciseEntry(e.name)?.movement_pattern ?? '') && getExerciseEntry(e.name)?.mechanics_tier !== 'primer').length, 0)
+    setRandomSource(seededRngFromKey('lateminimalistbodybuildingnovice'))
+    const mm = generateMesocycle(mum({ equipment_access: 'minimalist', training_style: 'bodybuilding', training_experience: 'novice' })); resetRandomSource()
+    const earlyW = mm.find(w => w.week_number === 1)!, lateWs = mm.filter(w => !w.is_deload && (pregnancyWeeksOn(dueIn(20), weekDate(w.week_number)) ?? 0) >= 28)
+    check('a minimalist kit keeps its pressing from 28 weeks (replaced, not dropped)', lateWs.length > 0 && lateWs.every(w => pushes(w) >= pushes(earlyW)), { early: pushes(earlyW), late: lateWs.map(pushes) })
+  }
+  check('every late-excluded name is a real catalogue entry', [...PREGNANCY_LATE_EXCLUDED].every(n => !!getExerciseEntry(n)), [...PREGNANCY_LATE_EXCLUDED].filter(n => !getExerciseEntry(n)))
 }
 
 console.log(`\n${ran} checks ran, ${failures} failed.`)
