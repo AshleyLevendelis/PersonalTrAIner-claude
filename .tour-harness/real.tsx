@@ -743,6 +743,10 @@ const doneSeed = (() => {
     mobility: hit.mobilityFiller!.activity, mobilityMinutes: hit.mobilityFiller!.duration,
   }
 })()
+// THE WEEK'S DATES FOR THE DOMING LINE — published for verify:pregnancy-audit (22 Nov 2026), only under ?pregnant=1.
+// The driver walks these and reads each day's rows off the SCREEN (the screen's day is not always the fixture's: a
+// row can be rotated on the way), so no weekday or lift is typed into it.
+;(window as unknown as { __domingTarget: unknown }).__domingTarget = PREGNANT ? { candidates: DAYS.map(n => nearestAnchorDate(n)) } : null
 
 // WHAT EACH DAY OF THE LIVE WEEK IS MADE OF — published for verify:day-length.
 //

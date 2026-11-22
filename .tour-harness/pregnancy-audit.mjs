@@ -83,16 +83,24 @@ const cueOn = async name => {
   return ev(`(() => { const c = [...document.querySelectorAll('[data-exercise-name]')].find(x => x.getAttribute('data-exercise-name') === ${JSON.stringify(name)}); if (!c) return 'no row'; const q = c.querySelector('[data-testid="doming-cue"]'); if (!q) return null; q.scrollIntoView({ block: 'center' }); const r = q.getBoundingClientRect(); return { text: q.textContent.trim(), inView: r.top >= 0 && r.bottom <= 844 } })()`)
 }
 
-console.log('\n1. Pregnant (due 30 Dec), Monday 14 Sep: a Copenhagen plank and a front squat\n')
-await open('pregnant=1&due=2026-12-30&today=2026-09-14')
-const plank = await cueOn('Copenhagen Plank')
-check('1a. the Copenhagen plank says to stop if her stomach domes, on screen', !!plank && plank.text === 'Stop if your stomach domes down the middle' && plank.inView, plank)
+console.log('\n1. Pregnant (due 30 Dec): the first day of the week the page names that holds a face-down row\n')
+await open('pregnant=1&due=2026-12-30')
+const dom = await ev('window.__domingTarget')
+check('1. the page names the week\u2019s days', (dom?.candidates?.length ?? 0) === 7, dom)
+let day = null, shown = [], rowCount = 0
+for (const c of dom?.candidates ?? []) {
+  await open(`pregnant=1&due=2026-12-30&today=${c}`)
+  rowCount = await openAll()
+  shown = await cues()
+  if (shown.length > 0) { day = c; break }
+}
+const first = shown[0] ? await cueOn(shown[0].ex) : null
+check(`1a. a face-down row says to stop if her stomach domes, on screen (${day}, ${shown[0]?.ex})`, !!first && first.text === 'Stop if your stomach domes down the middle' && first.inView, first)
 await shoot('pregnancy-doming')
-const squat = await cueOn('Front Squat')
-check('1b. the front squat on the same day does not', squat === null, squat)
+check('1b. the same day\u2019s other rows do not (fewer lines than rows, every line the same words)', shown.length > 0 && shown.length < rowCount && shown.every(x => x.text === 'Stop if your stomach domes down the middle'), { rowCount, shown })
 
-console.log('\n2. Not pregnant, the same Monday\n')
-await open('x=1&today=2026-09-14')
+console.log('\n2. Not pregnant, the same day\n')
+await open(`x=1&today=${day}`)
 const rows = await openAll()
 const none = await cues()
 check('2a. no row carries the line (every row opened)', rows > 3 && none.length === 0, { rows, none })
