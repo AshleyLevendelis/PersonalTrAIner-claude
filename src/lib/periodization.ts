@@ -97,6 +97,10 @@ export const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
     focus: 'Build a base — connective tissue, movement quality, work capacity',
     sets_multiplier: 0.8,
     rep_shift: 3,
+    // THE MAIN LIFT STARTS AT 8+ TOO (21 Nov 2026, his "yes fix all four"; CSCS, mine): a tier-1 base of 3-5 plus the
+    // block's +3 landed at 6-8 while every other lift was at 9-15, in the block that exists to build tolerance with
+    // higher reps and lighter loads. 8-10 is the low end of that block's own range.
+    main_lift_rep_floor: 8,
     rest_adjust_seconds: -15,
     target_rpe: 6.5,
     coach_note:

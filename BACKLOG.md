@@ -2,6 +2,28 @@
 
 Newest first. One line each.
 
+- [x] **A 40-YEAR-OLD INTERMEDIATE WOMAN'S WEEK, READ AS A COACH: his "yes fix all four"** (21 Nov 2026; CSCS
+  mine). Her week was squat, sumo deadlift, deadlift; one woodchop of trunk work; "Full Body Power" with no power block;
+  the squat at 6-8 in the foundations block. MEASURED on 2,048 plans before -> after: (1) ONE HEAVY FLOOR PULL A WEEK
+  (deadlift, sumo, trap bar are one family): weeks with two 3,012 -> 0; a later day that wants a hinge takes a Romanian
+  deadlift or hip thrust, never a third squat (the first build gave squat, sumo, squat, squat on a six-day week; caught
+  by `test:coach-read`). (2) TRUNK WORK TWICE A WEEK, required so trims keep it, run before the thin-day step: weeks
+  under two 6,270 -> 960 -> 429 -> 0 (two leaks found by measuring: a rotated core lift lost its protection at a block
+  boundary; core the week already had was not counted as protected). (3) "POWER" ONLY WITH A POWER BLOCK, read off one
+  `phaseSequenceFor` the generator and the names share: 584 plans -> 0. (4) FOUNDATIONS MAIN LIFT AT 8+
+  (main_lift_rep_floor 8): 1,684 main-lift slots -> 0; a strength block still goes to 3-5.
+  AND FOUND BY THE SAME MEASUREMENT, the house trap ("protecting something aims the trimmer at whatever is left"): once
+  core was protected, a heavy block's whole-exercise trim took the day's MAIN LIFT instead (an advanced lifter's
+  Pull-Ups gone in block 4; 21 cases). His 13 Sep "protect the main lift" now holds in that trim too: 0.
+  CSCS REVIEW: (1) the week's hinge load fits recovery; trunk trained twice; (2) takes away: a second heavy pull and
+  some accessory time; (3) every pattern still covered every week (0 missing), main lifts continuous; (4) RE-READS:
+  "Power" now follows the plan's blocks, not the level; (5) in scope.
+  CHECKS: new `test:week-shape` (178 plans, 12 checks; 8 mutations, 8 caught, one only after the six-day offender was
+  added to the spread); `test:older-beginner` re-anchored on the block rule (92 checks). Gates re-run green:
+  session-length, pattern-floor, day-purpose, coach-read, thin-day, filler-yields, rest-floors, exercise-consistency,
+  advanced-lifter, pregnancy-rules, short-session, session-shortfall, block-phases, edit-keeps-the-bar, day-coverage,
+  muscle-balance, push-pull-score, pathway, rehab-prescribed, injury-coverage, concurrent-activity, main-lift-rest.
+
 - [x] **A 25-YEAR-OLD ADVANCED MAN'S PLAN, READ AS A COACH: his "yes fix all five"** (21 Nov 2026; CSCS mine). Two
   read-only traces first (engine-tracer), then: (1) STARTING WEIGHTS LOOKED LIKE A BEGINNER'S (bench 40kg week 1,
   95kg by week 15, against a ~128kg estimated max). TRACED: the calibration week starts an unconfirmed "advanced" lift

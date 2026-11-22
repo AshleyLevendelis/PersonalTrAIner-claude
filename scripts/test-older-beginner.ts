@@ -2,7 +2,7 @@
 // tighten the beginner and 60+ selection rules"). The five: barbell lifts on day one, pull-up negatives / assisted
 // pull-ups, a landmine press at an empty bar beside a 4 kg dumbbell press, a session called "Power", no balance work.
 // Seeded, so every run is the same plan. Every section has a contrast that shows its fixture binds.
-import { bestEquipmentRank, generateMesocycle, generateExercisePlan, setRandomSource, capBeginnerSets, beginnerWorkingSets, BEGINNER_MAX_WORKING_SETS, getConstrainedPool, stageOlderBeginnerFilter, beginnerTrackName } from '../src/lib/exercise-plan'
+import { bestEquipmentRank, generateMesocycle, generateExercisePlan, setRandomSource, capBeginnerSets, beginnerWorkingSets, BEGINNER_MAX_WORKING_SETS, getConstrainedPool, stageOlderBeginnerFilter, fullBodyTrackName, phaseSequenceFor } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { getExerciseEntry, EXERCISE_DATABASE, REHAB_ONLY, isRehabOnly, type ExerciseEntry } from '../src/lib/exercise-db'
 import { isOlderBeginner, olderBeginnerExclusion, olderAdultExclusion, OLDER_ADULT_IMPACT } from '../src/lib/older-beginner'
@@ -83,13 +83,20 @@ check('at 59 a beginner is still never told "Power"', lifting(at59).every(d => !
 
 console.log('\n5. Not a beginner: nothing changes')
 const inter = plan(her({ age: 62, training_experience: 'intermediate' }))
-check('a 62-year-old intermediate keeps "Full Body Power"', lifting(inter).some(d => d.focus === 'Full Body Power'))
+// RE-ANCHORED 21 Nov 2026: "Power" now follows the plan's blocks, not the level. Her fat-loss plan has no power block.
+check('a 62-year-old intermediate: "Full Body Power" exactly when her plan holds a power block',
+  (() => { const hasPower = phaseSequenceFor(her({ age: 62, training_experience: 'intermediate' })).includes('power'); return lifting(inter).some(d => /^Full Body/.test(d.focus)) && lifting(inter).filter(d => /^Full Body/.test(d.focus)).every(d => d.focus === (hasPower ? 'Full Body Power' : 'Full Body Strength')) })())
+{
+  const strong = her({ age: 30, training_experience: 'advanced', fitness_goal: 'functional', training_style: 'functional' })
+  setRandomSource(seededRngFromKey('pw')); const sp = generateMesocycle(strong)
+  check('...and a plan WITH a power block keeps "Full Body Power" (the fixture binds)', phaseSequenceFor(strong).includes('power') && lifting(sp).some(d => d.focus === 'Full Body Power'), [...new Set(lifting(sp).map(d => d.focus))])
+}
 check('a 62-year-old intermediate can be given a barbell', [...names(inter)].some(n => olderBeginnerExclusion(entry(n)) === 'barbell'))
 check('balance from 65 for everyone, 60 for a beginner', needsBalanceWork({ age: 65, training_experience: 'advanced' })
   && !needsBalanceWork({ age: 64, training_experience: 'novice' }) && needsBalanceWork({ age: 60, training_experience: 'beginner' }))
-check('beginnerTrackName renames only Full Body Power, only below intermediate',
-  beginnerTrackName('Full Body Power', 'beginner') === 'Full Body Strength' && beginnerTrackName('Full Body Power', 'intermediate') === 'Full Body Power'
-  && beginnerTrackName('Squat & Carry', 'beginner') === 'Squat & Carry')
+check('fullBodyTrackName renames only Full Body Power, only in a plan with no power block',
+  fullBodyTrackName('Full Body Power', false) === 'Full Body Strength' && fullBodyTrackName('Full Body Power', true) === 'Full Body Power'
+  && fullBodyTrackName('Squat & Carry', false) === 'Squat & Carry')
 
 console.log('\n5b. The rename moves no calorie target')
 {
