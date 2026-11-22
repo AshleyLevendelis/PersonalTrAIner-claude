@@ -563,6 +563,17 @@ const SAID_HELLO = SEED_HELLO && new URLSearchParams(location.search).get('said'
 const MEALS_YESTERDAY = SEED_HELLO && new URLSearchParams(location.search).get('meals') === '1'
 const todayStr = isoOf(anchorDate())
 const OPENER_ROWS = Number(new URLSearchParams(location.search).get('rows') ?? '0')
+// ?seed=reply — A REPLY SAVED ON THE SERVER (22 Nov 2026, verify:chat-reply): the seeded conversation as stored rows,
+// plus one of his messages saved as a reply to "Coach line 3" (its quote in the row, as the chat saves it). More rows
+// than the phone's copy, so the chat takes the server's: the quote must come back from the row alone.
+const REPLY_SEED = new URLSearchParams(location.search).get('seed') === 'reply'
+const replyRows = REPLY_SEED
+  ? [
+      ...seeded.map((m, i) => ({ id: `r${i}`, profile_id: PROFILE_ID, role: m.role, content: m.content, status: 'complete', created_at: at((30 - i) * MIN) })),
+      { id: 'r-reply', profile_id: PROFILE_ID, role: 'user', content: 'Saved reply to the third one', status: 'complete', created_at: at(MIN),
+        action_data: { replyTo: { id: 'r4', role: 'assistant', excerpt: 'Coach line 3. Long enough to wrap onto more than one line so the thread actually overflows the card the way…' } } },
+    ]
+  : []
 const seededRows = (SEED_NUDGE || SEED_HELLO || (OPENER && OPENER_ROWS > 0))
   ? (SEED_NUDGE || SEED_HELLO ? seeded : seeded.slice(0, OPENER_ROWS)).map((m, i) => ({
       id: `seed-${i}`,
@@ -753,7 +764,7 @@ const db: Db = {
   daily_steps: [], meal_events: [...dayStateSeed.meals, ...mealYesterday], meal_plan_picks: [], meal_plan_slots: topUpSeed.slots,
   favorite_meals: [], grocery_items: topUpSeed.list, load_suggestions: [], pending_actions: [],
   plan_adaptations: KNEE_EASE ? [kneeEaseRow(PROFILE_ID)] : [], user_facts: [], user_context_facts: [], user_goals: [],
-  chat_messages: [...seededRows, ...helloRow, ...textsRows], exercise_plans: [], mesocycle_weeks: [],
+  chat_messages: [...seededRows, ...helloRow, ...textsRows, ...replyRows], exercise_plans: [], mesocycle_weeks: [],
   daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
 }
 setSupabaseClient(makeFakeSupabase(db) as never)

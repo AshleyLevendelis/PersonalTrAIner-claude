@@ -16,7 +16,7 @@ import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { weekdayLong, dayLabel } from '@/lib/day-labels'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle, PlayCircle, Timer, Camera } from 'lucide-react'
+import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle, PlayCircle, Timer, Camera, Reply, Copy, X } from 'lucide-react'
 import { formVideoFor, linkifyBareUrls, sessionVideosFor } from '@/lib/exercise-video'
 import { parseTimerSuggestion, type TimerSuggestion } from '@/lib/timer-engine'
 import { startLabel } from '@/lib/round-setup'
@@ -179,6 +179,9 @@ import { lessonDue, lessonBrief, lessonTaughtIn, taughtFromRows, actionDataWithL
 import { pickOpener, sessionMovements, missedYesterdayFrom, readLastOrdinaryKind, rememberOrdinaryKind, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
 import { cleanReplyText, applyMessageBreaks, ACTION_TAG_RE, QUICK_REPLIES_RE } from '@/lib/reply-text'
 import { rowToMessage, addServerMessages } from '@/lib/chat-history-merge'
+import { historyWithReply, offerAnsweredBy, replyActionData, replyRefFor, findReplyTarget, type ReplyRef } from '@/lib/chat-reply'
+import { replyGestures } from '@/components/chat/reply-gestures'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { recordMomentSent, markMomentAnswered, type MomentLogRow } from '@/lib/moment-log'
 import {
   pickNudge, nudgeKeys, keysCoveredByOpener, loadNudgeStore, saveNudgeStore,
@@ -780,6 +783,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // cleared by the store, so it fills the box but never re-appears later.
   // Filled, NOT sent: the user sees it before it becomes a message.
   const [input, setInput] = useState(() => takeChatPrefill())
+  // REPLY TO ONE MESSAGE (his ruling 22 Nov 2026, "1, build it"): the message the next send answers, shown as a strip
+  // over the box; the message whose hold menu is open; and the original a tapped quote has just scrolled to.
+  const [replyingTo, setReplyingTo] = useState<ReplyRef | null>(null)
+  const [messageMenu, setMessageMenu] = useState<string | null>(null)
+  const [flashedKey, setFlashedKey] = useState<string | null>(null)
   // ...AND ON EVERY LATER HAND-OVER, because this component never unmounts:
   // the mount read alone missed every question asked after the app opened.
   useEffect(() => {
@@ -2763,21 +2771,27 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     return { eatenByDay, weekReview, patterns }
   }
 
-  const callGemini = async (userMessage: string, placeholderId?: string, facts?: ReturnType<typeof readTurnFacts>): Promise<ChatApiResponse> => {
+  const callGemini = async (userMessage: string, placeholderId?: string, facts?: ReturnType<typeof readTurnFacts>, replyTo: ReplyRef | null = null): Promise<ChatApiResponse> => {
     // Fix #4: Only send conversation turns (last 20), context goes separately as system prompt
     // EVERY TURN SAYS WHEN IT WAS SAID — see stampTurnTime. History is
     // restored with no date filter, so this morning's conversation is replayed
     // into this evening's; undated, the coach's own 8am "this morning" reads
     // as the sentence immediately before this one.
     const historyNow = getAppNow(profile.id)
-    const history = messages
-      .filter(m => m.status === 'complete' || m.status === undefined)
-      .slice(1)
-      .slice(-PAGE_SIZE)
-      // ...AND HOW IT ENDED (H22.1). A card's lead is "Want me to …?" for ever,
-      // and a refusal is an ordinary sentence, so yesterday's closed request
-      // read as an open one. The outcome goes on first, the time around it.
-      .map(m => ({ role: m.role, content: stampTurnTime(m.role === 'assistant' ? stampTurnOutcome(m.content, turnOutcomeOf(m)) : m.content, m.created_at, historyNow) }))
+    // ...AND HOW IT ENDED (H22.1). A card's lead is "Want me to …?" for ever,
+    // and a refusal is an ordinary sentence, so yesterday's closed request
+    // read as an open one. The outcome goes on first, the time around it.
+    const stampTurn = (m: ChatMessage) => stampTurnTime(m.role === 'assistant' ? stampTurnOutcome(m.content, turnOutcomeOf(m)) : m.content, m.created_at, historyNow)
+    const sendable = messages.filter(m => m.status === 'complete' || m.status === undefined)
+    // A REPLY (22 Nov 2026): the turn he is answering is marked where it sits, or put back at the start when it is
+    // older than what is sent. Never pasted into his own words (chat-reply.ts).
+    const history = historyWithReply(
+      sendable,
+      sendable.slice(1).slice(-PAGE_SIZE).map(m => ({ source: m, turn: { role: m.role, content: stampTurn(m) } })),
+      replyTo,
+      PAGE_SIZE,
+      stampTurn,
+    )
 
     const { eatenByDay, weekReview, patterns } = await (facts ?? readTurnFacts())
 
@@ -2849,15 +2863,19 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // vanishes from the transcript on the next reload. Logged so a genuine
   // pattern (an RLS policy, a network run of bad luck) is traceable instead
   // of silent, same convention as onMealSwapApplied's pool re-read.
-  const persistUserMessage = (text: string) => {
+  const persistUserMessage = (text: string, sent: { id?: string; replyTo?: ReplyRef | null } = {}) => {
     if (!profile.id) return
     // Whatever he sends answers the coach's newest unprompted message of the last 12 hours (measurement, slice 1).
     void markMomentAnswered(profile.id, 'replied')
     supabase.from('chat_messages').insert({
+      // THE ID THE SCREEN ALREADY SHOWS, and a reply's quote with it (22 Nov 2026, chat-reply.ts), so a reply to this
+      // message finds it, and the quote still reads after a reload.
+      ...(sent.id ? { id: sent.id } : {}),
       profile_id: profile.id,
       role: 'user',
       content: text,
       status: 'complete',
+      ...(sent.replyTo ? { action_data: replyActionData(sent.replyTo) } : {}),
     }).then(({ error }) => {
       if (error) console.error('persistUserMessage: insert failed -- this message will not survive a reload', error)
     })
@@ -7191,7 +7209,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     }
 
     try {
-      const result = await callGemini(userMsg.content, failedMsg.id)
+      const result = await callGemini(userMsg.content, failedMsg.id, undefined, userMsg.replyTo ?? null)
       const processed = await processResponse(result, userMsg.content)
       const quickReplies = extractQuickReplies(processed.text)
       // THE SAME FLOOR AS THE SEND PATH. Without it a retried blank came back
@@ -7237,14 +7255,6 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   }
 
   // Fix #1: Full message lifecycle with placeholder
-  /** Most recent message still awaiting a yes/no on its ProposalCard, or -1. */
-  const findOpenPendingActionIndex = (): number => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].pendingAction?.status === 'pending') return i
-    }
-    return -1
-  }
-
   const sendMessage = async () => {
     if ((!input.trim() && !photo) || isLoading) return
     if (navigator.vibrate) navigator.vibrate(10)
@@ -7255,7 +7265,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     setPhoto(null)
     const userText = photo ? photoMessageText(plainTyped(input.trim())) : plainTyped(input.trim())
     const now = new Date().toISOString()
-    const userMessage: ChatMessage = { role: 'user', content: userText, status: 'complete', created_at: now }
+    // A REPLY TO ONE MESSAGE (22 Nov 2026, chat-reply.ts): the quote goes with this message and the strip closes.
+    const reply = replyingTo
+    setReplyingTo(null)
+    const userId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : undefined
+    const sent = { id: userId, replyTo: reply }
+    const userMessage: ChatMessage = { ...(userId ? { id: userId } : {}), role: 'user', content: userText, status: 'complete', created_at: now, ...(reply ? { replyTo: reply } : {}) }
     setMessages(prev => [...prev, userMessage])
     // HE CARRIES A PEN AND DESCRIBES A REACTION (his answer 2, 15 Nov 2026, "Use your pen, call 999"): the app's own
     // first-aid line goes under his message at once, before the coach has answered. Nothing on the plan changes.
@@ -7279,11 +7294,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // so a bare "Yes" would otherwise get re-classified as a failed
     // imperative and re-propose the identical question forever (only "No"
     // could escape by accident, since declining needs no tool call at all).
-    const openPendingIdx = findOpenPendingActionIndex()
+    // AS A REPLY, ONLY THE OFFER IT REPLIES TO (22 Nov 2026): a "yes" to an older message is the coach's to read,
+    // never a tap on whichever offer is newest.
+    const openPendingIdx = offerAnsweredBy(messages, reply)
     if (openPendingIdx !== -1) {
       const verdict = classifyConfirmationReply(userText)
       if (verdict !== 'ambiguous') {
-        persistUserMessage(userText)
+        persistUserMessage(userText, sent)
         setIsLoading(true)
         try {
           if (verdict === 'confirm') await handleConfirmProposal(openPendingIdx)
@@ -7302,7 +7319,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // "JUST REMEMBER IT" (16 Nov 2026): the answer to the app's own offer after a meal he likes. The like is already saved;
     // the app says so, and nothing else happens. No coach call.
     if (userText.trim() === MEAL_LIKE_OFFER.justRemember) {
-      persistUserMessage(userText)
+      persistUserMessage(userText, sent)
       const lineId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : undefined
       setMessages(prev => [...prev, { id: lineId, role: 'assistant' as const, content: MEAL_LIKE_OFFER.remembered, status: 'complete' as const, created_at: new Date().toISOString() }])
       if (profile.id) void supabase.from('chat_messages').insert({ ...(lineId ? { id: lineId } : {}), profile_id: profile.id, role: 'assistant', content: MEAL_LIKE_OFFER.remembered, status: 'complete' })
@@ -7312,7 +7329,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
     const openAsk = parseOpenRequest(userText)
     if (openAsk) {
-      persistUserMessage(userText)
+      persistUserMessage(userText, sent)
       const line = openedLine(openAsk.target, openAsk.kg)
       // THE LINE CARRIES ITS SAVED ROW'S ID FROM THE START (his live test, 16 Nov: every line showed twice). A line with
       // no id was unknown to the history re-read, which added the saved copy beside it.
@@ -7329,7 +7346,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     setIsLoading(true)
 
     // Save user message immediately (fire-and-forget, 0ms latency)
-    persistUserMessage(userText)
+    persistUserMessage(userText, sent)
 
     // The turn's facts start reading NOW, alongside the placeholder save, not after it.
     const turnFacts = readTurnFacts()
@@ -7356,7 +7373,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
     let coachSavedAFoodDislike = false
     try {
-      const result = await callGemini(userText, placeholderId, turnFacts)
+      const result = await callGemini(userText, placeholderId, turnFacts, reply)
       // Either road the coach took with a food dislike (an outright save, or a record_fact proposal the turn above turns
       // into the question) means the turn has dealt with it: the backstop below must not ask a second time.
       const dislikeFact = (kind: unknown, a: Record<string, unknown> | undefined) => kind === 'record_fact' && a?.kind === 'food_preference' && a?.polarity !== 'like'
@@ -7473,8 +7490,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       return [...prev.filter(m => !(m.role === 'assistant' && m.status === 'pending' && !m.content)), assistantMessage]
     })
     // A just-arrived reply gets the typewriter reveal; restored history
-    // never does (see TypewriterMarkdown.tsx / findOpenPendingActionIndex's
-    // sibling render check below).
+    // never does (see TypewriterMarkdown.tsx and the
+    // render check below).
     if (placeholderId && cleanedText) setAnimatingMessageId(placeholderId)
     // ...and once it is drawn, a long one is read from its start (a smooth scroll begun on send would carry on past it).
     requestAnimationFrame(() => requestAnimationFrame(() => { anchorLongReply() }))
@@ -7606,6 +7623,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     setMessages([{ role: 'assistant', content: greeting, status: 'complete', created_at: new Date().toISOString() }])
     setHasMoreMessages(false)
     setQuickRepliesDismissed(false)
+    // A cleared chat has nothing to reply to.
+    setReplyingTo(null)
+    setMessageMenu(null)
     setLastFailedInput(null)
     if (profile.id) {
       clearChatCache(profile.id)
@@ -7661,10 +7681,32 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     }
   }
 
+  /** REPLY TO THIS MESSAGE (22 Nov 2026): the strip over the box names it, and the box takes the typing. */
+  const startReply = (m: ChatMessage) => {
+    setMessageMenu(null)
+    setReplyingTo(replyRefFor(m))
+    if (navigator.vibrate) navigator.vibrate(10)
+    // After the menu has closed and handed focus back, so the keyboard opens on the box.
+    setTimeout(() => composerRef.current?.focus(), 0)
+  }
+  /** A TAPPED QUOTE goes back to the message it quotes, and marks it for a moment. */
+  const jumpToMessage = (index: number) => {
+    const target = messages[index]
+    if (!target) return
+    const key = target.id || `msg-${index}`
+    const el = scrollRef.current?.querySelector<HTMLElement>(`[data-reply-key="${CSS.escape(key)}"]`)
+    if (!el) return
+    el.scrollIntoView({ block: 'center', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+    setFlashedKey(key)
+    setTimeout(() => setFlashedKey(prev => (prev === key ? null : prev)), 1600)
+  }
+
   const handleQuickReply = (text: string) => {
     if (isLoading) return
     if (navigator.vibrate) navigator.vibrate(10)
     setQuickRepliesDismissed(true)
+    // A chip answers the newest message, never the one a reply strip names (22 Nov 2026).
+    setReplyingTo(null)
     setInput(text)
 
     // Use the full lifecycle by delegating to the send flow
@@ -9408,12 +9450,24 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                         const leadContent = offer && !msg.content && !isInterrupted(msg)
                           ? <ReactMarkdown components={markdownComponents}>{describeProposalClientSide(offer)}</ReactMarkdown>
                           : bodyContent
+                        // REPLY TO THIS MESSAGE (his ruling 22 Nov 2026, "1, build it"): swipe it right, or hold it for
+                        // Reply and Copy. Any message with words in it, once they are all in; never a placeholder.
+                        const msgKey = msg.id || `msg-${i}`
+                        const repliable = !!msg.content && !isInterrupted(msg) && !(msg.id != null && msg.id === animatingMessageId)
+                        const gestures = repliable ? replyGestures(() => startReply(msg), () => setMessageMenu(msgKey)) : null
+                        const quoted = msg.replyTo ?? null
+                        const quotedAt = quoted ? findReplyTarget(messages, quoted) : -1
                         const drawBubble = (inside?: ReactNode) => position && (
                               <div
                                 data-testid="chat-bubble"
                                 data-position={position}
                                 data-role={msg.role}
-                                className={`relative min-w-0 px-3.5 py-2.5 text-[0.9375rem] [overflow-wrap:anywhere] ${
+                                data-reply-key={msgKey}
+                                data-flashed={flashedKey === msgKey ? 'true' : undefined}
+                                {...(gestures ?? {})}
+                                className={`relative min-w-0 px-3.5 py-2.5 text-[0.9375rem] [overflow-wrap:anywhere] [-webkit-touch-callout:none] [@media(pointer:coarse)]:select-none transition-shadow ${
+                                  flashedKey === msgKey ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
+                                } ${
                                   msg.role === 'user'
                                     ? 'whitespace-pre-wrap border border-border bg-card leading-[1.45] text-card-foreground'
                                     : 'border border-[color:color-mix(in_oklab,var(--primary)_40%,var(--card))] bg-[color:color-mix(in_oklab,var(--primary)_14%,var(--card))] leading-[1.5] text-card-foreground'
@@ -9436,10 +9490,47 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                 // panel colour and its own text, with the hairline its
                                 // panels use, because in the light themes the panel
                                 // and the page are almost the same colour.
-                                style={{ maxWidth: offer ? '100%' : widest, borderRadius: bubbleRadius(msg.role, position) }}
+                                style={{ maxWidth: offer ? '100%' : widest, borderRadius: bubbleRadius(msg.role, position), touchAction: 'pan-y' }}
                               >
+                                {/* The reply arrow, fading in beside the bubble as it is swiped (--swipe-p, 0 to 1). */}
+                                {repliable && (
+                                  <span aria-hidden data-testid="chat-swipe-arrow" className="pointer-events-none absolute -left-8 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full bg-[color:var(--surface-raised)] text-primary-text" style={{ opacity: 'var(--swipe-p, 0)' }}>
+                                    <Reply className="size-3.5" />
+                                  </span>
+                                )}
+                                {/* THE QUOTE OF THE MESSAGE THIS ONE ANSWERS: a tap goes back to it, while it is loaded. */}
+                                {quoted && (
+                                  <button
+                                    type="button"
+                                    data-testid="chat-reply-quote"
+                                    data-quote-role={quoted.role}
+                                    disabled={quotedAt === -1}
+                                    onClick={() => jumpToMessage(quotedAt)}
+                                    aria-label={`Replying to ${quoted.role === 'assistant' ? 'Personal TrAIner' : 'your message'}: ${quoted.excerpt}. ${quotedAt === -1 ? '' : 'Show it.'}`}
+                                    className="mb-1.5 block w-full min-w-0 whitespace-normal rounded-lg border-l-[3px] border-primary bg-[color:color-mix(in_oklab,var(--foreground)_6%,transparent)] px-2.5 py-1.5 text-left disabled:cursor-default"
+                                  >
+                                    <span className="block text-[0.6875rem] font-semibold text-primary-text">{quoted.role === 'assistant' ? 'Personal TrAIner' : 'You'}</span>
+                                    <span className="line-clamp-2 block text-[0.8125rem] leading-snug text-muted-foreground">{quoted.excerpt}</span>
+                                  </button>
+                                )}
                                 {leadContent}
                                 {inside}
+                                {/* THE HOLD MENU: Reply and Copy, anchored to the bubble. */}
+                                {messageMenu === msgKey && (
+                                  <DropdownMenu open onOpenChange={open => { if (!open) setMessageMenu(null) }}>
+                                    <DropdownMenuTrigger asChild>
+                                      <span aria-hidden className="pointer-events-none absolute inset-0" />
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align={msg.role === 'user' ? 'end' : 'start'} data-testid="chat-message-menu">
+                                      <DropdownMenuItem data-testid="chat-menu-reply" className="min-h-[44px]" onSelect={() => startReply(msg)}>
+                                        <Reply className="size-4" /> Reply
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem data-testid="chat-menu-copy" className="min-h-[44px]" onSelect={() => { void navigator.clipboard?.writeText(msg.role === 'assistant' ? stripTags(msg.content) : msg.content).catch(() => {}) }}>
+                                        <Copy className="size-4" /> Copy
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )}
                                 {/* LISTEN (her 31 Oct 2026 ruling): one per coach bubble, once its words are all in. */}
                                 {msg.role === 'assistant' && !isInterrupted(msg) && !(msg.id != null && msg.id === animatingMessageId) && (
                                   <ListenButton messageKey={msg.id || `msg-${i}`} />
@@ -9617,6 +9708,26 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       {/* DESIGN 2b (31 Oct 2026): a 52px pill, and since 6 Nov 2026 ONE button in
           it (her WhatsApp ruling): the mic while the box is empty, send once
           there is text. Where the phone cannot listen, it is always send. */}
+      {/* REPLYING TO (22 Nov 2026): who said it and its first words, and an X that takes the reply away. */}
+      {replyingTo && (
+        <div data-testid="chat-reply-strip" data-quote-role={replyingTo.role} className="mb-1.5 flex items-center gap-2 rounded-xl border-l-[3px] border-primary bg-[color:var(--surface-raised)] pl-3">
+          <div className="min-w-0 flex-1 py-1.5">
+            <div className="text-[0.75rem] font-semibold text-primary-text">
+              {replyingTo.role === 'assistant' ? 'Replying to Personal TrAIner' : 'Replying to your message'}
+            </div>
+            <div className="truncate text-[0.8125rem] text-muted-foreground">{replyingTo.excerpt}</div>
+          </div>
+          <button
+            type="button"
+            data-testid="chat-reply-cancel"
+            aria-label="Cancel the reply"
+            onClick={() => { setReplyingTo(null); composerRef.current?.focus() }}
+            className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
       {photo && (
         <div data-testid="chat-photo-attached" className="mb-1.5 flex items-center justify-between gap-3 px-2 text-[0.8125rem] text-muted-foreground">
           <span>Photo attached. It is read once and not kept.</span>
