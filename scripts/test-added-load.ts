@@ -85,6 +85,7 @@ interface T {
   onDeload: number
   onCalibration: number
   onLightReps: string[]; onLightBlock: string[]
+  legPast10: number
   belowNovice: string[]
   notPlateRounded: string[]
   overCeiling: string[]
@@ -93,7 +94,7 @@ interface T {
   maxSeen: number
 }
 const t: T = {
-  slots: 0, loaded: 0, onWrongExercise: [], onDeload: 0, onCalibration: 0, onLightReps: [], onLightBlock: [],
+  slots: 0, loaded: 0, onWrongExercise: [], onDeload: 0, onCalibration: 0, onLightReps: [], onLightBlock: [], legPast10: 0,
   belowNovice: [], notPlateRounded: [], overCeiling: [], blockVaries: [],
   loadedByExp: new Map(), maxSeen: 0,
 }
@@ -128,7 +129,11 @@ for (const equipment_access of EQUIP)
 
           const m = String(ex.reps).match(/^(\d+)\s*-\s*(\d+)$/)
           const mid = m ? (Number(m[1]) + Number(m[2])) / 2 : Number(String(ex.reps)) || 0
-          if (mid > 10) t.onLightReps.push(`${ex.name} ${ex.reps}@${added}`)
+          // 22 Nov 2026 (the persona audit's C14, CSCS): a belt on a hanging or dip lift stops at 10 reps; dumbbells on step
+          // work go to 15. Both limits are literals here so the check cannot move with the constant it guards.
+          const legWork = entry?.movement_pattern === 'single_leg' || entry?.movement_pattern === 'knee_dominant'
+          if (mid > (legWork ? 15 : 10)) t.onLightReps.push(`${ex.name} ${ex.reps}@${added}`)
+          if (legWork && mid > 10) t.legPast10++
 
           const key = `${wk.block_number}|${ex.name}`
           const set = perBlock.get(key) ?? new Set<number>()
@@ -171,7 +176,9 @@ console.log('\n2. Never where it would be unsafe or unearned')
   check(`never on a deload week (${t.onDeload})`, t.onDeload === 0, String(t.onDeload))
   check(`never on the calibration week (${t.onCalibration})`, t.onCalibration === 0, String(t.onCalibration))
   check(`never below intermediate (${t.belowNovice.length})`, t.belowNovice.length === 0, t.belowNovice.slice(0, 3).join(', '))
-  check(`never on a rep target above 10 (${t.onLightReps.length})`, t.onLightReps.length === 0, t.onLightReps.slice(0, 3).join(', '))
+  check(`never past its rep limit: 10 for a belt, 15 for step work (${t.onLightReps.length})`, t.onLightReps.length === 0, t.onLightReps.slice(0, 3).join(', '))
+  // The leg limit binds: step work does carry weight past 10 reps somewhere in the grid, so the check above is not vacuous.
+  check(`...and step work does take weight past 10 reps (${t.legPast10})`, t.legPast10 > 0, String(t.legPast10))
   check(`always plate-rounded (${t.notPlateRounded.length} off-grid)`, t.notPlateRounded.length === 0, t.notPlateRounded.slice(0, 3).join(', '))
   check(`never past 35% of bodyweight (max seen ${t.maxSeen}kg of a 28kg cap)`, t.overCeiling.length === 0, t.overCeiling.slice(0, 3).join(', '))
 }
