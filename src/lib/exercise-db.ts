@@ -2922,6 +2922,12 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     indicated_joints: ['knee'],
     style_tags: ['functional', 'combat', 'hybrid'],
     substitution_group: 'single_leg',
+    // DUMBBELLS IN THE HANDS ONCE THE KNEE HAS HAD A BLOCK (22 Nov 2026, his "yes fix all three" on a 45-year-old with a
+    // bad knee; CSCS, mine): 48 sessions of unloaded step work over 16 weeks, only the reps ever changing. A rehab move
+    // still has to progress. Weight to add, from the muscle-building block (never the first block, a deload or a
+    // calibration week), and only past novice, exactly as a belt on a pull-up. About 10 kg in a hand-split pair.
+    accepts_added_load: true,
+    added_load_scale: 2,
     unilateral: true,
     avg_duration_seconds: 30,
   },
@@ -2948,6 +2954,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     indicated_joints: ['knee'],
     style_tags: ['functional', 'combat', 'hybrid'],
     substitution_group: 'single_leg',
+    // Weight to add, as the low box step-up above.
+    accepts_added_load: true,
+    added_load_scale: 1.5,
     unilateral: true,
     avg_duration_seconds: 30,
   },

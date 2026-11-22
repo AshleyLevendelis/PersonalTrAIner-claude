@@ -2674,7 +2674,13 @@ export function pickRehabMovement(
   // pull-apart is never compared against a 28-second leg curl as though the
   // numbers meant the same thing.
   const primers = indicated.filter(e => e.mechanics_tier === 'primer')
-  const band = primers.length > 0 ? primers : indicated
+  // A KNEE'S REHAB IS QUAD WORK FIRST (22 Nov 2026, his "yes fix all three" on a 45-year-old with a bad knee; CSCS, mine).
+  // The knee set holds quad drills (terminal knee extensions, short-arc quad sets) and hamstring curls, and the shuffle
+  // gave curls on most days: with his ordinary leg curls on top, a bad knee got about 9 hamstring sets a week against
+  // one leg press. Quadriceps strength is what every knee-pain guideline puts first (NICE and OARSI for osteoarthritis,
+  // the patellofemoral consensus), so the guaranteed slot takes a quad drill where one exists; curls stay in ordinary slots.
+  const quad = flaggedJoints.has('knee') ? indicated.filter(e => e.mechanics_tier !== 'primer' && (e.movement_pattern === 'isolation_quad' || e.movement_pattern === 'knee_dominant')) : []
+  const band = primers.length > 0 ? primers : quad.length > 0 ? quad : indicated
 
   // "Gentlest" is a BAND, not the single cheapest entry, and that distinction
   // is load-bearing. MEASURED with a strict minimum: Seated Short-Arc Quad
@@ -9773,6 +9779,18 @@ export function generateMesocycle(
         // comment. Deload weeks are exempt (like the duration filler below):
         // their volume is deliberately, uniformly cut, and nudging set counts
         // would fight that.
+        // AN EVEN WEEK (22 Nov 2026, his "yes fix all three" on a 45-year-old with a bad knee; CSCS, mine): his Monday held
+        // 25-26 working sets against 22-23 on his other days, from an extra accessory the first day's build had room for.
+        // A coach spreads the week; the heaviest day is the one that most taxes recovery, and a day well above the rest is
+        // the first to be skipped. A day more than three sets over the week's middle day gives up accessory sets (never the
+        // main lift, never what the block requires), before the balance pass so push and pull are evened afterwards.
+        {
+          const loads = days.filter(d => d.exercises.length > 0).map(d => beginnerWorkingSets(d)).sort((a, b) => a - b)
+          if (loads.length >= 3) {
+            const middle = loads[Math.floor((loads.length - 1) / 2)]
+            for (let i = 0; i < days.length; i++) if (days[i].exercises.length > 0 && beginnerWorkingSets(days[i]) > middle + 2) days[i] = capBeginnerSets(days[i], blockRequired, middle + 2)
+          }
+        }
         enforceWeeklyPatternBalance(days, { keepPulling: keepPullingThisPlan })
         // A BEGINNER'S CAP, after the balance pass (so nothing adds a set back) and before the filler (so the time it
         // frees goes to optional mobility). capBeginnerSets says why.
