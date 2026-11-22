@@ -144,7 +144,7 @@ while (guard++ < 40) {
   const stop = byKey[s.stepKey]
   if (!stop) { check(`the card names a known stop ("${s.stepKey}")`, false, s); break }
   const inMore = !CORE_KEYS.includes(stop.key)
-  const n = (inMore ? 'more ' : '') + (/(\d+) of/.exec(s.counter ?? '')?.[1] ?? '?')
+  const n = (inMore ? 'more' : '') + (/(\d+) of/.exec(s.counter ?? '')?.[1] ?? '?')
   const label = `${n}. ${stop.key}`
 
   // Assert a stop's aim ONCE, on the phase where its target is still live —
@@ -191,7 +191,7 @@ while (guard++ < 40) {
   }
 
   // THE OFFER at the end of the short tour: "Show me everything" beside "Maybe later", never a plain Finish.
-  if (!inMore && stop.last) {
+  if (!inMore && stop.last && !s.pulsing) {
     check(`${label}: the short tour ends by offering the full one, with a way to decline`,
       /Show me everything/.test(s.cta ?? '') && s.later && /full tour/i.test(s.body ?? ''), s)
     await clickCta(); await wait(1500)

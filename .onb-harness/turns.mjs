@@ -291,7 +291,7 @@ await section(7, 'M4 — tapping a summary row puts its prompt where the tap was
   check('...on screen', cards.length >= 1 && cards[cards.length - 1].inView, cards)
   check('...with the sentence that introduces it on screen too', cards.length >= 1 && cards[cards.length - 1].underInView, cards)
   check('...and that sentence reads as English ("pick a different meals a day" did not)',
-    cards.length >= 1 && !/a different |to be instead/i.test(cards[0].under) && /How many meals a day suits you\?/.test(cards[0].under), cards.map(c => c.under))
+    cards.length >= 1 && !/a different |to be instead/i.test(cards[0].under) && /How many meals a day works for you\?/.test(cards[0].under), cards.map(c => c.under))
   check('the summary is put away while one answer is being changed', !now.open)
   await shot('m4-editing')
 

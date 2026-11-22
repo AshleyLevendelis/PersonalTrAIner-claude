@@ -598,8 +598,9 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
                 Back
               </button>
             )}
+            {/* The offer's two buttons need the row: its dots go (22 Nov 2026, they squeezed both onto two lines). */}
             <div className="flex flex-1 items-center gap-1">
-              {STEPS.map((s, i) =>
+              {!offersMore && STEPS.map((s, i) =>
                 (setStepSkipped && i === SET_STEP_INDEX) || (inMore ? i < CORE_LEN : i >= CORE_LEN) ? null : (
                   <span
                     key={s.key}
@@ -613,7 +614,7 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
               )}
             </div>
             {offersMore && (
-              <button type="button" onClick={finish} className="px-1 py-1.5 text-[0.78125rem] text-muted-foreground" data-tour-later>
+              <button type="button" onClick={finish} className="whitespace-nowrap px-1 py-1.5 text-[0.78125rem] text-muted-foreground" data-tour-later>
                 Maybe later
               </button>
             )}
@@ -622,7 +623,7 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
               onClick={offersMore ? () => enterStep(CORE_LEN) : step.last ? finish : advance}
               data-tour-next
               disabled={holdingForMeals}
-              className="h-[34px] rounded-[10px] px-4 text-[0.78125rem] font-semibold text-primary-foreground glow-mint-box disabled:opacity-60"
+              className="h-[34px] whitespace-nowrap rounded-[10px] px-4 text-[0.78125rem] font-semibold text-primary-foreground glow-mint-box disabled:opacity-60"
               style={{ background: 'var(--primary)' }}
             >
               {holdingForMeals ? 'Still cooking…' : stepIndex === 0 ? 'Show me around' : offersMore ? 'Show me everything' : step.last ? 'Finish' : 'Next'}
