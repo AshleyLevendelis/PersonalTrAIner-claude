@@ -10030,6 +10030,10 @@ export function generateMesocycle(
           for (let i = 0; i < days.length; i++) {
             const d = days[i]
             if (!d.exercises.some(e => isPush(e.name) && working(e)) || d.exercises.some(e => isPull(e.name) && working(e))) continue
+            // Never past a session's set cap (the beginner's 18, a bad back's 22): the persona audit's S9 caught this adding
+            // two sets to an 18-set beginner day.
+            const setCap = experience === 'beginner' ? BEGINNER_MAX_WORKING_SETS : (profile.injuries ?? []).includes('lower_back') ? LOWER_BACK_MAX_WORKING_SETS : Infinity
+            if (beginnerWorkingSets(d) + 2 > setCap) continue
             days[i] = { ...d, exercises: [...d.exercises, { ...weekPull, sets: 2, superset_label: undefined, rest: weekPull.rest === 'alternate' ? '60s' : weekPull.rest }] }
             if (sum(isPush) <= sum(isPull) * 1.5) break
           }
