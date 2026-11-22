@@ -217,7 +217,7 @@ for (let i = 0; i < 30; i++) {
   const tab = /#\/tab\/(\w+)/.exec(s.hash || '')?.[1]
   if (tab) tabsSeen.add(tab)
   if (s.body) seen.push(s.body)
-  if (/Finish/.test(s.cta || '')) break
+  if (/Finish|Show me everything/.test(s.cta || '')) break
   if (s.pulsing) {
     // THE TARGET IS THE ELEMENT UNDER THE SPOTLIGHT, not the pulse ring: the
     // ring is a decoration inside the overlay with pointer-events none, so
@@ -258,7 +258,10 @@ check('the walk visited every tab', ['dashboard', 'nutrition', 'exercise', 'tool
 check('the walk passed the tools stop', /timers/i.test(everySeen), seen.slice(-3))
 check('the walk passed the settings stop', /behind the gear/i.test(everySeen), seen.slice(-3))
 s = await snapshot()
-check('the last stop offers Finish', /Finish/.test(s.cta||''), s.cta)
+// THE SHORT TOUR NOW ENDS ON AN OFFER (his ruling 22 Nov 2026, "Short tour, then offer more"): "Show me everything"
+// or "Maybe later". This driver takes "Maybe later", the path that must end the tour for good; verify:tour-real takes
+// the other and walks the full tour.
+check('the last stop offers the full tour, or Maybe later', /Show me everything/.test(s.cta||'') && await evalJs(`!!document.querySelector('.tour-fade [data-tour-later]')`), s.cta)
 check('...and has no Skip', await evalJs(`(() => { const c = document.querySelector('.tour-fade'); return !c || ![...c.querySelectorAll('button')].some(b => b.textContent === 'Skip') })()`))
 check('...over no dim, handing off to the chat behind it', await evalJs(`(() => {
   const root = document.querySelector('[role="dialog"][aria-label="App tour"]')
@@ -266,7 +269,7 @@ check('...over no dim, handing off to the chat behind it', await evalJs(`(() => 
   const full = [...root.children].find(k => { const r = k.getBoundingClientRect(); return r.width >= window.innerWidth - 1 && r.height >= window.innerHeight - 1 })
   return !full || getComputedStyle(full).backgroundColor === 'rgba(0, 0, 0, 0)'
 })()`))
-await clickCta(); await wait(600)
+await evalJs(`document.querySelector('.tour-fade [data-tour-later]').click()`); await wait(600)
 s = await snapshot()
 check('the overlay is gone for good', !s.hasCard && !s.pill, { card: s.hasCard, pill: s.pill })
 check('storage records done', s.stored === 'done', s.stored)
