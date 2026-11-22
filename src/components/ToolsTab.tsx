@@ -499,11 +499,13 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
         )}
       </div>
 
-      <PlateCard
-        liftName={nextLift?.name ?? null}
-        startKg={nextLift?.kg ?? PLATE_CARD_DEFAULT_KG}
-        onOpen={kg => { setPlateStartKg(kg); setPlateOpen(true) }}
-      />
+      <div data-tour="plates">
+        <PlateCard
+          liftName={nextLift?.name ?? null}
+          startKg={nextLift?.kg ?? PLATE_CARD_DEFAULT_KG}
+          onOpen={kg => { setPlateStartKg(kg); setPlateOpen(true) }}
+        />
+      </div>
 
       {(['Plan', 'Shop'] as const).map(group => (
         <div key={group}>

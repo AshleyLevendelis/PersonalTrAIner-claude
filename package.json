@@ -712,7 +712,8 @@
     "test:phone-app": "tsx scripts/test-phone-app.ts",
     "phone:sync": "npm run build && npx cap sync",
     "verify:countdown-timer": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/countdown-timer.mjs",
-    "verify:report-reply": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/report-reply.mjs"
+    "verify:report-reply": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/report-reply.mjs",
+    "verify:setup-why": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/setup-why.mjs"
   },
   "dependencies": {
     "@capacitor/android": "8.6.2",

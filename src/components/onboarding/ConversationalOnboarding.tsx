@@ -38,6 +38,8 @@ import {
   setupStepLine,
   editPromptFor,
   cardQuestion,
+  whyFor,
+  FOOD_HALF_LINE,
   saysPregnant,
   pregnancyAnswered,
   type OnboardingSlotValues,
@@ -2344,10 +2346,16 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                   // before it; those read as the lead-in, small, and only the
                   // question itself is set large.
                   const [lead, ask] = splitQuestion(msg.content)
+                  // WHY I'M ASKING, and the line between the halves (his "build it", 22 Nov 2026): only on the question
+                  // on screen, so the transcript above stays a conversation.
+                  const askedKey = (msg.slotCard ?? msg.asksSlot) as SlotKey | undefined
+                  const why = askedKey ? whyFor(askedKey, values, confirmed) : null
+                  const firstFood = !!askedKey && FOOD_SLOTS.includes(askedKey) && !FOOD_SLOTS.some(k => confirmed.has(k))
                   // ONE CONTAINER for both halves: the card under it belongs to
                   // the whole message, and reads as answering it.
                   return (
                     <div>
+                      {firstFood && <div className="ob-message-in mb-3 text-[0.9375rem]/[1.45] font-semibold text-primary-text" data-setup-half-line>{FOOD_HALF_LINE}</div>}
                       {lead && <div className="ob-message-in mb-2 text-[0.875rem]/[1.5] text-muted-foreground [text-wrap:pretty]">{lead} </div>}
                       <div
                         className={`ob-message-in font-bold tracking-[-.03em] text-foreground glow-text [text-wrap:pretty] ${ask.length > 120 ? 'text-[1.25rem]/[1.3]' : 'text-[1.75rem]/[1.12]'}`}
@@ -2355,6 +2363,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                       >
                         {ask}
                       </div>
+                      {why && <p className="ob-message-in mt-2 text-[0.8125rem]/[1.45] text-muted-foreground" data-setup-why>{why}</p>}
                     </div>
                   )
                 })() : (

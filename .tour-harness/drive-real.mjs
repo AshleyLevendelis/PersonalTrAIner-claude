@@ -75,6 +75,8 @@ const state = () => evalJs(`(() => {
   const r = spot && spot.getBoundingClientRect()
   return {
     counter: card ? (card.querySelector('span:nth-child(2)')||{}).textContent : null,
+    stepKey: card ? card.getAttribute('data-tour-step') : null,
+    later: card ? !!card.querySelector('[data-tour-later]') : false,
     title: card ? (card.querySelector('h2,h3,p')||{}).textContent : null,
     body: card ? [...card.querySelectorAll('p')].map(p=>p.textContent).join(' | ') : null,
     cta: card ? (([...card.querySelectorAll('button')].pop())||{}).textContent : null,
@@ -112,7 +114,7 @@ const shot = async name => {
 // was never missing.
 const STOPS = (await evalJs('JSON.stringify(window.__TOUR_STEPS__)')
   .then(j => JSON.parse(j)))
-  .map(st => ({ key: st.key, target: st.target ?? null, tab: st.tab, tap: st.nav ?? null, gate: !!st.gate }))
+  .map(st => ({ key: st.key, target: st.target ?? null, tab: st.tab, tap: st.nav ?? null, gate: !!st.gate, last: !!st.last }))
 if (!STOPS.length) { console.error('could not read TOUR_STEPS from the page'); process.exit(1) }
 
 console.log('\nTHE TOUR, STOP BY STOP, AGAINST THE REAL SCREENS\n')
@@ -124,7 +126,10 @@ console.log('\nTHE TOUR, STOP BY STOP, AGAINST THE REAL SCREENS\n')
 // so from stop 7 onward the driver was asserting each stop's target against
 // the previous stop's spotlight and reporting the mismatch as a bug. Reading
 // the number the tour is actually showing cannot drift from it.
-const byKey = Object.fromEntries(STOPS.map((s, i) => [i + 1, s]))
+// THE FULL TOUR (22 Nov 2026) restarts its counter at 1, so a stop is found by the key the card carries, and the
+// number is held to the part it is in.
+const byKey = Object.fromEntries(STOPS.map(s => [s.key, s]))
+const CORE_KEYS = STOPS.slice(0, STOPS.findIndex(s => s.last) + 1).map(s => s.key)
 const asserted = new Set()
 const taps = {}
 // Set once the set stop's row turns out to have no weight to offer, so the
@@ -136,9 +141,10 @@ let guard = 0
 while (guard++ < 40) {
   const s = await state()
   if (!s.hasCard) { check('the tour is still on screen', false, s); break }
-  const n = Number(/(\d+) of/.exec(s.counter ?? '')?.[1] ?? 0)
-  const stop = byKey[n]
-  if (!stop) { check(`counter "${s.counter}" maps to a known stop`, false, s.counter); break }
+  const stop = byKey[s.stepKey]
+  if (!stop) { check(`the card names a known stop ("${s.stepKey}")`, false, s); break }
+  const inMore = !CORE_KEYS.includes(stop.key)
+  const n = (inMore ? 'more ' : '') + (/(\d+) of/.exec(s.counter ?? '')?.[1] ?? '?')
   const label = `${n}. ${stop.key}`
 
   // Assert a stop's aim ONCE, on the phase where its target is still live —
@@ -184,6 +190,15 @@ while (guard++ < 40) {
     await shot(`${n}-${stop.key}`)
   }
 
+  // THE OFFER at the end of the short tour: "Show me everything" beside "Maybe later", never a plain Finish.
+  if (!inMore && stop.last) {
+    check(`${label}: the short tour ends by offering the full one, with a way to decline`,
+      /Show me everything/.test(s.cta ?? '') && s.later && /full tour/i.test(s.body ?? ''), s)
+    await clickCta(); await wait(1500)
+    const first = await state()
+    check('the full tour starts at its own stop 1 ("1 of 9"), with Skip available', /\b1 of 9\b/.test(first.counter ?? '') && /Skip/.test(await evalJs(`document.querySelector('.tour-fade')?.innerText ?? ''`)), first)
+    continue
+  }
   if (/Finish|Done/i.test(s.cta ?? '')) {
     check('the last stop offers a finish', true)
     await clickCta(); await wait(700)

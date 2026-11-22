@@ -439,7 +439,7 @@ export function NutritionDisplay({
       ) : (<>
       {/* THE DAY STRIP STAYS ON TOP — her 17 Oct ruling, over the one-page design, which had none. */}
       {mealStrip && (
-        <MealDayStrip dates={mealStrip.dates} today={mealStrip.today} selected={mealStrip.selected} onSelect={mealStrip.onSelect} />
+        <div data-tour="mealstrip"><MealDayStrip dates={mealStrip.dates} today={mealStrip.today} selected={mealStrip.selected} onSelect={mealStrip.onSelect} /></div>
       )}
       {/* THE DAY'S RESTRICTION WARNINGS (12 Nov 2026): a meal that breaks a food he avoids, or a diet the app cannot
           honour, is said HERE, above the rings card, so it is on screen when he arrives. The meal list draws into it. */}

@@ -1,9 +1,9 @@
 // ---------------------------------------------------------------------------
 // TWO QUESTIONS ON ONE SCREEN (his "Light trim", 14 Nov 2026; docs/plans/shorter-setup.md option 1).
 // The real onboarding screen, the coach scripted (scripted.tsx). It proves, on screen:
-//   1. the days card carries "How long can your sessions usually run?", and Next waits for both;
+//   1. the days card carries "How long have you got for a session?" (22 Nov 2026 wording), and Next waits for both;
 //   2. one Next keeps the days AND the length, and says both back;
-//   3. the diet card carries "Anything else you'd rather I left out?", and one Next keeps the diet and the foods;
+//   3. the diet card carries "Any foods you just don't like? I'll leave them out.", and one Next keeps the diet and the foods;
 //   4. the setup bar counts the two as one screen.
 // ---------------------------------------------------------------------------
 import { writeFileSync } from 'fs'
@@ -40,7 +40,7 @@ await section(1, 'The days card carries the session length, and Next waits for b
   barDays = await bar()
   check('1a. the days card is on screen', (await evj(`document.querySelectorAll('[data-slot-card="trainingDays"]').length`)) === 1)
   const q = await evj(`document.querySelector('[data-companion="sessionDuration"] p')?.textContent ?? null`)
-  check('1b. ...with "How long can your sessions usually run?" under it', q === 'How long can your sessions usually run?', q)
+  check('1b. ...with "How long have you got for a session?" under it', q === 'How long have you got for a session?', q)
   const lengths = await evj(`[...document.querySelectorAll('[data-companion="sessionDuration"] [role="radio"]')].map(b => b.textContent.trim())`)
   check('1c. ...and the lengths as taps', Array.isArray(lengths) && lengths.length >= 3, lengths)
   // THURSDAY FIRST, THEN MONDAY, on purpose (the setup walk, 18 Nov 2026): what he reads back is in week order.
@@ -71,7 +71,7 @@ await section(3, 'The diet card carries "anything else to leave out"', async () 
   await send('Page.navigate', { url: `${origin}/?state=diet-card&load=2` })
   await wait(1800)
   const label = await evj(`document.querySelector('[data-companion="dislikedFoods"] label')?.textContent ?? null`)
-  check('3a. the diet card has the leave-out box under it', label === "Anything else you'd rather I left out?", label)
+  check('3a. the diet card has the leave-out box under it', label === "Any foods you just don't like? I'll leave them out.", label)
   // THE BUTTON, BEFORE ANYTHING IS TICKED (the setup walk, 18 Nov 2026): "None" only while nothing has been said.
   const nextText = () => evj(`document.querySelector('[data-slot-card="dietaryPreferences"] [data-slot-next], [data-slot-next]')?.textContent.trim() ?? null`)
   check('3a2. nothing ticked, nothing typed: the button reads "None — next →"', (await nextText()) === 'None — next →', await nextText())

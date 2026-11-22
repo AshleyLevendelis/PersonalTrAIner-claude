@@ -352,7 +352,7 @@ await section(9, 'M4 — an answer you type rather than tap', async () => {
   await open('review')
   await tapRow('displayName')
   let now = await review()
-  check('the prompt says to type it', now.prompts.length === 1 && now.prompts[0].inView && /What should I call you\? Type it in below\./.test(now.prompts[0].text), now.prompts)
+  check('the prompt says to type it', now.prompts.length === 1 && now.prompts[0].inView && /[Ww]hat should I call you\? Type it in below\./.test(now.prompts[0].text), now.prompts)
   check('...and the typing box says what it is for', now.placeholder === 'Your name…', now.placeholder)
   await queue({ reply: 'Samuel it is.', actions: [{ name: 'set_slot', args: { slot_key: 'displayName', value: 'Samuel' } }] })
   await say('Samuel')

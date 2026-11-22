@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MessageCircle } from 'lucide-react'
 import { useAppRoute, tabHash, type Tab } from '@/lib/app-route'
-import { TOUR_STEPS, SET_STEP_KEY, MEALS_STEP_KEY } from '@/lib/app-tour-steps'
+import { TOUR_STEPS, MORE_TOUR_STEPS, SET_STEP_KEY, MEALS_STEP_KEY } from '@/lib/app-tour-steps'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { useViewportInset } from '@/hooks/useViewportInset'
@@ -32,7 +32,10 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 // then removed"): it is practice, never a week-1 calibration set.
 // ---------------------------------------------------------------------------
 
-const STEPS = TOUR_STEPS
+// The short tour, then the full one it offers at its end (his ruling 22 Nov 2026, "Short tour, then offer more"). One
+// list so Back, Skip and the stored place work the same in both parts; CORE_LEN is where the second part starts.
+const STEPS = [...TOUR_STEPS, ...MORE_TOUR_STEPS]
+const CORE_LEN = TOUR_STEPS.length
 const SET_STEP_INDEX = STEPS.findIndex(s => s.key === SET_STEP_KEY)
 const MEALS_STEP_INDEX = STEPS.findIndex(s => s.key === MEALS_STEP_KEY)
 /**
@@ -74,8 +77,8 @@ interface Rect { top: number; left: number; width: number; height: number }
  * the app could restart a tour once it was over, so "gone for good" would
  * have meant one mistaken tap lost it forever.
  */
-export function replayAppTour(): void {
-  window.dispatchEvent(new CustomEvent(TOUR_REPLAY_EVENT))
+export function replayAppTour(part?: 'more'): void {
+  window.dispatchEvent(new CustomEvent(TOUR_REPLAY_EVENT, { detail: part === 'more' ? 'more' : 'core' }))
 }
 
 const TOUR_REPLAY_EVENT = 'fitplan:replay-tour'
@@ -241,11 +244,14 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
     return () => practiceFns.current.endPractice()
   }, [onSetStop])
 
-  // The visible numbering skips the set stop when it does not apply.
-  const totalSteps = STEPS.length - (setStepSkipped ? 1 : 0)
+  // The visible numbering skips the set stop when it does not apply, and counts each part on its own: the short tour
+  // is "3 of 10" whether or not the full one follows, and the full one starts again at 1.
+  const inMore = stepIndex >= CORE_LEN
+  const totalSteps = inMore ? MORE_TOUR_STEPS.length : CORE_LEN - (setStepSkipped ? 1 : 0)
   const displayIndex = useMemo(() => {
+    if (stepIndex >= CORE_LEN) return stepIndex - CORE_LEN + 1
     let n = 0
-    for (let i = 0; i <= stepIndex && i < STEPS.length; i++) {
+    for (let i = 0; i <= stepIndex && i < CORE_LEN; i++) {
       if (setStepSkipped && i === SET_STEP_INDEX) continue
       n++
     }
@@ -321,10 +327,10 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
   // owns all of its own state. Deliberately re-arms from step 0 and clears
   // the set-stop exemption, so a replay is the tour as first shown.
   useEffect(() => {
-    const onReplay = () => {
+    const onReplay = (e: Event) => {
       if (!profileId) return
       setSetStepSkipped(false)
-      enterStep(0)
+      enterStep((e as CustomEvent).detail === 'more' ? CORE_LEN : 0)
     }
     window.addEventListener(TOUR_REPLAY_EVENT, onReplay)
     return () => window.removeEventListener(TOUR_REPLAY_EVENT, onReplay)
@@ -493,6 +499,8 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
   const body = tapPhase ? (step.teaser ?? '') : (showPending ? step.pendingCopy! : (typedWeight && step.typedWeightCopy ? step.typedWeightCopy : step.copy))
   const tapHint = typedWeight && step.typedWeightTapHint ? step.typedWeightTapHint : step.tapHint
   const calloutTop = calloutPosition(rect, step.last === true)
+  // THE OFFER (22 Nov 2026): the short tour's last stop asks whether to see everything, never assumes it.
+  const offersMore = step.last === true && stepIndex === CORE_LEN - 1
 
   return (
     <div className="fixed inset-0 z-[60]" style={{ pointerEvents: 'none' }} role="dialog" aria-modal="true" aria-label="App tour">
@@ -556,6 +564,7 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
 
       <div
         className="tour-fade absolute rounded-2xl border border-[color:var(--hairline)] bg-card px-4 pb-3 pt-3.5"
+        data-tour-step={step.key}
         style={{ left: 14, right: 14, top: calloutTop, boxShadow: '0 16px 40px rgba(0,0,0,.55)', pointerEvents: 'auto' }}
       >
         <div className="flex items-center gap-2">
@@ -591,7 +600,7 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
             )}
             <div className="flex flex-1 items-center gap-1">
               {STEPS.map((s, i) =>
-                setStepSkipped && i === SET_STEP_INDEX ? null : (
+                (setStepSkipped && i === SET_STEP_INDEX) || (inMore ? i < CORE_LEN : i >= CORE_LEN) ? null : (
                   <span
                     key={s.key}
                     className="size-[5px] rounded-full"
@@ -603,14 +612,20 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
                 ),
               )}
             </div>
+            {offersMore && (
+              <button type="button" onClick={finish} className="px-1 py-1.5 text-[0.78125rem] text-muted-foreground" data-tour-later>
+                Maybe later
+              </button>
+            )}
             <button
               type="button"
-              onClick={step.last ? finish : advance}
+              onClick={offersMore ? () => enterStep(CORE_LEN) : step.last ? finish : advance}
+              data-tour-next
               disabled={holdingForMeals}
               className="h-[34px] rounded-[10px] px-4 text-[0.78125rem] font-semibold text-primary-foreground glow-mint-box disabled:opacity-60"
               style={{ background: 'var(--primary)' }}
             >
-              {holdingForMeals ? 'Still cooking…' : stepIndex === 0 ? 'Show me around' : step.last ? 'Finish' : 'Next'}
+              {holdingForMeals ? 'Still cooking…' : stepIndex === 0 ? 'Show me around' : offersMore ? 'Show me everything' : step.last ? 'Finish' : 'Next'}
             </button>
           </div>
         )}

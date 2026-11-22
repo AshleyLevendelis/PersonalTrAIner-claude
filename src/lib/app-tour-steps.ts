@@ -181,10 +181,55 @@ export const TOUR_STEPS: TourStep[] = [
   {
     key: 'chat', tab: 'chat', target: null, last: true,
     nav: 'chatfab', tapHint: 'Tap the chat button', teaser: 'Last stop — the important one.',
-    copy: "And this is where we talk. Anything you'd tell a trainer — a heavy day, a food you hate, a sore shoulder — just say it. I'll take it from here.",
+    copy: "And this is where we talk. Anything you'd tell a trainer — a heavy day, a food you hate, a sore shoulder — just say it. That's the basics; there's plenty more. Want the full tour? It's about two minutes.",
   },
 ]
 
+
+/**
+ * THE FULL TOUR (his ruling 22 Nov 2026, "Short tour, then offer more", over one long tour and over tips as you go):
+ * the ten stops above stay as they are, and the last one offers these. Skip on every stop; the settings menu replays
+ * either part. Each stop names a thing the app really does today, checked against the screen it points at
+ * (docs/plans/setup-and-tour-refresh.md). The same honesty scan reads these lines as the ten above.
+ */
+export const MORE_TOUR_STEPS: TourStep[] = [
+  {
+    key: 'more-exmenu', tab: 'exercise', target: 'exmenu',
+    copy: "Every exercise has a ⋮. Behind it: About this exercise (how to do it, the muscles it works, a YouTube search for the form and your history on it), plus swap, move, remove, or ban it for good. Every change shows an Undo.",
+  },
+  {
+    key: 'more-effort', tab: 'exercise', target: null,
+    copy: "When you finish a lift I'll ask: too easy, about right, or too hard? One tap, and your answer moves the next session's weight.",
+  },
+  {
+    key: 'more-daymenu', tab: 'exercise', target: 'daymenu',
+    copy: 'This menu is for the whole day. Under What happened? you can move the session, mark it missed, make today a rest day, log something you did instead, or do a shorter version when time is tight.',
+  },
+  {
+    key: 'more-plates', tab: 'tools', target: 'plates',
+    copy: "The plate calculator: set the weight and I'll show you what goes on each side of the bar. It works for adjustable dumbbells too.",
+  },
+  {
+    key: 'more-mealstrip', tab: 'nutrition', target: 'mealstrip',
+    copy: "Tap any day ahead to see what you're eating, swap a meal before you get there, or add that day to your shopping list. Week shows all seven at once.",
+  },
+  {
+    key: 'more-meals', tab: 'nutrition', target: 'meals',
+    copy: "Open a meal for more: swap it, heart one you love so it comes round more often, or mark it as eaten out. I'll shrink the rest of the day to fit around it.",
+  },
+  {
+    key: 'more-progress', tab: 'dashboard', target: 'progress',
+    copy: 'Progress opens your personal bests and your weigh-ins. Tap Weight in there to log one and see your weekly averages on a graph.',
+  },
+  {
+    key: 'more-settings', tab: 'dashboard', target: 'settings',
+    copy: "A few things worth knowing behind the gear, in Profile: your allergies, the kit you own, reminders and how often I message you, and a pause button for a holiday or an illness.",
+  },
+  {
+    key: 'more-chat', tab: 'chat', target: null, last: true,
+    copy: "Last one. Things to try with me: \"swap my squats\", \"I'm eating out tonight\", a photo of a meal or a menu, or \"open my shopping list\". And if a reply of mine looks wrong, tap the little flag beside it.",
+  },
+]
 
 export const SET_STEP_KEY = 'set'
 /** The stop that can outrun its own content — see its pendingCopy above. */

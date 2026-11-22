@@ -4,7 +4,7 @@ Ashley's request: "1. The onboarding questions. How can it be improved, to get t
 are asking. Let's make the wording more enthusiastic/friendly. 2. The tour, the app does way more than the tour shows
 off, should we expand the tour with an option to skip at any time."
 
-Nothing below is built. Wording is his to approve; every line here is a draft.
+BUILT 22 Nov 2026 on his "build it", as written below, except the optional goal-target screen (his call, not built).
 
 ---
 
