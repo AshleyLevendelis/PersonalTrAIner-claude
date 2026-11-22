@@ -74,12 +74,17 @@ export const PREGNANCY_LATE_EXCLUDED: ReadonlySet<string> = new Set([
   // face-down trunk and push-up positions
   'Plank', 'Plank Shoulder Taps', 'Copenhagen Plank', 'Mountain Climbers', 'Push-Ups', 'Decline Push-Ups',
   'Archer Push-Ups', 'Deficit Push-Ups', 'Wide Push-Ups', 'Close-Grip Push-Ups', 'Knee Push-Ups',
+  // a row held in that position, one hand at a time: a plank with less support (22 Nov 2026, found reading the persona
+  // audit's plans: a woman 31 weeks pregnant had Renegade Rows while Plank Shoulder Taps were already out)
+  'Renegade Row',
+  // ...and crawled on hands and feet (the same plank, moving)
+  'Bear Crawl',
   // head below the hips, weight through the arms
   'Pike Push-Ups',
 ])
 
 /** What takes a late-excluded exercise's place, first one the person's pool allows. */
-export const PREGNANCY_LATE_REPLACEMENTS: Readonly<Record<'legs' | 'hinge' | 'push' | 'core', readonly string[]>> = {
+export const PREGNANCY_LATE_REPLACEMENTS: Readonly<Record<'legs' | 'hinge' | 'push' | 'pull' | 'core' | 'cardio', readonly string[]>> = {
   legs: ['Single-Leg Leg Press', 'Leg Press', 'Low Box Step-Up', 'Goblet Squats', 'Box Squat (Bodyweight)', 'Leg Extensions'],
   // A HINGE STAYS A HINGE (22 Nov 2026, the persona audit's C1): a single-leg RDL went to the legs list, all squats, so from
   // 28 weeks a hinge day became a second squat day and 114 of the audit's pregnant plans had weeks with no hinge at all.
@@ -87,11 +92,18 @@ export const PREGNANCY_LATE_REPLACEMENTS: Readonly<Record<'legs' | 'hinge' | 'pu
   hinge: ['Romanian Deadlifts', 'Kettlebell Deadlift', 'Smith Machine Romanian Deadlift', 'Cable Pull-Through', 'Bodyweight Good Morning', 'Bodyweight Hip Hinge to Wall'],
   push: ['Incline Push-Ups', 'Chest Press Machine', 'Incline Dumbbell Press', 'Incline Machine Press'],
   core: ['Side Plank', 'Bird Dog', 'Pallof Press', 'Cable Woodchops', 'Dumbbell Woodchop'],
+  // A row stays a row, seated or chest-up (CSCS, mine): the cable and machine rows, the bench-supported one-arm row, the towel row.
+  pull: ['Seated Cable Row', 'Seated Machine Row', 'Cable Rows', 'Single-Arm Cable Row', 'Dumbbell Rows', 'Towel Row'],
+  // CARDIO STAYS CARDIO (22 Nov 2026, the persona audit's C10): Mountain Climbers were swapped for a side plank, and a
+  // fat-loss plan's only conditioning went with them. Upright and low-impact, as pregnancy guidance describes (ACOG).
+  cardio: ['Elliptical', 'Cycling Intervals', 'Treadmill Intervals', 'Shadow Boxing', 'Battle Ropes'],
 }
 
-export function lateReplacementKind(name: string, pattern: string): 'legs' | 'hinge' | 'push' | 'core' {
+export function lateReplacementKind(name: string, pattern: string): 'legs' | 'hinge' | 'push' | 'pull' | 'core' | 'cardio' {
+  if (pattern === 'cardio') return 'cardio'
   if (pattern === 'core' || /plank|mountain/i.test(name)) return 'core'
   if (/push-up/i.test(name)) return 'push'
+  if (pattern === 'horizontal_pull' || pattern === 'vertical_pull') return 'pull'
   if (pattern === 'hip_hinge') return 'hinge'
   return 'legs'
 }

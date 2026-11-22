@@ -128,5 +128,104 @@ console.log('\n7. One heavy floor pull a week, on the hinge day, in the long and
   }
 }
 
+console.log('\n9. Round two (his "yes fix the remaining ones too", 22 Nov 2026)')
+{
+  const { getMovementFamily: fam, isGenuineDuplicate, isIndicatedFor } = await import('../src/lib/exercise-db')
+  const { prescribeAddedLoad } = await import('../src/lib/load-prescription')
+  const { PREGNANCY_LATE_EXCLUDED } = await import('../src/lib/pregnancy-rules')
+  const { getSessionMinimumSeconds } = await import('../src/lib/session-duration')
+  void fam
+  const ent = (n: string) => getExerciseEntry(n)
+  const loadingWeeks = (m: MesocycleWeek[]) => m.filter(w => !w.is_deload)
+  const sets = (w: MesocycleWeek, ps: string[]) => w.days.reduce((n, d) => n + d.exercises.filter(e => { const x = ent(e.name); return !!x && x.mechanics_tier !== 'primer' && ps.includes(x.movement_pattern) }).reduce((a, e) => a + (e.sets ?? 0), 0), 0)
+  const knee = new Set(['knee'])
+
+  // C16: a day that loads the knee carries the knee's rehab, whatever the day is called.
+  {
+    const { m } = audited(746)
+    const kneeDays = loadingWeeks(m).flatMap(w => w.days.filter(d => d.exercises.some(e => { const x = ent(e.name); return !!x && x.mechanics_tier !== 'primer' && ['knee_dominant', 'single_leg', 'isolation_quad', 'lunge'].includes(x.movement_pattern) && !isIndicatedFor(x, knee) })))
+    const bare = kneeDays.filter(d => !d.exercises.some(e => { const x = ent(e.name); return !!x && isIndicatedFor(x, knee) }))
+    check('C16 #746: every day that loads a bad knee carries knee rehab (a Chest & Triceps day with the week\'s leg press had none)', kneeDays.length > 0 && bare.length === 0, bare.map(d => d.focus).slice(0, 3))
+  }
+
+  // C14: dumbbells on a step-up up to 15 reps; a belt on a pull-up still stops at 10.
+  {
+    const p = someone({ training_experience: 'intermediate' }, ['Monday', 'Wednesday', 'Friday'])
+    const step = prescribeAddedLoad(ent('Low Box Step-Up')!, p, { repRangeLabel: '12-14', phase: 'hypertrophy', isDeload: false })
+    const pull = prescribeAddedLoad(ent('Pull-Ups')!, p, { repRangeLabel: '12-14', phase: 'hypertrophy', isDeload: false })
+    const step16 = prescribeAddedLoad(ent('Low Box Step-Up')!, p, { repRangeLabel: '16-18', phase: 'hypertrophy', isDeload: false })
+    check('C14: a step-up at 12-14 reps in a muscle-building block takes weight', !!step && step.added_kg > 0, step)
+    check('...a pull-up at the same reps takes no belt (the contrast: the rule is the leg one)', pull == null, pull)
+    check('...and a step-up past 15 reps takes none', step16 == null, step16)
+    const { m } = audited(930)
+    check('C14 #930: the trained lifter\'s step-ups are weighted in the muscle-building block', m.some(w => !w.is_deload && w.days.some(d => d.exercises.some(e => e.name === 'Low Box Step-Up' && (e.suggested_added_load_kg ?? 0) > 0))))
+  }
+
+  // C21: late in pregnancy, a replacement is never a copy of a lift already on the day.
+  for (const i of [27, 394, 1223]) {
+    const { m } = audited(i)
+    const copies = m.flatMap(w => w.days.flatMap(d => { const xs = d.exercises.map(e => ent(e.name)).filter((x): x is NonNullable<typeof x> => !!x && x.mechanics_tier !== 'primer')
+      return xs.flatMap((a, k) => xs.slice(k + 1).filter(b => isGenuineDuplicate(a, b)).map(b => `w${w.week_number} ${a.name}+${b.name}`)) }))
+    check(`C21 #${i}: no day holds the same movement twice (an air squat beside a bodyweight box squat)`, copies.length === 0, copies.slice(0, 3))
+  }
+
+  // Late pregnancy: a row from a plank is out; cardio stays cardio.
+  check('a renegade row and a bear crawl are on the late-pregnancy list (plank shoulder taps already were)', PREGNANCY_LATE_EXCLUDED.has('Renegade Row') && PREGNANCY_LATE_EXCLUDED.has('Bear Crawl'))
+  check('...a row is replaced by a row, cardio by cardio', lateReplacementKind('Renegade Row', 'horizontal_pull') === 'pull' && lateReplacementKind('Mountain Climbers', 'cardio') === 'cardio' && lateReplacementKind('Plank', 'core') === 'core')
+  {
+    const { m } = audited(4558)
+    const noCardio = loadingWeeks(m).filter(w => !w.days.some(d => d.recommendedCardio || d.exercises.some(e => ent(e.name)?.mechanics_tier === 'cardio'))).map(w => w.week_number)
+    check('C10 #4558 (31 weeks pregnant, fat loss): cardio every loading week (her mountain climbers had become a side plank)', noCardio.length === 0, noCardio)
+    check('...and no renegade row anywhere in her plan', !m.some(w => w.days.some(d => d.exercises.some(e => e.name === 'Renegade Row'))))
+  }
+
+  // C1: covering a missing plane never takes the week's only squat.
+  for (const i of [123, 388, 588]) {
+    const { m } = audited(i)
+    const none = loadingWeeks(m).filter(w => sets(w, ['knee_dominant', 'single_leg']) === 0).map(w => w.week_number)
+    check(`C1 #${i}: a squat-pattern exercise every loading week (a two-day week's step-ups had been swapped for a pulldown)`, none.length === 0, none)
+  }
+
+  // C8b / C8a: short sessions fit, and the warm-up is what gave.
+  for (const i of [36, 38, 44, 140, 168, 588, 1252]) {
+    const { p, m } = audited(i)
+    const hi = getSessionMaximumSeconds(p.session_duration_preference)
+    const over = loadingWeeks(m).flatMap(w => w.days.filter(d => d.exercises.length && estimateDaySeconds(d) > hi).map(d => `w${w.week_number} ${d.day} ${(estimateDaySeconds(d) / 60).toFixed(1)}`))
+    check(`C8b #${i} (${p.session_duration_preference}): no loading-week session past the time asked for`, over.length === 0, over.slice(0, 3))
+  }
+  {
+    const { p, m } = audited(48)
+    const lifting = loadingWeeks(m).flatMap(w => w.days.filter(d => d.exercises.length))
+    check('C8b #48 (pregnant): the pelvic floor work stays in every training day\'s warm-up', lifting.every(d => d.warmup?.mobility.some(x => /Pelvic Floor/.test(x.name))), p.due_date)
+  }
+  {
+    const { p, m } = audited(5721)
+    const lo = getSessionMinimumSeconds(p.session_duration_preference)
+    const short = loadingWeeks(m).flatMap(w => w.days.filter(d => d.exercises.length && estimateDaySeconds(d) < lo).map(d => `w${w.week_number} ${d.day}`))
+    check('C8a #5721: no session under the time asked for (a dropped press left a Chest & Triceps day at 28 of 30-45 minutes)', short.length === 0, short)
+  }
+  {
+    // A 20-30 session's build-ups: the first without its empty-bar set or its near-max single, a later one a single feeder.
+    const { m } = audited(815)
+    const ramps = loadingWeeks(m).flatMap(w => w.days.flatMap(d => d.warmup?.ramp_ups ?? []))
+    check('a 20-30 minute session\'s first build-up has no empty-bar set and nothing over 85%', ramps.length > 0 && ramps.filter(r => !r.abbreviated).every(r => r.sets.every(st => st.load_percent > 0 && st.load_percent <= 85)), ramps.slice(0, 2))
+    check('...and a later lift\'s build-up is one feeder set', ramps.some(r => r.abbreviated) && ramps.filter(r => r.abbreviated).every(r => r.sets.length === 1), ramps.filter(r => r.abbreviated).slice(0, 2).map(r => r.sets.length))
+    const long = planOf(someone({ session_duration_preference: '60-90', training_experience: 'advanced' }, ['Monday', 'Wednesday', 'Friday']), 'pa-long-ramps')
+    check('...a 60-90 minute session keeps the full build-up (the fixture binds: the rule is the short session)', long.some(w => w.days.some(d => d.warmup?.ramp_ups.some(r => r.sets.some(st => st.load_percent === 0)))))
+  }
+
+  // C18 / C17: the chest floor stops where pushing would run past 1.5x pulling; a week keeps four back sets.
+  {
+    const { m } = audited(207)
+    const heavy = loadingWeeks(m).filter(w => { const pull = sets(w, ['horizontal_pull', 'vertical_pull']); return pull > 0 && sets(w, ['horizontal_push', 'vertical_push']) > pull * 1.5 }).map(w => w.week_number)
+    check('C18 #207: no loading week pushes more than 1.5x what it pulls (the chest floor took push-ups to four sets beside a two-set row)', heavy.length === 0, heavy)
+  }
+  {
+    const { m } = audited(112)
+    const low = loadingWeeks(m).filter(w => sets(w, ['horizontal_push', 'isolation_chest']) < 4).map(w => w.week_number)
+    check('C17 #112: four chest sets every loading week (the bench\'s fourth set went to keep two sets of lateral raises)', low.length === 0, low)
+  }
+}
+
 console.log(`\n${passed + failed} checks ran: ${passed} passed, ${failed} failed`)
 process.exit(failed > 0 ? 1 : 0)
