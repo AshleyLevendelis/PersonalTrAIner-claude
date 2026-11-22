@@ -35,8 +35,8 @@ for (const eq of ['full_gym', 'home_gym', 'minimalist'] as const) for (const goa
 console.log('test:seventy\n')
 
 console.log('1. The demanding picks are off an older beginner\'s list; the supported ones stay')
-const OFF = ['Bent-Over Dumbbell Row', 'Hollow Body Hold', 'Single-Arm Dumbbell Bench Press', 'Half-Kneeling Single-Arm Dumbbell Press', 'Single-Arm Kettlebell Press']
-const ON = ['Chest-Supported Row', 'Dead Bug', 'Dumbbell Bench Press', 'Dumbbell Shoulder Press', 'Single-Arm Kettlebell Row', 'Single-Arm Cable Row', 'Single-Arm Lat Pulldown']
+const OFF = ['Bent-Over Dumbbell Row', 'Hollow Body Hold', 'Single-Arm Dumbbell Bench Press', 'Half-Kneeling Single-Arm Dumbbell Press', 'Single-Arm Kettlebell Press', 'Rotary Torso Machine']
+const ON = ['Chest-Supported Row', 'Dead Bug', 'Dumbbell Woodchop', 'Dumbbell Bench Press', 'Dumbbell Shoulder Press', 'Single-Arm Kettlebell Row', 'Single-Arm Cable Row', 'Single-Arm Lat Pulldown']
 for (const n of OFF) check(`${n}: left out (technique)`, olderBeginnerExclusion(getExerciseEntry(n)!) === 'technique')
 for (const n of ON) check(`${n}: kept`, olderBeginnerExclusion(getExerciseEntry(n)!) === null, olderBeginnerExclusion(getExerciseEntry(n)!))
 let inOlder = 0, inYounger = 0
@@ -90,6 +90,9 @@ check('two, each named optional, each a 20-minute easy walk', hers.length === 2 
   hers.map(d => [d.day, d.focus, d.recommendedCardio]))
 const order = (d: string) => ALL.indexOf(d)
 check('never on two rest days in a row', hers.length === 2 && Math.abs(order(hers[0].day) - order(hers[1].day)) !== 1, hers.map(d => d.day))
+// A week whose first two rest days ARE consecutive (Tuesday and Wednesday), where the rule has to choose.
+const monThuFri = walks(plan({ ...her(), training_days: ALL.map(d => ({ day: d, available: ['Monday', 'Thursday', 'Friday'].includes(d) })) } as UserProfile, 'f70mtf'))
+check('Mon/Thu/Fri: two walks, not Tuesday and Wednesday', monThuFri.length === 2 && !(monThuFri.some(d => d.day === 'Tuesday') && monThuFri.some(d => d.day === 'Wednesday')), monThuFri.map(d => d.day))
 check('never on a day she lifts', hers.every(d => !herPlan[0].days.some(x => x.day === d.day && x.exercises.length)))
 check('every week of the plan', herPlan.every(w => walks([w]).length === 2))
 check('at 58: none (his ruling "B" for a beginner stands under 60)', walks(plan(her({ age: 58 }), 'f58')).length === 0)

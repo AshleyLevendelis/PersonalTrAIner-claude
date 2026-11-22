@@ -71,9 +71,11 @@ export function isOlderBeginner(profile: Pick<UserProfile, 'age' | 'training_exp
  * body hold loads the lower back harder than a dead bug for the same trunk; and the one-arm presses (on a bench,
  * half-kneeling, or a kettlebell overhead) add a balance and anti-rotation demand on top of a press she is still
  * learning, where the two-arm version is the coach's first pick. The one-arm ROWS and pulldowns stay: they are done
- * seated or braced on a bench.
+ * seated or braced on a bench. And (his "yes take the twisting machine off too", the same day) the rotary torso
+ * machine: spinal rotation against a load, seated and pinned, the combination a coach builds up to last; a standing
+ * dumbbell woodchop or a dead bug trains the same trunk by turning through the hips or resisting the turn.
  */
-const OLDER_BEGINNER_TECHNIQUE = /single-leg[^,]*\b(rdl|romanian)|reverse hyper|russian twist|bent-over dumbbell row|hollow body|single-arm dumbbell bench|half-kneeling single-arm|single-arm kettlebell press/i
+const OLDER_BEGINNER_TECHNIQUE = /single-leg[^,]*\b(rdl|romanian)|reverse hyper|russian twist|bent-over dumbbell row|hollow body|single-arm dumbbell bench|half-kneeling single-arm|single-arm kettlebell press|rotary torso/i
 
 /** Kit you hang from or support your whole body on. */
 const HANGING_KIT = new Set(['pull-up bar', 'assisted pull-up machine', 'dip bars'])

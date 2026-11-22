@@ -13,8 +13,10 @@ Newest first. One line each.
   2019, ACSM: power falls faster than strength and predicts function); not on warm-ups, holds, swings, isolation.
   Screen only: the coach is not told yet. (4) Two optional 20-minute easy walks on non-consecutive rest days for a
   beginner from 60 (not with low recovery; WHO/ACSM aerobic guidance); 58 and under unchanged (`test:sal-margaret`).
-  `test:seventy` (34 checks; mutations in progress at commit), `verify:lift-fast`. Not changed: her starting weights
-  (2-5 kg, found in week 1), and the Rotary Torso Machine (asked).
+  `test:seventy` (37 checks), `verify:lift-fast`. Not changed: her starting weights
+  (2-5 kg, found in week 1). And his "yes take the twisting machine off too": the Rotary Torso Machine joins the list
+  (loaded spinal rotation, seated and pinned). Mutations: 9, all caught; the walk-spacing one only after a Mon/Thu/Fri
+  week was added (Mon/Wed/Fri never puts two rest days first in a row). `verify:lift-fast` 5 checks, 1 of 1 caught.
 - [x] **NO MEDICINE BALL SLAMS FOR A BAD BACK (his "yes fix it", 22 Nov 2026)**, read off the 50-year-old's full plan:
   slams sat in his Wednesday warm-up in weeks 5-8 and 13-16. CSCS, mine: a slam is fast, forceful spinal flexion with
   a load in the hands, the reason the loaded crunches already carry the back tag; it now carries it too (as a loaded
