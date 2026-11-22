@@ -153,6 +153,23 @@ if (state === 'days-card' || state === 'diet-card') {
   ))
 }
 
+if (state === 'meals-card') {
+  // THE FIRST FOOD QUESTION (22 Nov 2026): training and body answered, no food answer yet, the meals card on screen. The
+  // line between the two halves belongs here and nowhere else.
+  const { mealsPerDay: _m, dietaryPreferences: _dp, dislikedFoods: _df, usualFoods: _u, cookingTime: _ct, includeSnacks: _s, ...trainingDone } = SAM_SO_FAR as Record<string, unknown>
+  void _m; void _dp; void _df; void _u; void _ct; void _s
+  const b = { ...trainingDone, recoveryCapacity: 'moderate', age: '31', heightCm: '178', weightKg: '82', gender: 'male' }
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Sam' },
+      { role: 'assistant', content: 'How many meals a day works for you?', slotCard: 'mealsPerDay' },
+    ],
+    b as typeof SAM_SO_FAR,
+    Object.keys(b),
+  ))
+}
+
 if (state === 'injuries') {
   // THE INJURIES CARD WITH THE HEALTH TAPS (his ruling 14 Nov 2026, "Fold into injuries"): goal, experience and
   // equipment answered; the injuries card is the app's next question.

@@ -237,7 +237,7 @@ export function WeekContextRow({
           {(onOpenSessionHistory || onOpenWhatHappened) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="hit-slop-44 size-7 shrink-0 text-muted-foreground" aria-label="More options">
+                <Button variant="ghost" size="icon" className="hit-slop-44 size-7 shrink-0 text-muted-foreground" aria-label="More options" data-tour="daymenu">
                   <MoreHorizontal className="size-4" />
                 </Button>
               </DropdownMenuTrigger>

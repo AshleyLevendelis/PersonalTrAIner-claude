@@ -39,6 +39,12 @@ TOOLS
 Personal TrAIner gives general fitness and nutrition guidance. It does not diagnose or treat anything. For pain, an
 injury, a medical condition or pregnancy, talk to a doctor, physio or midwife.
 
+## Google Play pictures (made 20 Nov 2026)
+
+In `docs/store/play/`, made by `node scripts/make-store-assets.cjs` (after building the test pages):
+`icon-512.png` (store icon), `feature-graphic.png` (1024 x 500 banner), `screenshot-1..5.png` (1080 x 1920: Home,
+Exercise, the coach, Nutrition, Tools). The screens are the app's own, showing the test pages' made-up "Sam".
+
 ## Apple: App Privacy ("nutrition labels")
 
 Data used to track you: **none**. Every item below is **linked to the user** and used for **App Functionality** only
@@ -66,7 +72,8 @@ review notes.
   - Messages: Other in-app messages (the coach chat)
   - App activity: Other user-generated content (logged sets and meals, and a coach reply he chooses to report)
 - **AI-generated content** (Google's policy): the coach's replies are written by AI. Each one has a flag that reports
-  it from inside the app (reason + optional note, kept for review). Say so in the Play Console's content questions.
+  it from inside the app (reason + optional note, kept for review and emailed to the developer through Resend, an
+  email service acting on our behalf). Say so in the Play Console's content questions.
 
 ## Google: Health Connect declaration
 
@@ -83,7 +90,9 @@ middle tab. Photos sent to the coach are read once to answer and are not stored.
 
 ## Open for Ashley
 
-1. The contact email on the privacy page and both listings.
+0. DECIDED 20 Nov 2026: the app ID stays `app.personaltrainer.coach` (his choice; permanent after the first upload).
+
+1. DECIDED 20 Nov 2026: the public contact email is ashleylevendelis@gmail.com (his choice; on the privacy page and both listings).
 2. **Apple's rule on AI (guideline 5.1.2)**: an app must say clearly when personal data is sent to a third-party AI and
    get the person's permission first. The coach sends your plan, logs and profile to Google's Gemini to write each
    reply. The privacy page says so, but the app never asks. Before the App Store submission the app needs a one-time

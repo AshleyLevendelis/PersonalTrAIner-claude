@@ -59,16 +59,16 @@ export interface SlotOption {
 
 export const EXPERIENCE_OPTIONS: { value: TrainingExperience; icon: string; label: string; description: string }[] = [
   { value: 'beginner', icon: '🌱', label: 'Beginner', description: 'New to this, or coming back after a long break' },
-  { value: 'novice', icon: '📈', label: 'Novice', description: '6+ months training fairly consistently' },
-  { value: 'intermediate', icon: '🎯', label: 'Intermediate', description: '2+ years, comfortable with the main lifts' },
-  { value: 'advanced', icon: '🏅', label: 'Advanced', description: 'Years of training, progress comes slowly now' },
+  { value: 'novice', icon: '📈', label: 'Some experience', description: 'Training fairly regularly for 6+ months' },
+  { value: 'intermediate', icon: '🎯', label: 'Experienced', description: '2+ years, comfortable with the big lifts' },
+  { value: 'advanced', icon: '🏅', label: 'Advanced', description: 'Years in, and progress comes slowly now' },
 ]
 
 export const GOAL_OPTIONS: { value: FitnessGoal; icon: string; label: string; description: string }[] = [
-  { value: 'fat_loss', icon: '🔥', label: 'Fat loss', description: 'Shred body fat, get lean' },
+  { value: 'fat_loss', icon: '🔥', label: 'Fat loss', description: 'Lose fat, keep your muscle' },
   { value: 'hypertrophy', icon: '💪', label: 'Muscle growth', description: 'Build size & strength' },
-  { value: 'functional', icon: '⚡', label: 'Functional strength', description: 'Move better, lift heavier' },
-  { value: 'conditioning', icon: '❤️', label: 'Conditioning', description: 'Cardio & endurance' },
+  { value: 'functional', icon: '⚡', label: 'Functional strength', description: 'Get stronger and move better' },
+  { value: 'conditioning', icon: '❤️', label: 'Conditioning', description: 'Fitter, with more stamina' },
 ]
 
 /**
@@ -94,15 +94,15 @@ export const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 export const DAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 export const RECOVERY_OPTIONS: { value: RecoveryCapacity; icon: string; label: string; description: string }[] = [
-  { value: 'low', icon: '🪫', label: 'Stretched thin', description: 'Poor sleep, high stress, or a physically demanding job' },
-  { value: 'moderate', icon: '🔋', label: 'Getting by', description: 'Decent sleep most nights, manageable stress' },
-  { value: 'high', icon: '🔌', label: 'Well rested', description: 'Good sleep, low stress, recovery is not a limiter' },
+  { value: 'low', icon: '🪫', label: 'Stretched thin', description: 'Short on sleep, lots of stress, or a physical job' },
+  { value: 'moderate', icon: '🔋', label: 'Getting by', description: 'Decent sleep most nights, stress is manageable' },
+  { value: 'high', icon: '🔌', label: 'Well rested', description: 'Sleeping well and feeling good' },
 ]
 
 export const CONDITIONING_PREF_OPTIONS: { value: ConditioningPreference; icon: string; label: string; description: string }[] = [
-  { value: 'love', icon: '🏃‍♂️', label: 'Love it', description: 'Give me plenty of cardio/conditioning' },
-  { value: 'tolerate', icon: '🙂', label: "It's fine", description: "I'll do what the program calls for" },
-  { value: 'avoid', icon: '🙅', label: 'Not for me', description: 'Keep it to the minimum the goal actually needs' },
+  { value: 'love', icon: '🏃‍♂️', label: 'Love it', description: 'Bring it on' },
+  { value: 'tolerate', icon: '🙂', label: "It's fine", description: "I'll do what the plan needs" },
+  { value: 'avoid', icon: '🙅', label: 'Not for me', description: 'Just the minimum, please' },
 ]
 
 // PILLS, NOT CARDS, SINCE 15 Nov 2026: with "20-30 min" added there are five, and a described option draws as a card two
@@ -152,7 +152,7 @@ export const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string;
   { value: 'functional', icon: '🏃', label: 'Functional / athletic', description: 'Athletic movement & strength' },
   { value: 'bodybuilding', icon: '🏆', label: 'Bodybuilding', description: 'Aesthetics & symmetry' },
   { value: 'combat', icon: '🥊', label: 'Combat / conditioning', description: 'Fight-ready fitness' },
-  { value: 'hybrid', icon: '⚙️', label: 'Hybrid', description: 'Best of everything' },
+  { value: 'hybrid', icon: '⚙️', label: 'Hybrid', description: 'A bit of everything' },
 ]
 
 /**
@@ -578,6 +578,12 @@ export interface SlotDef {
   /** Coach-voice question — used as the chip card title in chat and mirrors the form's step title. */
   question: string
   /**
+   * WHY I'M ASKING (his "build it", 22 Nov 2026, docs/plans/setup-and-tour-refresh.md): one short line under the
+   * choices saying what the answer changes, so people answer with care. Each names something the app really does
+   * with the answer; none promises a result.
+   */
+  why?: string
+  /**
    * Two-or-three-word noun for this answer, e.g. "Goal", "Training days".
    * Used wherever a recorded value is echoed back — the confirmation line in
    * chat, the review card — because repeating the full question there is what
@@ -953,16 +959,16 @@ export function kitStatementsFromSetup(values: OnboardingSlotValues): KitStateme
 }
 
 export const ONBOARDING_SLOTS: SlotDef[] = [
-  { key: 'displayName', question: 'What should I call you?', inputHint: 'Your name…', shortLabel: 'Name', control: 'text', required: false, destination: 'column', validate: v => typeof v === 'string' && v.trim().length > 0 && v.trim().length <= 30 },
-  { key: 'fitnessGoal', question: "What's your main goal?", inputHint: 'Tell me your goal…', shortLabel: 'Goal', control: 'single', required: true, options: GOAL_OPTIONS, destination: 'column', validate: isOneOf(GOAL_OPTIONS) },
-  { key: 'trainingExperience', question: 'How much training have you done?', inputHint: 'Where are you at?', shortLabel: 'Experience', control: 'single', required: true, options: EXPERIENCE_OPTIONS, destination: 'column', validate: isOneOf(EXPERIENCE_OPTIONS) },
-  { key: 'activityLevel', question: 'How active is your day-to-day, outside training?', inputHint: 'How active is your day?', shortLabel: 'Daily activity', control: 'single', required: true, options: ACTIVITY_OPTIONS, destination: 'column', validate: isOneOf(ACTIVITY_OPTIONS) },
-  { key: 'equipment', question: 'What equipment do you have access to?', inputHint: 'Gym, home, or a mix?', shortLabel: 'Equipment', control: 'single', required: true, options: EQUIPMENT_OPTIONS, destination: 'column', validate: isOneOf(EQUIPMENT_OPTIONS) },
+  { key: 'displayName', question: 'First things first, what should I call you?', inputHint: 'Your name…', shortLabel: 'Name', control: 'text', required: false, destination: 'column', validate: v => typeof v === 'string' && v.trim().length > 0 && v.trim().length <= 30 },
+  { key: 'fitnessGoal', question: 'What are we working towards?', why: 'This shapes your whole plan, training and food.', inputHint: 'Tell me your goal…', shortLabel: 'Goal', control: 'single', required: true, options: GOAL_OPTIONS, destination: 'column', validate: isOneOf(GOAL_OPTIONS) },
+  { key: 'trainingExperience', question: 'How much training have you done before?', why: 'So I pitch the exercises and weights just right.', inputHint: 'Where are you at?', shortLabel: 'Experience', control: 'single', required: true, options: EXPERIENCE_OPTIONS, destination: 'column', validate: isOneOf(EXPERIENCE_OPTIONS) },
+  { key: 'activityLevel', question: 'Outside of training, how active are your days?', why: 'This is the biggest thing behind your calorie target.', inputHint: 'How active is your day?', shortLabel: 'Daily activity', control: 'single', required: true, options: ACTIVITY_OPTIONS, destination: 'column', validate: isOneOf(ACTIVITY_OPTIONS) },
+  { key: 'equipment', question: 'Where will you be training?', why: "I'll only give you exercises you can actually do there.", inputHint: 'Gym, home, or a mix?', shortLabel: 'Equipment', control: 'single', required: true, options: EQUIPMENT_OPTIONS, destination: 'column', validate: isOneOf(EQUIPMENT_OPTIONS) },
   // AFTER equipment on purpose: it reads goal, experience and activity, all
   // of which are asked above it, and it is the last thing needed before the
   // plan's shape is decided. Conditional in the same way knowsWorkingLifts
   // is — most people never see it.
-  { key: 'startPreference', question: 'Where do you want to start?', inputHint: 'Ease in, or straight in?', shortLabel: 'Starting point', control: 'single', required: true, requiredIf: needsStartPreferenceAnswer, options: START_PREFERENCE_OPTIONS, destination: 'column', validate: isOneOf(START_PREFERENCE_OPTIONS) },
+  { key: 'startPreference', question: 'How do you want to kick things off?', inputHint: 'Ease in, or straight in?', shortLabel: 'Starting point', control: 'single', required: true, requiredIf: needsStartPreferenceAnswer, options: START_PREFERENCE_OPTIONS, destination: 'column', validate: isOneOf(START_PREFERENCE_OPTIONS) },
   // MOVED FROM 16th TO 5th (Ashley's ruling). It is the only question whose
   // absence can hurt someone: every other unanswered slot costs accuracy,
   // this one costs safety. At 16th it sat behind the age/height/weight/sex
@@ -976,10 +982,10 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // HEALTH CONDITIONS RIDE ON THIS CARD (his ruling 14 Nov 2026, "Fold into injuries": no new question). The card offers
   // the joints and then five taps for what a doctor has said to watch; the answer holds both and assembleProfile
   // splits them, joints to `injuries` (the injury filter) and conditions to `health_conditions` (health-conditions.ts).
-  { key: 'injuries', question: 'Anything that bothers you when you train, or anything a doctor has said to watch?', inputHint: 'Anything that bothers you?', shortLabel: 'Injuries and health', control: 'multi', required: false, options: INJURY_CARD_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_CARD_OPTIONS) },
+  { key: 'injuries', question: "Anything I should work around? Niggles, old injuries, or something a doctor's asked you to watch.", why: "I'll keep out anything likely to aggravate it.", inputHint: 'Anything that bothers you?', shortLabel: 'Injuries and health', control: 'multi', required: false, options: INJURY_CARD_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_CARD_OPTIONS) },
   // AFTER injuries, which must stay in the opening block (her ruling: the only question whose absence can hurt),
   // and still right behind equipment: the ticks start from that answer (picksHomeKit, defaultKitTicks).
-  { key: 'kitTicks', question: 'Which of these do you have?', inputHint: 'Tick everything you have', shortLabel: 'Your kit', control: 'multi', required: false, requiredIf: kitTicksAsked, options: KIT_TICK_OPTIONS, destination: 'user_facts', validate: isSubsetOf(KIT_TICK_OPTIONS) },
+  { key: 'kitTicks', question: "Tick everything you've got.", why: 'Every exercise will use kit you own.', inputHint: 'Tick everything you have', shortLabel: 'Your kit', control: 'multi', required: false, requiredIf: kitTicksAsked, options: KIT_TICK_OPTIONS, destination: 'user_facts', validate: isSubsetOf(KIT_TICK_OPTIONS) },
   { key: 'knowsWorkingLifts', question: 'Do you know what you lift on the barbell back squat, bench press and deadlift?', inputHint: 'Do you know your numbers?', shortLabel: 'Working lifts', control: 'single', required: false, requiredIf: willBeLiftingBarbells, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   // Only meaningful once someone has said they DO know their numbers.
   { key: 'knownSquatKg', question: liftSetQuestion('back squat'),
@@ -988,21 +994,21 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
     inputHint: 'Your bench, in kg…', shortLabel: 'Bench', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 400, unit: 'kg', destination: 'column', validate: isNumberIn(1, 400) },
   { key: 'knownDeadliftKg', question: liftSetQuestion('deadlift'),
     inputHint: 'Your deadlift, in kg…', shortLabel: 'Deadlift', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, unit: 'kg', destination: 'column', validate: isNumberIn(1, 500) },
-  { key: 'trainingDays', question: 'Which days can you actually train?', inputHint: 'Which days?', shortLabel: 'Training days', control: 'multi', required: true, options: DAY_OPTIONS, destination: 'column', validate: v => isSubsetOf(DAY_OPTIONS)(v) && Array.isArray(v) && v.length > 0 },
-  { key: 'sessionDuration', question: 'How long can your sessions usually run?', inputHint: 'How long have you got?', shortLabel: 'Session length', control: 'single', required: true, options: DURATION_OPTIONS, destination: 'column', validate: isOneOf(DURATION_OPTIONS) },
-  { key: 'trainingStyle', question: "What's your training style?", inputHint: 'How do you like to train?', shortLabel: 'Style', control: 'single', required: true, options: STYLE_OPTIONS, destination: 'column',
+  { key: 'trainingDays', question: 'Which days can you train? Be realistic: a plan you stick to beats a perfect one.', inputHint: 'Which days?', shortLabel: 'Training days', control: 'multi', required: true, options: DAY_OPTIONS, destination: 'column', validate: v => isSubsetOf(DAY_OPTIONS)(v) && Array.isArray(v) && v.length > 0 },
+  { key: 'sessionDuration', question: 'How long have you got for a session?', why: "I'll fit every session into it.", inputHint: 'How long have you got?', shortLabel: 'Session length', control: 'single', required: true, options: DURATION_OPTIONS, destination: 'column', validate: isOneOf(DURATION_OPTIONS) },
+  { key: 'trainingStyle', question: 'What kind of training gets you going?', inputHint: 'How do you like to train?', shortLabel: 'Style', control: 'single', required: true, options: STYLE_OPTIONS, destination: 'column',
     // A NEW answer must be one that is offered. `options` stays the full list
     // so a value already stored still shows its label, but an unoffered one
     // can no longer be written here — not by a tap (the chips do not show it),
     // not by typing its label, and not by the coach mapping "I box" onto it.
     // A draft saved before this that holds it is simply asked again.
     validate: isOneOf(OFFERED_STYLE_OPTIONS) },
-  { key: 'conditioningPreference', question: 'How do you feel about cardio?', inputHint: 'Love it or loathe it?', shortLabel: 'Cardio', control: 'single', required: true, options: CONDITIONING_PREF_OPTIONS, destination: 'column', validate: isOneOf(CONDITIONING_PREF_OPTIONS) },
+  { key: 'conditioningPreference', question: 'Be honest, how do you feel about cardio?', inputHint: 'Love it or loathe it?', shortLabel: 'Cardio', control: 'single', required: true, options: CONDITIONING_PREF_OPTIONS, destination: 'column', validate: isOneOf(CONDITIONING_PREF_OPTIONS) },
   // BESIDE THE CARDIO QUESTION, and after injuries (which must stay in the opening block). OPTIONAL, AND ONLY ON THE PATHWAY (his 13 Nov 2026 strategy, slice 3; collision (d), "Setup asks, optional").
   // A RUNNING GOAL, OPTIONAL, AND ONLY FOR SOMEONE WHO LOVES CARDIO (his 13 Nov 2026 strategy, slice 6; his ruling that
   // day, "Only if they like cardio"). Only the distance: a race date is the coach's to ask (his ruling, "Coach only").
   { key: 'runningGoal', question: 'Would you like to work towards a running goal?', inputHint: 'A distance, or skip', shortLabel: 'Running goal', control: 'single', required: false, requiredIf: lovesCardio, options: RUNNING_GOAL_SLOT_OPTIONS, destination: 'column', validate: isOneOf(RUNNING_GOAL_SLOT_OPTIONS) },
-  { key: 'enjoyedActivities', question: 'Besides walking, do you enjoy swimming or cycling?', inputHint: 'Swimming, cycling, or neither', shortLabel: 'Also enjoy', control: 'multi', required: false, requiredIf: choseThePathway, options: ENJOYED_OPTIONS, destination: 'column', validate: isSubsetOf(ENJOYED_OPTIONS) },
+  { key: 'enjoyedActivities', question: 'Apart from walking, do you enjoy swimming or cycling?', why: "I'll swap one walk a week for it.", inputHint: 'Swimming, cycling, or neither', shortLabel: 'Also enjoy', control: 'multi', required: false, requiredIf: choseThePathway, options: ENJOYED_OPTIONS, destination: 'column', validate: isSubsetOf(ENJOYED_OPTIONS) },
   // REQUIRED, and the comment that used to sit here argued the opposite.
   //
   // It read: "measured to have zero effect anywhere in the generated plan
@@ -1024,7 +1030,7 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // two outcomes. Whether "high recovery" should earn more volume than
   // "moderate" is a training call, not a bug; it is in BACKLOG for Ashley.
   // Run `npm run report:slot-impact` to see this alongside every other slot.
-  { key: 'recoveryCapacity', question: "How's your recovery capacity — sleep, stress, physical job?", inputHint: 'How’s your sleep and stress?', shortLabel: 'Recovery', control: 'single', required: true, options: RECOVERY_OPTIONS, destination: 'column', validate: isOneOf(RECOVERY_OPTIONS) },
+  { key: 'recoveryCapacity', question: 'How are your sleep and stress at the moment?', why: 'Progress happens in recovery, so this sets how hard I push.', inputHint: 'How’s your sleep and stress?', shortLabel: 'Recovery', control: 'single', required: true, options: RECOVERY_OPTIONS, destination: 'column', validate: isOneOf(RECOVERY_OPTIONS) },
   // THE MIRROR OF dislikedFoods, and it was missing. "I won't eat mushrooms"
   // in onboarding lands in user_facts and is kept out of every meal; "never
   // give me burpees", said in the same breath, had nowhere to go at all —
@@ -1039,21 +1045,21 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // and adding a new one to fix a capture gap would take back what that
   // bought. In the catalogue, though, the model can record it the moment
   // someone volunteers it, which is exactly the case this exists for.
-  { key: 'dislikedExercises', question: "Any exercises you'd rather never see?", inputHint: 'Exercises to skip…', shortLabel: 'Exercises to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
-  { key: 'age', question: "What's your date of birth?", inputHint: 'Your date of birth, or your age…', shortLabel: 'Age', askLabel: 'date of birth', control: 'numeric', required: false, min: 13, max: 100, destination: 'column', validate: isNumberIn(13, 100) },
-  { key: 'heightCm', question: 'How tall are you?', inputHint: 'cm, or 5\'10…', shortLabel: 'Height', control: 'numeric', required: false, min: 100, max: 250, unit: 'cm', destination: 'column', validate: isNumberIn(100, 250) },
-  { key: 'weightKg', question: 'What do you weigh right now?', inputHint: 'kg, or 13st…', shortLabel: 'Weight', control: 'numeric', required: false, min: 25, max: 350, unit: 'kg', destination: 'column', validate: isNumberIn(25, 350) },
+  { key: 'dislikedExercises', question: "Any exercises you can't stand? I'll leave them out.", inputHint: 'Exercises to skip…', shortLabel: 'Exercises to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
+  { key: 'age', question: "When's your birthday?", why: "For your calorie targets, and I won't forget the day 🎂", inputHint: 'Your date of birth, or your age…', shortLabel: 'Age', askLabel: 'date of birth', control: 'numeric', required: false, min: 13, max: 100, destination: 'column', validate: isNumberIn(13, 100) },
+  { key: 'heightCm', question: 'How tall are you?', why: 'For your calorie targets.', inputHint: 'cm, or 5\'10…', shortLabel: 'Height', control: 'numeric', required: false, min: 100, max: 250, unit: 'cm', destination: 'column', validate: isNumberIn(100, 250) },
+  { key: 'weightKg', question: 'What do you weigh right now?', why: 'Just a starting point for your targets. No judgement.', inputHint: 'kg, or 13st…', shortLabel: 'Weight', control: 'numeric', required: false, min: 25, max: 350, unit: 'kg', destination: 'column', validate: isNumberIn(25, 350) },
   { key: 'gender', question: 'For your calorie targets, should I use the male or female formula?', inputHint: 'Whichever fits…', shortLabel: 'Sex', control: 'single', required: false, options: GENDER_OPTIONS, destination: 'column', validate: isOneOf(GENDER_OPTIONS) },
-  { key: 'mealsPerDay', question: 'How many meals a day suits you?', inputHint: 'How many meals?', shortLabel: 'Meals a day', control: 'single', required: true, options: MEALS_PER_DAY_OPTIONS, destination: 'column', validate: isOneOf(MEALS_PER_DAY_OPTIONS) },
-  { key: 'dietaryPreferences', question: 'Any dietary preferences or restrictions?', inputHint: 'Vegan, gluten-free, an allergy…', shortLabel: 'Diet', control: 'multi', required: false, options: DIETARY_OPTIONS, destination: 'column', validate: isSubsetOf(DIETARY_OPTIONS) },
-  { key: 'dislikedFoods', question: 'Anything else you\'d rather I left out?', inputHint: 'Foods to leave out…', shortLabel: 'Foods to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
+  { key: 'mealsPerDay', question: 'How many meals a day works for you?', inputHint: 'How many meals?', shortLabel: 'Meals a day', control: 'single', required: true, options: MEALS_PER_DAY_OPTIONS, destination: 'column', validate: isOneOf(MEALS_PER_DAY_OPTIONS) },
+  { key: 'dietaryPreferences', question: 'Any diets or allergies I need to know about?', why: "I'll filter your meals for these.", inputHint: 'Vegan, gluten-free, an allergy…', shortLabel: 'Diet', control: 'multi', required: false, options: DIETARY_OPTIONS, destination: 'column', validate: isSubsetOf(DIETARY_OPTIONS) },
+  { key: 'dislikedFoods', question: "Any other foods you just don't like? I'll leave them out.", inputHint: 'Foods to leave out…', shortLabel: 'Foods to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
   // WHAT HE ALREADY EATS (his ruling, 11 Nov 2026: "My usual meals first"; "setup asks what he usually eats"). Asked,
   // optional, straight after the foods to leave out, so the two sit together. What he says is kept as LIKES, the
   // same rows Profile's "Foods and meals I like" writes, so it shows there and can be changed there; a like naming
   // several foods ("chicken and rice") is one meal and matches a dish holding all of them. It never blocks setup.
-  { key: 'usualFoods', question: 'What do you usually eat? A few meals or foods you have most weeks.', inputHint: 'Porridge, chicken and rice…', shortLabel: 'Usual meals', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
-  { key: 'cookingTime', question: 'How much time do you want to spend cooking?', inputHint: 'How long do you want to cook?', shortLabel: 'Cooking time', control: 'single', required: false, options: COOKING_TIME_OPTIONS, destination: 'column', validate: isOneOf(COOKING_TIME_OPTIONS) },
-  { key: 'includeSnacks', question: 'Snacks too, or meals only?',
+  { key: 'usualFoods', question: "What do you usually eat? Tell me a few favourites and I'll work them into your meals.", inputHint: 'Porridge, chicken and rice…', shortLabel: 'Usual meals', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
+  { key: 'cookingTime', question: 'How much time do you want to spend in the kitchen?', inputHint: 'How long do you want to cook?', shortLabel: 'Cooking time', control: 'single', required: false, options: COOKING_TIME_OPTIONS, destination: 'column', validate: isOneOf(COOKING_TIME_OPTIONS) },
+  { key: 'includeSnacks', question: 'Want snacks in your plan too?',
     inputHint: 'Snacks or not?', shortLabel: 'Snacks', control: 'single', required: false, options: SNACKS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   // Last, and NEVER PROACTIVELY ASKED — both are in NEVER_BLOCKING_SLOTS, so
   // trackedSlots filters them out of the questioning list entirely. They stay
@@ -1681,6 +1687,20 @@ export function buildSlotCatalog(values: OnboardingSlotValues = initialSlotValue
  * unanswered number of its group at once (age, height and weight), and the line above it read only the first ("How old
  * are you?"). Several still to give: "What's your age, height and weight?". One, or any other card: its own question.
  */
+/**
+ * The "why I'm asking" line for the question on screen (22 Nov 2026). The body numbers asked together share one line,
+ * because the birthday's own line names only the birthday.
+ */
+export function whyFor(key: SlotKey, values: OnboardingSlotValues, confirmed: ReadonlySet<string>): string | null {
+  const def = getSlotDef(key)
+  if (!def?.why) return null
+  if (def.control === 'numeric' && cardQuestion(key, values, confirmed) !== def.question) return 'For your calorie targets.'
+  return def.why
+}
+
+/** The line between the two halves of setup, on the first food question (22 Nov 2026). */
+export const FOOD_HALF_LINE = "That's the training side sorted 💪 Now the food side."
+
 export function cardQuestion(key: SlotKey, values: OnboardingSlotValues, confirmed: ReadonlySet<string>): string {
   const def = getSlotDef(key)
   if (!def) return ''

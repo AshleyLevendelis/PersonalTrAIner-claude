@@ -526,7 +526,17 @@ const textsRows = TEXTS
         action_data: { source: 'reminder', moment: 'workout_today', shortcut: 'exercise' } },
     ]
   : []
-if (!OPENER) localStorage.setItem(`chat_history_cache_${PROFILE_ID}`, JSON.stringify(GROUPS || TEXTS ? grouped : seeded))
+// ?seed=store — THE PLAY STORE SCREENSHOT (20 Nov 2026, scripts/make-store-assets.cjs): an ordinary exchange, so the
+// store's picture of the chat shows what a conversation looks like rather than "Coach line 6". Nothing reads the words.
+const STORE = new URLSearchParams(location.search).get('seed') === 'store'
+const storeThread = [
+  { id: 's1', role: 'user', status: 'complete', created_at: at(9 * MIN), content: 'My shoulder feels a bit tight today. Should I still do the overhead press?' },
+  { id: 's2', role: 'assistant', status: 'complete', created_at: at(8 * MIN), content: "Tight but not painful is fine to train around. Warm up with band pull-aparts, then press at the lighter end of today's range. If it pinches at any point, stop and tell me and we'll swap it for a landmine press." },
+  { id: 's3', role: 'user', status: 'complete', created_at: at(6 * MIN), content: 'Ok. And what should I eat after? I have chicken, rice and spinach.' },
+  { id: 's4', role: 'assistant', status: 'complete', created_at: at(5 * MIN), content: "That's a great post-session dinner. Your dinner share today is about 45g of protein, so roughly 170g raw chicken with 80g dry rice and a big handful of spinach. Want me to log it when you've eaten?" },
+  { id: 's5', role: 'user', status: 'complete', created_at: at(MIN), content: 'Yes please' },
+]
+if (!OPENER) localStorage.setItem(`chat_history_cache_${PROFILE_ID}`, JSON.stringify(STORE ? storeThread : GROUPS || TEXTS ? grouped : seeded))
 else localStorage.removeItem(`chat_history_cache_${PROFILE_ID}`)
 
 // ---------------------------------------------------------------------------

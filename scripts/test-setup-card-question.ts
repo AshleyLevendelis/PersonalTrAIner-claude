@@ -27,7 +27,9 @@ async function main() {
   const all3 = cardQuestion('age', values, new Set())
   // 9 Nov 2026 (Ashley): the age is asked as a date of birth, with a date picker.
   check('age, height and weight all to give: "What\'s your date of birth, height and weight?"', all3 === "What's your date of birth, height and weight?", all3)
-  check('...and the age alone is asked as a date of birth too', getSlotDef('age')!.question === "What's your date of birth?", getSlotDef('age')!.question)
+  // Worded "When's your birthday?" since 22 Nov 2026 (his approved wording); the property is that it asks for a DATE,
+  // never an age, and the picker beside it takes the year.
+  check('...and the age alone is asked as a date too, never as an age', /\b(date of birth|birthday)\b/i.test(getSlotDef('age')!.question) && !/\bhow old\b|\bage\b/i.test(getSlotDef('age')!.question), getSlotDef('age')!.question)
   const two = cardQuestion('heightCm', values, new Set(['age']))
   check('age given: "What\'s your height and weight?"', two === "What's your height and weight?", two)
   const one = cardQuestion('weightKg', values, new Set(['age', 'heightCm']))

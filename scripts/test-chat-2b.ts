@@ -49,7 +49,11 @@ console.log('[1] No context strip, and one name (his request, 20 Nov 2026)')
 check('the chat draws no context strip and no pills', !/data-testid="chat-context-strip"/.test(chat) && !/data-context-pill/.test(chat) && !/chatContextPills\(/.test(chat))
 check('...and no "Sees today\'s session" line', !/chat-header-live/.test(chat) && !/Sees today/.test(chat))
 const h2 = (chat.match(/<h2[^>]*>([^<]*)<\/h2>/) || [])[1] ?? ''
-check('the header says "Personal TrAIner", once', h2 === 'Personal TrAIner' && (chat.match(/>Personal TrAIner</g) || []).length === 1, h2)
+// Once in the header, and once more as the coach messages' small label (his "Yes" the same day: one name everywhere
+// in the chat), never a third place, and never "Trainer" alone.
+const named = (chat.match(/<[^<>]*>Personal TrAIner</g) || [])
+check('the header says "Personal TrAIner", and the only other place is the coach messages\' label', h2 === 'Personal TrAIner'
+  && named.length === 2 && named.filter(t => /data-testid="chat-group-name"/.test(t)).length === 1 && !/>Trainer</.test(chat), named)
 const nutritionHero = (target: number, eaten: number) => { const [amount, word] = kcalLeftOrOver(target - eaten).split(' '); return `${Number(amount).toLocaleString()} kcal ${word}` }
 check('the calorie words the coach still uses are Nutrition\'s, either side of the target', [[3040, 630], [2000, 2160], [2500, 2499.6], [1800, 0]].every(([t, e]) => kcalPillText(t, e) === nutritionHero(t, e)))
 

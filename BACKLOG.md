@@ -2,6 +2,47 @@
 
 Newest first. One line each.
 
+- [x] **EACH REPORTED COACH REPLY IS EMAILED TO HIM: his request 22 Nov 2026, "email me each new report".** After a
+  report saves, the database posts it to a new function, `report-email`, which sends one plain email through Resend:
+  the reason in the words he tapped (unsafe ones flagged ⚠️ in the subject), the note, when, the account id and the
+  reply word for word. The report ALWAYS saves first: the trigger swallows any error with a warning (a separate
+  "is pg_net here?" guard was measured inert by a MISSED mutation and removed). Only the database can call it (a
+  shared secret; the deploy turns the sign-in check off for it, like coach-reach-out). Privacy page: "kept, and emailed
+  to us". CHECKS: `test:report-email` (18 checks; 8 mutations, 8 caught), `test:rls-local` §10 (the trigger is on, and
+  a report saves with it; 2 mutations, 1 caught, the other the inert guard). NEEDS HIM: a free Resend account (its
+  free plan sends to the account's own address), the migration `20261122120000_report_email_trigger`, the
+  `report-email` deploy, three function secrets and one Vault secret (the handover prompt). Never sent a real email.
+
+- [x] **SETUP WORDING AND A FULLER TOUR: his request 22 Nov 2026, built on his "build it" the same day.**
+  ("make the wording more enthusiastic/friendly"; "the app does way more than the tour shows off"). Plan and his
+  approval of every line: `docs/plans/setup-and-tour-refresh.md`.
+  SETUP: every app-asked question reworded as drafted; a "why I'm asking" line under ten of them (`why` on the slot,
+  `whyFor`; the body numbers asked together share "For your calorie targets."), shown only on the question on screen;
+  "That's the training side sorted 💪 Now the food side." on the first food question; plainer choices (Novice → "Some
+  experience", Intermediate → "Experienced", recovery and cardio in everyday words, Hybrid "A bit of everything"). No
+  new screen. The coach's own setup lines are its own words (its prompt already says never to read the app's wording
+  back), so no deploy is needed. NOT BUILT, his call: the optional "anything specific you're aiming for?" screen.
+  TOUR, his ruling "Short tour, then offer more": the 10 stops stay; the last now says "Want the full tour? It's about
+  two minutes" with "Show me everything" and "Maybe later". The full tour, 9 stops, Skip on each, its own "1 of 9":
+  the exercise ⋮ (About this exercise, swap, move, remove, ban, Undo), too easy / about right / too hard, the day menu
+  (What happened?), the plate calculator, the meal day strip, meal swap / heart / eating out, Home's Progress and
+  weight graph, Profile's allergies / kit / reminders / pause, and things to try in the chat (and the report flag).
+  New targets: exmenu, daymenu, plates, mealstrip, progress. Settings gains "The full tour". Every claim checked
+  against the screen it points at.
+  CHECKS: `test:app-tour` (both parts' targets and copy; §6b the offer, 7 new checks), `verify:tour-real` (walks
+  both parts on the real screens), `verify:setup-why` (new, 6 checks). Mutations: logic checks 8 of 8 caught;
+  browser checks 5 of 6, the sixth (a stop aimed at a different real element) is a property only the logic check
+  can see, and it catches it. Found on the way and fixed: the app recognises a question partly by its words, so six
+  new phrasings had to be taught to it (`onboarding-chip-match`); the leave-out question became "Any OTHER foods..."
+  so it still reads as an addition to the diet question; the offer's buttons wrapped on a phone. 130 derived logic
+  checks, 13 setup drivers and 22 screen drivers pass; full sweep before the merge.
+
+- [x] **THE PLAY STORE PICTURES, AND THE APP'S PERMANENT ID: 20 Nov 2026.** Store icon, 1024 x 500 banner and five
+  1080 x 1920 screenshots (Home, Exercise, the coach, Nutrition, Tools) in `docs/store/play/`, drawn by
+  `scripts/make-store-assets.cjs` from the app's own screens on the test pages (made-up "Sam"); the chat test page gained
+  a `?seed=store` conversation (shoulder tight before a press, then dinner sized to his protein; CSCS-checked: tight is
+  trained around, pain stops it). **His ruling, from three options: keep `app.personaltrainer.coach`** as the permanent
+  app ID (over one based on a domain he owns, and over waiting). It cannot change once the first build is uploaded.
 - [x] **FIVE SCREEN CHECKS AFTER THE PERSONA FIXES, AND ONE REAL CARD FIX (pre-merge sweep, 22 Nov 2026)**. The test
   page's seeded plan changed with this branch's fixes (today opens on Medicine Ball Slams, not Band Face Pulls; the
   row slot after dumbbell rows now carries 16 kg a hand as 32 kg on a two-arm machine, 37.5 kg, where it had read 20).
@@ -283,7 +324,9 @@ Newest first. One line each.
   `test:phone-app`, `verify:chat-2b`, `verify:chat-bubbles`, all pass; `test:bundle` was 2 kB over its combined line
   and moved 3235 -> 3262 (measured 3237 + 25, his 15 Sep ruling), the other three budgets unmoved.
   NEEDS: migration `20261120120000_coach_reply_reports` via `db:push-both` on his machine; until then Send says it
-  could not send. Not on `main`.
+  could not send. Not on `main`. A REPORT IS A RECORD (22 Nov 2026, found by the full sweep): it has read, add and
+  delete rules and deliberately no edit rule, so a sent report is never rewritten; `test:rls-local` names it as the
+  one such table (2 mutations, 2 caught). No new migration.
   And the Android handover prompts are rewritten for his WINDOWS laptop (his FYI the same day; a Mac comes later for
   the App Store): PowerShell paths, Android Studio's bundled Java, the phone's USB driver, `gradlew.bat`, a Windows
   key path written with forward slashes; the iPhone steps stay Mac-only.

@@ -63,7 +63,7 @@ import { BottomTabBar } from '@/components/BottomTabBar'
 import { ProfileMenu } from '@/components/ProfileMenu'
 import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import { AppTour } from '@/components/AppTour'
-import { TOUR_STEPS } from '@/lib/app-tour-steps'
+import { TOUR_STEPS, MORE_TOUR_STEPS } from '@/lib/app-tour-steps'
 // The app's own provider tree. Not decoration: useActiveSession throws
 // outside its provider, and the tour's exercise stops render inside
 // components that call it. A harness missing a provider is a harness whose
@@ -2054,7 +2054,7 @@ function Harness() {
 // is 'chatfab', and the driver reported a missing target that was never
 // missing. A harness that restates what it is testing will eventually
 // disagree with it, and the disagreement looks like a bug in the app.
-;(window as unknown as { __TOUR_STEPS__: unknown }).__TOUR_STEPS__ = TOUR_STEPS
+;(window as unknown as { __TOUR_STEPS__: unknown }).__TOUR_STEPS__ = [...TOUR_STEPS, ...MORE_TOUR_STEPS]
 
 if (!window.location.hash) window.location.hash = tabHash('dashboard')
 // ?open=plate|history (16 Nov 2026, "open the plate calculator" from the chat): the chat's own request, made before the
