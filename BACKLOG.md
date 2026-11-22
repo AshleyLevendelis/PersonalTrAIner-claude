@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **FROM 28 WEEKS PREGNANT, ONE NOTCH LOWER, IN EVERY PLAN WEEK (found reading a 30-year-old pregnant woman's plan,
+  21 Nov 2026)**. The week's date for his 15 Nov "from 28 weeks the sets cap at RPE 7" was worked out from the week
+  inside its BLOCK (1-4), so every block's first week was dated today: a woman 20 weeks pregnant had RPE 7-8 in plan
+  weeks 13-15, at 32-35 weeks. Now the plan's own week: every week from 28 weeks tops out at RPE 7, weeks before can
+  still reach 8. Mechanical (his ruling, applied as he made it). `test:pregnancy-rules` §10 (3 checks, 1 mutation,
+  caught), due date set relative to the run date so the check means the same thing any day; pregnancy-one-switch and
+  health-conditions re-run green. NOT CHANGED, named: the PRINTED plan's weights still climb past 28 weeks; the hold is
+  applied on the session screen on the day (TodayPanel, PREGNANCY_HOLD_NOTE), so the number she trains is held.
+
 - [x] **A 40-YEAR-OLD INTERMEDIATE WOMAN'S WEEK, READ AS A COACH: his "yes fix all four"** (21 Nov 2026; CSCS
   mine). Her week was squat, sumo deadlift, deadlift; one woodchop of trunk work; "Full Body Power" with no power block;
   the squat at 6-8 in the foundations block. MEASURED on 2,048 plans before -> after: (1) ONE HEAVY FLOOR PULL A WEEK

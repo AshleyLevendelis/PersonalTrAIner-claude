@@ -8857,7 +8857,10 @@ export function generateMesocycle(
           // RPE or a load that scales with the block.
           // FROM 28 WEEKS PREGNANT, ONE NOTCH LOWER (his ruling 15 Nov 2026, "Ask due date"; CSCS basis in
           // docs/plans/pregnancy-one-switch.md): the week's own date, read against the due date. No due date: as before.
-          const lateWeek = lateInPregnancy(profile, getLocalDateString(new Date(getAppNow(profile.id).getTime() + (w - 1) * 7 * 86_400_000)))
+          // THE PLAN'S WEEK, not the block's (21 Nov 2026): `w` is the week inside the block (1-4), so every block's week
+          // 1 was dated today and a woman 20 weeks pregnant had RPE 7-8 in weeks 13-15 of the plan, 32-35 weeks along.
+          // weekCounter is the week of the plan, counted from today, as the date it will actually be trained.
+          const lateWeek = lateInPregnancy(profile, getLocalDateString(new Date(getAppNow(profile.id).getTime() + (weekCounter - 1) * 7 * 86_400_000)))
           const intensity = isPrimer ? ex.intensity : resolveTargetRpe(phase, experience, w, isDeload, lateWeek ? LATE_PREGNANCY_SET_RPE_CEILING : hasHealthCondition(profile) ? HEALTH_SET_RPE_CEILING : undefined)
 
           let load = null as ReturnType<typeof prescribeLoad> | null

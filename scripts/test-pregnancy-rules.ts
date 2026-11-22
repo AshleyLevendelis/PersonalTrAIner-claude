@@ -9,6 +9,8 @@ import { generateMesocycle, getConstrainedPool, getExerciseCompatibilityWarnings
 import { pregnancyExclusion, pregnancyWarning, PREGNANCY_IMPACT, PREGNANCY_LYING, PREGNANCY_ABDOMINAL_STRAIN, PREGNANCY_REP_FLOOR } from '../src/lib/pregnancy-rules'
 import { isContraindicatedFor, INJURED_JOINTS } from '../src/lib/exercise-db'
 import { detectPlanInvalidation } from '../src/lib/plan-invalidation'
+import { pregnancyWeeksOn } from '../src/lib/health-conditions'
+import { getAppNow, getLocalDateString } from '../src/lib/dev-clock'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { buildProfile, comboKey, generateAllCombinations } from './quality-grid'
 import type { UserProfile } from '../src/lib/types'
@@ -192,6 +194,27 @@ console.log('\n9. His "yes fix all three", 21 Nov 2026: an injury, heavy low rep
   check('the search warning names it', /stomach wall/.test(pregnancyWarning('abdominal')))
   const w = getExerciseCompatibilityWarnings(getExerciseEntry('Hanging Leg Raises')!, mum({}))
   check('picking one from the whole catalogue says so', w.some(x => /stomach wall/.test(x)), w)
+}
+
+console.log('\n10. From 28 weeks, one notch lower: read at the date each PLAN week will be trained (21 Nov 2026)')
+{
+  // The week's date was worked out from the week inside its BLOCK (1-4), so every block's first week was dated today
+  // and a woman 20 weeks pregnant had RPE 7-8 in plan weeks 13-15, at 32-35 weeks. Due 20 weeks after today's run.
+  const today = getLocalDateString(getAppNow(undefined))
+  const due = getLocalDateString(new Date(Date.parse(`${today}T12:00:00Z`) + 20 * 7 * 86_400_000))
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  const p = { age: 30, gender: 'female', height_cm: 166, weight_kg: 66, activity_level: 'lightly_active', fitness_goal: 'functional',
+    health_conditions: ['pregnancy'], due_date: due, start_preference: 'train', equipment_access: 'full_gym',
+    training_days: DAYS.map(d => ({ day: d, available: ['Monday', 'Wednesday', 'Friday'].includes(d) })), session_duration_preference: '45-60',
+    training_style: 'hybrid', training_experience: 'intermediate', injuries: [], recovery_capacity: 'moderate', workout_split_preference: 'ai_recommendation' } as unknown as UserProfile
+  setRandomSource(seededRngFromKey('late28')); const m = generateMesocycle(p); resetRandomSource()
+  const topRpe = (w: (typeof m)[number]) => Math.max(0, ...w.days.flatMap(d => d.exercises).map(e => { const r = String(e.intensity ?? '').match(/RPE\s*\d+(?:-(\d+))?/); const n = String(e.intensity ?? '').match(/RPE\s*(\d+)(?:-(\d+))?/); return n ? Number(n[2] ?? n[1]) : 0 }))
+  const weekDate = (n: number) => getLocalDateString(new Date(Date.parse(`${today}T12:00:00Z`) + (n - 1) * 7 * 86_400_000))
+  const late = m.filter(w => (pregnancyWeeksOn(due, weekDate(w.week_number)) ?? 0) >= 28)
+  const early = m.filter(w => (pregnancyWeeksOn(due, weekDate(w.week_number)) ?? 0) < 28 && !w.is_deload)
+  check('plan weeks past 28 weeks pregnant exist in this fixture', late.length >= 4, late.map(w => w.week_number))
+  check('every one of them tops out at RPE 7', late.every(w => topRpe(w) <= 7), late.map(w => `${w.week_number}:${topRpe(w)}`))
+  check('...while a week before 28 can still reach RPE 8 (the fixture binds)', early.some(w => topRpe(w) === 8), early.map(w => `${w.week_number}:${topRpe(w)}`))
 }
 
 console.log(`\n${ran} checks ran, ${failures} failed.`)
