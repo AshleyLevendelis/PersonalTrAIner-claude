@@ -2,6 +2,35 @@
 
 Newest first. One line each.
 
+- [x] **REPLY TO ONE MESSAGE IN THE CHAT, THE WHATSAPP WAY: his idea 22 Nov 2026; his ruling "1, build it"** (from
+  three: swipe right or press and hold, over swipe only and over a Reply button under every message). Swipe a message
+  to the right (the bubble follows, a reply arrow fades in, it springs back) or hold it for a small menu (Reply, Copy;
+  a right click does the same on a computer). "Replying to Personal TrAIner" or "Replying to your message", with its
+  first words and an X, sits over the box, and the keyboard opens. The sent message carries the quote; tapping the
+  quote scrolls back to the original and rings it for a moment. A scroll, a left swipe, or a press on a button inside
+  the bubble (Listen, Report, an offer's buttons) is never a reply. A chip, or clearing the chat, closes the strip.
+  SAVED WITH THE REPLY, NO MIGRATION: the quote (id, who, first words) goes in the reply row's `action_data`, which
+  user rows never used (every other reader of that column reads coach rows only, checked); your own messages now get
+  their id on the phone when sent, so a reply to one finds it.
+  THE COACH IS TOLD WHICH MESSAGE, NEVER THROUGH HIS WORDS (mine): the app reads his turns for what HE stated (a
+  number, "from now on", a maybe) before building some offers, so pasting the quoted coach message into his turn
+  would let the coach's words count as his. Instead the answered turn is marked where it sits in the conversation sent
+  ("[↩ their new message replies to this one]"), or put back at the start, at its own time, when older than the 20
+  sent (the oldest makes room so the server's trim never drops it). Works on the deployed coach today; one prompt line
+  saying what the marker means needs the `chat-gemini` deploy.
+  A "YES" AS A REPLY ANSWERS WHAT IT REPLIES TO (mine): a typed yes or no used to confirm the NEWEST open offer;
+  as a reply it confirms only the offer it replies to, if still open (checked against the plan at the tap as ever),
+  otherwise it goes to the coach.
+  FOUND BY THE BROWSER DRIVER: the second swipe of a visit did nothing, because the chat redraws mid-swipe and each
+  redraw handed the bubble new handlers holding no gesture; the gesture in progress now lives outside them.
+  CHECKS: `test:chat-reply` (44 checks; 15 mutations, 15 caught), `verify:chat-reply` (26 checks at 390px, mouse and
+  finger, incl. a reply read back from the server via `?seed=reply`; 11 mutations, 11 caught, every run at 26 checks;
+  taking off the bubble's "scroll only up and down" setting broke the finger swipe, so that line is load-bearing).
+  The full sweep found `verify:parked-question` red: it reads his message as text standing alone in the bubble, and
+  the bubble now also holds the reply arrow. His words are their own element again; the driver passes. NEEDS: `chat-gemini` deploy
+  for the prompt line (optional; the marker reads plainly without it). Not built: replying to a message not loaded
+  (an older page) scrolls nowhere, the quote still shows.
+
 - [x] **EACH REPORTED COACH REPLY IS EMAILED TO HIM: his request 22 Nov 2026, "email me each new report".** After a
   report saves, the database posts it to a new function, `report-email`, which sends one plain email through Resend:
   the reason in the words he tapped (unsafe ones flagged ⚠️ in the subject), the note, when, the account id and the

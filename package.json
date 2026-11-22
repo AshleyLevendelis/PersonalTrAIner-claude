@@ -718,7 +718,9 @@
     "verify:countdown-timer": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/countdown-timer.mjs",
     "verify:report-reply": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/report-reply.mjs",
     "verify:setup-why": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/setup-why.mjs",
-    "test:report-email": "tsx scripts/test-report-email.ts"
+    "test:report-email": "tsx scripts/test-report-email.ts",
+    "test:chat-reply": "tsx scripts/test-chat-reply.ts",
+    "verify:chat-reply": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-reply.mjs"
   },
   "dependencies": {
     "@capacitor/android": "8.6.2",

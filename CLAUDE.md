@@ -1752,6 +1752,11 @@ menu" stays true when a copy is also left outside it.
   report that does not save says so. `verify:report-reply`. Needs migration 20261120120000. **And each one is emailed to
   him** (his request 22 Nov 2026): the database calls `report-email` after the save, which never waits on or blocks
   it. `test:report-email`, `test:rls-local` §10. Needs migration 20261122120000, the `report-email` deploy and a Resend key
+- **Reply to one message, WhatsApp's way: his ruling 22 Nov 2026, "1, build it"** (swipe right or press and hold, over
+  swipe only and a Reply button on every message): the reply carries a quote that taps back to the original. The
+  coach is told by marking the answered turn in the conversation it is sent, NEVER by putting the quoted words into
+  his turn (his turns are the evidence for what he stated); a typed yes as a reply answers only the offer it replies
+  to. `test:chat-reply`, `verify:chat-reply`. The prompt line needs the `chat-gemini` deploy
 - **The phone app (Capacitor), steps from the phone: his request 20 Nov 2026** ("Start on the App Store version with
   step counting"): Profile, "Steps from your phone", phone app only; steps only, read only; the phone's count never
   lowers a typed number. Android declares READ_STEPS alone: the plugin's 46 other health permissions are removed and

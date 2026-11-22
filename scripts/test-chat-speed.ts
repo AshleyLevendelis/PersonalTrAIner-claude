@@ -30,7 +30,8 @@ check('...and none of them is awaited on its own before it', !/await getEatenByD
 const send = chat.indexOf('const turnFacts = readTurnFacts()')
 const ph = chat.indexOf('const placeholderId = await insertPlaceholder()')
 check('sendMessage starts the reads before it waits for the placeholder', send > 0 && ph > 0 && send < ph, { send, ph })
-check('...and hands them to the coach call', /callGemini\(userText, placeholderId, turnFacts\)/.test(chat))
+// A reply's quote follows them since 22 Nov 2026: the property is that the facts read early are the ones handed over.
+check('...and hands them to the coach call', /callGemini\(userText, placeholderId, turnFacts[,)]/.test(chat))
 check('the coach call uses what it was handed', /await \(facts \?\? readTurnFacts\(\)\)/.test(chat))
 
 console.log('\n3. The server says where the wait goes')

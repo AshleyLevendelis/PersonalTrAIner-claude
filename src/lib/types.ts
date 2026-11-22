@@ -811,6 +811,11 @@ export interface ChatMessage {
    */
   reminder?: { moment: string; shortcut: 'exercise' | 'nutrition' | null }
   /**
+   * THE MESSAGE THIS ONE REPLIES TO (his request 22 Nov 2026, "1, build it": swipe or hold to reply, WhatsApp's
+   * way). A quote: who said it and its first words, kept with the reply. chat-reply.ts.
+   */
+  replyTo?: import('./chat-reply').ReplyRef
+  /**
    * How this turn's request ENDED, when the turn itself no longer says:
    * 'refused' on a reply that is the app declining to build a card, and the
    * last known outcome of a card whose view was dropped when history was
