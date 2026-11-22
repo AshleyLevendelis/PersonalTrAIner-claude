@@ -198,6 +198,25 @@ console.log('\n9. Round two (his "yes fix the remaining ones too", 22 Nov 2026)'
     const lifting = loadingWeeks(m).flatMap(w => w.days.filter(d => d.exercises.length))
     check('C8b #48 (pregnant): the pelvic floor work stays in every training day\'s warm-up', lifting.every(d => d.warmup?.mobility.some(x => /Pelvic Floor/.test(x.name))), p.due_date)
   }
+  // The warm-up trim never takes the pelvic floor work (S5), found binding on these two by switching its guard off.
+  for (const i of [97, 140]) {
+    const { m } = audited(i)
+    const bare = loadingWeeks(m).flatMap(w => w.days.filter(d => d.exercises.length && !d.warmup?.mobility.some(x => /Pelvic Floor/.test(x.name))).map(d => `w${w.week_number} ${d.day}`))
+    check(`S5 #${i}: pelvic floor work in every training day's warm-up, however short the session`, bare.length === 0, bare.slice(0, 3))
+  }
+  // A conditioning day's own block counts as one of its three (3812: three trunk exercises beside the circuit ran over).
+  {
+    const { p, m } = audited(3812)
+    const hi = getSessionMaximumSeconds(p.session_duration_preference)
+    const over = loadingWeeks(m).flatMap(w => w.days.filter(d => d.focus === 'Conditioning & Core' && estimateDaySeconds(d) > hi).map(d => `w${w.week_number}`))
+    check('C8b #3812: a Conditioning & Core day fits its time (its circuit counts toward the three exercises a day keeps)', over.length === 0, over)
+  }
+  // ...and a second trunk exercise is dropped as spare only while the week keeps two (C2).
+  for (const i of [2436, 2566]) {
+    const { m } = audited(i)
+    const thin = loadingWeeks(m).filter(w => sets(w, ['core']) > 0 && w.days.reduce((n, d) => n + d.exercises.filter(e => { const x = ent(e.name); return x?.movement_pattern === 'core' && x.mechanics_tier !== 'primer' }).length, 0) < 2).map(w => w.week_number)
+    check(`C2 #${i}: trunk work at least twice every loading week`, thin.length === 0, thin)
+  }
   {
     const { p, m } = audited(5721)
     const lo = getSessionMinimumSeconds(p.session_duration_preference)
