@@ -56,10 +56,13 @@ async function main() {
   const alts = goblet.offered.slice(1)
   check('a lookalike he can do comes first (Step-Ups (Bodyweight), which needs no kit)', goblet.offered[0] === 'Step-Ups (Bodyweight)', goblet.offered)
   check("the alternatives after it are the swap sheet's own shortlist, in its order", alts.length === 2 && alts.every((n, i) => n === sheet[i]), { offered: goblet.offered, sheet })
-  const bandOwner = ask('Goblet Squats', 'Dumbbell Step-Up', base)
   const needsBand = (n: string) => (getExerciseEntry(n)?.equipment ?? []).includes('resistance band')
+  // RE-ANCHORED 21 Nov 2026: the squat sheet's band move was the Spanish Squat, now a knee-rehab drill kept for a sore
+  // knee only, so the property is held on a lift whose sheet has an ordinary band option (a band lateral raise).
+  const raise = ask('Lateral Raises', 'Dumbbell Side Raise Thing')
   check('the kit binds: the tier\'s guess (bands) can offer a band move, his own kit never does',
-    getReplacementCandidates('Goblet Squats', base, []).some(c => needsBand(c.exercise.name)) && !goblet.offered.some(needsBand), { guess: bandOwner.offered, his: goblet.offered })
+    getReplacementCandidates('Lateral Raises', base, []).some(c => needsBand(c.exercise.name)) && !raise.offered.some(needsBand) && !goblet.offered.some(needsBand),
+    { guess: getReplacementCandidates('Lateral Raises', base, []).map(c => c.exercise.name), his: raise.offered })
   const rdl = ask('Romanian Deadlifts', 'Dumbbell Stiff Leg Thing')
   // IN the guess's list, not FIRST in it (3 Nov 2026): the exercise library's one-leg dumbbell RDL now ranks above the
   // swing, which is a better hinge stand-in. The property was always that the kit binds, never which lift ranks first.

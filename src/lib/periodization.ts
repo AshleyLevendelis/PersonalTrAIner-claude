@@ -2,6 +2,7 @@ import type { FitnessGoal, TrainingExperience, WorkoutDay, Exercise, UserProfile
 import { getMovementFamily, meetsCapabilityRequirement, isBallisticMovement, type ExerciseEntry, getExerciseEntry } from './exercise-db'
 import { getExperienceConfig, isSkillAppropriate } from './experience-config'
 import { isExternallyLoaded, preservesRelativeLoad } from './load-prescription'
+import { PREGNANCY_REP_FLOOR } from './pregnancy-rules'
 
 // ---------------------------------------------------------------------------
 // PERIODIZATION
@@ -96,6 +97,10 @@ export const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
     focus: 'Build a base — connective tissue, movement quality, work capacity',
     sets_multiplier: 0.8,
     rep_shift: 3,
+    // THE MAIN LIFT STARTS AT 8+ TOO (21 Nov 2026, his "yes fix all four"; CSCS, mine): a tier-1 base of 3-5 plus the
+    // block's +3 landed at 6-8 while every other lift was at 9-15, in the block that exists to build tolerance with
+    // higher reps and lighter loads. 8-10 is the low end of that block's own range.
+    main_lift_rep_floor: 8,
     rest_adjust_seconds: -15,
     target_rpe: 6.5,
     coach_note:
@@ -445,6 +450,9 @@ const REGRESSION_VARIATIONS = new Set([
   // sideways step, which is the regression this list exists to refuse.
   'Knee Push-Ups',
   'Pull-Up Negatives',
+  // 21 Nov 2026 (his "yes fix all five"): the counterweight takes bodyweight OFF a dip, so past novice it is the
+  // easier version of the dip, offered to an advanced lifter beside a seated dip machine and real dips.
+  'Assisted Dip Machine',
 ])
 
 export function isRegressionFor(name: string, experience: TrainingExperience): boolean {
@@ -726,8 +734,9 @@ export const ASSISTANCE_REP_FLOOR = 6
  * day's main lift and to the assistance floor for everything else. ONE function, read by generation, by the swap
  * helper and by the base assignment, because three copies of this had to agree.
  */
-export function repFloorFor(experienceMinReps: number, phase: Pick<PhaseConfig, 'main_lift_rep_floor'> | null, isMainLift: boolean): number {
-  return Math.max(experienceMinReps, isMainLift ? (phase?.main_lift_rep_floor ?? 0) : ASSISTANCE_REP_FLOOR)
+export function repFloorFor(experienceMinReps: number, phase: Pick<PhaseConfig, 'main_lift_rep_floor'> | null, isMainLift: boolean, pregnant = false): number {
+  // Pregnant: 8 reps or more on every working set (pregnancy-rules.ts PREGNANCY_REP_FLOOR says why).
+  return Math.max(experienceMinReps, isMainLift ? (phase?.main_lift_rep_floor ?? 0) : ASSISTANCE_REP_FLOOR, pregnant ? PREGNANCY_REP_FLOOR : 0)
 }
 
 /** Shifts a rep range up or down while keeping its spread. */

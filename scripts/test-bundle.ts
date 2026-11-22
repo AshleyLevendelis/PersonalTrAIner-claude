@@ -244,8 +244,11 @@ console.log('\n1. The libraries are cached separately from the app')
   // this gate: 452 on 58437906, 453 on the change (paint 608 -> 609, app 1564 -> 1565, total 3203 -> 3204; those three
   // were not raised and have 3, 1 and 7 left, so the next addition to the app chunk must decide). His 15 Sep ruling,
   // "raise it with room to grow": 8 gz over today.
-  headroom('a deploy re-downloads', appGzip, 461, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, under 461`, appGzip < 461, appGzip)
+  // MOVED 22 Nov 2026: 461 -> 469. Crossed at 461 when his tour and setup wording met main's plan rules (PR #40: the
+  // advanced-lifter, pregnancy and bad-back passes) in one tree. MEASURED 461 through this gate on the merge. His
+  // 15 Sep ruling, "raise it with room to grow": 8 gz over today.
+  headroom('a deploy re-downloads', appGzip, 469, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, under 469`, appGzip < 469, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -489,7 +492,8 @@ console.log('\n3. Nothing has crept back up')
   // rating, the weight weeks and the chat's reply clean-up, none of which touched this line; MEASURED 1565 on efd27b02
   // (1 left) and 1566.4 with the put-back for a shortened or rebuilt day and the phone's Back on Profile (about 1 kB
   // between them). His 15 Sep ruling: 25 kB raw over today's number.
-  const APP_CHUNK_BUDGET_KB = 1591
+  // MOVED 22 Nov 2026: 1591 -> 1615, the same merge: MEASURED 1590 (1 kB left). His 15 Sep ruling: 25 kB raw over today.
+  const APP_CHUNK_BUDGET_KB = 1615
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,

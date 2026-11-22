@@ -165,7 +165,8 @@ function getSessionDurationMinutes(profile: UserProfile): number {
 
 function getTrainingMET(focus: string): number {
   const lower = focus.toLowerCase()
-  if (lower.includes('power') || lower.includes('conditioning')) return 7.0
+  // 'full body strength' is a beginner's name for the Full Body Power day (21 Nov 2026): the same session, the same burn.
+  if (lower.includes('power') || lower.includes('full body strength') || lower.includes('conditioning')) return 7.0
   if (lower.includes('squat') || lower.includes('leg')) return 6.0
   if (lower.includes('pull') || lower.includes('hinge') || lower.includes('back')) return 6.0
   if (lower.includes('push') || lower.includes('chest') || lower.includes('press')) return 5.0

@@ -596,6 +596,8 @@ const effortTarget = (() => {
   return {
     kind: EFFORT, name: ex.name, sets: ex.sets, repsLow, liveWeek: liveWeekNo, isDeload: !!nowWeek.is_deload, lastWasDeload: !!thenWeek?.is_deload,
     printedNowKg: ex.suggested_load_kg as number, printedThenKg,
+    // The plan's own number for each set this week (a lift can step up across its sets), else the one number.
+    printedNowPerSetKg: Array.from({ length: ex.sets }, (_, i) => ex.per_set_load?.find(s => s.set_number === i + 1)?.load_kg ?? (ex.suggested_load_kg as number)),
     lastKg: EFFORT === 'deload' ? printedThenKg + 5 : printedThenKg,
     seeded: EFFORT !== 'ask',
   }

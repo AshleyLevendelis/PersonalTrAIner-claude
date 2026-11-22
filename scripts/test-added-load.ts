@@ -84,7 +84,7 @@ interface T {
   onWrongExercise: string[]
   onDeload: number
   onCalibration: number
-  onLightReps: string[]
+  onLightReps: string[]; onLightBlock: string[]
   belowNovice: string[]
   notPlateRounded: string[]
   overCeiling: string[]
@@ -93,7 +93,7 @@ interface T {
   maxSeen: number
 }
 const t: T = {
-  slots: 0, loaded: 0, onWrongExercise: [], onDeload: 0, onCalibration: 0, onLightReps: [],
+  slots: 0, loaded: 0, onWrongExercise: [], onDeload: 0, onCalibration: 0, onLightReps: [], onLightBlock: [],
   belowNovice: [], notPlateRounded: [], overCeiling: [], blockVaries: [],
   loadedByExp: new Map(), maxSeen: 0,
 }
@@ -120,6 +120,7 @@ for (const equipment_access of EQUIP)
 
           if (!entry?.accepts_added_load) t.onWrongExercise.push(ex.name)
           if (wk.is_deload) t.onDeload++
+          if (/adaptation|conditioning|metabolic/i.test(wk.phase_label ?? '')) t.onLightBlock.push(`${wk.phase_label}: ${ex.name}@${added}`)
           if (wk.isCalibrationWeek) t.onCalibration++
           if (training_experience === 'beginner' || training_experience === 'novice') t.belowNovice.push(`${ex.name}@${added}`)
           if (Math.abs(added / 2.5 - Math.round(added / 2.5)) > 1e-9) t.notPlateRounded.push(`${ex.name}@${added}`)
@@ -150,8 +151,11 @@ console.log('\n1. The four lifts finally get weight — and only on the heavy bl
   const share = t.loaded / t.slots
   check(`weight reaches them at all (${t.loaded} of ${t.slots} slots = ${(share * 100).toFixed(1)}%, was 0)`,
     t.loaded > 100 && share > 0.05, `${t.loaded} (${(share * 100).toFixed(1)}%)`)
-  check('...and NOT on every slot — the light blocks are still bodyweight',
-    t.loaded < t.slots * 0.4, `${t.loaded}/${t.slots}`)
+  // RE-ANCHORED 21 Nov 2026 (his "yes fix all five"): hypertrophy blocks now load these lifts too, at 60% of the
+  // strength figure, so a share ceiling written for "strength and power only" no longer says anything. The property
+  // it stood for is the one below: the light blocks stay bodyweight. Plus a ceiling that still catches "every slot".
+  check('...and NOT in a light block (foundations, conditioning) — those are still bodyweight', t.onLightBlock.length === 0, t.onLightBlock.slice(0, 4))
+  check('...and NOT on every slot', t.loaded < t.slots * 0.6, `${t.loaded}/${t.slots}`)
   check(`nothing without accepts_added_load ever gets any (${t.onWrongExercise.length})`,
     t.onWrongExercise.length === 0, [...new Set(t.onWrongExercise)].slice(0, 4).join(', '))
   const flagged = EXERCISE_DATABASE.filter(e => e.accepts_added_load).map(e => e.name)

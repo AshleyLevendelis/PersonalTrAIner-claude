@@ -131,8 +131,8 @@ check('5c2. nothing on the card talks about TODAY\u2019s plan', !/today's plan|A
 check('5d. three sets are in the database, every one dated YESTERDAY', pastDb.sets.length === 3 && pastDb.sets.every(r => r[0] === lift5 && r[2] === 50 && r[3] === yesterday), pastDb.sets)
 check('5e. NOT ONE set was written to today', pastDb.sets.every(r => r[3] !== today), pastDb.sets)
 check('5f. yesterday is a finished session', pastDb.sessions.some(r => r[0] === yesterday && r[1] === true), pastDb.sessions)
-// Read off the saved sessions, not the chat header's set pill: the pill left the header on 20 Nov 2026 (his ruling).
-check('5g. today\u2019s own session is untouched: not finished, nothing logged to it', !pastDb.sessions.some(r => r[0] === today && r[1] === true) && pastDb.sets.every(r => r[3] !== today), pastDb.sessions)
+// Read off the record: the chat header's "0 of N sets" pill this read was removed on his word, 20 Nov 2026.
+check('5g. today\u2019s own session has not moved: not finished, nothing logged on it', !pastDb.sessions.some(r => r[0] === today && r[1] === true) && pastDb.sets.every(r => r[3] !== today), { sessions: pastDb.sessions, today })
 
 // 6. More sets told about the same day are added AFTER the ones there, never over them.
 check('6a. the chat sent', await say(`did ${lift5} 2x8 at 55 kg on ${yesterday}`))

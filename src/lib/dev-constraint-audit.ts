@@ -1429,10 +1429,29 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
     resetRandomSource()
     const sortedWeeks = [...meso].sort((a, b) => a.week_number - b.week_number)
 
+    // THE REFERENCE THE PLAN STEPS FROM (21 Nov 2026), so the check asks what the generator promises: a lift with its
+    // own history steps from its OWN last loading week (lowest across its slots), and a lift new to the plan from the
+    // slot's last number in its own units (total vs per side). The slot-only, raw-kg reading flagged a 12kg-a-hand
+    // farmer's walk becoming a 27.5kg trap-bar carry, the same load plus one step, as a jump.
+    const ownByWeek = new Map<number, Map<string, number>>()
+    for (const week of sortedWeeks) {
+      if (week.is_deload) continue
+      const m = new Map<string, number>()
+      for (const d of week.days) for (const e of d.exercises) {
+        if (e.suggested_load_kg == null) continue
+        m.set(e.name, Math.min(m.get(e.name) ?? Infinity, e.suggested_load_kg))
+      }
+      ownByWeek.set(week.week_number, m)
+    }
+    const ownBefore = (name: string, weekNum: number): number | null => {
+      for (let w = weekNum - 1; w >= 1; w--) { const v = ownByWeek.get(w)?.get(name); if (v != null) return v }
+      return null
+    }
     const dayCount = sortedWeeks[0]?.days.length ?? 0
     for (let dayIdx = 0; dayIdx < dayCount; dayIdx++) {
       const exCount = sortedWeeks[0]?.days[dayIdx]?.exercises.length ?? 0
       for (let exIdx = 0; exIdx < exCount; exIdx++) {
+        let lastLoadingWeekName: string | null = null
         let lastLoadingWeekKg: number | null = null
         let lastLoadingWeekNum: number | null = null
         let currentBlockNum: number | null = null
@@ -1461,12 +1480,17 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
               const step = unverifiedRampStepKg(entry)
               const floor = getEquipmentFloorKg(entry)
               const roundingTolerance = loadingMode(entry) === 'barbell' || loadingMode(entry) === 'stack' ? 1.25 : 1
-              const ceiling = lastLoadingWeekKg + step + roundingTolerance
+              const own = ownBefore(ex.name, week.week_number)
+              const lastEntry = lastLoadingWeekName ? EXERCISE_DATABASE.find(e => e.name === lastLoadingWeekName) : undefined
+              const converted = !lastEntry || isPerSideLoad(lastEntry) === isPerSideLoad(entry) ? lastLoadingWeekKg
+                : isPerSideLoad(entry) ? lastLoadingWeekKg / 2 : lastLoadingWeekKg * 2
+              const reference = own ?? converted
+              const ceiling = reference + step + roundingTolerance
               if (ex.suggested_load_kg > ceiling && ex.suggested_load_kg > floor) {
                 failures.push({
                   check: 'block_transition_jump',
                   combination: comboLabel,
-                  details: `"${ex.name}" week ${week.week_number} load ${ex.suggested_load_kg}kg jumps more than one step (${step}kg) from week ${lastLoadingWeekNum}'s ${lastLoadingWeekKg}kg — ceiling is ${ceiling.toFixed(1)}kg`,
+                  details: `"${ex.name}" week ${week.week_number} load ${ex.suggested_load_kg}kg jumps more than one step (${step}kg) from ${own != null ? 'its own last' : `week ${lastLoadingWeekNum}'s slot`} ${reference}kg — ceiling is ${ceiling.toFixed(1)}kg`,
                   exercise: ex.name,
                 })
               }
@@ -1479,6 +1503,7 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
           }
 
           lastLoadingWeekKg = ex.suggested_load_kg
+          lastLoadingWeekName = ex.name
           lastLoadingWeekNum = week.week_number
         }
       }

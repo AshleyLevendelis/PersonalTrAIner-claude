@@ -43,6 +43,273 @@ Newest first. One line each.
   a `?seed=store` conversation (shoulder tight before a press, then dinner sized to his protein; CSCS-checked: tight is
   trained around, pain stops it). **His ruling, from three options: keep `app.personaltrainer.coach`** as the permanent
   app ID (over one based on a domain he owns, and over waiting). It cannot change once the first build is uploaded.
+- [x] **FIVE SCREEN CHECKS AFTER THE PERSONA FIXES, AND ONE REAL CARD FIX (pre-merge sweep, 22 Nov 2026)**. The test
+  page's seeded plan changed with this branch's fixes (today opens on Medicine Ball Slams, not Band Face Pulls; the
+  row slot after dumbbell rows now carries 16 kg a hand as 32 kg on a two-arm machine, 37.5 kg, where it had read 20).
+  `verify:logged-set-word` and `verify:qa-training` now open `offstyle=1`, whose day opens on a band move; `verify:lift-effort`
+  1c reads this week's plan set by set (the lift steps 40 / 42.5 / 47.5); `verify:bodyweight-progress` expects "BW", the
+  badge since 12 Nov (it had only ever met a band move). **REAL, found by 2b: a "too easy" session whose plan had
+  already stepped higher read "Last session done as planned" over a find-your-weight search** (CSCS, mine: the search
+  starts at the higher of the two, the plan's number, and still says it was too easy). `test:lift-effort` 8h2 (1 of 1
+  mutation caught; the driver's 2b-2f caught it too). `verify:chat-log-words` 5g read the chat's "0 of N sets" pill,
+  removed on his word 20 Nov, and failed on `main` too: it reads the record now (overlaps 5e; not mutation-tested).
+  Landmine rows that follow the machine row now start near 52.5 kg (was 25): carried from the row in its own units,
+  an estimate the calibration and the logs correct; unmeasured against a coach's number.
+- [x] **THE TOUR'S SET STOP, A RACE (found by the pre-merge sweep, 21 Nov 2026)**. "Leave the fields blank" showed
+  under a row that had just asked for a typed weight. CORRECTED: my first fix (a2753e1) blamed the row's flag settling
+  late and kept the flag once seen; it passed alone and failed under the sweep's load. Instrumenting it made it pass
+  again, which is what named it: after the save, one more animation frame runs before the after-log phase takes
+  effect, finds the NEXT set's ✓ (which now offers the weight just typed) and WROTE the flag back to false. Now the flag
+  only ever turns on within a step and resets when the step changes. Two further mechanisms written while guessing (a
+  persistent row attribute, "a target that moved is not a save") were measured inert against the real cause and
+  removed. `verify:tour-real` 3 runs of 3 under load, `verify:tour`, `test:app-tour` green. Also: `test:machine-pack`
+  models the Leg Press Calf Raise's joint tags on the Seated Calf Raise (back supported, nothing on the shoulders), not
+  the standing machine that gained the axial tag; it is still priced as the standing machine.
+
+- [x] **A BAD BACK, READ AS A COACH: his "yes fix all four"** (21 Nov 2026; CSCS, mine). A 50-year-old with his lower
+  back on the injuries list was given a hack squat to 150kg, Smith-machine split squats (bar across the back), a
+  reverse hyper as Friday's main hip lift to 72.5kg, and a 26-set Monday. FIXED: five entries gain `lower_back_axial`
+  in `contraindicated_joints` (load on the shoulders/spine, or swinging the lower back under load): Hack Squat, Smith
+  Machine Split Squat, Reverse Hyper Machine, Smith Machine Calf Raise, Standing Calf Raise Machine. Not tagged, on
+  purpose: Belt Squat (load from the hips, built to spare the spine), goblet and dumbbell front squats and dumbbell
+  split squats (held in the hands). THIS REVERSES an earlier tagging choice recorded in `test:joint-tag-states` (the
+  reverse hyper "mirrors Hip Thrust's almost nothing on the spine"): a hip thrust loads the hips with the spine
+  braced; a reverse hyper swings the lumbar spine through flexion and extension under load, which is not first-line
+  for back pain. The hack squat keeps its knee verdict (his 15 Nov "knee keeps machine leg work"). And a bad back's
+  session holds at most 22 working sets (`LOWER_BACK_MAX_WORKING_SETS`, the beginner cap's machinery; a beginner keeps
+  18): trunk fatigue across many braced sets is what a coach manages with back pain; 22 trims only the tail.
+  His plan now: belt squat, machine hip thrust, dumbbell hip thrust as main lifts; every session 22 sets or fewer.
+  CHECKS: new `test:bad-back` (20 checks; 7 mutations, 7 caught: each tag, the cap and its switch). Counts that pin
+  what an injury removes moved on purpose, with the reason beside them: `test:injury-coverage` and
+  `test:joint-tag-states` lower_back 34 -> 39. Re-run green: enforcement-gaps, injury-adaptation-safety,
+  rehab-prescribed, injury-rebuild, other-injury, pattern-floor, day-purpose, shoulders-day, week-shape,
+  advanced-lifter, older-beginner, pregnancy-rules, session-length, audit, coach-swap-pick, no-dead-code, bundle.
+
+- [x] **PREGNANCY FROM 28 WEEKS, AND PELVIC FLOOR WORK: his "yes fix all four"** (21 Nov 2026), after reading a
+  30-year-old's plan at about 20 weeks. (1)+(2) CSCS, mine: a block that reaches 28 weeks (read at its LAST week's date,
+  so a little early, the safe side) swaps split-stance and single-leg work (lunges, split squats, step-ups, single-leg
+  RDLs) for supported or two-footed versions (single-leg leg press, leg press, low box step-up, goblet squat), and
+  face-down trunk work and push-ups (planks, shoulder taps, Copenhagen plank, mountain climbers, floor/decline/archer/
+  pike push-ups) for incline push-ups, a press, side plank, bird dog, Pallof press. Basis: balance and pelvic comfort
+  worsen as the centre of gravity moves and the joints loosen, and the stretched abdominal wall is loaded face-down.
+  First the person's own pool, then any exercise of the movement both rules allow; only with nothing at all (a
+  bodyweight kit has no upright press) is the slot dropped for the block, never kept. Weeks before keep them ("fine
+  while they feel fine"). (3) The PRINTED plan's weights hold from 28 weeks, as the session screen already does: one
+  pass after every load pass, clamping a lift to its last loading-week number and only ever moving the reference DOWN
+  (a lift that came out lighter in a later block holds there). A first version also held before the weight was worked
+  out; measured redundant once the after-pass ratchets down, and removed (one mechanism). (4) HIS RULING, "yes" to
+  pelvic floor exercises: every training day's warm-up while pregnant, "10 slow squeezes, each held for up to 10
+  seconds, then 10 quick ones", purpose "Recommended for everyone who is pregnant (NHS)". General guidance, no
+  clinical claim; added after every budget pass, so it takes nothing from the session.
+  PROVEN UNTOUCHED: 576 non-pregnant plans byte-identical. CHECKS: `test:pregnancy-rules` §11 (81 checks; 8
+  mutations, 8 caught; four first MISSED: the list check read the list it guards, so names are now literal; the
+  minimalist fallback had no check, so "pressing is kept" is checked; the two holds hid each other, so one was
+  deleted). Re-run green: pregnancy-one-switch, health-conditions, warmup-rules, no-dead-code, bundle, week-shape,
+  older-beginner, advanced-lifter, session-length.
+
+- [x] **FROM 28 WEEKS PREGNANT, ONE NOTCH LOWER, IN EVERY PLAN WEEK (found reading a 30-year-old pregnant woman's plan,
+  21 Nov 2026)**. The week's date for his 15 Nov "from 28 weeks the sets cap at RPE 7" was worked out from the week
+  inside its BLOCK (1-4), so every block's first week was dated today: a woman 20 weeks pregnant had RPE 7-8 in plan
+  weeks 13-15, at 32-35 weeks. Now the plan's own week: every week from 28 weeks tops out at RPE 7, weeks before can
+  still reach 8. Mechanical (his ruling, applied as he made it). `test:pregnancy-rules` §10 (3 checks, 1 mutation,
+  caught), due date set relative to the run date so the check means the same thing any day; pregnancy-one-switch and
+  health-conditions re-run green. NOT CHANGED, named: the PRINTED plan's weights still climb past 28 weeks; the hold is
+  applied on the session screen on the day (TodayPanel, PREGNANCY_HOLD_NOTE), so the number she trains is held.
+
+- [x] **A 40-YEAR-OLD INTERMEDIATE WOMAN'S WEEK, READ AS A COACH: his "yes fix all four"** (21 Nov 2026; CSCS
+  mine). Her week was squat, sumo deadlift, deadlift; one woodchop of trunk work; "Full Body Power" with no power block;
+  the squat at 6-8 in the foundations block. MEASURED on 2,048 plans before -> after: (1) ONE HEAVY FLOOR PULL A WEEK
+  (deadlift, sumo, trap bar are one family): weeks with two 3,012 -> 0; a later day that wants a hinge takes a Romanian
+  deadlift or hip thrust, never a third squat (the first build gave squat, sumo, squat, squat on a six-day week; caught
+  by `test:coach-read`). (2) TRUNK WORK TWICE A WEEK, required so trims keep it, run before the thin-day step: weeks
+  under two 6,270 -> 960 -> 429 -> 0 (two leaks found by measuring: a rotated core lift lost its protection at a block
+  boundary; core the week already had was not counted as protected). (3) "POWER" ONLY WITH A POWER BLOCK, read off one
+  `phaseSequenceFor` the generator and the names share: 584 plans -> 0. (4) FOUNDATIONS MAIN LIFT AT 8+
+  (main_lift_rep_floor 8): 1,684 main-lift slots -> 0; a strength block still goes to 3-5.
+  AND FOUND BY THE SAME MEASUREMENT, the house trap ("protecting something aims the trimmer at whatever is left"): once
+  core was protected, a heavy block's whole-exercise trim took the day's MAIN LIFT instead (an advanced lifter's
+  Pull-Ups gone in block 4; 21 cases). His 13 Sep "protect the main lift" now holds in that trim too: 0.
+  CSCS REVIEW: (1) the week's hinge load fits recovery; trunk trained twice; (2) takes away: a second heavy pull and
+  some accessory time; (3) every pattern still covered every week (0 missing), main lifts continuous; (4) RE-READS:
+  "Power" now follows the plan's blocks, not the level; (5) in scope.
+  CHECKS: new `test:week-shape` (178 plans, 12 checks; 8 mutations, 8 caught, one only after the six-day offender was
+  added to the spread); `test:older-beginner` re-anchored on the block rule (92 checks). Gates re-run green:
+  session-length, pattern-floor, day-purpose, coach-read, thin-day, filler-yields, rest-floors, exercise-consistency,
+  advanced-lifter, pregnancy-rules, short-session, session-shortfall, block-phases, edit-keeps-the-bar, day-coverage,
+  muscle-balance, push-pull-score, pathway, rehab-prescribed, injury-coverage, concurrent-activity, main-lift-rest.
+
+- [x] **A 25-YEAR-OLD ADVANCED MAN'S PLAN, READ AS A COACH: his "yes fix all five"** (21 Nov 2026; CSCS mine). Two
+  read-only traces first (engine-tracer), then: (1) STARTING WEIGHTS LOOKED LIKE A BEGINNER'S (bench 40kg week 1,
+  95kg by week 15, against a ~128kg estimated max). TRACED: the calibration week starts an unconfirmed "advanced" lift
+  at 45% of the estimate, then it may climb only one plate step (5kg) per loading week, capped by the estimate,
+  never re-anchored to it. DELIBERATE and measured: a self-reported advanced lifter was once handed a 130kg first-ever
+  deadlift, and an earlier percentage schedule snapped a squat 55 -> 135kg at a block boundary. NOT CHANGED, and why,
+  told to him: his real numbers replace the guesses as soon as he logs week 1 (or answers the first-session "recent
+  hard set" card, which an advanced barbell lifter is asked); loosening the ramp would re-open the overclaiming harm.
+  The printed plan for someone who never logs stays conservative. (2) PULL-UPS: I first said a strength block had
+  bodyweight pull-ups; WRONG, my summary script never printed the added-load field (+15kg was there). The real gap:
+  the hypertrophy blocks, 5x6-8 bodyweight for an advanced 85kg man. Added load now applies in hypertrophy at 60% of
+  the strength figure (+10kg), the rep guard unchanged. (3) CORE KEEPS 8+ REPS: hanging leg raises and rollouts are
+  catalogued tier 2, so a strength block cut them to 6-8 (CORE_REP_FLOOR 8). (4) ODD PICKS: the assisted dip machine
+  is a regression past novice; the Spanish squat is rehab-only (knee); a renegade row ranks below loadable rows on a
+  muscle-gain plan (24 hypertrophy plans: 0; fat-loss plans still 18 of 24, so it is not banned). (5) DISPLAY:
+  "per leg" now needs one leg working (Suitcase Deadlift, both feet down, reads "(single side)"; the five single-leg
+  entries keep "per leg"); and A LIFT STEPS UP FROM ITS OWN LAST NUMBER: min(own, slot) let a stranger in the slot
+  pull it down (Push Press 37.5kg in week 5, 25kg in week 13); now own history first, as the declaration always said:
+  52.5kg in week 13.
+  CSCS REVIEW: (1) effect: real loading on pull-ups and dips, trunk work trained for position, honest labels; (2)
+  takes away: nothing a healthy advanced lifter needs; (3) fundamentals: progressive overload now continuous across
+  blocks for rotated-back lifts; (4) the unverified-ramp invariant is untouched (one step per loading week, own
+  history); (5) in scope.
+  AND (6), found reading the fixed plan: a lift NEW to the plan inherits its slot's last number, and that number was
+  read in the wrong units: a two-arm pulldown's 57.5kg TOTAL became a single-arm pulldown's PER-ARM start, 42.5kg an
+  arm beside a 62.5kg two-arm pulldown the same week. The slot's lift is now remembered and its number converted
+  (total <-> per side) first: 35kg an arm (56%, inside the bilateral deficit). The same conversion raised three lifts
+  that had been reading a per-hand number as a total (Smith shrug 42.5 -> 65kg beside 28kg-a-hand dumbbell shrugs).
+  CHECKS: `test:advanced-lifter` (18 checks; 12 mutations, 12 caught); ten load gates re-run green (assumed-body,
+  ramp-arrived, per-side-load, block-swap-reach, load-display, calibration-search, frozen-weeks, load-ceilings,
+  single-implement, replacement-prescription).
+
+- [x] **HER FOUR LEFTOVERS, AND WHAT THEY WERE FOR EVERYONE: his "fix the four leftovers in her plan too"** (21 Nov
+  2026; every decision CSCS, mine). Her plan (60, beginner, full gym) still had a backpack row in a gym, a Russian
+  twist, a wrist-tendon drill as a warm-up, and a back-extension machine as her main hip lift. Three were general:
+  MEASURED on 2,048 plans (real kit values this time) before -> after. (1) IMPROVISED KIT: a backpack row lists
+  'bodyweight' too, and that 'medium' won over the backpack's 'low', so the improvised-over-real penalty never fired:
+  gym plans with a backpack or furniture lift 539/1,024 -> 166. The 166 left are a chair leg extension where no
+  leg-extension machine is in the style's options (home gyms; Functional full gyms, his 18 Sep machines-are-
+  bodybuilding convention); named, not changed. (2) REHAB-ONLY DRILLS (new `REHAB_ONLY`, 8 names: forearm and ankle
+  tendon drills, the seated quad set, the banded terminal knee extension) stay with the injury they treat: plans with
+  NO injury holding one 1,007 -> 0; a sore elbow or knee keeps its own. Everyday prep drills are untouched. (3) THE
+  MAIN-LIFT ANCHOR on a day with no tier-1 lift: his 16 Nov "main lifts for the whole plan" read tier 1 only, so a
+  bodyweight, limited-kit or older-beginner day's real main lift rotated away every block: days whose main lift
+  changed across the plan 1,631/6,846 -> 2. Her own: (4) FOUNDATION LIFTS for a beginner from 60 (kettlebell
+  deadlift, suitcase deadlift, glute bridge; goblet squat, box squat, leg press, first allowed), repeated across the
+  week on purpose (practice): older-beginner gym plans with a kettlebell deadlift 18/32 -> 26/32. And a Russian
+  twist is a technique lift for her (loaded flexion with rotation; Pallof press or woodchop instead). Also: the
+  balance hold appeared twice when it was the day's movement prep (294 days -> 0). Unchanged: weeks missing a
+  pattern 0, beginner days over 18 sets 0.
+  CSCS REVIEW: (1) effect: same patterns and volume, better tools, a stable main lift to progress; (2) takes away:
+  rehab drills from the healthy, improvised kit where real kit exists; (3) fundamentals: coverage 0 missing, the
+  overload thread now continuous on non-barbell days; (4) RE-READS a ruling's floor: "main lift" now means the
+  day's first compound when it has no tier-1 lift; scores of `main_lift_changed_between_blocks` before 21 Nov are not
+  comparable on those days; (5) in scope.
+  CHECKS: `test:older-beginner` section 15, 91 checks; 10 mutations, 10 caught (one first MISSED: her plan alone
+  could not see the generator's own rehab filter; now 32 healthy base weeks are read).
+
+- [x] **PREGNANCY AND INJURIES TESTED, THREE FIXED: his "test what workouts they get and if they are safe and cscs
+  level", then "yes fix all three"** (21 Nov 2026). MEASURED: 2,368 seeded plans (832 pregnant at 25/32/38, every
+  level/kit/style, with and without a due date past 28 weeks; 1,600 with each injury and four combinations; 64
+  pregnant WITH an injury). Already right and untouched: injury-only plans held 0 contraindicated lifts and covered
+  squat, hinge and pull every week (no push only for bodyweight + sore wrists or shoulders, where every press loads the
+  joint); pregnant plans held 0 jumps, 0 lying moves, no set above RPE 8, none above RPE 7 past 28 weeks.
+  FIXED: (1) A SAFETY BUG: the pregnancy stage replaced a lying move from the equipment pool, from BEFORE the injury
+  stage, and never asked about injuries: 64 of 64 pregnant plans with a back, knee, hip or wrist injury held Deadlifts,
+  Trap Bar Deadlift or the like in every week. A replacement now clears the injury rule too (both pipelines, so the
+  swap list agrees); 0 after. COST, named: a pregnant woman with sore shoulders on minimal kit now has no press at all
+  (the only replacement loaded the shoulder); `test:pregnancy-rules` §3 was re-anchored off that profile, which had
+  passed only through the leak. (2) NO HEAVY LOW REPS (CSCS, mine): no strength or power block (the bodyweight phase
+  list) and a floor of 8 reps on every working set; 32,657 sets under 8 reps across the pregnant plans before, 0 after.
+  Basis: the RPE 8 cap bounds effort, not load; a 3-5 rep set at RPE 8 is ~85% of a max with the breath-hold that
+  brings, and ACOG (2020) / RCOG advise moderate resistance work, usually 8-12 reps. (3) NO HARD AB MOVES (CSCS, mine):
+  Hanging Leg Raises, Ab Wheel Rollout, Russian Twist, Cable Crunch, Ab Crunch Machine (loaded flexion, hanging and
+  rollouts raise abdominal pressure on the stretched midline; diastasis recti); Bird Dog, Side Plank, Pallof Press and
+  planks stay; 0 after. Four of the five had been on the "kept on purpose" list since 15 Nov (they are not lying
+  flat); they now leave for this different reason. The swap search warns: "A hard ab move that strains the stomach
+  wall". PROVEN UNTOUCHED: 576 non-pregnant plans (ages 25/62/70, every level/kit/style, with and without injuries)
+  hash byte-identical before and after, every exercise, set, rep and load.
+  MY GRID ERROR, corrected: earlier audits today used an equipment value "dumbbells_only" the app does not have; those
+  plans fell back to a default kit. The conclusions stand (other kits covered each), and this audit used the real four.
+  CHECKS: `test:pregnancy-rules` section 9 (+ re-anchors), 58 checks, 10 mutations, 10 caught; 30 gates reading the
+  changed files re-run green, plus `test:bundle` and `verify:profile-fixes`.
+
+- [x] **A BEGINNER'S SESSION HOLDS AT MOST 18 WORKING SETS: his ruling 21 Nov 2026, "yes cap beginners at 18 sets"**,
+  from my CSCS recommendation, put to him because it collides with his session-length rulings (the time asked for is
+  filled). The audit had beginner days of 24-27 working sets in 45-60 minutes. Basis: a first-timer adapts to far less
+  (NSCA, 1-3 sets of 6-10 exercises); technique fades before the muscle. What gives, in this file's usual order: a set
+  off the biggest isolation lift, then accessory (never below its floor), then a whole isolation/core exercise from the
+  end; never the main lift, a conditioning block, a primer, a superset partner, a pattern-floor lift, or the third
+  exercise. Conditioning rounds are not counted. Runs after the balance pass and before the filler, so the freed time
+  becomes optional mobility, never more lifting. Generation only: an exercise he adds himself is his ("you asked, you
+  get it"). MEASURED on 1,024 beginner plans x 16 weeks (57,344 days, ages 24-68, all kits/styles/goals, 45-60 and
+  60-90): 0 days over 18 (max 18), every week still squats, hinges, pushes and pulls, every day 3+ exercises, no deload
+  heavier than its week before; 45-60 loading sessions median 53.4 min, 10th percentile 48.7 (rests stay honest), 3,447
+  of 21,504 with a mobility close-out. Novice and up are untouched by construction (a novice on the measured offender
+  still has 24). This REDEFINES nothing for other levels but CHANGES what a beginner plan holds: beginner set counts and
+  session minutes before 21 Nov are not comparable.
+  Also found by the sweep and fixed: `test:coach-read` and `test:day-purpose` named "Full Body Power" literally and
+  failed on the beginner/novice name; both now read the track under either name (the property, not the label).
+  `test:no-dead-code` was two over budget from two exported constants nothing used; made private.
+  CHECKS: `test:older-beginner` section 14 (10 checks), 6 mutations, 6 caught. The first version missed 4 of 6: its
+  constructed day reached 18 by trimming alone, so no protection was ever tested; each constructed day now makes one
+  rule decide.
+
+- [x] **EVERY AGE AND LEVEL READ AS A COACH: his request 21 Nov 2026**, "you need to fix the logic for all users off all
+  ages so it's proper cscs level". MEASURED FIRST, not reasoned: 2,048 seeded plans (ages 24/40/55/68 x four levels x
+  four kits x four styles x four goals x 3-4 days, 45-60 min), read for what a coach would refuse. Sound already, and
+  left alone: no isolation before a main lift, no loaded set past 20 reps, phases read right (strength 3-4 reps at
+  ~165-180s rest, hypertrophy 6+ at ~120s, beginners never below 8), barbell lifts for a YOUNG beginner (light, with a
+  calibration week: standard NSCA practice). FIVE FIXED (all CSCS, mine; basis beside each in the code):
+  (1) FROM 65 AT ANY LEVEL, no jump with a real landing (Box Jumps, Broad Jumps, Plyo Push-Ups, Skater Bounds,
+  Burpees): 156 of 512 plans at 68 had one, 0 after. A coach uses power work with older lifters after screening
+  landing, joints and bone health, which the app cannot do; skipping (rope, jacks, high knees) stays past beginner.
+  (2) PULL-UP NEGATIVES WAIT FOR NOVICE (catalogue `capability_requirement`): 86 of 512 beginner plans, 0 after;
+  lowering a whole bodyweight needs a base a first-timer lacks. (3) KETTLEBELL SWINGS WAIT FOR NOVICE: 100 of 512,
+  0 after; the hinge is taught slow (kettlebell deadlift) before fast. (4) "FULL BODY POWER" IS "FULL BODY STRENGTH"
+  FOR A NOVICE TOO: 352 of 1,024 beginner/novice plans, 0 after (neither ever reaches a power phase). (5) A BODYWEIGHT
+  WEEK SQUATS: the 18 Nov squat/hinge alternation counted tier-1 lifts only, and a bodyweight pool has none, so every
+  full-body day took the ranking's hinge; 111 of 3,072 bodyweight and dumbbell weeks held no squat, 0 after, hinges
+  still 0 missing. Full-gym plans cannot move (the new fallback runs only when no tier-1 lift exists). And the warm-up
+  opener: a beginner from 60 training at home opened with Jumping Jacks; now the low-impact twin the pregnancy rule
+  uses. Median sets a day unchanged (17).
+  CSCS REVIEW: (1) effect: same patterns and volume, safer or better-taught lifts; (2) takes away: landing jumps from
+  65 (power stays via throws and fast step-ups), two lifts from beginners until novice; (3) fundamentals: squat
+  coverage IMPROVED (111 -> 0), push/pull/hinge unchanged; (4) no floor or ceiling redefined; (5) in scope.
+  NAMED, NOT FIXED, because each collides with a ruling of his (asked): a beginner day can hold 24-27 working sets in
+  45-60 minutes (66 such days in weeks 1-3, e.g. 8 exercises x 3 on a 4-day combat Pull & Hinge day), which a coach
+  would cap nearer 15-18 for a first-timer, but the session-length rulings fill the time asked for; and hypertrophy
+  pushing volume for intermediate/advanced functional and combat plans is ~9-11 sets a week, under the ~10-20 per
+  muscle the evidence puts at the useful range, inside a 45-60 minute 3-4 day budget. Also still open from the entry
+  below: the landmine price, the older beginner's hinge tie.
+  CHECKS: `test:older-beginner` now 66 checks (sections 9-13 for all ages); 26 mutations, 26 caught, each checked to
+  apply and to run every check; one first came back MISSED (the warm-up flag at generation is rebuilt downstream) and
+  is now held through the single-week build, which returns that first warm-up.
+
+- [x] **BEGINNERS FROM 60 GET A PLAN A COACH WOULD SIGN: his request 21 Nov 2026**, "run a test on a 60year old
+  beginner woman", then "fix those five issues for beginners over 60. tighten the beginner and 60+ selection rules".
+  MEASURED FIRST (60, female, beginner, full gym, functional, 3 days, 30-45 min, seeded): day one held Trap Bar
+  Deadlift and Barbell Squats, Pull-Up Negatives and Pull-Ups (Assisted), a Landmine Press at ~20 kg (the empty bar,
+  barbell loading mode) beside a 4 kg-a-hand dumbbell press, two days named "Full Body Power", and no balance work
+  (balance started at 65). Every pick was legal under the beginner rules.
+  CHANGED (all CSCS, mine, under his 18 Sep delegation; basis in `src/lib/older-beginner.ts`): a beginner aged 60+
+  is not given (1) technique lifts (the skill table's moderate/high, plus single-leg RDLs and the reverse hyper),
+  (2) barbell-mode lifts (Olympic bar, trap bar, t-bar, landmine, Smith), which cannot start below the bar, (3)
+  hanging kit (pull-up bar, assisted pull-up machine, dip bars), (4) jumps (the pregnancy impact list). Basis: an
+  older adult new to training learns squat, hinge and press on implements that start near zero and rise in small
+  steps; the barbell comes once there is a technique base; a seated pulldown trains the vertical pull without the
+  grip and bodyweight demand; impact comes last (ACSM older-adult guidance). One pool stage after skill, in BOTH
+  generation and `getConstrainedPool`, so the swap shortlist agrees. A pattern it would empty keeps its technique or
+  barbell lifts (no week loses its squat); hanging and jumping are never put back (pulling is rows then, as a coach
+  would set it). Balance hold in the warm-up from 60 for a beginner (65 for everyone, unchanged), basis: balance is in
+  every older-adult guideline, earlier for the deconditioned. A beginner's "Full Body Power" day is named "Full Body
+  Strength" (same track, any age): a beginner never gets a power phase, so the name promised work the day lacks.
+  His 13 Nov "age only adds safeguards" holds: nothing is lighter, shorter or fewer sets; only WHICH exercise changes,
+  and every rule lifts once she is no longer a beginner.
+  AFTER (same profile): Goblet Squats, Kettlebell Deadlift / Back Extension / Machine Hip Thrust for the hinge, Lat
+  Pulldown, dumbbell presses and rows, Step-Ups, carries; balance hold every lifting day; "Full Body Strength".
+  CSCS REVIEW: (1) effect: the same patterns and volume, on implements she can load from near zero; (2) takes away:
+  barbell and hanging options for this group only; measured on 768 plans for a 62-year-old beginner (4 kits x 4
+  styles x 4 goals x 4 day counts x 3 lengths), 0 leaks, 0 days without balance, 0 named Power; (3) fundamentals:
+  every week still squats, hinges, pushes and pulls (gate); quality 96 plans with injuries: mean 11.46 / min 10.90 at
+  62 against 11.42 / 10.70 at 59 (floor 7.2); (4) no floor or ceiling redefined; balance adds 2 minutes of warm-up;
+  (5) in scope, no rehab or diagnosis.
+  NAMED, NOT DONE: (a) her main hinge is a tie between Kettlebell Deadlift, Back Extension Machine and Machine Hip
+  Thrust (equal on every ranking factor), so which one she gets is the seed's; the kettlebell deadlift is the one a
+  coach would teach first, and preferring it is a ranking change; (b) a landmine press is priced at the bar for
+  EVERYONE, though a landmine puts roughly half of it in the hand: a pricing question for all ages, not fixed here;
+  (c) the calorie estimate reads "power" in a day's name; "Full Body Strength" is given the same 7.0 METs so no
+  target moves (a check in the gate); (d) not driven in a browser: the name and the balance line
+  render through existing components.
+  CHECKS: `test:older-beginner` (45 checks; 16 mutations, 16 caught, each checked to apply and to run all 43).
 
 - [x] **A COACH REPLY CAN BE REPORTED FROM INSIDE THE APP: his "1, build it", 20 Nov 2026**, from three options (a flag
   kept for him to review; over a mailto link and over leaving it). Google Play requires an app with AI-generated content

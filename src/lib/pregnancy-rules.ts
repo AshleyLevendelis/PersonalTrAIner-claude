@@ -46,6 +46,59 @@ export const PREGNANCY_LYING = new Set([
   'Nordic Hamstring Curl',
 ])
 
+/**
+ * Hard ab moves that strain the stomach wall (his "yes fix all three", 21 Nov 2026; CSCS, mine): repeated loaded
+ * trunk flexion, hanging leg work and rollouts raise the pressure inside the abdomen and load the midline the bump is
+ * already stretching (diastasis recti). Pregnancy guidance swaps them for anti-movement work: bird dog, side plank,
+ * Pallof press, planks while they feel fine. Measured before: all five in pregnant plans, Hanging Leg Raises in 1,564
+ * sessions. Standing rotation (woodchops, landmine rotation) stays: it is moderate and controlled.
+ */
+export const PREGNANCY_ABDOMINAL_STRAIN = new Set([
+  'Hanging Leg Raises', 'Ab Wheel Rollout', 'Russian Twist', 'Cable Crunch', 'Ab Crunch Machine',
+])
+
+export type PregnancyReason = 'impact' | 'lying' | 'abdominal'
+
+// ---------------------------------------------------------------------------
+// FROM 28 WEEKS (his "yes fix all four", 21 Nov 2026; CSCS, mine). Two things grow harder as the bump does: balance
+// (the centre of gravity moves forward, the joints loosen) and holding the trunk face-down (the abdominal wall is at
+// its most stretched). So a block that reaches 28 weeks swaps split-stance and single-leg work for supported or
+// two-footed versions, and front-loaded core and push-ups for incline push-ups and side-on or kneeling trunk work.
+// Earlier weeks keep them: they are fine while they feel fine, which is the guidance.
+// ---------------------------------------------------------------------------
+export const PREGNANCY_LATE_EXCLUDED: ReadonlySet<string> = new Set([
+  // split stance, single leg, wide lunges
+  'Bulgarian Split Squats', 'Walking Lunges', 'Dumbbell Lateral Lunge', 'Lateral Lunge (Bodyweight)', 'Dumbbell Reverse Lunge',
+  'Barbell Reverse Lunge', 'Split Squat (Bodyweight)', 'Smith Machine Split Squat', 'Single-Leg Dumbbell RDL',
+  'Single-Leg RDL (Bodyweight)', 'Step-Down (Eccentric)', 'Step-Ups', 'Pistol Squat Progression',
+  // face-down trunk and push-up positions
+  'Plank', 'Plank Shoulder Taps', 'Copenhagen Plank', 'Mountain Climbers', 'Push-Ups', 'Decline Push-Ups',
+  'Archer Push-Ups', 'Deficit Push-Ups', 'Wide Push-Ups', 'Close-Grip Push-Ups', 'Knee Push-Ups',
+  // head below the hips, weight through the arms
+  'Pike Push-Ups',
+])
+
+/** What takes a late-excluded exercise's place, first one the person's pool allows. */
+export const PREGNANCY_LATE_REPLACEMENTS: Readonly<Record<'legs' | 'push' | 'core', readonly string[]>> = {
+  legs: ['Single-Leg Leg Press', 'Leg Press', 'Low Box Step-Up', 'Goblet Squats', 'Box Squat (Bodyweight)', 'Leg Extensions'],
+  push: ['Incline Push-Ups', 'Chest Press Machine', 'Incline Dumbbell Press', 'Incline Machine Press'],
+  core: ['Side Plank', 'Bird Dog', 'Pallof Press', 'Cable Woodchops', 'Dumbbell Woodchop'],
+}
+
+export function lateReplacementKind(name: string, pattern: string): 'legs' | 'push' | 'core' {
+  if (pattern === 'core' || /plank|mountain/i.test(name)) return 'core'
+  if (/push-up/i.test(name)) return 'push'
+  return 'legs'
+}
+
+/** Pelvic floor exercises in the warm-up of every training day while pregnant (his "yes", 21 Nov 2026). */
+export const PELVIC_FLOOR_WARMUP_ITEM = {
+  name: 'Pelvic Floor Exercises',
+  prescription: '10 slow squeezes, each held for up to 10 seconds, then 10 quick ones',
+  purpose: 'Recommended for everyone who is pregnant (NHS): they support your bladder and bowel, now and after the birth',
+  duration_seconds: 150,
+} as const
+
 // THE WARM-UP TOO (18 Nov 2026): its opening item and mobility drills are not catalogue exercises, so these lists never
 // reached them. A pregnant trainee with no kit opened every session with "Jumping Jacks & High Knees", and a hip day
 // could open with a Glute Bridge. warmup.ts now asks: the opening item has a both-feet-on-the-floor twin
@@ -55,17 +108,31 @@ export const PREGNANCY_LYING = new Set([
  * Why this exercise is left out while pregnant, or null. A variant or machine version answers as the exercise it is a
  * version of (`parent`), so a log-only or machine copy of a flat bench press is left out with it.
  */
-export function pregnancyExclusion(ex: { name: string; parent?: string | null }): 'impact' | 'lying' | null {
+export function pregnancyExclusion(ex: { name: string; parent?: string | null }): PregnancyReason | null {
   for (const n of [ex.name, ex.parent ?? '']) {
     if (PREGNANCY_IMPACT.has(n)) return 'impact'
     if (PREGNANCY_LYING.has(n)) return 'lying'
+    if (PREGNANCY_ABDOMINAL_STRAIN.has(n)) return 'abdominal'
   }
   return null
 }
 
 /** The free-search warning, so a pick from the whole catalogue says it, as an injury clash does. */
-export function pregnancyWarning(kind: 'impact' | 'lying'): string {
+export function pregnancyWarning(kind: PregnancyReason): string {
   return kind === 'impact'
     ? 'A jumping move: your plan leaves these out while you are pregnant.'
-    : 'A move lying flat: your plan leaves these out while you are pregnant.'
+    : kind === 'lying'
+      ? 'A move lying flat: your plan leaves these out while you are pregnant.'
+      : 'A hard ab move that strains the stomach wall: your plan leaves these out while you are pregnant.'
 }
+
+// ---------------------------------------------------------------------------
+// AND NO HEAVY, LOW-REP LIFTING (his "yes fix all three", 21 Nov 2026; CSCS, mine, basis below): every working set
+// is 8 reps or more, and no strength or power block (the bodyweight phase list: foundations, hypertrophy,
+// conditioning). The RPE 8 cap (health-conditions.ts) bounds effort, not load: a 3-5 rep set at RPE 8 is still ~85%
+// of a max, with the breath-hold that load brings. ACOG (2020) and RCOG advise moderate resistance training; the
+// usual prescription is 8-12 reps at a weight that allows normal breathing. Measured before: 832 pregnant plans held
+// 3-5 rep barbell squats and deadlifts in their Maximal Strength blocks.
+// ---------------------------------------------------------------------------
+export const PREGNANCY_REP_FLOOR = 8
+

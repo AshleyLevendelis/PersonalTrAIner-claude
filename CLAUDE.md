@@ -183,6 +183,14 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   silently open a session, and the pain boundary is enforced on the screen
   only. `tightness`, `verify:tightness`
 - No plan below the quality floor — `quality` (floor 7.2/12; 0 below)
+- **Age and level choose WHICH exercises, never how much — his requests 21 Nov 2026** ("fix those five issues for
+  beginners over 60", then "fix the logic for all users off all ages so it's proper cscs level"; CSCS mine, basis in
+  `older-beginner.ts`): a beginner from 60 gets no technique, barbell, hanging or jumping lift and balance work from 60;
+  from 65 at any level no jump with a real landing; pull-up negatives and kettlebell swings wait for novice; a beginner's
+  or novice's full-body day is "Full Body Strength". Measured on 2,048 plans across ages 24-68. `test:older-beginner`
+- **A beginner's session holds at most 18 working sets — his ruling 21 Nov 2026, "yes cap beginners at 18 sets"** (over
+  filling the time with lifting): the spare minutes go to optional mobility. It narrows his session-length rulings for
+  beginners only. `test:older-beginner` §14
 - **A pull-heavy week is not scored as a flaw when the injuries left one
   press** — Ashley's ruling 24 Sep 2026, from three options: don't count it,
   over keeping the flag and over cutting pulling to match. 366 of 379 flags
@@ -1813,6 +1821,12 @@ menu" stays true when a copy is also left outside it.
 - **"Leave it as it is" on a goal change undoes the goal: "Undo the goal change"** (over keeping the goal and saying
   so, and over always rebuilding): the goal is saved before the question and moves calories at once, so Leave puts the
   old goal back and the targets follow. `test:qa-batch3` §1, `test:rebuild-offer`
+- **Pregnancy also means 8+ reps, no strength or power block, no hard ab moves, and her injuries still apply — his "yes
+  fix all three", 21 Nov 2026** (CSCS mine, basis in `pregnancy-rules.ts`): a pregnancy replacement clears the injury
+  rule too. `test:pregnancy-rules` §9
+- **From 28 weeks pregnant, supported legs and no face-down work, weights held in the printed plan; pelvic floor
+  exercises in every training day's warm-up while pregnant — his "yes fix all four", 21 Nov 2026** (the pelvic floor
+  half is his ruling; the rest CSCS mine, basis in `pregnancy-rules.ts`). `test:pregnancy-rules` §11
 - **Pregnancy: "Exercise rules only"**: BUILT 15 Nov 2026. No jumping or impact move and no move lying flat on the back or
   front while "Pregnant" is ticked, each replaced by one of the same group (never a wider swap: it brought kettlebell swings);
   the coach is told; calories and food untouched. No due date is stored, so every pregnancy is treated as past week 16

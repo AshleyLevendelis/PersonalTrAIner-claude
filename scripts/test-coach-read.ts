@@ -14,6 +14,8 @@ import type { UserProfile, MesocycleWeek } from '../src/lib/types'
 
 let failures = 0
 let ran = 0
+// A full-body day under either name: a beginner's or novice's is "Full Body Strength" since 21 Nov 2026, the same track.
+const isFullBody = (focus: string) => focus === 'Full Body Power' || focus === 'Full Body Strength'
 const check = (name: string, ok: boolean, detail?: unknown) => {
   ran++
   if (ok) console.log(`  ok: ${name}`)
@@ -173,8 +175,8 @@ async function main() {
     const mains = mainsOf(prof(who), `coach-read-mains-${i}`)
     if (mains.length < 2) continue
     judged++
-    if (mains.filter(m => m.focus === 'Full Body Power').length >= 2) twoFullBody++
-    if (mains.every(m => m.focus === 'Full Body Power')) firstWhenFree.add(mains[0].pattern!)
+    if (mains.filter(m => isFullBody(m.focus)).length >= 2) twoFullBody++
+    if (mains.every(m => isFullBody(m.focus))) firstWhenFree.add(mains[0].pattern!)
     const squat = mains.filter(m => m.pattern === 'knee_dominant').length, hinge = mains.length - squat
     const line = `${mains.map(m => m.name).join(' | ')} ${JSON.stringify(who)}`
     if (squat === 0 || hinge === 0) oneSided.push(line)
@@ -190,7 +192,7 @@ async function main() {
   for (let i = 0; i < 8; i++) {
     const who = { training_style: 'functional', n: 2, fitness_goal: GOALS[i % 4], training_experience: EXPS[1 + (i % 3)], equipment_access: EQS[i % 2] }
     const mains = mainsOf(prof(who), `coach-read-ahead-${i}`)
-    if (!(mains.length === 2 && mains[0].focus === 'Full Body Power' && mains[0].pattern === 'hip_hinge' && mains[1].pattern === 'knee_dominant')) ahead.push(`${mains.map(m => `${m.focus}: ${m.name}`).join(' | ')} ${JSON.stringify(who)}`)
+    if (!(mains.length === 2 && isFullBody(mains[0].focus) && mains[0].pattern === 'hip_hinge' && mains[1].pattern === 'knee_dominant')) ahead.push(`${mains.map(m => `${m.focus}: ${m.name}`).join(' | ')} ${JSON.stringify(who)}`)
   }
   check('a full-body day before a squat day is built on a hinge, all eight times (it knows what comes later)', ahead.length === 0, ahead.slice(0, 3))
   // The preference gives way when the pool cannot meet it: a flagged knee still gets a main lift on each full-body day.

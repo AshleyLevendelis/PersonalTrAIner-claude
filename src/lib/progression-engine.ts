@@ -569,7 +569,10 @@ export function cardLoadFor(rec: DoubleProgressionRecommendation, plan: PlanWeek
   // Did the last session keep up with the plan? Only then may the plan's own next number raise today's.
   const keptUp = plan.printedThenKg != null && last >= plan.printedThenKg && !rec.fellShort && rec.effort !== 'hard'
   if (keptUp && plan.printedKg > rec.weightKg) {
-    return { weightKg: plan.printedKg, note: `Last session done as planned — this week's ${plan.printedKg}kg.`, didProgress: plan.printedKg > last, findWeight: !!rec.findWeight }
+    // A too-easy session is a find-your-weight day: it starts at the plan's number when that is already higher, and
+    // still says why (it had read "done as planned" over a search the card was running).
+    if (rec.findWeight) return { weightKg: plan.printedKg, note: rec.note.replace(`starts at ${rec.weightKg}kg`, `starts at ${plan.printedKg}kg`), didProgress: true, findWeight: true }
+    return { weightKg: plan.printedKg, note: `Last session done as planned — this week's ${plan.printedKg}kg.`, didProgress: plan.printedKg > last, findWeight: false }
   }
   return { weightKg: rec.weightKg, note: rec.note, didProgress: rec.didProgress, findWeight: !!rec.findWeight }
 }
