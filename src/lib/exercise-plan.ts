@@ -1751,7 +1751,12 @@ function mainLiftRestFloor(
   if (!entry) return 0
   if (entry.mechanics_tier !== 'tier1_compound') return promoted ? MAIN_LIFT_REST_FLOOR_SECONDS : 0
   const loaded = policy?.minLoadedMainLiftRestSeconds
-  return loaded && isExternallyLoaded(entry)
+  // A PULL-UP OR DIP THAT LEADS THE DAY RESTS LIKE ONE (22 Nov 2026, the persona audit's C19; CSCS, mine): every tier-1
+  // lift resting under 90s was a pull-up or chin-up, at 60s in 1,816 slots and in a Maximal Strength block too, 198 of
+  // 259 plans with a belt on it. "Bodyweight" kept it on the bodyweight floor, but a tier-1 pull-up is the day's main
+  // lift and takes a belt from the muscle-building block: it is a heavy compound and recovers like one. The time it
+  // costs comes out of accessory sets (his 18 Sep ruling: protect the rest, do less).
+  return loaded && (isExternallyLoaded(entry) || entry.accepts_added_load)
     ? Math.max(MAIN_LIFT_REST_FLOOR_SECONDS, loaded)
     : MAIN_LIFT_REST_FLOOR_SECONDS
 }
@@ -7439,10 +7444,16 @@ export function trimShortSessionSets(days: WorkoutDay[], maxSeconds: number, tri
     for (let guard = 0; guard < 100 && day.exercises.length > 0 && estimateDaySeconds(day) > maxSeconds; guard++) {
       // Accessories first, from the bottom of the session up, and the main lift last: his 13 Sep ruling for a shortened
       // day (protect the main lift, drop accessory work from the bottom up), applied to sets.
+      // ...never a pull set the week's balance needs (22 Nov 2026, the persona audit's C18): the balance pass bumps a row
+      // to answer the pushing, and this took that very set back, shipping two-day 20-30 weeks at push 4 / pull 2. A pull
+      // whose set would leave pushing over 1.5x pulling goes last.
+      const weekSets = (ps: string[]) => days.reduce((n, dd, k) => n + (k === d ? day : dd).exercises.filter(e => ps.includes(findEntry(e.name)?.movement_pattern ?? '') && findEntry(e.name)?.mechanics_tier !== 'primer').reduce((a, e) => a + (e.sets ?? 0), 0), 0)
+      const push = weekSets(['horizontal_push', 'vertical_push']), pull = weekSets(['horizontal_pull', 'vertical_pull'])
+      const needed = (ex: Exercise) => ['horizontal_pull', 'vertical_pull'].includes(findEntry(ex.name)?.movement_pattern ?? '') && push > (pull - 1) * 1.5
       const order = day.exercises
         .map((ex, i) => ({ ex, i }))
         .filter(({ ex }) => ex.tier !== 'tier_0_primer' && typeof ex.sets === 'number' && ex.sets > 2)
-        .sort((a, b) => ((a.ex.tier === 'tier_1_primary' ? 1 : 0) - (b.ex.tier === 'tier_1_primary' ? 1 : 0)) || b.i - a.i)
+        .sort((a, b) => ((needed(a.ex) ? 1 : 0) - (needed(b.ex) ? 1 : 0)) || ((a.ex.tier === 'tier_1_primary' ? 1 : 0) - (b.ex.tier === 'tier_1_primary' ? 1 : 0)) || b.i - a.i)
       if (order.length === 0) break
       const { ex, i } = order[0]
       const exercises = day.exercises.slice()
