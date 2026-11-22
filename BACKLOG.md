@@ -46,7 +46,9 @@ Newest first. One line each.
   `test:phone-app`, `verify:chat-2b`, `verify:chat-bubbles`, all pass; `test:bundle` was 2 kB over its combined line
   and moved 3235 -> 3262 (measured 3237 + 25, his 15 Sep ruling), the other three budgets unmoved.
   NEEDS: migration `20261120120000_coach_reply_reports` via `db:push-both` on his machine; until then Send says it
-  could not send. Not on `main`.
+  could not send. Not on `main`. A REPORT IS A RECORD (22 Nov 2026, found by the full sweep): it has read, add and
+  delete rules and deliberately no edit rule, so a sent report is never rewritten; `test:rls-local` names it as the
+  one such table (2 mutations, 2 caught). No new migration.
   And the Android handover prompts are rewritten for his WINDOWS laptop (his FYI the same day; a Mac comes later for
   the App Store): PowerShell paths, Android Studio's bundled Java, the phone's USB driver, `gradlew.bat`, a Windows
   key path written with forward slashes; the iPhone steps stay Mac-only.
