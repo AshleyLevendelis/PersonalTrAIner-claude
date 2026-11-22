@@ -6768,6 +6768,25 @@ export const INJURED_JOINTS: Record<string, string[]> = {
   ankles: ['ankle'],
 }
 
+/**
+ * REHAB ONLY (his "fix the four leftovers in her plan too", 21 Nov 2026; CSCS, mine). Physio drills for a joint that
+ * is hurting: tendon loading for a tennis elbow, a quad set and a terminal knee extension for a knee, shin work after an
+ * ankle sprain. Given to somebody with nothing wrong they spend a warm-up, or the day's quad exercise, on a problem
+ * they do not have. Measured on 2,048 plans with no injury: each of the six forearm and ankle drills in about 469 of
+ * them as the day's warm-up, the quad set in 458 and the terminal knee extension in 290. They stay in the plan of
+ * anyone whose injury they are indicated for (`indicated_joints`), and in the free search for anyone.
+ * The everyday prep drills (scapular push-ups, wall slides, band pull-aparts, wrist circles) are not on this list.
+ */
+export const REHAB_ONLY: ReadonlySet<string> = new Set([
+  'Eccentric Wrist Extension', 'Forearm Pronation-Supination', 'Isometric Grip Squeeze', 'Banded Wrist Flexion',
+  'Banded Wrist Extension', 'Banded Ankle Dorsiflexion', 'Seated Short-Arc Quad Set', 'Banded Terminal Knee Extension',
+])
+
+/** True when a plan should hold this exercise only for someone whose injury it treats. */
+export function isRehabOnly(entry: Pick<ExerciseEntry, 'name'> & { parent?: string }): boolean {
+  return REHAB_ONLY.has(entry.name) || (!!entry.parent && REHAB_ONLY.has(entry.parent))
+}
+
 export function contraindicatedJoints(entry: ExerciseEntry): string[] {
   return entry.contraindicated_joints ?? entry.loads_joints
 }

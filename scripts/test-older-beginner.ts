@@ -2,9 +2,9 @@
 // tighten the beginner and 60+ selection rules"). The five: barbell lifts on day one, pull-up negatives / assisted
 // pull-ups, a landmine press at an empty bar beside a 4 kg dumbbell press, a session called "Power", no balance work.
 // Seeded, so every run is the same plan. Every section has a contrast that shows its fixture binds.
-import { generateMesocycle, generateExercisePlan, setRandomSource, capBeginnerSets, beginnerWorkingSets, BEGINNER_MAX_WORKING_SETS, getConstrainedPool, stageOlderBeginnerFilter, beginnerTrackName } from '../src/lib/exercise-plan'
+import { bestEquipmentRank, generateMesocycle, generateExercisePlan, setRandomSource, capBeginnerSets, beginnerWorkingSets, BEGINNER_MAX_WORKING_SETS, getConstrainedPool, stageOlderBeginnerFilter, beginnerTrackName } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
-import { getExerciseEntry, EXERCISE_DATABASE, type ExerciseEntry } from '../src/lib/exercise-db'
+import { getExerciseEntry, EXERCISE_DATABASE, REHAB_ONLY, isRehabOnly, type ExerciseEntry } from '../src/lib/exercise-db'
 import { isOlderBeginner, olderBeginnerExclusion, olderAdultExclusion, OLDER_ADULT_IMPACT } from '../src/lib/older-beginner'
 import { meetsCapabilityRequirement } from '../src/lib/exercise-db'
 import { generalWarmupFor } from '../src/lib/warmup'
@@ -68,7 +68,7 @@ check('no pull-up of any kind', ![...herNames].some(n => /pull-up/i.test(n)))
 check('no landmine press', !herNames.has('Landmine Press'))
 check('no session named "Power"', lifting(hers).every(d => !/power/i.test(d.focus)), [...new Set(lifting(hers).map(d => d.focus))].join(', '))
 check('her full-body days are "Full Body Strength"', lifting(hers).some(d => d.focus === 'Full Body Strength'))
-check('balance work in the warm-up of every lifting day', lifting(hers).every(d => d.warmup?.mobility.some(m => m.name === BALANCE_HOLD)))
+check('balance work on every lifting day (a warm-up line, or the day\'s movement prep, never both)', lifting(hers).every(d => d.warmup?.mobility.some(m => m.name === BALANCE_HOLD) || d.exercises.some(e => e.name === BALANCE_HOLD)))
 const coversEveryWeek = (pats: string[]) => hers.every(w => w.days.some(d => d.exercises.some(e => pats.includes(getExerciseEntry(e.name)?.movement_pattern ?? ''))))
 check('every week still squats', coversEveryWeek(['knee_dominant']))
 check('every week still hinges', coversEveryWeek(['hip_hinge']))
@@ -221,6 +221,56 @@ const drops = cap([row('Deadlifts', 10), row('Lat Pulldown', 2), row('Bent-Over 
 check('a superset partner is never dropped; the next isolation goes instead', drops.exercises.some(e => e.name === 'Shrugs')
   && !drops.exercises.some(e => e.name === 'Dead Bug') && !drops.exercises.some(e => e.name === 'Dumbbell Curls'), JSON.stringify(drops.exercises.map(e => e.name)))
 check('the dropped day is at the cap', beginnerWorkingSets(drops as never) === 18)
+
+console.log('\n15. HER FOUR LEFTOVERS (his "fix the four leftovers in her plan too", 21 Nov 2026), and what they were for everyone')
+{
+  const hersNow = plan(her())
+  const loadingWeeks = hersNow.filter(w => !w.is_deload)
+  const mainOf = (d: MesocycleWeek['days'][number]) => d.exercises.find(e => getExerciseEntry(e.name)?.mechanics_tier !== 'primer'
+    && ['knee_dominant', 'hip_hinge'].includes(getExerciseEntry(e.name)?.movement_pattern ?? ''))?.name
+  // (4) The foundations: a kettlebell deadlift and a goblet squat, for the whole plan.
+  const mains = new Set(loadingWeeks.flatMap(w => lifting([w]).map(mainOf)).filter(Boolean))
+  check('her main lower-body lifts are the kettlebell deadlift and the goblet squat, all 16 weeks', mains.size === 2 && mains.has('Kettlebell Deadlift') && mains.has('Goblet Squats'), [...mains].join(', '))
+  const at59 = plan(her({ age: 59 }))
+  check('...where at 59 (no foundation rule) they are not', !new Set(lifting(at59).map(mainOf)).has('Kettlebell Deadlift') || !new Set(lifting(at59).map(mainOf)).has('Goblet Squats'))
+  // (2) No Russian twist for a beginner from 60.
+  check('a Russian twist is a technique lift for her', olderBeginnerExclusion(entry('Russian Twist')) === 'technique')
+  // (3) A rehab drill only for the injury it treats.
+  const herNames = names(hersNow)
+  check('no rehab-only drill in her plan', ![...herNames].some(n => REHAB_ONLY.has(n)), [...herNames].filter(n => REHAB_ONLY.has(n)).join(', '))
+  check('every rehab-only name is a real catalogue entry', [...REHAB_ONLY].every(n => !!getExerciseEntry(n)))
+  const sorePool = getConstrainedPool(her({ age: 40, training_experience: 'intermediate', injuries: ['elbows'] })).map(e => e.name)
+  const okPool = getConstrainedPool(her({ age: 40, training_experience: 'intermediate' })).map(e => e.name)
+  check('a sore elbow keeps its tendon drill; a healthy one does not', sorePool.includes('Eccentric Wrist Extension') && !okPool.includes('Eccentric Wrist Extension'))
+  check('a sore knee keeps its quad set; a healthy knee does not', getConstrainedPool(her({ age: 40, training_experience: 'intermediate', injuries: ['knees'] })).some(e => e.name === 'Seated Short-Arc Quad Set') && !okPool.includes('Seated Short-Arc Quad Set'))
+  // Through the generator's own pipeline, on healthy profiles across kit and style (the audit had a rehab drill in
+  // 1,007 of 2,048 plans before): her plan alone could miss it, a first version of this check did.
+  {
+    const leaks: string[] = []
+    for (const eq of ['full_gym', 'home_gym', 'minimalist', 'bodyweight'] as const) for (const style of ['functional', 'hybrid', 'bodybuilding', 'combat'] as const) for (const exp of ['beginner', 'intermediate'] as const) {
+      setRandomSource(seededRngFromKey(`rehab${eq}${style}${exp}`))
+      const week = generateExercisePlan(her({ age: 35, training_experience: exp, equipment_access: eq, training_style: style, fitness_goal: 'hypertrophy' })).plan
+      for (const d of week) for (const e of d.exercises) if (REHAB_ONLY.has(e.name)) leaks.push(`${eq}/${style}/${exp}: ${e.name}`)
+    }
+    check('32 healthy base weeks, through the generator itself: no rehab-only drill', leaks.length === 0, leaks.slice(0, 4).join('; '))
+  }
+  check('a near-copy of a rehab drill answers as its parent', isRehabOnly({ name: 'x', parent: 'Eccentric Wrist Extension' }))
+  // (1) Improvised kit is improvised: a backpack row and a chair leg extension rank low.
+  check('a backpack row ranks as improvised kit', bestEquipmentRank(entry('Backpack Row')) === 'low')
+  check('a chair leg extension ranks as improvised kit', bestEquipmentRank(entry('Chair Leg Extension')) === 'low')
+  check('a dumbbell row does not', bestEquipmentRank(entry('Bent-Over Dumbbell Row')) === 'high')
+  check('no backpack or furniture lift in her full-gym plan', ![...herNames].some(n => /backpack|chair|towel row|table row/i.test(n)), [...herNames].filter(n => /backpack|chair|towel|table/i.test(n)).join(', '))
+  // The measured offender for everyone: her own plan at 59 held a backpack row in week 5 before this.
+  // And the main-lift anchor on a day with no tier-1 lift (bodyweight): it holds for the whole plan.
+  setRandomSource(seededRngFromKey('bwmain'))
+  const bw = generateMesocycle(her({ age: 30, training_experience: 'intermediate', equipment_access: 'bodyweight', training_style: 'hybrid' }))
+  const bwMains = new Map<number, Set<string>>()
+  for (const w of bw.filter(x => !x.is_deload)) lifting([w]).forEach((d, i) => { const m = d.exercises.find(e => getExerciseEntry(e.name)?.mechanics_tier === 'tier2_compound' && getExerciseEntry(e.name)?.movement_pattern !== 'carry')?.name; if (m) (bwMains.get(i) ?? bwMains.set(i, new Set()).get(i)!).add(m) })
+  check('a bodyweight day keeps its main lift in every block (16 Nov "main lifts for the whole plan")', [...bwMains.values()].every(s => s.size === 1), [...bwMains.values()].map(s => [...s].join('/')).join(' | '))
+  // The balance hold once per warm-up.
+  const twice = lifting(hersNow).filter(d => d.exercises.some(e => e.name === BALANCE_HOLD) && d.warmup?.mobility.some(m => m.name === BALANCE_HOLD))
+  check('the balance hold is never both the movement prep and a warm-up line', twice.length === 0, twice.length)
+}
 
 console.log(`\n${passed + failed} checks ran: ${passed} passed, ${failed} failed`)
 process.exit(failed > 0 ? 1 : 0)

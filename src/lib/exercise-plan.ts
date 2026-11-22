@@ -5,12 +5,12 @@ import type {
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
 import { getAppNow, getLocalDateString } from './dev-clock'
-import { EXERCISE_DATABASE, INJURED_JOINTS, getMovementFamily, isGenuineDuplicate, getVolumeRole, muscleGroupsOf, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, isBallisticMovement, jointListDisplay, NEAREST_PATTERN_FALLBACK, EXPLOSIVE_PREP_GROUPS, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole, type MuscleGroup, getExerciseEntry } from './exercise-db'
+import { EXERCISE_DATABASE, INJURED_JOINTS, getMovementFamily, isGenuineDuplicate, getVolumeRole, muscleGroupsOf, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isRehabOnly, isBandEquipped, isBallisticMovement, jointListDisplay, NEAREST_PATTERN_FALLBACK, EXPLOSIVE_PREP_GROUPS, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole, type MuscleGroup, getExerciseEntry } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
 } from './experience-config'
-import { isOlderBeginner, olderBeginnerExclusion, olderAdultExclusion, OLDER_BEGINNER_REASON_TEXT } from './older-beginner'
+import { isOlderBeginner, olderBeginnerExclusion, olderAdultExclusion, OLDER_BEGINNER_REASON_TEXT, OLDER_BEGINNER_FOUNDATIONS } from './older-beginner'
 import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields, withBalanceWork } from './warmup'
 import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
@@ -624,6 +624,9 @@ const EQUIPMENT_SETS: Record<EquipmentAccess, Set<string> | null> = {
 //     ranking a treadmill against a barbell is a category error.
 // Both cases fall through to a 0 contribution rather than a low one, so an
 // unranked entry is never quietly penalised for being unranked.
+/** Household furniture standing in for a machine or a bench (bestEquipmentRank). */
+const IMPROVISED_FURNITURE: ReadonlySet<string> = new Set(['Chair Leg Extension', 'Chair Dips', 'Table Row', 'Towel Row'])
+
 export const EQUIPMENT_QUALITY: Record<string, 'high' | 'medium' | 'low'> = {
   // Externally loaded in fine increments — the tools a working set is
   // actually built on.
@@ -709,6 +712,10 @@ export const EQUIPMENT_QUALITY: Record<string, 'high' | 'medium' | 'low'> = {
  * option they'd choose, or the primary implement rather than its furniture.
  */
 export function bestEquipmentRank(entry: ExerciseEntry): 'high' | 'medium' | 'low' | null {
+  // IMPROVISED KIT IS IMPROVISED WHATEVER ELSE IT LISTS (21 Nov 2026, the four leftovers): a backpack row lists
+  // 'bodyweight' so a bodyweight trainee can have it, and that 'medium' won over the backpack's 'low', so the
+  // improvised-over-real penalty never fired: a backpack row in 331 of 1,024 gym plans, a chair leg extension in 267.
+  if (entry.equipment.includes('weighted backpack') || IMPROVISED_FURNITURE.has(entry.name)) return 'low'
   let best: 'high' | 'medium' | 'low' | null = null
   for (const eq of entry.equipment) {
     const rank = EQUIPMENT_QUALITY[eq]
@@ -1128,6 +1135,17 @@ function stageInjuryFilter(
   }
   trace.pool_size_after_each_stage.injury = result.length
   return result
+}
+
+// ---------------------------------------------------------------------------
+// STAGE 2a: Rehab-only drills stay with the injury they treat (exercise-db.ts REHAB_ONLY says why)
+// ---------------------------------------------------------------------------
+function stageRehabOnlyFilter(pool: ExerciseEntry[], flaggedJoints: Set<string>, trace: ConstraintTrace): ExerciseEntry[] {
+  return pool.filter(e => {
+    if (!isRehabOnly(e) || isIndicatedFor(e, flaggedJoints)) return true
+    trace.injury_filtered.push({ exercise: e.name, stage: 'injury', reason: 'rehab drill for an injury not on the list' })
+    return false
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -2765,6 +2783,8 @@ function selectExercisesForTrack(
   weekTrainsLegsElsewhere: boolean = false,
   /** Later days of this week whose main lift is fixed to a squat or to a hinge (lowerMainToPrefer, below). */
   lowerMainsLater: { squat: number; hinge: number } = { squat: 0, hinge: 0 },
+  /** An older beginner's foundation lifts (older-beginner.ts), tried first for the main lower-body slot. */
+  foundationLifts?: Readonly<Partial<Record<'knee_dominant' | 'hip_hinge', readonly string[]>>>,
 ): { primer: ExerciseEntry | null; rehab: ExerciseEntry | null; main: ExerciseEntry[]; requiredNames: Set<string>; uncoveredPatterns: MovementPattern[]; selectionNotes: Map<string, string> } {
   const counts = applyIsolationSlotShift(countsIn, policy.isolationSlotShift)
   const allPatterns = new Set([...track.primary_patterns, ...track.secondary_patterns])
@@ -2976,6 +2996,22 @@ function selectExercisesForTrack(
     return squat === hinge ? null : squat < hinge ? 'knee_dominant' : 'hip_hinge'
   }
 
+  /** The first foundation lift (older-beginner.ts) the pool allows for a main lower-body slot; null for everyone else. */
+  function foundationFor(slot: TrackSlot, preferred: MovementPattern | null): ExerciseEntry | null {
+    if (!foundationLifts || slot.tier !== 'tier1_compound') return null
+    const lower = slot.patterns.filter((p): p is 'knee_dominant' | 'hip_hinge' => p === 'knee_dominant' || p === 'hip_hinge')
+    if (lower.length === 0) return null
+    const order = preferred && (lower as MovementPattern[]).includes(preferred) ? [preferred as 'knee_dominant' | 'hip_hinge', ...lower.filter(p => p !== preferred)] : lower
+    // The same foundation on two days is the point, not a repeat to avoid: a beginner learns a lift by practising it
+    // (a goblet squat Wednesday and Friday beats a bodyweight box squat on Friday). So the week's earlier days are not
+    // a reason to skip one.
+    for (const pattern of order) for (const name of foundationLifts[pattern] ?? []) {
+      const e = pool.find(x => x.name === name)
+      if (e && !selected.some(x => x.name === name) && !usedGroups.has(getMovementFamily(e)) && !wouldBeSecondMainLift(e)) return e
+    }
+    return null
+  }
+
   function fillSlot(slot: TrackSlot): void {
     // Preferred tier wins over "fresh this week" — reusing the same main
     // lift on a second day (normal in full-body/PPL splits) is a better
@@ -2986,6 +3022,7 @@ function selectExercisesForTrack(
     // slots only, logged) -> give up (required slots only, logged).
     const preferredLowerMain = lowerMainToPrefer(slot)
     const pick =
+      foundationFor(slot, preferredLowerMain) ??
       (preferredLowerMain ? findForSlot([preferredLowerMain], slot.tier, true) ?? findForSlot([preferredLowerMain], slot.tier, false) : null) ??
       findForSlot(slot.patterns, slot.tier, true, slot.groups) ??
       findForSlot(slot.patterns, slot.tier, false, slot.groups) ??
@@ -5960,6 +5997,7 @@ export function getConstrainedPool(
   pool = stageEquipmentFilter(pool, profile, throwaway)
   const equipmentOnly = [...pool]
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], throwaway)
+  pool = stageRehabOnlyFilter(pool, getFlaggedJoints(profile.injuries || []), throwaway)
   pool = stagePregnancyFilter(pool, equipmentOnly, isPregnant(profile), throwaway, getFlaggedJoints(profile.injuries || []))
   if (!opts.skipStyle) {
     pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway, getFlaggedJoints(profile.injuries || []), (equipmentTierFor(profile) || 'full_gym'))
@@ -6109,6 +6147,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   // STAGE 2: Injury (replacements sourced from equipment-filtered pool only)
   const equipmentOnly = [...pool]
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], trace)
+  pool = stageRehabOnlyFilter(pool, getFlaggedJoints(profile.injuries || []), trace)
   pool = stagePregnancyFilter(pool, equipmentOnly, isPregnant(profile), trace, getFlaggedJoints(profile.injuries || []))
 
   // STAGE 3: Style
@@ -6175,7 +6214,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const laterFixed = resolvedTracks.slice(index + 1).map(focus => fixedLowerMainPattern(TRACKS[focus]))
     const lowerMainsLater = { squat: laterFixed.filter(p => p === 'knee_dominant').length, hinge: laterFixed.filter(p => p === 'hip_hinge').length }
 
-    const { primer, rehab, main, requiredNames, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []), (equipmentTierFor(profile) || 'full_gym'), trainingStyle, legDaysElsewhere >= 2, lowerMainsLater)
+    const { primer, rehab, main, requiredNames, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []), (equipmentTierFor(profile) || 'full_gym'), trainingStyle, legDaysElsewhere >= 2, lowerMainsLater, isOlderBeginner(profile) ? OLDER_BEGINNER_FOUNDATIONS : undefined)
     for (const name of requiredNames) weeklyRequiredNames.add(name)
 
     // Build exercise list with sets/reps from style config
@@ -6831,6 +6870,13 @@ type RotationTier = 'main' | 'accessory' | 'core'
  */
 function classifyRotationTiers(exercises: Exercise[]): RotationTier[] {
   let mainCount = 0
+  // A DAY WITH NO TIER-1 LIFT STILL HAS A MAIN LIFT (21 Nov 2026, the four leftovers): its first compound. Read as
+  // tier 1 only, a bodyweight or limited-kit day, and an older beginner's (her barbells are out), had no anchor, so
+  // the lift her week was built on rotated away at every block: a goblet squat in weeks 1-3 became a dumbbell front
+  // squat in week 5, against his 16 Nov "main lifts for the whole plan". The same blind spot lowerMainToPrefer had.
+  const hasTier1 = exercises.some(ex => getExerciseEntry(ex.name)?.mechanics_tier === 'tier1_compound')
+  const mainTier = hasTier1 ? 'tier1_compound' : 'tier2_compound'
+  const mainCap = hasTier1 ? 2 : 1
   return exercises.map(ex => {
     const dbEntry = getExerciseEntry(ex.name)
     if (!dbEntry || dbEntry.mechanics_tier === 'primer') return 'core'
@@ -6840,7 +6886,7 @@ function classifyRotationTiers(exercises: Exercise[]): RotationTier[] {
     // exercise (getExerciseCountForDuration always asks for a single tier1
     // slot), but the cap stays at 2 to match the spec for any future
     // session shape that requests more.
-    if (dbEntry.mechanics_tier === 'tier1_compound' && mainCount < 2) {
+    if (dbEntry.mechanics_tier === mainTier && mainCount < mainCap) {
       mainCount++
       return 'main'
     }

@@ -62,9 +62,11 @@ export function isOlderBeginner(profile: Pick<UserProfile, 'age' | 'training_exp
 /**
  * Lifts the general skill table rates 'low' that still ask too much of an older beginner: a single-leg hinge is a
  * balance test under load, and a reverse hyper swings the legs through spinal extension on a machine that needs
- * teaching. The kettlebell deadlift teaches the same hinge from two feet.
+ * teaching. The kettlebell deadlift teaches the same hinge from two feet. And (21 Nov 2026, the four leftovers) a
+ * Russian twist: loaded flexion and rotation together, the combination a coach builds up to last; a Pallof press or a
+ * woodchop trains the same trunk by resisting the turn.
  */
-const OLDER_BEGINNER_TECHNIQUE = /single-leg[^,]*\b(rdl|romanian)|reverse hyper/i
+const OLDER_BEGINNER_TECHNIQUE = /single-leg[^,]*\b(rdl|romanian)|reverse hyper|russian twist/i
 
 /** Kit you hang from or support your whole body on. */
 const HANGING_KIT = new Set(['pull-up bar', 'assisted pull-up machine', 'dip bars'])
@@ -85,6 +87,18 @@ export function olderBeginnerExclusion(ex: ExerciseEntry): OlderBeginnerReason |
   if (OLDER_BEGINNER_TECHNIQUE.test(ex.name)) return 'technique'
   if (getSkillDemand(ex.name) !== 'low' || (ex.parent && getSkillDemand(ex.parent) !== 'low')) return 'technique'
   return null
+}
+
+/**
+ * THE FOUNDATION LIFTS (his "fix the four leftovers in her plan too", 21 Nov 2026; CSCS, mine). An older beginner's
+ * main lower-body slot was a tie between a kettlebell deadlift, a back-extension machine and a hip-thrust machine,
+ * equal on every ranking factor, so the seed chose. A coach teaches the two patterns of daily life first, from two
+ * feet with the weight in the hands: picking something up (the deadlift) and sitting and standing (the squat).
+ * Tried in this order, the first one her kit and injuries allow; nothing here when none is available.
+ */
+export const OLDER_BEGINNER_FOUNDATIONS: Readonly<Partial<Record<'knee_dominant' | 'hip_hinge', readonly string[]>>> = {
+  hip_hinge: ['Kettlebell Deadlift', 'Suitcase Deadlift', 'Glute Bridge'],
+  knee_dominant: ['Goblet Squats', 'Box Squat (Bodyweight)', 'Leg Press'],
 }
 
 /** The words the plan's trace and the swap search use for each reason. */

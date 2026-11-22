@@ -840,6 +840,8 @@ export function drillsPreparing(joints: string[], injuries: string[] = [], pregn
 export function withBalanceWork(day: WorkoutDay, profile: Pick<UserProfile, 'age'> & Partial<Pick<UserProfile, 'training_experience'>>): WorkoutDay {
   if (!day.warmup || day.exercises.length === 0 || !needsBalanceWork(profile)) return day
   if (day.warmup.mobility.some(m => m.name === BALANCE_WARMUP_ITEM.name)) return day
+  // Already the day's movement-prep exercise (21 Nov 2026): the same hold twice in one warm-up says nothing new.
+  if (day.exercises.some(e => e.name === BALANCE_WARMUP_ITEM.name)) return day
   return {
     ...day,
     warmup: {

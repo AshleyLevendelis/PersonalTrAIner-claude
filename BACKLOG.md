@@ -2,6 +2,32 @@
 
 Newest first. One line each.
 
+- [x] **HER FOUR LEFTOVERS, AND WHAT THEY WERE FOR EVERYONE: his "fix the four leftovers in her plan too"** (21 Nov
+  2026; every decision CSCS, mine). Her plan (60, beginner, full gym) still had a backpack row in a gym, a Russian
+  twist, a wrist-tendon drill as a warm-up, and a back-extension machine as her main hip lift. Three were general:
+  MEASURED on 2,048 plans (real kit values this time) before -> after. (1) IMPROVISED KIT: a backpack row lists
+  'bodyweight' too, and that 'medium' won over the backpack's 'low', so the improvised-over-real penalty never fired:
+  gym plans with a backpack or furniture lift 539/1,024 -> 166. The 166 left are a chair leg extension where no
+  leg-extension machine is in the style's options (home gyms; Functional full gyms, his 18 Sep machines-are-
+  bodybuilding convention); named, not changed. (2) REHAB-ONLY DRILLS (new `REHAB_ONLY`, 8 names: forearm and ankle
+  tendon drills, the seated quad set, the banded terminal knee extension) stay with the injury they treat: plans with
+  NO injury holding one 1,007 -> 0; a sore elbow or knee keeps its own. Everyday prep drills are untouched. (3) THE
+  MAIN-LIFT ANCHOR on a day with no tier-1 lift: his 16 Nov "main lifts for the whole plan" read tier 1 only, so a
+  bodyweight, limited-kit or older-beginner day's real main lift rotated away every block: days whose main lift
+  changed across the plan 1,631/6,846 -> 2. Her own: (4) FOUNDATION LIFTS for a beginner from 60 (kettlebell
+  deadlift, suitcase deadlift, glute bridge; goblet squat, box squat, leg press, first allowed), repeated across the
+  week on purpose (practice): older-beginner gym plans with a kettlebell deadlift 18/32 -> 26/32. And a Russian
+  twist is a technique lift for her (loaded flexion with rotation; Pallof press or woodchop instead). Also: the
+  balance hold appeared twice when it was the day's movement prep (294 days -> 0). Unchanged: weeks missing a
+  pattern 0, beginner days over 18 sets 0.
+  CSCS REVIEW: (1) effect: same patterns and volume, better tools, a stable main lift to progress; (2) takes away:
+  rehab drills from the healthy, improvised kit where real kit exists; (3) fundamentals: coverage 0 missing, the
+  overload thread now continuous on non-barbell days; (4) RE-READS a ruling's floor: "main lift" now means the
+  day's first compound when it has no tier-1 lift; scores of `main_lift_changed_between_blocks` before 21 Nov are not
+  comparable on those days; (5) in scope.
+  CHECKS: `test:older-beginner` section 15, 91 checks; 10 mutations, 10 caught (one first MISSED: her plan alone
+  could not see the generator's own rehab filter; now 32 healthy base weeks are read).
+
 - [x] **PREGNANCY AND INJURIES TESTED, THREE FIXED: his "test what workouts they get and if they are safe and cscs
   level", then "yes fix all three"** (21 Nov 2026). MEASURED: 2,368 seeded plans (832 pregnant at 25/32/38, every
   level/kit/style, with and without a due date past 28 weeks; 1,600 with each injury and four combinations; 64
