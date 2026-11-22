@@ -3350,6 +3350,11 @@ function selectExercisesForTrack(
         // an implement in common. Three air squats, or a Plank beside a Dead
         // Bug, no longer get through; a second angle still does.
         if (respectFamilies && usedGroups.has(getMovementFamily(c.e)) && selected.some(sel => isGenuineDuplicate(sel, c.e))) continue
+        // ...BUT A SECOND ANGLE IS A COMPOUND'S ALLOWANCE (22 Nov 2026, the persona audit's C21): the "same movement" test
+        // needs an implement in common, so two isolations of one family on different kit got through (a cable rear-delt
+        // fly beside a reverse pec deck, a machine and a dumbbell pullover, a pec deck and cable flyes: about 85 of 2,000
+        // plans). Two pressing angles is what a coach writes; two rear-delt flys is the same set twice.
+        if (respectFamilies && c.e.mechanics_tier === 'tier3_isolation' && selected.some(sel => sel.mechanics_tier === 'tier3_isolation' && getMovementFamily(sel) === getMovementFamily(c.e))) continue
         if (overFillCap(c.e)) continue
         if (wouldBeSecondMainLift(c.e)) continue
         selected.push(c.e)
@@ -3395,7 +3400,9 @@ function selectExercisesForTrack(
   const requiredPatterns = feasibleRequiredPatterns || styleConfig.requiresPatterns || []
   if (requiredPatterns.length > 0) {
     for (const reqPattern of requiredPatterns) {
-      if (!selected.some(e => e.movement_pattern === reqPattern)) {
+      // The rehab slot counts (22 Nov 2026, the persona audit's C21): a bad back's Dead Bug or Bird Dog IS the day's trunk
+      // work, and a Plank added beside it to "fill" core was the same movement twice.
+      if (!selected.some(e => e.movement_pattern === reqPattern) && rehab?.movement_pattern !== reqPattern) {
         // PASS 1: Strict search (respect all constraints)
         const fill = pool.find(e =>
           e.movement_pattern === reqPattern &&
@@ -3413,7 +3420,7 @@ function selectExercisesForTrack(
           const relaxedFill = pool.find(e =>
             e.movement_pattern === reqPattern &&
             !wouldBeSecondMainLift(e) &&
-            !selected.some(s => s.name === e.name) &&
+            !selected.some(s => s.name === e.name || isGenuineDuplicate(s, e)) &&
             !forbidden.has(e.movement_pattern)
           )
           
@@ -8418,7 +8425,11 @@ export function generateMesocycle(
           const kind = lateReplacementKind(rotatedPlain, findEntry(rotatedPlain)?.movement_pattern ?? '')
           const ok = (n: string) => pool.some(e => e.name === n) && !PREGNANCY_LATE_EXCLUDED.has(n) && !pregnancyExclusionLate({ name: n })
             && !usedNamesThisDay.has(n) && !day.exercises.some((other, j) => j !== exIdx && other.name === n)
-          const fromList = PREGNANCY_LATE_REPLACEMENTS[kind].find(ok)
+          // ...and not a second of a family the day already holds (22 Nov 2026, the persona audit's C21: Incline Push-Ups
+          // beside an incline press, a box squat beside an air squat, in 120 of 129 pregnant plans). Tried first; the
+          // name-only test stays the fallback, so a slot is never emptied for it.
+          const freshFamily = (n: string) => { const e = findEntry(n); const f = e ? getMovementFamily(e) : null; return !f || !dayFamiliesByIndex.some((g, j) => j !== exIdx && g === f) }
+          const fromList = PREGNANCY_LATE_REPLACEMENTS[kind].find(n => ok(n) && freshFamily(n)) ?? PREGNANCY_LATE_REPLACEMENTS[kind].find(ok)
           // None of the list in her pool (a minimalist kit, a style filter): any exercise of the same movement both
           // rules allow, the nearest the pool has; only with nothing at all does the original stay.
           const pattern = findEntry(rotatedPlain)?.movement_pattern
@@ -8426,7 +8437,9 @@ export function generateMesocycle(
             && (kind === 'legs' ? ['single_leg', 'knee_dominant'].includes(e.movement_pattern)
               : kind === 'push' ? ['horizontal_push', 'vertical_push'].includes(e.movement_pattern)
               : kind === 'hinge' ? e.movement_pattern === 'hip_hinge' && !isBallisticMovement(e) : e.movement_pattern === pattern)
-          const samePattern = pool.find(e => fits(e) && ok(e.name))
+          // A push-up becomes a horizontal press before an overhead one (two overhead presses on a day otherwise).
+          const byPlane = kind === 'push' ? [...pool].sort((a, b) => (a.movement_pattern === 'horizontal_push' ? 0 : 1) - (b.movement_pattern === 'horizontal_push' ? 0 : 1)) : pool
+          const samePattern = byPlane.find(e => fits(e) && ok(e.name) && freshFamily(e.name)) ?? byPlane.find(e => fits(e) && ok(e.name))
           // A hinge with none in her style's pool (a combat-style bodyweight pool's only hinge is the single-leg RDL): the
           // style stage is the one that may relax (it is a preference, never a safety rule); every other stage still runs.
           const offStyle = !fromList && !samePattern && kind === 'hinge'

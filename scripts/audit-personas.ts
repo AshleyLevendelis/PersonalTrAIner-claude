@@ -17,7 +17,7 @@ import { spawnSync, spawn } from 'node:child_process'
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs'
 import { generateMesocycle, setRandomSource, getConstrainedPool, getFlaggedJoints, beginnerWorkingSets, OPTIONAL_CARDIO_FOCUS, daysDroppedForRecovery } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
-import { getExerciseEntry, isContraindicatedFor, isIndicatedFor, getMovementFamily, isBallisticMovement } from '../src/lib/exercise-db'
+import { getExerciseEntry, isContraindicatedFor, isIndicatedFor, getMovementFamily, isBallisticMovement, isGenuineDuplicate } from '../src/lib/exercise-db'
 import { pregnancyExclusion, PREGNANCY_LATE_EXCLUDED, PREGNANCY_REP_FLOOR } from '../src/lib/pregnancy-rules'
 import { lateInPregnancy, isPregnant, hasHealthCondition, HEALTH_SET_RPE_CEILING, HEALTH_CONDITIONING_RPE_CEILING, LATE_PREGNANCY_SET_RPE_CEILING } from '../src/lib/health-conditions'
 import { needsBeginnerSafeguards, beginnerSafeguardExclusion, olderAdultExclusion, isOlderBeginner } from '../src/lib/older-beginner'
@@ -183,8 +183,10 @@ const RULES: Rule[] = [
     check: (_p, m) => [...new Set(m.flatMap(w => w.days.flatMap(d => d.exercises.filter(e => entry(e.name)?.mechanics_tier === 'tier1_compound' && e.rest !== 'alternate' && (parseInt(String(e.rest)) || 999) < 90).map(e => `${e.name} ${e.rest}`))))].slice(0, 3) },
   { id: 'C20', kind: 'coaching', text: 'every lifting day has a warm-up', applies: () => true,
     check: (_p, m) => m.flatMap(w => lifting(w).filter(d => !d.warmup || ((d.warmup.general ?? []).length + (d.warmup.mobility ?? []).length) === 0).map(d => `w${w.week_number} ${d.day}`)).slice(0, 3) },
-  { id: 'C21', kind: 'coaching', text: 'no session holds two exercises of one movement family (two curls, two pushdowns)', applies: () => true,
-    check: (_p, m) => [...new Set(m.flatMap(w => w.days.flatMap(d => { const fams = d.exercises.filter(e => !isPrimer(e.name)).map(e => { const x = entry(e.name); return x ? getMovementFamily(x) : '' }).filter(f => f && f !== 'core' && f !== 'cardio'); return fams.filter((f, i) => fams.indexOf(f) !== i).map(f => `${d.day}: ${f}`) })))].slice(0, 3) },
+  { id: 'C21', kind: 'coaching', text: 'no session repeats itself: one isolation per family, and never the same movement twice (two angles of a press, or two trunk drills in different planes, are fine)', applies: () => true,
+    check: (_p, m) => [...new Set(m.flatMap(w => w.days.flatMap(d => { const xs = d.exercises.filter(e => !isPrimer(e.name)).map(e => entry(e.name)).filter((x): x is NonNullable<typeof x> => !!x && x.movement_pattern !== 'cardio')
+      const out: string[] = []; xs.forEach((a, i) => xs.slice(i + 1).forEach(b => { if (getMovementFamily(a) !== getMovementFamily(b)) return
+        if ((a.mechanics_tier === 'tier3_isolation' && b.mechanics_tier === 'tier3_isolation' && a.movement_pattern !== 'core') || isGenuineDuplicate(a, b)) out.push(`${d.day}: ${a.name} + ${b.name}`) })); return out })))].slice(0, 3) },
 ]
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -270,7 +272,7 @@ function selfTest(): string[] {
     ['C11', { ...base, age: 70, training_experience: 'beginner' } as UserProfile, plan([day('Monday', good)])],
     ['C12', base, plan([day('Monday', [...good, ex('Leg Press')])])],
     ['C13', base, plan([day('Monday', [...good.filter(e => e.name !== 'Goblet Squats'), ex('Romanian Deadlifts', { sets: 6, suggested_load_kg: 50 }), ex('Goblet Squats', { sets: 1, suggested_load_kg: 10 })])])],
-    ['C14', base, Array.from({ length: 12 }, (_, k) => week(k + 1, [day('Monday', [...good, ex('Low Box Step-Up')])])) as unknown as MesocycleWeek[]],
+    ['C14', base, Array.from({ length: 12 }, (_, k) => week(k + 1, [day('Monday', [...good, ex('Low Box Step-Up')])], { phase_label: 'Hypertrophy' })) as unknown as MesocycleWeek[]],
     ['C15', base, plan([day('Monday', good.map(e => ({ ...e, sets: 5 }))), day('Wednesday', good.map(e => ({ ...e, sets: 2 })))])],
     ['C16', { ...base, injuries: ['knees'] } as UserProfile, plan([day('Monday', good)])],
     ['C17', { ...base, training_days: ['Monday', 'Wednesday', 'Friday'].map(d => ({ day: d, available: true })) } as UserProfile, plan([day('Monday', good.map(e => e.name === 'Chest Press Machine' ? { ...e, sets: 2 } : e))])],
