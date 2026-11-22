@@ -4862,19 +4862,11 @@ function balanceWeeklyStructure(
     // scanning from the end of the week backward so the days built around
     // heavier/earlier tracks are disturbed last.
     let slot: { dayIdx: number; exIdx: number } | null = null
-    // NEVER THE WEEK'S LAST OF ANOTHER PATTERN (22 Nov 2026, the persona audit's C1): covering a missing vertical pull
-    // swapped out a two-day week's only squat (its step-ups), so 19 plans went sixteen weeks without one. A slot is
-    // only ever one whose own pattern the week holds elsewhere too.
-    const soleCoverage = (name: string): boolean => {
-      const pat = findEntry(name)?.movement_pattern; const cov = pat ? classifyForCoverage(pat) : null
-      if (!cov) return false
-      return days.reduce((n, d) => n + d.exercises.filter(ex => { const x = findEntry(ex.name); return !!x && x.mechanics_tier !== 'primer' && classifyForCoverage(x.movement_pattern) === cov }).length, 0) <= 1
-    }
     for (let dayIdx = days.length - 1; dayIdx >= 0 && !slot; dayIdx--) {
       if (!dayAllowsCoveragePattern(dayIdx, missing)) continue
       const exercises = days[dayIdx].exercises
       for (let exIdx = exercises.length - 1; exIdx >= 0; exIdx--) {
-        if (protectedNames.has(exercises[exIdx].name) || soleCoverage(exercises[exIdx].name)) continue
+        if (protectedNames.has(exercises[exIdx].name)) continue
         if (findEntry(exercises[exIdx].name)?.mechanics_tier === 'tier3_isolation') { slot = { dayIdx, exIdx }; break }
       }
     }
@@ -4883,7 +4875,7 @@ function balanceWeeklyStructure(
         if (!dayAllowsCoveragePattern(dayIdx, missing)) continue
         const exercises = days[dayIdx].exercises
         for (let exIdx = exercises.length - 1; exIdx >= 0; exIdx--) {
-          if (protectedNames.has(exercises[exIdx].name) || soleCoverage(exercises[exIdx].name)) continue
+          if (protectedNames.has(exercises[exIdx].name)) continue
           const entry = findEntry(exercises[exIdx].name)
           if (entry && entry.mechanics_tier !== 'tier1_compound' && entry.mechanics_tier !== 'primer') { slot = { dayIdx, exIdx }; break }
         }
@@ -5885,14 +5877,6 @@ function enforceDayDurationBudget(
     const accessories = trimmable.filter(t => !t.isRehab && (!t.role || !protectedRoles.has(t.role)))
     const rehabOnly = trimmable.filter(t => t.isRehab)
     const candidates = accessories.length > 0 ? accessories : rehabOnly.length > 0 ? rehabOnly : trimmable
-    // AN ISOLATION LIFT GOES BEFORE A MAIN LIFT'S SET (22 Nov 2026, the persona audit's C17; CSCS, mine): with every
-    // accessory at its floor, this took a bench press's fourth set (the week's only chest work) and kept two sets of lateral
-    // raises. At the last time check, an isolation lift (never trunk work or rehab) leaves the day first, while it keeps three.
-    if (candidates === trimmable && trunkElsewhere != null) {
-      const slots = trainingSlotCount(exercises.map(ex => findEntry(ex.name))) + (day.recommendedCardio?.timing === 'post_session' && !day.recommendedCardio.is_filler ? 1 : 0)
-      const iso = slots > 3 ? exercises.map((ex, i) => ({ i, e: findEntry(ex.name) })).filter(t => t.e?.mechanics_tier === 'tier3_isolation' && t.e.movement_pattern !== 'core' && !isIndicatedFor(t.e, flaggedJoints)).pop() : undefined
-      if (iso) { exercises = exercises.filter((_, i) => i !== iso.i); continue }
-    }
     candidates.sort((a, b) => ((pullNeeded && isPullT(a.entry) ? 1 : 0) - (pullNeeded && isPullT(b.entry) ? 1 : 0)) || b.sets - a.sets)
     const target = candidates[0].i
     exercises = exercises.map((ex, i) => (i === target ? { ...ex, sets: ex.sets - 1 } : ex))
@@ -9973,11 +9957,7 @@ export function generateMesocycle(
           const isChest = (e: ExerciseEntry) => e.mechanics_tier !== 'primer' && (e.movement_pattern === 'horizontal_push' || (e.movement_pattern as string) === 'isolation_chest')
           const chestRows = days.flatMap(d => d.exercises.filter(ex => { const x = findEntry(ex.name); return !!x && isChest(x) }))
           let chestSets = chestRows.reduce((n, ex) => n + (ex.sets ?? 0), 0)
-          // ...never past pushing 1.5x the week's pulling (the persona audit's C18: a two-day week's push-ups went to four
-          // sets beside a two-set row). A week short of both chest and back work is a short week, not a press-heavy one.
-          const weekSets = (ps: string[]) => days.reduce((n, d) => n + d.exercises.filter(ex => { const x = findEntry(ex.name); return !!x && x.mechanics_tier !== 'primer' && ps.includes(x.movement_pattern) }).reduce((a, ex) => a + (ex.sets ?? 0), 0), 0)
-          const pressRoom = () => { const pull = weekSets(['horizontal_pull', 'vertical_pull']); return pull === 0 || weekSets(['horizontal_push', 'vertical_push']) + 1 <= pull * 1.5 }
-          for (let guard = 0; chestRows.length > 0 && chestSets < 4 && pressRoom() && guard < 8; guard++) {
+          for (let guard = 0; chestRows.length > 0 && chestSets < 4 && guard < 8; guard++) {
             const room = chestRows.filter(ex => { const x = findEntry(ex.name)!; const role = getVolumeRole(x); return !!role && ex.sets < getRoleSetCeiling(role, true) }).sort((a, b) => a.sets - b.sets)[0]
             if (!room) break
             room.sets += 1
@@ -10189,27 +10169,6 @@ export function generateMesocycle(
         const isPush = (n: string) => ['horizontal_push', 'vertical_push'].includes(findEntry(n)?.movement_pattern ?? '')
         const isPull = (n: string) => ['horizontal_pull', 'vertical_pull'].includes(findEntry(n)?.movement_pattern ?? '')
         const sum = (f: (n: string) => boolean) => days.reduce((n, d) => n + d.exercises.filter(e => f(e.name) && findEntry(e.name)?.mechanics_tier !== 'primer').reduce((a, e) => a + (e.sets ?? 0), 0), 0)
-        // First a pull with room takes a set, on a day with the minutes for it (more pulling, not less pressing); only then
-        // does a press go.
-        const maxSeconds = getSessionMaximumSeconds(profile.session_duration_preference || '45-60')
-        const setCap = experience === 'beginner' ? BEGINNER_MAX_WORKING_SETS : (profile.injuries ?? []).includes('lower_back') ? LOWER_BACK_MAX_WORKING_SETS : Infinity
-        for (let guard = 0; guard < 8 && sum(isPull) > 0 && sum(isPush) > sum(isPull) * 1.5; guard++) {
-          let bumped = false
-          // The lighter day first, so the extra set evens the week rather than piling onto its longest day (C15).
-          const byLoad = days.map((_, k) => k).filter(k => days[k].exercises.length > 0).sort((a, b) => beginnerWorkingSets(days[a]) - beginnerWorkingSets(days[b]))
-          for (const di of byLoad) {
-            if (bumped) break
-            const d = days[di]
-            if (beginnerWorkingSets(d) + 1 > setCap) continue
-            const ix = d.exercises.findIndex(e => { const x = findEntry(e.name); const role = x ? getVolumeRole(x) : null; return !!x && isPull(e.name) && x.mechanics_tier !== 'primer' && !!role && e.sets < getRoleSetCeiling(role, true) })
-            if (ix < 0) continue
-            const next = { ...d, exercises: d.exercises.map((e, j) => (j === ix ? { ...e, sets: e.sets + 1 } : e)) }
-            if (estimateDaySeconds(next) > maxSeconds) continue
-            days[di] = next
-            bumped = true
-          }
-          if (!bumped) break
-        }
         for (let guard = 0; guard < 6 && sum(isPull) > 0 && sum(isPush) > sum(isPull) * 1.5; guard++) {
           const di = days.findIndex(d => d.exercises.filter(e => isPush(e.name) && findEntry(e.name)?.mechanics_tier !== 'primer').length >= 2 && trainingSlotCount(d.exercises.map(e => findEntry(e.name))) > 3)
           if (di < 0) break

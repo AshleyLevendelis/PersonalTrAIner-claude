@@ -179,7 +179,7 @@ console.log('\n9. Round two (his "yes fix the remaining ones too", 22 Nov 2026)'
     check('...and no renegade row anywhere in her plan', !m.some(w => w.days.some(d => d.exercises.some(e => e.name === 'Renegade Row'))))
   }
 
-  // C1: covering a missing plane never takes the week's only squat.
+  // C1: a 20-30 minute week is not made to cover a second plane, so its only squat is never swapped away for one.
   for (const i of [123, 388, 588]) {
     const { m } = audited(i)
     const none = loadingWeeks(m).filter(w => sets(w, ['knee_dominant', 'single_leg']) === 0).map(w => w.week_number)
@@ -233,11 +233,16 @@ console.log('\n9. Round two (his "yes fix the remaining ones too", 22 Nov 2026)'
     check('...a 60-90 minute session keeps the full build-up (the fixture binds: the rule is the short session)', long.some(w => w.days.some(d => d.warmup?.ramp_ups.some(r => r.sets.some(st => st.load_percent === 0)))))
   }
 
-  // C18 / C17: the chest floor stops where pushing would run past 1.5x pulling; a week keeps four back sets.
+  // C18 / C17: a press-heavy week gives a pull a set first (on the lighter day, with the minutes); a week keeps four chest sets.
   {
     const { m } = audited(207)
     const heavy = loadingWeeks(m).filter(w => { const pull = sets(w, ['horizontal_pull', 'vertical_pull']); return pull > 0 && sets(w, ['horizontal_push', 'vertical_push']) > pull * 1.5 }).map(w => w.week_number)
-    check('C18 #207: no loading week pushes more than 1.5x what it pulls (the chest floor took push-ups to four sets beside a two-set row)', heavy.length === 0, heavy)
+    check('C18 #207: no loading week pushes more than 1.5x what it pulls (push-ups at four sets beside a two-set row)', heavy.length === 0, heavy)
+  }
+  {
+    const { m } = audited(36)
+    const low = loadingWeeks(m).filter(w => sets(w, ['horizontal_pull', 'vertical_pull']) < 4).map(w => w.week_number)
+    check('C17 #36: four back sets every loading week (a bodyweight week\'s only pull was a two-set table row)', low.length === 0, low)
   }
   {
     const { m } = audited(112)
