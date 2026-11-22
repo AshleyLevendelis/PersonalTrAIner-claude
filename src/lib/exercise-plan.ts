@@ -8820,13 +8820,16 @@ export function generateMesocycle(
             if (rampLoad && unverifiedForCategory && !isDeload && !isCalibrationWeek) {
               const previousInSlot = lastUnverifiedLoadingWeekKg[dayIdx][exIdx]
               const previousForThisLift = dbEntry ? lastUnverifiedLoadingWeekKgByLift.get(dbEntry.name) : undefined
-              // Both, when both exist: never step up from a number that was
-              // not this lift's, and never step up past what this slot
-              // actually displayed last week either. See
-              // lastUnverifiedLoadingWeekKgByLift's declaration.
-              const previous = previousForThisLift != null && previousInSlot != null
-                ? Math.min(previousForThisLift, previousInSlot)
-                : previousForThisLift ?? previousInSlot
+              // ITS OWN NUMBER FIRST, as the declaration of
+              // lastUnverifiedLoadingWeekKgByLift says ("a lift with its own
+              // history uses that instead"). It read min(own, slot) until
+              // 21 Nov 2026, so the slot's half could still pull a lift DOWN
+              // to a stranger's weight: an advanced man's Push Press was 37.5kg
+              // in week 5 and 25kg in week 13, at the same reps, because a
+              // 20kg lift had sat in its Friday slot the week before. The
+              // per-lift value is already the lowest across that lift's
+              // slots, so nothing it guards is lost.
+              const previous = previousForThisLift ?? previousInSlot
               if (previous != null) unverifiedPreviousLoadingWeekKg = previous
             }
             if (unverifiedPreviousLoadingWeekKg == null && baselineKg != null) {

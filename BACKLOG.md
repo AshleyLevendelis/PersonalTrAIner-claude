@@ -2,6 +2,33 @@
 
 Newest first. One line each.
 
+- [x] **A 25-YEAR-OLD ADVANCED MAN'S PLAN, READ AS A COACH: his "yes fix all five"** (21 Nov 2026; CSCS mine). Two
+  read-only traces first (engine-tracer), then: (1) STARTING WEIGHTS LOOKED LIKE A BEGINNER'S (bench 40kg week 1,
+  95kg by week 15, against a ~128kg estimated max). TRACED: the calibration week starts an unconfirmed "advanced" lift
+  at 45% of the estimate, then it may climb only one plate step (5kg) per loading week, capped by the estimate,
+  never re-anchored to it. DELIBERATE and measured: a self-reported advanced lifter was once handed a 130kg first-ever
+  deadlift, and an earlier percentage schedule snapped a squat 55 -> 135kg at a block boundary. NOT CHANGED, and why,
+  told to him: his real numbers replace the guesses as soon as he logs week 1 (or answers the first-session "recent
+  hard set" card, which an advanced barbell lifter is asked); loosening the ramp would re-open the overclaiming harm.
+  The printed plan for someone who never logs stays conservative. (2) PULL-UPS: I first said a strength block had
+  bodyweight pull-ups; WRONG, my summary script never printed the added-load field (+15kg was there). The real gap:
+  the hypertrophy blocks, 5x6-8 bodyweight for an advanced 85kg man. Added load now applies in hypertrophy at 60% of
+  the strength figure (+10kg), the rep guard unchanged. (3) CORE KEEPS 8+ REPS: hanging leg raises and rollouts are
+  catalogued tier 2, so a strength block cut them to 6-8 (CORE_REP_FLOOR 8). (4) ODD PICKS: the assisted dip machine
+  is a regression past novice; the Spanish squat is rehab-only (knee); a renegade row ranks below loadable rows on a
+  muscle-gain plan (24 hypertrophy plans: 0; fat-loss plans still 18 of 24, so it is not banned). (5) DISPLAY:
+  "per leg" now needs one leg working (Suitcase Deadlift, both feet down, reads "(single side)"; the five single-leg
+  entries keep "per leg"); and A LIFT STEPS UP FROM ITS OWN LAST NUMBER: min(own, slot) let a stranger in the slot
+  pull it down (Push Press 37.5kg in week 5, 25kg in week 13); now own history first, as the declaration always said:
+  52.5kg in week 13.
+  CSCS REVIEW: (1) effect: real loading on pull-ups and dips, trunk work trained for position, honest labels; (2)
+  takes away: nothing a healthy advanced lifter needs; (3) fundamentals: progressive overload now continuous across
+  blocks for rotated-back lifts; (4) the unverified-ramp invariant is untouched (one step per loading week, own
+  history); (5) in scope.
+  CHECKS: `test:advanced-lifter` (16 checks; 9 mutations, 9 caught); ten load gates re-run green (assumed-body,
+  ramp-arrived, per-side-load, block-swap-reach, load-display, calibration-search, frozen-weeks, load-ceilings,
+  single-implement, replacement-prescription).
+
 - [x] **HER FOUR LEFTOVERS, AND WHAT THEY WERE FOR EVERYONE: his "fix the four leftovers in her plan too"** (21 Nov
   2026; every decision CSCS, mine). Her plan (60, beginner, full gym) still had a backpack row in a gym, a Russian
   twist, a wrist-tendon drill as a warm-up, and a back-extension machine as her main hip lift. Three were general:

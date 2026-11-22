@@ -1663,9 +1663,15 @@ export function loadLabelMode(isDumbbell: boolean, isSingleSide: boolean, isLowe
  * error alone, because the caption is what a trainee uses to decide whether
  * to load one dumbbell or two.
  */
+const ONE_LEG_NAME = /single[- ]leg|one[- ]leg|iso-lateral|kickback/i
+
 export function labelModeForEntry(entry: ExerciseEntry): LoadLabelMode {
   const mode = loadingMode(entry)
-  return loadLabelMode(mode === 'dumbbell', isPerSideLoad(entry) && mode !== 'dumbbell', isLowerBodyMovement(entry))
+  // "PER LEG" NEEDS ONE LEG WORKING (21 Nov 2026). Load on one side plus leg muscles was read as one leg, so a
+  // Suitcase Deadlift (one dumbbell at the side, both feet down) said "per leg". A stack machine worked one leg at a
+  // time, or a name that says so, is per leg; anything else held on one side is "(single side)".
+  const oneLeg = mode === 'stack' || ONE_LEG_NAME.test(entry.name)
+  return loadLabelMode(mode === 'dumbbell', isPerSideLoad(entry) && mode !== 'dumbbell', isLowerBodyMovement(entry) && oneLeg)
 }
 
 export function formatLoad(kg: number, labelMode: LoadLabelMode): string {
