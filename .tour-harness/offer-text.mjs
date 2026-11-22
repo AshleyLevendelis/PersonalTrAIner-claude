@@ -72,7 +72,7 @@ const READ = String.raw`((n) => {
   // The offer's own answers. Not the Listen icon on the coach's bubble (her 31 Oct 2026 ruling): it reads the
   // message aloud and answers nothing, and it is checked by verify:chat-2b and verify:chat-bubbles.
   // The Details toggle (17 Nov 2026) sits inside the bubble and is not an answer to the offer.
-  const answers = [...o.querySelectorAll('button')].filter(b => !b.hasAttribute('data-listen') && b.dataset.testid !== 'offer-details-toggle')
+  const answers = [...o.querySelectorAll('button')].filter(b => !b.hasAttribute('data-listen') && !b.hasAttribute('data-report-reply') && b.dataset.testid !== 'offer-details-toggle')
   const buttons = answers.map(b => {
     const r = b.getBoundingClientRect(), pill = b.firstElementChild, pr = pill ? pill.getBoundingClientRect() : null, ps = cs(pill)
     return { label: (b.textContent || '').trim(), h: r.height, w: r.width, pillH: pr ? pr.height : 999, pillFont: ps ? parseFloat(ps.fontSize) : 99, pillShadow: ps ? ps.boxShadow : '?', shadow: cs(b).boxShadow, inConfirmRow: confirmRow.includes(b) }
