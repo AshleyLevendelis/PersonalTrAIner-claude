@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **A PREGNANT BEGINNER GETS THE SAFER LIST AND TWO WALKS (his "yes fix all four", 22 Nov 2026)**, read off a
+  35-year-old pregnant beginner's plan: she was learning barbell back squats, sumo deadlifts and an incline barbell
+  bench, doing bent-over and T-bar rows, walking lunges, Bulgarian split squats and a one-leg balance hold, and had no
+  rest-day walking. CSCS mine, inside the pregnancy rules (ACOG: start low if new to exercise, avoid fall risk, about
+  150 minutes a week of moderate aerobic activity): a pregnant beginner gets the whole older-beginner safer list (no
+  barbell, technique, hanging or jumping lift), plus a balance rule of her own (lateral lunge, one-leg balance hold;
+  an older beginner keeps both, they are her training), the same foundation lifts, and the two optional rest-day
+  walks. Lifts once she is past beginner. `test:pregnant-beginner` (29 checks; 4 of 4 valid mutations caught; a fifth
+  named a function no longer imported and crashed, not counted).
 - [x] **A 70-YEAR-OLD BEGINNER'S PLAN, FOUR FIXES (his "yes fix all four", 22 Nov 2026)**, read off her 16 weeks as a
   coach. CSCS mine on all four; the fourth narrows his ruling "B" (no rest-day activity for a beginner) from 60.
   (1) No bent-over dumbbell row, hollow body hold or one-arm press (bench, half-kneeling, kettlebell) for a beginner

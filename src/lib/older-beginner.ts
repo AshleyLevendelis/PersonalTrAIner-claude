@@ -31,6 +31,7 @@ import { getExerciseEntry, isBallisticMovement, type ExerciseEntry } from './exe
 import { getSkillDemand } from './experience-config'
 import { loadingMode } from './load-prescription'
 import { PREGNANCY_IMPACT } from './pregnancy-rules'
+import { isPregnant } from './health-conditions'
 
 const OLDER_BEGINNER_FROM_AGE = 60
 
@@ -80,7 +81,7 @@ const OLDER_BEGINNER_TECHNIQUE = /single-leg[^,]*\b(rdl|romanian)|reverse hyper|
 /** Kit you hang from or support your whole body on. */
 const HANGING_KIT = new Set(['pull-up bar', 'assisted pull-up machine', 'dip bars'])
 
-export type OlderBeginnerReason = 'technique' | 'barbell' | 'hanging' | 'impact'
+export type OlderBeginnerReason = 'technique' | 'barbell' | 'hanging' | 'impact' | 'balance'
 
 /**
  * Why this exercise is left out of an older beginner's plan, or null when it is fine.
@@ -110,12 +111,42 @@ export const OLDER_BEGINNER_FOUNDATIONS: Readonly<Partial<Record<'knee_dominant'
   knee_dominant: ['Goblet Squats', 'Box Squat (Bodyweight)', 'Leg Press'],
 }
 
+/**
+ * A PREGNANT BEGINNER GETS THE SAME SAFER LIST (22 Nov 2026, his "yes fix all four" on a 35-year-old pregnant
+ * beginner's plan; CSCS, mine, inside the pregnancy rules, never a medical judgement). She was learning barbell back
+ * squats, sumo deadlifts and bent-over barbell rows while pregnant. ACOG: a woman new to exercise starts at low
+ * intensity and progresses gradually, and avoids activities with a high risk of falling. A coach teaches a new lifter
+ * the same patterns on dumbbells, machines and goblet squats in any case, and pregnancy is not the time to learn a
+ * barbell: technique, breath-holding and a growing bump all work against her. So everything the older-beginner list
+ * keeps out, she does not get either; it lifts when she is past beginner, exactly as for an older beginner.
+ * And one more kind, for her alone: balance-heavy moves (a lateral lunge, a one-leg balance hold), because her balance
+ * shifts week by week and a fall is the thing to avoid. Step-ups and reverse lunges stay until the 28-week rules take
+ * them. An older beginner keeps her balance hold: there it is the training.
+ */
+export function isPregnantBeginner(profile: Pick<UserProfile, 'training_experience' | 'health_conditions'>): boolean {
+  return isPregnant(profile) && profile.training_experience === 'beginner'
+}
+/** An older beginner or a pregnant beginner: who gets the safer exercise list. */
+export function needsBeginnerSafeguards(profile: Pick<UserProfile, 'age' | 'training_experience' | 'health_conditions'>): boolean {
+  return isOlderBeginner(profile) || isPregnantBeginner(profile)
+}
+const PREGNANT_BEGINNER_BALANCE = /lateral lunge|single-leg balance|curtsy|skater/i
+/** Why this exercise is left out for this person's safer list, or null. */
+export function beginnerSafeguardExclusion(profile: Pick<UserProfile, 'age' | 'training_experience' | 'health_conditions'>, ex: ExerciseEntry): OlderBeginnerReason | null {
+  if (!needsBeginnerSafeguards(profile)) return null
+  const why = olderBeginnerExclusion(ex)
+  if (why) return why
+  if (isPregnantBeginner(profile) && PREGNANT_BEGINNER_BALANCE.test(ex.name)) return 'balance'
+  return null
+}
+
 /** The words the plan's trace and the swap search use for each reason. */
 export const OLDER_BEGINNER_REASON_TEXT: Record<OlderBeginnerReason, string> = {
   technique: 'a technique lift, introduced once you have a training base',
   barbell: 'a barbell lift, which cannot start lighter than the bar; dumbbells and machines first',
   hanging: 'hanging or full-bodyweight support work; a seated pulldown trains the same muscles',
   impact: 'a jumping move, added once you have trained a while',
+  balance: 'a balance-heavy move, kept out while you are pregnant',
 }
 
 /**

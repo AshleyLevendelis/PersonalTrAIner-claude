@@ -11,7 +11,7 @@ import {
   type ExperienceConfig,
 } from './experience-config'
 import { PREGNANCY_LATE_EXCLUDED, PREGNANCY_LATE_REPLACEMENTS, lateReplacementKind, PELVIC_FLOOR_WARMUP_ITEM, pregnancyExclusion as pregnancyExclusionLate } from './pregnancy-rules'
-import { isOlderBeginner, olderBeginnerExclusion, olderAdultExclusion, OLDER_BEGINNER_REASON_TEXT, OLDER_BEGINNER_FOUNDATIONS } from './older-beginner'
+import { isOlderBeginner, needsBeginnerSafeguards, beginnerSafeguardExclusion, olderAdultExclusion, OLDER_BEGINNER_REASON_TEXT, OLDER_BEGINNER_FOUNDATIONS } from './older-beginner'
 import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields, withBalanceWork } from './warmup'
 import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, isPerSideLoad, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
@@ -1471,27 +1471,29 @@ function stageSkillFilter(
 
 export function stageOlderBeginnerFilter(
   pool: ExerciseEntry[],
-  profile: Pick<UserProfile, 'age' | 'training_experience'>,
+  profile: Pick<UserProfile, 'age' | 'training_experience' | 'health_conditions'>,
   trace: ConstraintTrace
 ): ExerciseEntry[] {
   // From 65 at any level: no landing-impact jumps, never put back (older-beginner.ts olderAdultExclusion).
   const impactOut = pool.filter(ex => olderAdultExclusion(profile, ex))
   for (const ex of impactOut) trace.skill_filtered.push({ exercise: ex.name, stage: 'skill', reason: 'from 65: a jump with a real landing; fast work without impact instead' })
   if (impactOut.length) pool = pool.filter(ex => !impactOut.includes(ex))
-  if (!isOlderBeginner(profile)) return pool
-  const kept = pool.filter(ex => !olderBeginnerExclusion(ex))
+  // A beginner from 60, or a pregnant beginner (older-beginner.ts needsBeginnerSafeguards).
+  if (!needsBeginnerSafeguards(profile)) return pool
+  const who = isOlderBeginner(profile) ? 'beginner from 60' : 'pregnant beginner'
+  const kept = pool.filter(ex => !beginnerSafeguardExclusion(profile, ex))
   const keptPatterns = new Set(kept.map(ex => ex.movement_pattern))
   const result: ExerciseEntry[] = []
   for (const ex of pool) {
-    const why = olderBeginnerExclusion(ex)
+    const why = beginnerSafeguardExclusion(profile, ex)
     if (!why) { result.push(ex); continue }
     // Hanging and jumping are never put back: with only a pull-up bar her pulling is rows, as a coach would set it.
     if ((why === 'technique' || why === 'barbell') && !keptPatterns.has(ex.movement_pattern)) {
       result.push(ex)
-      trace.skill_filtered.push({ exercise: ex.name, stage: 'skill', reason: `beginner from 60: kept, the only ${ex.movement_pattern} option left` })
+      trace.skill_filtered.push({ exercise: ex.name, stage: 'skill', reason: `${who}: kept, the only ${ex.movement_pattern} option left` })
       continue
     }
-    trace.skill_filtered.push({ exercise: ex.name, stage: 'skill', reason: `beginner from 60: ${OLDER_BEGINNER_REASON_TEXT[why]}` })
+    trace.skill_filtered.push({ exercise: ex.name, stage: 'skill', reason: `${who}: ${OLDER_BEGINNER_REASON_TEXT[why]}` })
   }
   return result
 }
@@ -5955,7 +5957,9 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
   // cool-down walks reach a fraction of it. An easy 20-minute walk is the lightest dose there is: it costs her lifting
   // days nothing and is named optional wherever it shows. Two, never on consecutive rest days, so at least one rest
   // day in between stays a full rest; never with low recovery; and outside the goal's conditioning count.
-  if (noRestDayActivity && isOlderBeginner(profile) && recovery !== 'low') {
+  // And a pregnant beginner (22 Nov 2026, his "yes fix all four"): ACOG asks about 150 minutes a week of moderate
+  // aerobic activity in pregnancy, and an easy walk is its gentlest form; the same two, the same optional words.
+  if (noRestDayActivity && needsBeginnerSafeguards(profile) && recovery !== 'low') {
     const walk = { activity: 'Easy walk — conversational pace', duration: 20, targetRpe: 3 }
     const picked: string[] = []
     for (const d of restDayNames) {
@@ -6310,7 +6314,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const laterFixed = resolvedTracks.slice(index + 1).map(focus => fixedLowerMainPattern(TRACKS[focus]))
     const lowerMainsLater = { squat: laterFixed.filter(p => p === 'knee_dominant').length, hinge: laterFixed.filter(p => p === 'hip_hinge').length }
 
-    const { primer, rehab, main, requiredNames, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []), (equipmentTierFor(profile) || 'full_gym'), trainingStyle, legDaysElsewhere >= 2, lowerMainsLater, isOlderBeginner(profile) ? OLDER_BEGINNER_FOUNDATIONS : undefined)
+    const { primer, rehab, main, requiredNames, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []), (equipmentTierFor(profile) || 'full_gym'), trainingStyle, legDaysElsewhere >= 2, lowerMainsLater, needsBeginnerSafeguards(profile) ? OLDER_BEGINNER_FOUNDATIONS : undefined)
     for (const name of requiredNames) weeklyRequiredNames.add(name)
 
     // Build exercise list with sets/reps from style config
