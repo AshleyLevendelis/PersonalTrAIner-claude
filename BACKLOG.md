@@ -2,6 +2,17 @@
 
 Newest first. One line each.
 
+- [x] **THE TOUR'S SET STOP, A RACE (found by the pre-merge sweep, 21 Nov 2026)**. "Leave the fields blank" showed
+  under a row that had just asked for a typed weight. CORRECTED: my first fix (a2753e1) blamed the row's flag settling
+  late and kept the flag once seen; it passed alone and failed under the sweep's load. Instrumenting it made it pass
+  again, which is what named it: after the save, one more animation frame runs before the after-log phase takes
+  effect, finds the NEXT set's ✓ (which now offers the weight just typed) and WROTE the flag back to false. Now the flag
+  only ever turns on within a step and resets when the step changes. Two further mechanisms written while guessing (a
+  persistent row attribute, "a target that moved is not a save") were measured inert against the real cause and
+  removed. `verify:tour-real` 3 runs of 3 under load, `verify:tour`, `test:app-tour` green. Also: `test:machine-pack`
+  models the Leg Press Calf Raise's joint tags on the Seated Calf Raise (back supported, nothing on the shoulders), not
+  the standing machine that gained the axial tag; it is still priced as the standing machine.
+
 - [x] **A BAD BACK, READ AS A COACH: his "yes fix all four"** (21 Nov 2026; CSCS, mine). A 50-year-old with his lower
   back on the injuries list was given a hack squat to 150kg, Smith-machine split squats (bar across the back), a
   reverse hyper as Friday's main hip lift to 72.5kg, and a 26-set Monday. FIXED: five entries gain `lower_back_axial`

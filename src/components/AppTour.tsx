@@ -219,6 +219,8 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
   const [setNeedsWeight, setSetNeedsWeight] = useState(false)
 
   const stepIndex = state.status === 'active' ? state.step : state.status === 'skipped' ? state.step : 0
+  // The set stop's "this row asked for a typed weight" starts fresh with each stop (it only ever turns on within one).
+  useEffect(() => { setSetNeedsWeight(false) }, [stepIndex])
   const step = STEPS[stepIndex]
   const phase: Phase = state.status === 'active' ? state.phase : 'info'
   const running = state.status === 'active'
@@ -386,15 +388,18 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
             return
           }
           // The row's answer can settle after the step first found it (its weight is worked out a moment later), so it
-          // is read again on every measure, and once the row has asked for a typed weight the step remembers it: the
-          // flag leaves the row when the set saves, and the after-log line is about the row that was tapped (21 Nov 2026).
+          // is read again on every measure; once seen it is kept for the step (21 Nov 2026).
           if (step.key === SET_STEP_KEY && held.getAttribute('data-needs-weight') === 'true') setSetNeedsWeight(true)
           el = held
         } else {
           el = findTarget(key)
           if (el) {
             gateNode.current = el
-            if (step.key === SET_STEP_KEY) setSetNeedsWeight(el.getAttribute('data-needs-weight') === 'true')
+            // ONLY EVER TURNS ON within a step (it resets when the step changes, at the top). After the save, one more frame can
+            // run before the after-log phase takes effect, find the NEXT set's ✓ here (which offers the weight just typed)
+            // and, if this could write false, put "Leave the fields blank" under the row that asked for a weight. That
+            // race was the whole failure: it passed whenever anything slowed the page down.
+            if (step.key === SET_STEP_KEY && el.getAttribute('data-needs-weight') === 'true') setSetNeedsWeight(true)
           }
         }
       } else {

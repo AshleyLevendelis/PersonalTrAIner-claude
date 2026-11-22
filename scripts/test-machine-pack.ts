@@ -35,7 +35,9 @@ const PACK: { name: string; copies: string; pricedAs: string | null; category: s
   { name: 'Iso-Lateral Pulldown', copies: 'Lat Pulldown', pricedAs: 'Lat Pulldown', category: 'pulldown' },
   { name: 'Cable Y-Raise', copies: 'Cable Lateral Raises', pricedAs: 'Cable Lateral Raises', category: 'isolation_shoulder' },
   { name: 'Bayesian Cable Curl', copies: 'Incline Dumbbell Curls', pricedAs: 'Cable Curls', category: 'isolation_bicep' },
-  { name: 'Leg Press Calf Raise', copies: 'Standing Calf Raise Machine', pricedAs: 'Standing Calf Raise Machine', category: 'isolation_calf' },
+  // copies (its joint tags) the SEATED calf raise since 21 Nov 2026: the standing machine gained the axial tag (shoulder pads),
+  // and on a leg press the back is supported with nothing on the shoulders. It is still PRICED as the standing machine.
+  { name: 'Leg Press Calf Raise', copies: 'Seated Calf Raises', pricedAs: 'Standing Calf Raise Machine', category: 'isolation_calf' },
   { name: 'Smith Machine Split Squat', copies: 'Bulgarian Split Squats', pricedAs: 'Bulgarian Split Squats', category: 'single_leg_dumbbell' },
   { name: 'Single-Leg Leg Press', copies: 'Leg Press', pricedAs: 'Leg Press', category: 'leg_press' },
   { name: 'Single-Leg Leg Extension', copies: 'Leg Extensions', pricedAs: 'Leg Extensions', category: 'isolation_quad' },
