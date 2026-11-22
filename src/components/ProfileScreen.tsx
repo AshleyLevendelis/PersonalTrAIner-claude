@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { allergiesOf, allergyLine } from '@/lib/allergies'
-import { PAUSE_WORDS } from '@/lib/plan-pause'
+import { PAUSE_WORDS, planPausedSince, pausedForDueDateOf } from '@/lib/plan-pause'
 import { otherInjuryOutcome, PELVIC_PREGNANCY_LINE } from '@/lib/other-injury'
 import { likeClash, likeRefusal as likeRefusalWords } from '@/lib/named-food-clash'
 import { HURT_KINDS, type HurtKind } from '@/lib/edit-reason'
@@ -2305,22 +2305,27 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         <div className="pt-1 space-y-2" style={{ borderTop: '1px solid var(--hairline)' }}>
           {/* A PLAN PAUSE (his ruling 14 Nov 2026, "Add a pause"): nothing due, nothing missed, no workout reminders;
               meals carry on. One function with today's card and the coach (App's handlePlanPause). */}
-          {onPlanPause && (
+          {onPlanPause && (() => {
+            // The pause as every screen reads it, so a due-date pause (his ruling 22 Nov 2026, "A") shows here too.
+            const pausedSince = planPausedSince(profileId) ?? profile.plan_paused_since ?? null
+            const forDueDate = pausedForDueDateOf(profileId)
+            return (
             <div className="space-y-1" data-testid="plan-pause-row">
               <Button
                 variant="outline"
                 className="hit-slop-44 h-11 w-full"
                 disabled={pauseBusy}
-                data-testid={profile.plan_paused_since ? 'plan-resume-profile' : 'plan-pause-profile'}
-                onClick={async () => { setPauseBusy(true); setPauseNote(await onPlanPause(!profile.plan_paused_since)); setPauseBusy(false) }}
+                data-testid={pausedSince ? 'plan-resume-profile' : 'plan-pause-profile'}
+                onClick={async () => { setPauseBusy(true); setPauseNote(await onPlanPause(!pausedSince)); setPauseBusy(false) }}
               >
-                {pauseBusy ? 'Saving…' : profile.plan_paused_since ? PAUSE_WORDS.resume : PAUSE_WORDS.pause}
+                {pauseBusy ? 'Saving…' : pausedSince ? (forDueDate ? PAUSE_WORDS.dueDateResume : PAUSE_WORDS.resume) : PAUSE_WORDS.pause}
               </Button>
               <p className="text-xs text-muted-foreground" data-testid="plan-pause-note">
-                {pauseNote ?? (profile.plan_paused_since ? PAUSE_WORDS.paused(profile.plan_paused_since) : 'Nothing is due or counted as missed while paused, and meals carry on.')}
+                {pauseNote ?? (pausedSince ? (forDueDate ? PAUSE_WORDS.dueDateLine : PAUSE_WORDS.paused(pausedSince)) : 'Nothing is due or counted as missed while paused, and meals carry on.')}
               </p>
             </div>
-          )}
+            )
+          })()}
           <Button
             variant="outline"
             className="hit-slop-44 h-11 w-full border-destructive/40 text-destructive"

@@ -64,27 +64,27 @@ type Asks = RegExp | readonly [RegExp, RegExp]
 
 const ASKS: Record<SlotKey, Asks> = {
   displayName: /call you|your name/i,
-  fitnessGoal: /\bgoals?\b|aiming (at|for)|what are you (actually |really |mainly )?after|what do you want (to get )?(out of|from)|what brings you|hoping to (get|achieve)|working towards|want (to get )?out of (this|it|all this)|hoping (this|the|your) plan/i,
-  trainingExperience: /how (much|long) (training|lifting)|background (with|in) (lifting|training|the gym|weights)|(lifting|training) background|describe your .{0,30}(lifting|training)|how long have you (been|trained|lifted)|\bexperience\b|new to (this|it|training|lifting|the gym)|(trained|lifted) before|done (much|any) (training|lifting)|(training|lifting) (before|in the past)|where are you at with/i,
+  fitnessGoal: /\bgoals?\b|aiming (at|for)|what are you (actually |really |mainly )?after|what do you want (to get )?(out of|from)|what brings you|hoping to (get|achieve)|working towards|want (to get )?out of (this|it|all this|training|the gym)|hoping (this|the|your) plan|want to achieve|what are you training for|(like|want) to get out of/i,
+  trainingExperience: /how (much|long) (training|lifting)|background (with|in) (lifting|training|the gym|weights)|(lifting|training) background|describe your .{0,30}(lifting|training)|how long have you (been|trained|lifted)|\bexperience\b|new to (this|it|training|lifting|the gym)|(trained|lifted) before|done (much|any) (training|lifting)|(training|lifting) (before|in the past)|(lifted|trained)( weights)? before|\bexperienced\b|\ba beginner\b|where are you at with/i,
   activityLevel: /how active|day[- ]to[- ]day|on your feet|\bdesk\b|outside (of )?(training|the gym|your sessions)/i,
   // 22 Nov 2026, his setup: the question became "Where will you be training?", so the coach asks about the PLACE
   // ("at a gym, at home, or a bit of both?", "where are you planning to train?") and the buttons stopped coming.
-  equipment: /equipment|\bkit\b|where (do|will|would|are) you (be |going to |planning (to|on) )*(train|training|work ?out|do(ing)? (your )?(workouts?|training|sessions))|access to|gym or (at )?home|home or (the |a )?gym|\bgym\b.{0,40}\bhome\b|\bhome\b.{0,40}\bgym\b|what (have|do) you (got|have) to (train|work) with/i,
+  equipment: /equipment|\bkit\b|where (do|will|would|are) you (be |going to |planning (to|on) )*(train|training|work ?out|do(ing)? (your )?(workouts?|training|sessions))|access to|gym or (at )?home|home or (the |a )?gym|be at a gym\b|train(ing)? at a gym\b|gym member|\bgym\b.{0,40}\bhome\b|\bhome\b.{0,40}\bgym\b|what (have|do) you (got|have) to (train|work) with/i,
   startPreference: /where (do|would) you (want|like) to start|ease in|straight in|kick things off/i,
-  injuries: /injur|niggle|bother|\bache|\bpain|work(ing)? around|play(s|ing)? up|dodgy|doctor|\bGP\b|health condition/i,
+  injuries: /injur|niggle|bother|\bache|\bpain|\bhurts?\b|work(ing)? around|play(s|ing)? up|dodgy|doctor|\bGP\b|health condition/i,
   knowsWorkingLifts: /know (your|what you).{0,40}(numbers|lifts|weights|squat|bench|dead)|working (lifts|weights)|your numbers/i,
   knownSquatKg: /squat|working weights?/i,
   knownBenchKg: /bench/i,
   knownDeadliftKg: /dead\s?lift/i,
-  trainingDays: /(which|what) days?|days (a|per|each) week|how many (days|times|sessions)|times a week|week look like/i,
+  trainingDays: /(which|what) days?|when can you (train|get to the gym|make it)|days (a|per|each) week|how many (days|times|sessions)|times a week|week look like/i,
   sessionDuration: [
     /how long|how much time|minutes|\bmins?\b|\bhour\b|session length/i,
     // "How long have you been training?" is experience; "how much time do you
     // want to spend cooking?" is cooking. Neither is session length.
     /cook|kitchen|\bmeals?\b|\beat|how long have you (been|trained|lifted)|been (training|lifting)|stuck with/i,
   ],
-  trainingStyle: /\bstyle\b|(like|prefer|want) to train|(kind|sort|type) of (training|workouts?|exercise) (do )?you (like|enjoy|prefer|love)|(kind|sort|type) of training gets you going/i,
-  conditioningPreference: /cardio|conditioning/i,
+  trainingStyle: /\bstyle\b|(like|prefer|want) to train|(kind|sort|type) of (training|workouts?|exercise) (do )?you (like|enjoy|prefer|love)|(kind|sort|type) of training gets you going|\bbodybuilding\b/i,
+  conditioningPreference: /cardio|conditioning|fan of running|(like|enjoy) running/i,
   recoveryCapacity: /recover|sleep|stress|well rested/i,
   dislikedExercises: /exercises? (you|to)\b.{0,30}(never|avoid|skip|hate|rather)|exercises? you can'?t stand/i,
   // 9 Nov 2026: the age is asked as a date of birth (his request), so the coach's "when were you born?" is the age too.
@@ -99,7 +99,7 @@ const ASKS: Record<SlotKey, Asks> = {
   // came with no buttons. A question about which FORMULA the calorie maths uses is this one.
   gender: /\bsex\b|\bgender\b|male or female|female or male|which should i use for|which (option|one|formula|figures?) should i use|calibrat\w*\b.{0,40}\b(calorie|nutrition|target)/i,
   mealsPerDay: /how many meals|meals (a|per|each) day|times a day|how often (do|would) you (like to |want to )?eat|\b(two|three|four|2|3|4) meals/i,
-  dietaryPreferences: /dietar|\bdiet\b|allerg|intoleran|vegetarian|vegan|restriction/i,
+  dietaryPreferences: /dietar|\bdiets?\b|allerg|foods? you can'?t (have|eat)|intoleran|vegetarian|vegan|restriction/i,
   dislikedFoods: /won'?t eat|rather i left out|leave (out|off)|foods? (you|to)\b.{0,20}(hate|dislike|avoid|can'?t stand)|foods? you (just )?don'?t like/i,
   usualFoods: /usually (eat|have)|(eat|have) most weeks|meals? (you|do you) (already|usually|normally)|normally eat/i,
   cookingTime: /cook|kitchen/i,
@@ -117,7 +117,7 @@ const ASKS: Record<SlotKey, Asks> = {
   // Its own wording, so its question is recognised as itself. It has no card of its own (a text answer), so this can
   // never put anything under a question: "date of birth" brings the AGE card (above), which sets this beside the age.
   dateOfBirth: /date of birth|\bborn\b|birthday|\bdob\b/i,
-  kitTicks: /which of these do you have|tick everything you'?ve got|untick anything you don.t have|what (kit|equipment) do you (actually )?(have|own) at home/i,
+  kitTicks: /which of these do you have|tick everything you'?ve got|untick anything you don.t have|what (kit|equipment) do you (actually )?(have|own) at home|what (kit|equipment) do you (actually )?own\b/i,
   enjoyedActivities: /(enjoy|like) (swimming|cycling)|swimming or cycling|besides walking/i,
   runningGoal: /running goal|work towards a run|run (a )?(5|10) ?k|half marathon|20 minutes non-stop/i,
 }

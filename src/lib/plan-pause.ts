@@ -12,10 +12,20 @@
 import { shortDate } from './day-labels'
 
 const pausedSince = new Map<string, string | null>()
+const pausedForDueDate = new Map<string, boolean>()
 
-/** App mirrors the profile's answer here on load and on every change. */
-export function setPlanPausedSince(profileId: string, since: string | null | undefined): void {
+/**
+ * App mirrors the profile's answer here on load and on every change. `forDueDate` when the pause is her due date
+ * arriving (health-conditions.ts dueDatePauseSince): the cards then say so, and resuming ends the pregnancy settings.
+ */
+export function setPlanPausedSince(profileId: string, since: string | null | undefined, forDueDate = false): void {
   pausedSince.set(profileId, since ?? null)
+  pausedForDueDate.set(profileId, !!since && forDueDate)
+}
+
+/** Is the plan paused because her due date has arrived? */
+export function pausedForDueDateOf(profileId: string | null | undefined): boolean {
+  return profileId ? pausedForDueDate.get(profileId) ?? false : false
 }
 
 /** The local date the pause began, or null when the plan is running. */
@@ -63,4 +73,10 @@ export const PAUSE_WORDS = {
   unchanged: 'Your meals, history and settings stay as they are.',
   alreadyPaused: (since: string) => `Your plan is already paused, since ${shortDate(since)}.`,
   notPaused: "Your plan isn't paused, so there's nothing to resume.",
+  // HER DUE DATE (his ruling 22 Nov 2026, "A"): congratulate, pause, restart after the 6-8 week postnatal check. The
+  // due date is not the birth, so the words hold either way.
+  dueDateCard: 'Your due date is here',
+  dueDateLine: "Congratulations, or good luck if your baby's still on the way. Your training is paused. Start again once you've had your 6-8 week postnatal check with your GP.",
+  dueDateResume: "I've had my check, start again",
+  dueDateResumed: 'Welcome back. Your pregnancy settings are off now, and your first sessions back are eased in.',
 }

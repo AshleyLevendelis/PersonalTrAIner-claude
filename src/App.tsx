@@ -20,7 +20,7 @@ import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import { BottomDock } from '@/components/BottomDock'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
-import { isPregnant, mealRestrictionsOf } from '@/lib/health-conditions'
+import { isPregnant, mealRestrictionsOf, dueDatePauseSince } from '@/lib/health-conditions'
 import { allergiesOf, labelLines as allergyLabelLines } from '@/lib/allergies'
 import { BottomDockHeightProvider, useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { AppTour, replayAppTour } from '@/components/AppTour'
@@ -70,7 +70,7 @@ import { applyCalibrationAnchors, calibrationAnchorMessage, sweepCalibrationWeek
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { readBootSnapshot, saveBootSnapshot, clearBootSnapshot, type BootSnapshot } from '@/lib/boot-cache'
 import { ensureSignedIn, claimProfile, hasClaimedOnThisPhone, markClaimedOnThisPhone, shouldAskForEmail, findOwnedProfileId, describeSignInFailure } from '@/lib/auth'
-import { rebuildFromCurrentWeek, type PlanInvalidation } from '@/lib/plan-invalidation'
+import { rebuildFromCurrentWeek, detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
 import { updateProfileField, savePlanPause } from '@/lib/profile-store'
 import { setPlanPausedSince, PAUSE_WORDS, setPlanPauseHandler } from '@/lib/plan-pause'
 import { SignInScreen } from '@/components/SignInScreen'
@@ -3295,7 +3295,18 @@ function App() {
    * which the field never touched, so a correction on Profile was a silent no-op.
    */
   // THE PAUSE, MIRRORED WHERE EVERY READER ASKS (plan-pause.ts), during render so the first strip drawn already knows.
-  if (profile?.id) setPlanPausedSince(profile.id, profile.plan_paused_since ?? null)
+  // HER DUE DATE PAUSES THE PLAN TOO (his ruling 22 Nov 2026, "A"): from the due date, read off the profile, so it holds
+  // even before the saved pause below lands (or where the pause's database step has not run).
+  const dueDatePause = profile?.id ? dueDatePauseSince(profile, getLocalDateString(getAppNow(profile.id))) : null
+  if (profile?.id) setPlanPausedSince(profile.id, profile.plan_paused_since ?? dueDatePause, !!dueDatePause)
+  // ...and saved as a real pause, once, so the phone's workout reminders (the server reads only the saved pause) stop.
+  useEffect(() => {
+    if (!profile?.id || !dueDatePause || profile.plan_paused_since) return
+    const id = profile.id
+    savePlanPause(id, dueDatePause)
+      .then(outcome => { if (outcome === 'saved') setProfile(prev => prev && prev.id === id ? { ...prev, plan_paused_since: dueDatePause } : prev) })
+      .catch(err => console.error('Saving the due-date pause failed:', err))
+  }, [profile?.id, dueDatePause, profile?.plan_paused_since])
 
   /**
    * PAUSE OR RESUME THE PLAN (his ruling 14 Nov 2026, "Add a pause"). Null when done, else the sentence to show. One
@@ -3304,12 +3315,24 @@ function App() {
   const handlePlanPause = async (pause: boolean): Promise<string | null> => {
     if (!profile?.id) return "That can't be changed until your profile has loaded."
     const since = pause ? getLocalDateString(getAppNow(profile.id)) : null
+    // RESUMING AFTER HER DUE DATE ENDS THE PREGNANCY SETTINGS (his ruling 22 Nov 2026, "A"): she starts again after her
+    // postnatal check, so "Pregnant" and the due date come off first (or the due date would pause it again at once), and
+    // the plan offers its rebuild without the pregnancy rules, as unticking it on Profile does.
+    const endsPregnancy = !pause && !!dueDatePause
+    const pregnancyOff: Partial<UserProfile> = { health_conditions: (profile.health_conditions ?? []).filter(c => c !== 'pregnancy'), due_date: null }
     try {
+      if (endsPregnancy) await updateProfileField(profile.id, pregnancyOff)
       const outcome = await savePlanPause(profile.id, since)
-      if (outcome === 'not-yet') return PAUSE_WORDS.notLive
+      if (outcome === 'not-yet' && !endsPregnancy) return PAUSE_WORDS.notLive
     } catch (err) {
       console.error('Saving the plan pause failed:', err)
       return pause ? "Your plan didn't pause just now. Try again in a moment." : "Your plan didn't resume just now. Try again in a moment."
+    }
+    if (endsPregnancy) {
+      const invalidation = detectPlanInvalidation(profile, pregnancyOff)
+      handleProfilePatched({ ...pregnancyOff, plan_paused_since: since })
+      if (invalidation) setPlanInvalidation(invalidation)
+      return null
     }
     handleProfilePatched({ plan_paused_since: since })
     return null

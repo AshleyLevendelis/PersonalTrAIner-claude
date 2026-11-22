@@ -6,6 +6,10 @@
 import fs from 'fs'
 import { EXERCISE_DATABASE, getExerciseEntry } from '../src/lib/exercise-db'
 import { generateMesocycle, getConstrainedPool, getExerciseCompatibilityWarnings, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
+import { PREGNANCY_LATE_REPLACEMENTS, lateReplacementKind, domingCue, DOMING_CUE } from '../src/lib/pregnancy-rules'
+import { dueDatePauseSince } from '../src/lib/health-conditions'
+import { setPlanPausedSince, pausedForDueDateOf, PAUSE_WORDS } from '../src/lib/plan-pause'
+import { readFileSync } from 'fs'
 import { PREGNANCY_LATE_EXCLUDED, PELVIC_FLOOR_WARMUP_ITEM, pregnancyExclusion, pregnancyWarning, PREGNANCY_IMPACT, PREGNANCY_LYING, PREGNANCY_ABDOMINAL_STRAIN, PREGNANCY_REP_FLOOR } from '../src/lib/pregnancy-rules'
 import { isContraindicatedFor, INJURED_JOINTS } from '../src/lib/exercise-db'
 import { detectPlanInvalidation } from '../src/lib/plan-invalidation'
@@ -278,6 +282,76 @@ console.log('\n11. His "yes fix all four", 21 Nov 2026: from 28 weeks, supported
     check('a minimalist kit keeps its pressing from 28 weeks (replaced, not dropped)', lateWs.length > 0 && lateWs.every(w => pushes(w) >= pushes(earlyW)), { early: pushes(earlyW), late: lateWs.map(pushes) })
   }
   check('every late-excluded name is a real catalogue entry', [...PREGNANCY_LATE_EXCLUDED].every(n => !!getExerciseEntry(n)), [...PREGNANCY_LATE_EXCLUDED].filter(n => !getExerciseEntry(n)))
+}
+
+console.log('\n12. The pregnancy audit, 22 Nov 2026 (his "A, and build fixes 2 and 3")')
+{
+  const today = getLocalDateString(getAppNow(undefined))
+  const dueIn = (weeks: number) => getLocalDateString(new Date(Date.parse(`${today}T12:00:00Z`) + weeks * 7 * 86_400_000))
+  const weekDate = (n: number) => getLocalDateString(new Date(Date.parse(`${today}T12:00:00Z`) + (n - 1) * 7 * 86_400_000))
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  const mum = (o: Record<string, unknown>) => ({ age: 31, gender: 'female', height_cm: 166, weight_kg: 68, activity_level: 'lightly_active', fitness_goal: 'functional',
+    health_conditions: ['pregnancy'], due_date: dueIn(10), start_preference: 'train', equipment_access: 'full_gym', conditioning_preference: 'tolerate',
+    training_days: DAYS.map(d => ({ day: d, available: ['Monday', 'Wednesday', 'Friday', 'Saturday'].includes(d) })), session_duration_preference: '45-60',
+    training_style: 'hybrid', training_experience: 'intermediate', injuries: [], recovery_capacity: 'moderate', workout_split_preference: 'ai_recommendation', ...o } as unknown as UserProfile)
+  // (a) The near-copies that got through, by NAME, not by the list (the list is what the fix changed). Measured before
+  // on the audit's 96 plans: 856 one-leg calf raises, 240 renegade rows, 144 reverse Nordics, 164 loaded rotations.
+  const NEAR = /renegade row|reverse nordic|cossack|single-leg .*calf raise|calf raise hold|landmine rotation|rotary torso/i
+  const leaks: string[] = []
+  let earlyNear = 0, rowsShort = 0, calfShort = 0
+  const pattern = (n: string) => getExerciseEntry(n)?.movement_pattern ?? ''
+  for (const eq of ['full_gym', 'home_gym', 'minimalist', 'bodyweight']) for (const style of ['hybrid', 'functional', 'bodybuilding']) for (const exp of ['novice', 'intermediate', 'advanced']) {
+    setRandomSource(seededRngFromKey(`g${eq}${style}${exp}10`))
+    const m = generateMesocycle(mum({ equipment_access: eq, training_style: style, training_experience: exp })); resetRandomSource()
+    for (const w of m) {
+      const late = (pregnancyWeeksOn(dueIn(10), weekDate(w.week_number)) ?? 0) >= 28
+      for (const d of w.days) for (const e of d.exercises) if (NEAR.test(e.name)) { if (late) leaks.push(`${eq}/${style}/${exp} w${w.week_number} ${e.name}`); else earlyNear++ }
+    }
+  }
+  // Early weeks of a plan due in 24 weeks, to show the pattern still runs where it may (so the check binds).
+  for (const eq of ['full_gym', 'minimalist', 'bodyweight']) for (const exp of ['intermediate', 'advanced']) {
+    setRandomSource(seededRngFromKey(`e${eq}${exp}`)); const m = generateMesocycle(mum({ equipment_access: eq, training_style: 'functional', training_experience: exp, due_date: dueIn(24) })); resetRandomSource()
+    const w1 = m[0], count = (w: typeof w1, pat: string) => w.days.reduce((n, d) => n + d.exercises.filter(e => pattern(e.name) === pat).length, 0)
+    for (const w of m.filter(x => !x.is_deload && (pregnancyWeeksOn(dueIn(24), weekDate(x.week_number)) ?? 0) >= 28)) {
+      if (count(w, 'horizontal_pull') < count(w1, 'horizontal_pull')) rowsShort++
+      if (count(w, 'isolation_calf') < count(w1, 'isolation_calf')) calfShort++
+    }
+    for (const w of m) for (const d of w.days) for (const e of d.exercises) if (NEAR.test(e.name) && (pregnancyWeeksOn(dueIn(24), weekDate(w.week_number)) ?? 0) < 28) earlyNear++
+  }
+  check('no renegade row, reverse Nordic, Cossack squat, one-leg calf raise or loaded rotation from 28 weeks (36 plans)', leaks.length === 0, leaks.slice(0, 4))
+  check('...while they still appear before 28 weeks (the check binds)', earlyNear > 0, earlyNear)
+  check('a row is replaced by a row from 28 weeks, never dropped', rowsShort === 0, rowsShort)
+  check('...and calf work by two-footed calf work', calfShort === 0, calfShort)
+  check('a renegade row is replaced from the rows list', lateReplacementKind('Renegade Row', 'horizontal_pull') === 'pull')
+  check('a one-leg calf raise from the calf list', lateReplacementKind('Single-Leg Dumbbell Calf Raise', 'isolation_calf') === 'calf')
+  check('a reverse Nordic from the quad list', lateReplacementKind('Reverse Nordic Curl', 'isolation_quad') === 'quad')
+  check('every replacement named is a real catalogue entry', Object.values(PREGNANCY_LATE_REPLACEMENTS).flat().every(n => !!getExerciseEntry(n)))
+  check('...and none is itself left out while pregnant', Object.values(PREGNANCY_LATE_REPLACEMENTS).flat().every(n => !PREGNANCY_LATE_EXCLUDED.has(n) && !pregnancyExclusion({ name: n })))
+
+  // (b) The doming line: on face-down and push-up work, only while pregnant.
+  const preg = { health_conditions: ['pregnancy'] }
+  check('a plank carries the doming line while pregnant', domingCue(preg, { name: 'Plank' }) === DOMING_CUE)
+  for (const n of ['Push-Ups', 'Copenhagen Plank', 'Pike Push-Ups', 'Renegade Row', 'Archer Push-Ups']) check(`...and ${n}`, domingCue(preg, { name: n }) === DOMING_CUE)
+  check('...never when she is not pregnant', domingCue({ health_conditions: [] }, { name: 'Plank' }) === null)
+  check('...nor on a squat', domingCue(preg, { name: 'Goblet Squats' }) === null)
+  check('the line is drawn on the exercise row', /domingCue\(profile, ex\) &&/.test(readFileSync('src/components/exercise/ExerciseRow.tsx', 'utf8')))
+
+  // (c) The due date pauses the plan (his ruling "A").
+  const p = (o: Record<string, unknown>) => ({ health_conditions: ['pregnancy'], due_date: '2026-12-10', ...o })
+  check('no pause before the due date', dueDatePauseSince(p({}), '2026-12-09') === null)
+  check('paused from the due date', dueDatePauseSince(p({}), '2026-12-10') === '2026-12-10')
+  check('...and after it', dueDatePauseSince(p({}), '2027-01-20') === '2026-12-10')
+  check('never without the pregnancy tick', dueDatePauseSince(p({ health_conditions: [] }), '2027-01-20') === null)
+  check('never without a due date', dueDatePauseSince(p({ due_date: null }), '2027-01-20') === null)
+  const app = readFileSync('src/App.tsx', 'utf8').replace(/^\s*\/\/.*$/gm, '')
+  check('the app mirrors the due-date pause where every screen reads the pause', /setPlanPausedSince\(profile\.id, profile\.plan_paused_since \?\? dueDatePause, !!dueDatePause\)/.test(app))
+  check('...saves it as a real pause so the phone reminders stop', /savePlanPause\(id, dueDatePause\)/.test(app))
+  check('...and resuming after it takes the pregnancy tick and due date off', /const endsPregnancy = !pause && !!dueDatePause/.test(app) && /if \(endsPregnancy\) await updateProfileField\(profile\.id, pregnancyOff\)/.test(app))
+  setPlanPausedSince('due-test', '2026-12-10', true)
+  check('a due-date pause is known as one, for the cards', pausedForDueDateOf('due-test') === true)
+  setPlanPausedSince('due-test', '2026-12-10', false)
+  check('...and a pause she chose is not', pausedForDueDateOf('due-test') === false)
+  check('the cards say her due date is here and to start after her postnatal check', /postnatal check/.test(PAUSE_WORDS.dueDateLine) && /due date/i.test(PAUSE_WORDS.dueDateCard))
 }
 
 console.log(`\n${ran} checks ran, ${failures} failed.`)

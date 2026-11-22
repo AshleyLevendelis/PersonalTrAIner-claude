@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { TOUR_OPENS, useTourStage } from '@/lib/tour-stage'
-import { PAUSE_WORDS, isPausedOn, planPausedSince } from '@/lib/plan-pause'
+import { PAUSE_WORDS, isPausedOn, planPausedSince, pausedForDueDateOf } from '@/lib/plan-pause'
 import { addDays } from '@/lib/session-move'
 import { nextSessionAfter, nextSessionGlance, type NextSession } from '@/lib/home-next-session'
 import { useShowNumbers } from '@/lib/show-numbers'
@@ -592,6 +592,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         prCount={prCount}
         swappedFor={swappedFor}
         declaredToday={declaredToday}
+        pausedForDueDate={pausedForDueDateOf(profile.id)}
         nextUp={nextUp}
         todayLift={lift}
         topPr={prCount > 0 && topPr ? `${topPrLift ?? ''} ${topPr}`.trim() : null}
@@ -896,7 +897,7 @@ export function RingCell({ k, share, color, glow, icon, value, label, onClick, a
  * the week under a hairline. Every state the old row had is here: not yet planned, moved, rest, done (with its
  * time, PRs and the summary), and the session itself. data-tour and data-home-hero keep their names.
  */
-export function SessionHero({ status, data, week, sessionGlance, done, minutes, setsLogged, setsPlanned, prCount, topPr, onSummary, cta, footer, swappedFor = null, declaredToday = null, nextUp = null, todayLift = null }: {
+export function SessionHero({ status, data, week, sessionGlance, done, minutes, setsLogged, setsPlanned, prCount, topPr, onSummary, cta, footer, swappedFor = null, declaredToday = null, pausedForDueDate = false, nextUp = null, todayLift = null }: {
   status: DashboardData['session']['status']
   data: DashboardData
   week: ReturnType<typeof useTrainingWeek>
@@ -914,6 +915,8 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
   swappedFor?: string | null
   /** Today said missed, or made a rest day, on the day menu: Home says so, as Exercise does. */
   declaredToday?: 'missed' | 'rest_chosen' | 'paused' | null
+  /** The pause is her due date arriving (his ruling 22 Nov 2026, "A"). */
+  pausedForDueDate?: boolean
   /** Today is done and a session is next: the card shows it, with today as one line (his report 16 Nov 2026). */
   nextUp?: NextSession | null
   /** What he lifted today ("Bench 22.5kg today"), kept on today's line when the card has moved on (L9). */
@@ -941,8 +944,8 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
     right = weekCount
   } else if (declaredToday === 'paused' && !done) {
     // THE PLAN IS PAUSED (his ruling 14 Nov 2026, "Add a pause"): nothing is due, so Home offers nothing to start.
-    title = PAUSE_WORDS.card
-    sub = 'Nothing is due while it is paused. Resume from Profile, or ask in the chat.'
+    title = pausedForDueDate ? PAUSE_WORDS.dueDateCard : PAUSE_WORDS.card
+    sub = pausedForDueDate ? PAUSE_WORDS.dueDateLine : 'Nothing is due while it is paused. Resume from Profile, or ask in the chat.'
     right = weekCount
   } else if (declaredToday && !done) {
     title = declaredToday === 'missed' ? 'Marked missed' : 'Rest day, your choice'

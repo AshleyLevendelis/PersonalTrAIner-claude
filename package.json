@@ -691,6 +691,7 @@
     "verify:chat-dislike-redflag": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-dislike-redflag.mjs",
     "test:plan-pause": "tsx scripts/test-plan-pause.ts",
     "verify:plan-pause": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/plan-pause.mjs",
+    "verify:pregnancy-audit": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/pregnancy-audit.mjs",
     "test:pregnancy-one-switch": "tsx scripts/test-pregnancy-one-switch.ts",
     "test:pregnancy-rules": "tsx scripts/test-pregnancy-rules.ts",
     "test:other-injury": "tsx scripts/test-other-injury.ts",

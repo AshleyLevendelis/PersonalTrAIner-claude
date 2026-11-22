@@ -90,6 +90,16 @@ const DERIVED_RULES: readonly string[] = ['pregnancy', 'peanut-free', 'tree-nut-
  * HOW FAR ALONG, from the due date ("Ask due date"): whole weeks, 40 at the due date. Null with no date, and the app
  * then treats the pregnancy as past 16 weeks, as before.
  */
+/**
+ * HER DUE DATE HAS ARRIVED (his ruling 22 Nov 2026, "A", from the pregnancy audit: the plan ran on up to six weeks past
+ * it). From the due date the plan is paused, and it starts again after her 6-8 week postnatal check, never by itself.
+ * The due date, or null: only while "Pregnant" is ticked and a due date is set, from that date on.
+ */
+export function dueDatePauseSince(profile: { health_conditions?: readonly string[] | null; due_date?: string | null } | null | undefined, today: string): string | null {
+  const due = profile?.due_date ?? null
+  return isPregnant(profile) && !!due && today >= due ? due : null
+}
+
 export function pregnancyWeeksOn(dueDate: string | null | undefined, today: string): number | null {
   if (!dueDate || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return null
   const days = Math.round((Date.parse(`${dueDate}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86_400_000)
