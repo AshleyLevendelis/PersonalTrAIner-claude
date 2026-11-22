@@ -1742,9 +1742,21 @@ menu" stays true when a copy is also left outside it.
 - **The exercise sheet is "About this exercise", tabs How to | Muscles | History (his report 20 Nov 2026)**: "How to do
   it" opened a sheet whose "Summary" tab was the muscle map. Each tab holds what its name says; the trend is on History.
   `test:exercise-detail`, `verify:exercise-video`
+- **Setup says why it asks, and the tour offers more: his "build it", 22 Nov 2026** (`docs/plans/setup-and-tour-refresh.md`):
+  friendlier wording on every setup question, a "why I'm asking" line under ten, a line between the training and food
+  halves, plainer choices; the 10-stop tour ends by OFFERING a 9-stop full tour (his ruling "Short tour, then offer
+  more", over one long tour and over tips as you go), Skip on every stop, both replayable from settings.
+  `test:app-tour` §6b, `verify:tour-real`, `verify:setup-why`
 - **A coach reply can be reported in the app: his "1, build it", 20 Nov 2026** (Google Play's rule on AI content): a
   flag beside each coach reply, four reasons and an optional note, kept in `coach_reply_reports` for him to review; a
-  report that does not save says so. `verify:report-reply`. Needs migration 20261120120000
+  report that does not save says so. `verify:report-reply`. Needs migration 20261120120000. **And each one is emailed to
+  him** (his request 22 Nov 2026): the database calls `report-email` after the save, which never waits on or blocks
+  it. `test:report-email`, `test:rls-local` §10. Needs migration 20261122120000, the `report-email` deploy and a Resend key
+- **Reply to one message, WhatsApp's way: his ruling 22 Nov 2026, "1, build it"** (swipe right or press and hold, over
+  swipe only and a Reply button on every message): the reply carries a quote that taps back to the original. The
+  coach is told by marking the answered turn in the conversation it is sent, NEVER by putting the quoted words into
+  his turn (his turns are the evidence for what he stated); a typed yes as a reply answers only the offer it replies
+  to. `test:chat-reply`, `verify:chat-reply`. The prompt line needs the `chat-gemini` deploy
 - **The phone app (Capacitor), steps from the phone: his request 20 Nov 2026** ("Start on the App Store version with
   step counting"): Profile, "Steps from your phone", phone app only; steps only, read only; the phone's count never
   lowers a typed number. Android declares READ_STEPS alone: the plugin's 46 other health permissions are removed and

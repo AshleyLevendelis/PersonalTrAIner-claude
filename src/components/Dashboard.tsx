@@ -714,6 +714,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         <button
           type="button"
           onClick={() => setProgressOpen(o => !o)}
+          data-tour="progress"
           aria-expanded={progressOpen}
           className="flex min-h-[48px] w-full items-center gap-2 border-t border-[color:var(--hairline)] px-4 text-left"
           data-home-progress-toggle

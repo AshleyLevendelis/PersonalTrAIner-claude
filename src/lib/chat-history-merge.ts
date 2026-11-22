@@ -13,6 +13,7 @@
 // server finished while this phone was waiting on it.
 // ---------------------------------------------------------------------------
 import type { ChatMessage, PlanAction } from './types'
+import { replyRefOf } from './chat-reply'
 
 export interface ChatRow {
   id: string
@@ -45,6 +46,7 @@ function isPlanAction(a: unknown): a is PlanAction {
 /** One stored row as a chat message. A reminder's marker is its own field, never mistaken for a plan action. */
 export function rowToMessage(row: ChatRow): ChatMessage {
   const reminder = reminderOf(row.action_data)
+  const replyTo = replyRefOf(row.action_data)
   return {
     id: row.id,
     role: row.role as 'user' | 'assistant',
@@ -54,6 +56,8 @@ export function rowToMessage(row: ChatRow): ChatMessage {
     // lesson's record, coach-lessons.ts) is never drawn as an action.
     action: reminder || !isPlanAction(row.action_data) ? undefined : row.action_data,
     ...(reminder ? { reminder: { moment: reminder.moment, shortcut: reminder.shortcut } } : {}),
+    // A REPLY'S QUOTE (22 Nov 2026), saved with it: never a plan action (it names no type).
+    ...(replyTo ? { replyTo } : {}),
     created_at: row.created_at,
   }
 }

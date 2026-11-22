@@ -88,9 +88,14 @@ console.log('\n[1] A turn carries when it was said')
   // `stampTurnTime(m.content` no longer appears. The property is unchanged:
   // the history map calls stampTurnTime, on the message's own content, with
   // the message's own created_at and the app's clock.
+  // RE-ANCHORED 22 Nov 2026 (reply to one message): the stamp is one helper, `stampTurn`, so the turn a reply answers
+  // can be stamped the same way when it is put back at the start of what is sent (chat-reply.ts). The property is the
+  // same two halves: the helper stamps the message's own content with its own time on the app's clock, and every turn
+  // sent is built through it.
   check('the history sent to the coach is actually stamped',
-    /\.map\(m => \(\{ role: m\.role, content: stampTurnTime\([^\n]{0,160}?m\.content[^\n]{0,40}?, m\.created_at, historyNow\)/.test(CLIENT),
-    CLIENT.split('\n').filter(l => l.includes('stampTurnTime')).slice(0, 3))
+    /const stampTurn = \(m: ChatMessage\) => stampTurnTime\([^\n]{0,160}?m\.content[^\n]{0,40}?, m\.created_at, historyNow\)/.test(CLIENT)
+      && /turn: \{ role: m\.role, content: stampTurn\(m\) \}/.test(CLIENT),
+    CLIENT.split('\n').filter(l => l.includes('stampTurn')).slice(0, 3))
   check('...against the app clock rather than a fresh Date', /const historyNow = getAppNow\(/.test(CLIENT))
   check('no timestamp means no claim about when it was said', stampTurnTime('x', null, now) === 'x')
   check('...and an unparseable one is the same', stampTurnTime('x', 'not-a-date', now) === 'x')

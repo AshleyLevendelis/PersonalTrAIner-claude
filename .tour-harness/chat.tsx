@@ -526,7 +526,17 @@ const textsRows = TEXTS
         action_data: { source: 'reminder', moment: 'workout_today', shortcut: 'exercise' } },
     ]
   : []
-if (!OPENER) localStorage.setItem(`chat_history_cache_${PROFILE_ID}`, JSON.stringify(GROUPS || TEXTS ? grouped : seeded))
+// ?seed=store — THE PLAY STORE SCREENSHOT (20 Nov 2026, scripts/make-store-assets.cjs): an ordinary exchange, so the
+// store's picture of the chat shows what a conversation looks like rather than "Coach line 6". Nothing reads the words.
+const STORE = new URLSearchParams(location.search).get('seed') === 'store'
+const storeThread = [
+  { id: 's1', role: 'user', status: 'complete', created_at: at(9 * MIN), content: 'My shoulder feels a bit tight today. Should I still do the overhead press?' },
+  { id: 's2', role: 'assistant', status: 'complete', created_at: at(8 * MIN), content: "Tight but not painful is fine to train around. Warm up with band pull-aparts, then press at the lighter end of today's range. If it pinches at any point, stop and tell me and we'll swap it for a landmine press." },
+  { id: 's3', role: 'user', status: 'complete', created_at: at(6 * MIN), content: 'Ok. And what should I eat after? I have chicken, rice and spinach.' },
+  { id: 's4', role: 'assistant', status: 'complete', created_at: at(5 * MIN), content: "That's a great post-session dinner. Your dinner share today is about 45g of protein, so roughly 170g raw chicken with 80g dry rice and a big handful of spinach. Want me to log it when you've eaten?" },
+  { id: 's5', role: 'user', status: 'complete', created_at: at(MIN), content: 'Yes please' },
+]
+if (!OPENER) localStorage.setItem(`chat_history_cache_${PROFILE_ID}`, JSON.stringify(STORE ? storeThread : GROUPS || TEXTS ? grouped : seeded))
 else localStorage.removeItem(`chat_history_cache_${PROFILE_ID}`)
 
 // ---------------------------------------------------------------------------
@@ -553,6 +563,17 @@ const SAID_HELLO = SEED_HELLO && new URLSearchParams(location.search).get('said'
 const MEALS_YESTERDAY = SEED_HELLO && new URLSearchParams(location.search).get('meals') === '1'
 const todayStr = isoOf(anchorDate())
 const OPENER_ROWS = Number(new URLSearchParams(location.search).get('rows') ?? '0')
+// ?seed=reply — A REPLY SAVED ON THE SERVER (22 Nov 2026, verify:chat-reply): the seeded conversation as stored rows,
+// plus one of his messages saved as a reply to "Coach line 3" (its quote in the row, as the chat saves it). More rows
+// than the phone's copy, so the chat takes the server's: the quote must come back from the row alone.
+const REPLY_SEED = new URLSearchParams(location.search).get('seed') === 'reply'
+const replyRows = REPLY_SEED
+  ? [
+      ...seeded.map((m, i) => ({ id: `r${i}`, profile_id: PROFILE_ID, role: m.role, content: m.content, status: 'complete', created_at: at((30 - i) * MIN) })),
+      { id: 'r-reply', profile_id: PROFILE_ID, role: 'user', content: 'Saved reply to the third one', status: 'complete', created_at: at(MIN),
+        action_data: { replyTo: { id: 'r4', role: 'assistant', excerpt: 'Coach line 3. Long enough to wrap onto more than one line so the thread actually overflows the card the way…' } } },
+    ]
+  : []
 const seededRows = (SEED_NUDGE || SEED_HELLO || (OPENER && OPENER_ROWS > 0))
   ? (SEED_NUDGE || SEED_HELLO ? seeded : seeded.slice(0, OPENER_ROWS)).map((m, i) => ({
       id: `seed-${i}`,
@@ -743,7 +764,7 @@ const db: Db = {
   daily_steps: [], meal_events: [...dayStateSeed.meals, ...mealYesterday], meal_plan_picks: [], meal_plan_slots: topUpSeed.slots,
   favorite_meals: [], grocery_items: topUpSeed.list, load_suggestions: [], pending_actions: [],
   plan_adaptations: KNEE_EASE ? [kneeEaseRow(PROFILE_ID)] : [], user_facts: [], user_context_facts: [], user_goals: [],
-  chat_messages: [...seededRows, ...helloRow, ...textsRows], exercise_plans: [], mesocycle_weeks: [],
+  chat_messages: [...seededRows, ...helloRow, ...textsRows, ...replyRows], exercise_plans: [], mesocycle_weeks: [],
   daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
 }
 setSupabaseClient(makeFakeSupabase(db) as never)

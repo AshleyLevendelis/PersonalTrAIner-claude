@@ -207,7 +207,8 @@ async function main() {
   {
     const chat = strip(readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
     check('the chat tells the coach which row its reply goes in', /placeholder_id: placeholderId \?\? null/.test(chat) && /callGemini\(userText, placeholderId[,)]/.test(chat))
-    check('...on a retry too', /callGemini\(userMsg\.content, failedMsg\.id\)/.test(chat))
+    // A retry also passes the reply's quote since 22 Nov 2026, after the row: the property is the row, not the arity.
+    check('...on a retry too', /callGemini\(userMsg\.content, failedMsg\.id[,)]/.test(chat))
     check('every read of the chat\'s rows goes through rowToMessage (three of them)', (chat.match(/\.map\(rowToMessage\)/g) ?? []).length === 3, (chat.match(/\.map\(rowToMessage\)/g) ?? []).length)
     check('the chat re-reads on return: visible again, focus, arriving at the chat, and the service worker\'s word',
       /visibilitychange/.test(chat) && /addEventListener\('focus'/.test(chat) && /'hashchange'/.test(chat) && /serviceWorker\?\.addEventListener\?\.\('message'/.test(chat) && /'coach-message'/.test(chat))

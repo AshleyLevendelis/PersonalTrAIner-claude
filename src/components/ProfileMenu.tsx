@@ -5,7 +5,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Settings, UserCircle, Compass } from 'lucide-react'
+import { Settings, UserCircle, Compass, Sparkles } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Houses the housekeeping actions ("Profile", "Replay the tour") the header used to
@@ -21,7 +21,8 @@ export function ProfileMenu({
   onReplayTour,
 }: {
   onOpenProfile: () => void
-  onReplayTour: () => void
+  /** Starts the tour again; 'more' starts its second part, the full tour (22 Nov 2026). */
+  onReplayTour: (part?: 'more') => void
 }) {
   return (
     <DropdownMenu>
@@ -43,9 +44,14 @@ export function ProfileMenu({
             "New Plan" used to sit under it and does not any more: it moved to
             Profile's destructive footer on 6 Sep 2026, where an action that
             abandons a profile reads like one. Moved, not copied. */}
-        <DropdownMenuItem onClick={onReplayTour}>
+        <DropdownMenuItem onClick={() => onReplayTour()}>
           <Compass className="size-3.5" />
           Replay the tour
+        </DropdownMenuItem>
+        {/* The full tour on its own, for someone who said "Maybe later" (his ruling 22 Nov 2026: both replayable). */}
+        <DropdownMenuItem onClick={() => onReplayTour('more')}>
+          <Sparkles className="size-3.5" />
+          The full tour
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -337,11 +337,22 @@ try {
       WHERE schemaname = 'public' AND policyname LIKE 'owner\\_%'
       GROUP BY tablename ORDER BY 1;
     `).split('\n').filter(Boolean).map(row => row.split('=')))
+    // A RECORD, NOT A DRAFT (22 Nov 2026): a reported coach reply is kept for Ashley to review, so its sender can read
+    // and delete it but never rewrite it after sending. Named here, so a table cannot become append-only by forgetting
+    // its update policy: everything else must carry all four, and these exactly the three and no update.
+    const APPEND_ONLY = ['coach_reply_reports']
     const wrong = expectScoped
       .map(t => ({ table: t, policies: Number(counts.get(t) ?? 0) }))
-      .filter(r => r.policies !== 4)
-    check('every table holding user data carries all four of select/insert/update/delete',
+      .filter(r => r.policies !== (APPEND_ONLY.includes(r.table) ? 3 : 4))
+    check('every table holding user data carries all four of select/insert/update/delete (a named record: the three, no update)',
       wrong.length === 0, wrong)
+    const updatable = psql(`
+      SELECT tablename FROM pg_policies
+      WHERE schemaname = 'public' AND policyname LIKE 'owner\\_%' AND cmd = 'UPDATE'
+      ORDER BY 1;
+    `).split('\n').filter(Boolean)
+    check('...and a record cannot be rewritten: no update policy on ' + APPEND_ONLY.join(', '),
+      APPEND_ONLY.every(t => !updatable.includes(t)) && APPEND_ONLY.every(t => expectScoped.includes(t)), updatable.filter(t => APPEND_ONLY.includes(t)))
 
     // And prove it by reading, not only by counting: a policy set that exists
     // but denies its own owner is the failure a count cannot see.
@@ -384,6 +395,19 @@ try {
     check('...the same reminder twice in a day is refused (two runs racing cannot both send it)', repeat !== null && /duplicate key|unique/i.test(repeat), repeat)
     const col = psql(`SELECT count(*) FROM information_schema.columns WHERE table_name = 'coach_moment_facts' AND column_name = 'protein_target_g';`)
     check('...and the facts row has room for the protein target', col === '1', col)
+  }
+
+  // THE EMAIL NEVER COSTS A REPORT (22 Nov 2026, "email me each new report"): the insert trigger posts the row to the
+  // report-email function, and here, with no pg_net, it must step aside. A report signed in as its owner still saves.
+  console.log('\n10. A reported reply saves whether or not it can be emailed')
+  {
+    const trig = psql(`SELECT count(*) FROM pg_trigger WHERE tgname = 'coach_reply_reports_email' AND NOT tgisinternal;`)
+    check('the email trigger is on the reports table', trig === '1', trig)
+    const err = expectRefused(`INSERT INTO coach_reply_reports (user_id, reply_text, reason, note) VALUES ('${PROFILE_A}', 'Max out today.', 'unsafe', 'sore back');`,
+      { role: 'authenticated', uid: UID_A })
+    check('...and a report signed in as its owner saves with it there (no pg_net here: the email steps aside)', err === null, err)
+    const n = psql(`SELECT count(*) FROM coach_reply_reports WHERE note = 'sore back';`, { role: 'authenticated', uid: UID_A })
+    check('...the row is there to read', n === '1', n)
   }
 } finally {
   stop()

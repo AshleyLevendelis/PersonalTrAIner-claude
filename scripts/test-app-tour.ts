@@ -26,7 +26,9 @@ import { readFileSync, readdirSync, statSync } from 'fs'
 import { join, dirname, extname, sep } from 'path'
 import { existsSync as fileExists } from 'fs'
 import { fileURLToPath } from 'url'
-import { TOUR_STEPS, SET_STEP_KEY, MEALS_STEP_KEY, type TourStep } from '../src/lib/app-tour-steps'
+import { TOUR_STEPS, MORE_TOUR_STEPS, SET_STEP_KEY, MEALS_STEP_KEY, type TourStep } from '../src/lib/app-tour-steps'
+/** Both parts: the short tour and the full one it offers (his ruling 22 Nov 2026). Targets and copy are held for both. */
+const ALL_STEPS: TourStep[] = [...TOUR_STEPS, ...MORE_TOUR_STEPS]
 import { TABS } from '../src/lib/app-route'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -121,14 +123,14 @@ for (const { path, text } of SOURCE) {
 function keysOf(step: TourStep): string[] {
   return [step.target, step.nav].filter((k): k is string => !!k)
 }
-const referenced = new Set(TOUR_STEPS.flatMap(keysOf))
+const referenced = new Set(ALL_STEPS.flatMap(keysOf))
 
 // ---------------------------------------------------------------------------
 console.log('\n1. Every stop points at an element that exists')
 // ---------------------------------------------------------------------------
 {
   check(`there are stops to check, so this has teeth (${TOUR_STEPS.length})`, TOUR_STEPS.length >= 8, TOUR_STEPS.length)
-  for (const step of TOUR_STEPS) {
+  for (const step of ALL_STEPS) {
     for (const key of keysOf(step)) {
       const where = attrsInSource.get(key)
       check(`${step.key}: data-tour="${key}" exists${where ? ` (${where[0]})` : ''}`, !!where, key)
@@ -230,7 +232,7 @@ console.log('\n4. Nothing the tour promises is a capability the coach declines')
     [/\b(add|drop|cut|reduce|increase)\s+(\w+\s+)?(sets?|reps?|volume)\b/i, 'propose_volume_change'],
     [/\b(ban|never give you|blacklist)\b/i, 'ban_exercise'],
   ]
-  for (const s of TOUR_STEPS) {
+  for (const s of ALL_STEPS) {
     const text = [s.copy, s.pendingCopy, s.teaser, s.tapHint, s.title].filter(Boolean).join(' ')
     const hit = OVERCLAIM.find(([re]) => re.test(text))
     check(`${s.key}: promises nothing that lands on a decliner`,
@@ -430,7 +432,7 @@ console.log('\n6. Skip actually skips')
   // which happens to quote the retired promise — the same "a check satisfied
   // by its own comment" failure this repo keeps producing. The copy a user
   // reads is data; check the data.
-  const allCopy = TOUR_STEPS.map(t => `${t.title ?? ''} ${t.copy ?? ''} ${t.teaser ?? ''}`).join(' ')
+  const allCopy = ALL_STEPS.map(t => `${t.title ?? ''} ${t.copy ?? ''} ${t.teaser ?? ''}`).join(' ')
   check('no stop promises to keep your place after Skip',
     !/keep your place/i.test(allCopy), /.{0,50}keep your place.{0,20}/i.exec(allCopy)?.[0])
   check('...and the opener says where the tour lives instead',
@@ -444,9 +446,30 @@ console.log('\n6. Skip actually skips')
   // characters. Nothing referenced the first. Editing it — the obvious one,
   // being first in the file — would have changed precisely nothing on screen
   // while reading as a fix. Deleted; this stops it coming back.
+  // TWO arrays since 22 Nov 2026 (the short tour and the full one), and both must be the tour's own: a third, or one
+  // the tour does not read, is the dead twin again.
   const stepArrays = (steps.match(/TourStep\[\] = \[/g) ?? []).length
-  check('there is exactly ONE step array, not a live one and a dead twin',
-    stepArrays === 1, `${stepArrays} arrays`)
+  const tourSrc = readFileSync(join(ROOT, 'src/components/AppTour.tsx'), 'utf8')
+  check('there are exactly TWO step arrays, the short tour and the full one, and the tour reads both',
+    stepArrays === 2 && /\[\.\.\.TOUR_STEPS, \.\.\.MORE_TOUR_STEPS\]/.test(tourSrc), `${stepArrays} arrays`)
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n6b. The full tour is offered, never assumed (his ruling 22 Nov 2026, "Short tour, then offer more")')
+// ---------------------------------------------------------------------------
+{
+  const tourSrc = readFileSync(join(ROOT, 'src/components/AppTour.tsx'), 'utf8')
+  const menuSrc = readFileSync(join(ROOT, 'src/components/ProfileMenu.tsx'), 'utf8')
+  const coreLast = TOUR_STEPS[TOUR_STEPS.length - 1]
+  check('the short tour\'s last stop asks about the full tour', /full tour/i.test(coreLast.copy), coreLast.copy)
+  check('the full tour has stops to show, and exactly one last', MORE_TOUR_STEPS.length >= 6 && MORE_TOUR_STEPS.filter(s => s.last).length === 1 && MORE_TOUR_STEPS[MORE_TOUR_STEPS.length - 1].last === true, MORE_TOUR_STEPS.length)
+  check('no full-tour stop is gated (it asks nothing of him but Next)', MORE_TOUR_STEPS.every(s => !s.gate && !s.nav))
+  check('no key is shared between the two parts', new Set(ALL_STEPS.map(s => s.key)).size === ALL_STEPS.length)
+  check('the offer is a choice: "Show me everything" and "Maybe later" on the last short stop',
+    /offersMore \? 'Show me everything'/.test(tourSrc) && /offersMore && \([\s\S]{0,300}Maybe later/.test(tourSrc))
+  check('...and "Maybe later" ends the tour rather than starting the full one',
+    /offersMore && \([\s\S]{0,120}onClick=\{finish\}/.test(tourSrc))
+  check('the settings menu replays the full tour on its own', /onReplayTour\('more'\)/.test(menuSrc) && /The full tour/.test(menuSrc))
 }
 
 // ---------------------------------------------------------------------------

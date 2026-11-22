@@ -385,7 +385,7 @@ function ExerciseMenu({ ex, onOpenDetail, onOpenHistory, onSwap, onMove, canMove
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="hit-slop-44 size-7 shrink-0" aria-label="Exercise options">
+        <Button variant="ghost" size="icon" className="hit-slop-44 size-7 shrink-0" aria-label="Exercise options" data-tour="exmenu">
           <MoreVertical className="size-3.5" />
         </Button>
       </DropdownMenuTrigger>
