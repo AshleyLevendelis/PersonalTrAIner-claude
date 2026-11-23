@@ -41,6 +41,11 @@
 export const ANCHOR_DIFFICULTY_BUMP: Record<string, 1 | 2> = {
   // knee_dominant — a loaded squat is a main lift; a bodyweight one is not
   'Goblet Squats': 2,
+  // THE SMITH MACHINE IS A LOADED BAR ON RAILS (23 Nov 2026, CSCS): its squat, bench, press, row, split squat, RDL and
+  // hip thrust are loaded like their free-weight twins and a day is built around them. Absent, a Smith bench at 90 kg
+  // scored as baseline and the MAIN LIFT label went to a 24 kg dumbbell press written after it (his Push & Press day).
+  'Smith Machine Squat': 2,
+  'Smith Machine Split Squat': 2,
   'Leg Press': 2,
   'Hack Squat': 2,
   // Spanish Squat is deliberately ABSENT. It is a patellar-tendon rehab tool
@@ -49,6 +54,7 @@ export const ANCHOR_DIFFICULTY_BUMP: Record<string, 1 | 2> = {
 
   // horizontal_push
   'Dumbbell Bench Press': 2,
+  'Smith Machine Bench Press': 2,
   'Barbell Floor Press': 2,
   'Incline Dumbbell Press': 2,
   'Neutral-Grip Dumbbell Press': 2,
@@ -61,6 +67,7 @@ export const ANCHOR_DIFFICULTY_BUMP: Record<string, 1 | 2> = {
 
   // horizontal_pull
   'Dumbbell Rows': 2,
+  'Smith Machine Bent-Over Row': 2,
   'T-Bar Rows': 2,
   'Chest-Supported Row': 2,
   'Seated Machine Row': 2,
@@ -72,6 +79,7 @@ export const ANCHOR_DIFFICULTY_BUMP: Record<string, 1 | 2> = {
 
   // vertical_push
   'Dumbbell Shoulder Press': 2,
+  'Smith Machine Shoulder Press': 2,
   'Landmine Press': 2,
   'Arnold Press': 2,
   'Shoulder Press Machine': 2,
@@ -86,6 +94,8 @@ export const ANCHOR_DIFFICULTY_BUMP: Record<string, 1 | 2> = {
 
   // hip_hinge
   'Hip Thrust': 2,
+  'Smith Machine Hip Thrust': 2,
+  'Smith Machine Romanian Deadlift': 2,
   'Kettlebell Swing (Heavy)': 2,
   'Single-Leg RDL (Bodyweight)': 1,
 

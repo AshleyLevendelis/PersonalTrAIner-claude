@@ -59,6 +59,78 @@ Newest first. One line each.
   added cardio session is a line of text, not a loggable round-timer session (it stores only a name and minutes), and
   his "it went back to a rest day after a refresh" reads as the strip showing last week (Wed 18): the write is saved to
   the database and re-read (traced, not run).
+- [x] **A PRESS ADDED TO BALANCE THE WEEK GOES IN WITH THE PRESSES, AND A SMITH LIFT CAN BE THE MAIN LIFT (23 Nov 2026,
+  CSCS, mine).** His report: his Push & Press day, rated by Gemini ("the Main Lift is sitting at the bottom"), ran Smith
+  bench 90 kg, push press, lateral raises, skull crushers, then Neutral-Grip Dumbbell Press labelled MAIN LIFT, held at
+  24 kg "short of 9 reps". Traced (engine-tracer), two causes, both generation: (1) the week's push:pull balance pass
+  runs AFTER the day's tier sort and appended its press to the end of the day (catalogue order makes it exactly
+  Neutral-Grip DB Press on a day already holding a bench); (2) with no tier-1 lift the label goes to the highest anchor
+  score, and Smith Machine Bench Press had no difficulty entry, so a 24 kg dumbbell press outranked the 90 kg Smith
+  bench that opened the day, while the block rotation (first compound) treated the Smith bench as main. Gemini was
+  right on both. FIXED: a compound the balance pass adds sits after the day's last compound and before its first
+  isolation, finisher, trunk or carry move (never inside a superset); the seven Smith compounds (squat, split squat,
+  bench, row, shoulder press, RDL, hip thrust) rank as main-lift candidates like their free-weight twins. MEASURED on
+  every 8th grid plan (1,152 plans, 4,608 days, `measure:compound-order`): a compound written after muscle isolation
+  735 days -> 88; the 88 are all knee-injury days whose rehab drills and leg curl open the day by design. CSCS review:
+  (1) the added press is now trained fresh instead of after the shoulders and triceps were tired, so it can reach its
+  reps and progress; (2) nothing removed, only reordered; (3) pattern coverage, push:pull and volume unchanged;
+  (4) no floor or ceiling moves, but the Smith bump also decides which lift gets the main-lift rest floor on a day
+  with no barbell lift: a Smith lift that opens its day now gets it; (5) in scope. NOT FIXED, named: on 826 of 4,499
+  labelled days the MAIN LIFT label sits on a harder lift that is not the day's first compound (e.g. a cable row
+  written after Iso-Lateral Pulldown, which has no difficulty entry either), so the label and the block rotation can
+  still disagree; the clean fix is one definition of "main lift" for both, which moves rest floors and needs its own
+  measured change. `test:compound-order` (5 checks; 5 mutations, 4 caught: counting trunk work as a compound changed
+  nothing because the pass never adds trunk work, an inert guard kept for clarity). Frontend only; existing plans keep
+  their order until rebuilt.
+
+- [x] **THE NEXT SET MOVES WITH THE REPS JUST DONE: his ruling 23 Nov 2026, "1"** (from three options: one question
+  per lift plus a tap-free nudge, over asking after every set every week, and over leaving it). His report: "The app
+  didnt ask me how the set felt", then "last week it was showing after each set". Both were by design: last week was
+  his testing week (his 15 Nov "Ask, then fill"), this week asks once per lift (his 11 Nov "One tap per lift"). Asked
+  which is best at CSCS level, I recommended neither alone. BUILT: when a logged working set lands 3+ reps over the top
+  of its range, the next set's blank box goes up ONE step (about 5%, at least one plate step); 2+ under the bottom, down
+  about 5%; a line under the row says why ("18 reps on set 1, so up to 37.5 kg"), and the Exercise tab's button and a
+  blank tick use the same number. The per-lift question is unchanged. CSCS basis (mine): reps fall about one a set at a
+  fixed load, so one either side is the plan working; three over is roughly three reps further from failure than asked,
+  about 7-10% of load, so the move takes the cautious half because fatigue builds through the session and the lift's
+  own question moves the next session; two under is a load the set cannot reach. Off where the effort question is off
+  (testing week, deload, a lift with no number), on the first session back from a break (its eased weights are the
+  point), on a stepped (pyramid) prescription, timed or distance sets, warm-ups, drops and bodyweight; never past a stated
+  kit limit. A typed weight always wins. CSCS review: (1) effect: keeps each set near its target effort instead of a
+  wasted easy set or a failed one; (2) takes away nothing (no set, rep or exercise); (3) fundamentals: overload is
+  kept, recovery protected by the one-step cap; (4) no floor or ceiling redefined, the progression engine still reads
+  what was logged; (5) in scope. NOT covered: a strength/power/consolidation block's compounds, which ramp across sets
+  (no nudge there), and a set over the range at a stated kit limit (no weight to add; nothing is said). `test:set-nudge`
+  (19 checks, 8 of 8 mutations caught), `verify:set-nudge` (11 checks, 2 of 2 caught). Frontend only.
+
+- [x] **EMAIL SIGN-UP, SIGN-IN AND SIGN-OUT: his report 23 Nov 2026, "I didn't receive a proper email to confirm my
+  email address, and there's no way to sign out and sign back in with the email. Several times, it's asked me to change
+  my password", then "Yes" to building the fix** (`docs/plans/account-signin.md`). Live testers in days.
+  FOUND (code; the server half is inferred, because this session cannot reach either Supabase project and the
+  connector needs signing in): the weekly "add an email" prompt asked again while the address was waiting on its link
+  (`new_email` set, `email` empty), and every save set the password again, which is the "change my password" he saw;
+  no sign-out anywhere; sign-in only on a phone with no plan; no forgot-password; no link ever named where to come back
+  to, so it went to the dashboard's Site URL. ON THE SERVER, NOT VERIFIED: Supabase's built-in sender sends its stock
+  "Confirm Change of Email" only to the project's own team and a couple an hour, so no tester would ever get one.
+  BUILT: waiting is its own state everywhere (no prompt, no password box; **Resend link** and **Use a different
+  email**, the address alone); every link lands back on the app (the page's own address, the live app from the phone
+  app); **Sign out of this phone** on a saved account, asked first, refused while a set or plan change is still unsent,
+  then the phone forgets the last person (Supabase's own keys and the look of the app kept) and opens afresh; **Already
+  have an account? Sign in** on an account with no email, warning the plan here is left behind, nothing changing until
+  the sign-in works; **Forgot your password?** on both sign-in screens, answered the same whether or not the address has
+  an account; a reset link opens **Set a new password** INSTEAD of the start (the link signs the page in as its account,
+  and starting first would read the phone's old plan under it); a confirmed or spent link says so once; Profile reads
+  the account again every time it opens (a link tapped in the phone's browser confirms the address on the server, and
+  the home-screen app learns it only by asking); Supabase's sentences in plain words. Decisions mine (mechanical or
+  security): the sign-out scope is this phone only; the reset answer does not say whether an address has an account.
+  Changed from the plan: no live listener for the session changing; the read on open covers the same case.
+  `test:account-auth` (35 checks, 11 of 11 mutations caught), `verify:account-row` (34 checks, sections 5-9 new; 5 of 5 mutations caught).
+  The reset page's own screen is driven on the Profile test page; App's half (that it is shown instead of the start)
+  is held by source only, because no harness page boots App with a link in its address.
+  NOT DONE, HIS (dashboard, production): custom SMTP (Resend), Site URL and Redirect URLs, the two email templates in
+  the app's words, then a real end-to-end test with an address that is not his. Until the sender is set up, NO TESTER
+  GETS ANY EMAIL. Frontend only; no edge function, no migration.
+
 - [x] **SETUP'S BUTTONS, EVERY QUESTION: his "is the onboarding fixed for all questions? do they have the relevant quick
   reply buttons", 22 Nov 2026.** The morning's fix had covered the 59 phrasings tried then. Measured wider: 160 phrasings
   of every question setup asks with buttons, each in the state setup would ask it (earlier answers given), with and

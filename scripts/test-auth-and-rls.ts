@@ -39,6 +39,7 @@ let session: { user: { id: string; email?: string } } | null = null
 let anonSignInCount = 0
 let rpcResult: unknown = true
 let updateUserError: string | null = null
+let signInError: string | null = null
 let orderedBy: { column: string; ascending?: boolean } | null = null
 let ownedRows: { id: string }[] = []
 
@@ -68,7 +69,7 @@ const fakeClient = {
       if (session) session.user.email = patch.email
       return { data: { user: session?.user }, error: null }
     },
-    signInWithPassword: async () => ({ data: null, error: null }),
+    signInWithPassword: async () => ({ data: null, error: signInError ? { message: signInError } : null }),
   },
   rpc: async (name: string, args: Record<string, unknown>) => {
     calls.push(`rpc:${name}:${JSON.stringify(args)}`)
@@ -180,7 +181,8 @@ console.log('\n4. The email prompt asks, snoozes, and comes back')
 
   updateUserError = 'email already registered'
   const clash = await auth.attachEmail('taken@example.test', 'a-real-password')
-  check('a rejected email reports why', !clash.ok && clash.error === 'email already registered', clash)
+  // Reported in plain words since 23 Nov 2026 (Supabase's own English was shown raw before).
+  check('a rejected email reports why, in words a person can act on', !clash.ok && /already has an account/.test(clash.error ?? ''), clash)
   updateUserError = null
 }
 
@@ -390,8 +392,12 @@ console.log('\n10. An attached email can actually sign you back in')
     /plan/.test(screen) && /logged/.test(screen))
   // Supabase returns the same error for a wrong password and an unknown
   // address. Passing that through verbatim is unhelpful.
+  // Asked of the sign-in path itself, since the wording moved into auth.ts (23 Nov 2026).
+  signInError = 'Invalid login credentials'
+  const wrong = await auth.signInWithEmail('sam@example.test', 'nope')
+  signInError = null
   check('...and turns the server\'s error into something a person can act on',
-    /don't match an account/.test(screen))
+    !wrong.ok && /don't match an account/.test(wrong.error ?? ''), wrong)
 
   const app = stripComments(readFileSync(join(ROOT, 'src/App.tsx'), 'utf8'))
   // THE COPY MOVED, AND THIS CHECK MOVED WITH IT. The offer used to be

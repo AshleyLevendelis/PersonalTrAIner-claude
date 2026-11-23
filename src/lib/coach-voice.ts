@@ -849,6 +849,16 @@ export function sameAsSet(setNumber: number): string {
   return `weight from set ${setNumber}`
 }
 
+/**
+ * THE NEXT SET MOVED BY THE REPS JUST DONE (his ruling 23 Nov 2026, "1"; set-nudge.ts). Says what he did and what
+ * the box now holds, so the changed number is never mistaken for the plan's.
+ */
+export function setNudgeLine(n: { reps: number; fromSet: number; kg: number; direction: 'up' | 'down' }): string {
+  return n.direction === 'up'
+    ? `${n.reps} reps on set ${n.fromSet}, so up to ${n.kg} kg`
+    : `${n.reps} reps on set ${n.fromSet}, so down to ${n.kg} kg`
+}
+
 export function lastTime(reading: LoggedSetReading): string {
   // NEVER A BARE COUNT. "last time 9" beside a weight box reads as 9kg;
   // the kind travels with the number, same rule as personalBest.

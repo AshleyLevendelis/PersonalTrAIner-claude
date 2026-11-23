@@ -328,7 +328,14 @@ if (marked.grid) {
   const typed = String(target.liftedKg - 2.5)
   const typedOk = await ev(`(() => { const card = ${CARD}; const el = card && card.querySelector('input[id^="setgrid-weight-"][id$="-s1"]'); if (!el) return false
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
-    setter.call(el, ${JSON.stringify(typed)}); el.dispatchEvent(new Event('input', { bubbles: true })); return true })()`)
+    setter.call(el, ${JSON.stringify(typed)}); el.dispatchEvent(new Event('input', { bubbles: true }))
+    // REPS INSIDE THE RANGE (23 Nov 2026): a blank reps box takes last time's reps, and this fixture's last time is ONE
+    // rep, which now (rightly) moves set 2 down a step (set-nudge.ts). This check is about the weight carrying, so set 1
+    // is logged at the bottom of the range, as a set done as written.
+    const lo = (/×\\s*(\\d+)\\s*[-–]\\s*\\d+/.exec(card.innerText.replace(/\\s+/g, ' ')) ?? /(\\d+)\\s*[-–]\\s*\\d+/.exec(card.innerText) ?? [])[1]
+    const reps = card.querySelector('input[id^="setgrid-reps-"][id$="-s1"]')
+    if (!lo || !reps) return false
+    setter.call(reps, lo); reps.dispatchEvent(new Event('input', { bubbles: true })); return true })()`)
   await wait(400)
   const tap = n => ev(`(() => { const card = ${CARD}; const b = card && [...card.querySelectorAll('button')].find(x => x.getAttribute('aria-label') === 'Save set ${n}'); if (!b) return false; b.click(); return true })()`)
   const t1 = await tap(1)

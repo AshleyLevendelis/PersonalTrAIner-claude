@@ -32,6 +32,7 @@
 // ---------------------------------------------------------------------------
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { SetNewPasswordScreen } from '../src/components/SetNewPasswordScreen'
 import { setSupabaseClient } from '@/lib/supabase'
 import './fake-health'
 import { makeFakeSupabase, type Db } from './fake-supabase'
@@ -384,4 +385,7 @@ function Harness() {
   )
 }
 
-createRoot(document.getElementById('root')!).render(<StrictMode><Harness /></StrictMode>)
+// ?newpassword=1 (23 Nov 2026): the REAL page a reset link opens, on the fake sign-in. App's half (that it shows this
+// instead of starting, off the address it opened at) is held by test:account-auth, by source.
+const NEW_PASSWORD = new URLSearchParams(location.search).get('newpassword') === '1'
+createRoot(document.getElementById('root')!).render(<StrictMode>{NEW_PASSWORD ? <SetNewPasswordScreen onCancel={() => {}} /> : <Harness />}</StrictMode>)

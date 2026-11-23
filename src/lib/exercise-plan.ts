@@ -4770,6 +4770,30 @@ function balanceWeeklyStructure(
       const added = list.pop()!
       list.splice(list.length - 1, 0, added)
     }
+    // A COMPOUND GOES IN WITH THE COMPOUNDS (23 Nov 2026, CSCS, mine; his Push & Press day). This pass runs after the
+    // day's tier sort, so a press added to even out push and pull was written after the lateral raises and skull
+    // crushers: a multi-joint lift done on shoulders and triceps that isolation had already tired, and labelled the
+    // main lift. A compound added here sits after the day's last compound and before its first isolation, finisher,
+    // trunk or carry move, never between a superset's two halves.
+    if (isPlacedWithCompounds(entry)) {
+      const at = list.findIndex(e => e.name === entry.name)
+      const firstLater = list.findIndex((e, i) => {
+        if (i === at) return false
+        const en = findEntry(e.name)
+        return !!en && en.mechanics_tier !== 'primer' && !isPlacedWithCompounds(en)
+      })
+      if (at !== -1 && firstLater !== -1 && firstLater < at) {
+        let to = firstLater
+        while (to > 0 && list[to - 1].superset_label && list[to - 1].superset_label === list[to].superset_label) to--
+        const [added] = list.splice(at, 1)
+        list.splice(to, 0, added)
+      }
+    }
+  }
+  /** A multi-joint lift of the session's main work: not isolation, a finisher, trunk work, a carry or cardio. */
+  function isPlacedWithCompounds(e: ExerciseEntry): boolean {
+    return (e.mechanics_tier === 'tier1_compound' || e.mechanics_tier === 'tier2_compound')
+      && e.movement_pattern !== 'core' && e.movement_pattern !== 'carry'
   }
 
   // Mirror of addExercise — removes the weakest excess-pattern accessory
