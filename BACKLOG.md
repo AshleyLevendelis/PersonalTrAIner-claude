@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **FIRST PLAY STORE BUNDLE BUILT, 23 Nov 2026** (closed test only; nothing published). `app-release.aab`, 6.61 MB,
+  versionCode 1 / versionName 1.0, production database (4 references to the production project in the bundled app, 0
+  to TEST). Signed with his upload key (`%USERPROFILE%\personal-trainer-upload.jks`, alias `upload`, owner "CN=Ashley
+  Levendelis", valid to 2054); the key's settings file is git-ignored and the key lives outside the repo. Merged release
+  manifest: INTERNET, health.READ_STEPS and AndroidX's DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION, nothing else.
+  `test:phone-app` 35 checks green. **The release build needs Java 21**: with the laptop's default JDK 17 it fails
+  "invalid source release: 21" in `:capacitor-android`; set `JAVA_HOME` to Android Studio's `jbr` (21.0.5) first. Next:
+  he uploads to Closed testing; every later upload raises versionCode by one.
 - [x] **THE STORE APP UPDATES THROUGH GOOGLE'S REVIEW, NO LIVE-UPDATE SERVICE: his ruling 23 Nov 2026, "I think its
   fine to do the Google review version"** (over a paid live-update service and over loading the live website inside the
   app). Each change reaches the phone app only as a new upload (versionCode +1) and Google's review; the website still
