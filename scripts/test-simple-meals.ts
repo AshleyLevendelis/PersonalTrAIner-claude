@@ -50,7 +50,7 @@ async function main() {
   console.log('\n2. The library holds enough simple food')
   const by = (slot: string) => MEAL_LIBRARY.filter(d => d.slot === slot)
   const counts = Object.fromEntries(['breakfast', 'lunch', 'dinner', 'snack'].map(s => [s, by(s).filter(simple).length]))
-  check('at least 100 simple breakfasts, lunches and dinners, and 40 simple snacks (measured 127, 113, 116, 45)', counts.breakfast >= 100 && counts.lunch >= 100 && counts.dinner >= 100 && counts.snack >= 40, counts)
+  check('at least 100 simple breakfasts, lunches and dinners, and 40 simple snacks (measured 127, 113, 116, 55)', counts.breakfast >= 100 && counts.lunch >= 100 && counts.dinner >= 100 && counts.snack >= 40, counts)
   const snack2 = by('snack').filter(d => mainFoodCount(namesOfLines(d.ingredients)) <= 2).length
   check('snacks of one or two foods: at least 40 (there were 7 of 143)', snack2 >= 40, snack2)
 

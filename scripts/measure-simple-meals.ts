@@ -47,7 +47,9 @@ const fakeFrom = (table: string) => {
 }
 
 import { MEAL_LIBRARY } from '../src/lib/meal-library-data'
-const WRITER_POOL = MEAL_LIBRARY
+// The library as it stood before 23 Nov 2026 (its first 725 dishes, unchanged since), so the stand-in writer offers the
+// same dishes on a before and an after checkout and only the change under test moves the numbers.
+const WRITER_POOL = MEAL_LIBRARY.slice(0, 725)
 let writerTurn = 0
 ;(globalThis as { fetch: unknown }).fetch = async (_u: string, init?: { body?: string }) => {
     // THE WRITER STANDS IN WITH LIBRARY DISHES: a spread of real dishes per meal, taken in a fixed stride so each round

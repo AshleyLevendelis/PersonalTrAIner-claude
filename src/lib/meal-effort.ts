@@ -22,9 +22,9 @@ import type { CookingTimePreference } from './types'
 // ---------------------------------------------------------------------------
 
 /** Main foods a simple meal may hold. */
-export const SIMPLE_MAIN_FOODS = 5
+const SIMPLE_MAIN_FOODS = 5
 /** Foods a simple snack may hold: "a snack should be yoghurt and fruit". */
-export const SIMPLE_SNACK_FOODS = 2
+const SIMPLE_SNACK_FOODS = 2
 
 const COOKING_OILS = new Set(['olive oil', 'vegetable oil', 'coconut oil', 'sesame oil', 'peanut oil', 'safflower oil'])
 

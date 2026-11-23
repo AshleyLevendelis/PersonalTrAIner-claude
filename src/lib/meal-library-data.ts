@@ -873,6 +873,17 @@ const SIMPLE_EVERYDAY: RawProposal[] = [
   d('snack', 'Greek yoghurt with pomegranate', MIDE, 'Scatter the pomegranate seeds over the yoghurt.', ['200g greek yoghurt 0%', '60g pomegranate']),
   d('snack', 'Ricotta with figs', ITAL, 'Spoon the ricotta into a bowl and top with the sliced figs.', ['150g ricotta light', '80g figs']),
   d('snack', 'Spiced paneer cubes', INDI, 'Cube the paneer and toss it in the chaat masala.', ['100g paneer', '1 tsp chaat masala']),
+  // Bigger snacks for bigger appetites (muscle gain): a protein and a carb, still two foods.
+  d('snack', 'Overnight oats with skyr', NORD, 'Stir the oats into the skyr and leave in the fridge overnight.', ['200g skyr', '40g oats']),
+  d('snack', 'Greek yoghurt and granola', MEDI, 'Scatter the granola over the yoghurt. Ready in 1 minute.', ['200g greek yoghurt 2%', '45g granola']),
+  d('snack', 'Quark and granola', BRIT, 'Top the quark with the granola. Ready in 1 minute.', ['200g quark', '45g granola']),
+  d('snack', 'Cottage cheese bagel', AMER, 'Toast the bagel and spread with the cottage cheese. Ready in 4 minutes.', ['85g bagel', '150g cottage cheese']),
+  d('snack', 'Turkey pitta', MEDI, 'Warm the pitta and fill it with the turkey. Ready in 3 minutes.', ['60g pitta bread', '90g smoked turkey breast']),
+  d('snack', 'Greek yoghurt and banana', MEDI, 'Slice the banana over the yoghurt. Ready in 2 minutes.', ['200g greek yoghurt 0%', '120g banana']),
+  d('snack', 'Ham and crackers', BRIT, 'Fold the ham onto the crackers.', ['80g ham', '30g crackers']),
+  d('snack', 'Cottage cheese and crackers', BRIT, 'Spread the cottage cheese over the crackers.', ['200g cottage cheese', '30g crackers']),
+  d('snack', 'Smoked salmon bagel', AMER, 'Toast the bagel and top with the smoked salmon. Ready in 4 minutes.', ['85g bagel', '70g smoked salmon']),
+  d('snack', 'Protein shake and oatcakes', AMER, 'Shake the protein powder with cold water and have it with the oatcakes.', ['30g whey protein powder', '30g oatcakes', '250ml water']),
 
   // Lunches: something to put together, not a recipe.
   d('lunch', 'Chicken salad wrap', BRIT, 'Pan-fry the chicken until cooked through, slice it, and roll it in the wrap with the leaves, tomatoes and light mayo. Ready in 15 minutes.', ['140g raw chicken breast', '1 tortilla wrap', '40g mixed salad leaves', '60g cherry tomatoes', '1 tbsp mayonnaise light']),

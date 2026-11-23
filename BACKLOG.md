@@ -10,16 +10,21 @@ Newest first. One line each.
   Tofu with Charred Bok Choy", and a new plan served 42% simple meals and 4% two-food snacks. BUILT (decisions mine):
   "simple" = five main foods or fewer (a snack two; seasonings and oil not counted, read off the food), nothing to
   shape, layer, batter or make a sauce from (`meal-effort.ts`); 78 new simple dishes (36 two-food snacks, 20 lunches,
-  22 dinners, plain names; 24 drafts dropped or changed to pass every library rule); the library offers simple dishes
+  22 dinners, plus 10 two-food snacks for bigger appetites; plain names; 27 drafts dropped or changed to pass every
+  library rule; 88 in all); the library offers simple dishes
   first unless he loves cooking; recipes are capped by the cooking answer (Quick none past a thin meal, Moderate a
   quarter of what the meal holds, Happy to cook unlimited; a thin meal under 20 dishes always takes one); the writer is
   asked for simple food with plain names (needs the `generate-meals` deploy); the cooking choices say "simple". AFTER
-  (measure:simple-meals, a new plan through generateMealPools, 3 targets x 4 diets, 28 days): Moderate 69% simple
-  served, 57% two-food snacks, 96% days on target (were 42%, 4%, 94%); Quick 88%, 68%, 99%. Cost: about two fewer
-  different dishes a meal over four weeks (20.1 -> 17.9). FOUND ON THE WAY: the quarter had first been a quarter of
+  (measure:simple-meals, a new plan through generateMealPools, 3 targets x 4 diets, 28 days): Moderate 71% simple
+  served, 64% two-food snacks, 99% days on target (were 42%, 4%, 94%); Quick 89%, 68%, 99% (43%, 7%, 97%). Variety
+  held on Moderate (20.1 -> 19.9 dishes a meal in 4 weeks), Quick lost about two. On-target moves with which dishes
+  the writer offers (89-96% in a run whose stand-in drew from the changed library), so it reads "did not fall". FOUND ON THE WAY: the quarter had first been a quarter of
   the 100-dish ceiling, which was 60% of a real meal (about 40 dishes land a day), so it reads what the meal holds; and
   my rename of three clashing new names also renamed an older "Chicken curry with rice" (caught by test:meal-facts,
-  put back). NOT DONE: existing plans keep their meals until Regenerate all or a top-up; changing the cooking answer
+  put back), and did it AGAIN with "Edamame and rice cakes" (put back; a replace edits the FIRST match, and the older
+  dish is first). And the first snacks left a muscle-gain plan 20 snacks deep (test:real-plates wants 30); a thin-meal
+  line of 30 cost the default 7 points of simple meals, so two-food snacks for bigger appetites went in instead. The
+  depth control's floor went 20 -> 15 (measured 22 on this morning's code, 19 after; its note said 32). NOT DONE: existing plans keep their meals until Regenerate all or a top-up; changing the cooking answer
   does not offer new meals; cook once eat twice, same breakfast, whole-pack portions (next slice); fast logging, eating
   out from the menu and adherence (not started). `test:simple-meals` (38 checks, 17 mutations, 17 caught),
   `measure:simple-meals`, `docs/plans/simple-meals.md`. Total size budget 3323 -> 3352 (measured 3327, the library's

@@ -72,10 +72,13 @@ async function main() {
   const seStart = src.indexOf('const SIMPLE_EVERYDAY: RawProposal[] = [')
   const seEnd = seStart < 0 ? -1 : src.indexOf('\n]\n', seStart)
   const seNames = new Set([...(seStart >= 0 && seEnd > seStart ? src.slice(seStart, seEnd) : '').matchAll(/d\('(?:breakfast|lunch|dinner|snack)', '([^']+)'/g)].map(m => m[1]))
-  check('the simple everyday block is found and every name in it is a dish in the library (measured 78)', seNames.size >= 60 && MEAL_LIBRARY.filter(d => seNames.has(d.name)).length === seNames.size, seNames.size)
+  check('the simple everyday block is found and every name in it is a dish in the library (measured 88)', seNames.size >= 60 && MEAL_LIBRARY.filter(d => seNames.has(d.name)).length === seNames.size, seNames.size)
   const before = await libraryDepth({ library: MEAL_LIBRARY.filter(d => !names.has(d.name) && !deepNames.has(d.name) && !vgNames.has(d.name) && !seNames.has(d.name)) })
   const thinBefore = before.flatMap(r => Object.entries(r.depth).filter(([, n]) => n < 7).map(([slot, n]) => `${r.target} ${r.diet} ${slot} ${n}`))
-  check('without them at least 20 meals fall under seven (measured 32), so the pass above is the dishes, not a blind walk', thinBefore.length >= 20, thinBefore.length)
+  // MOVED 23 Nov 2026: 20 -> 15. Measured on this morning's code: 22 (the "32" quoted here was older still); with simple
+  // dishes offered first (docs/plans/simple-meals.md) a few more meals reach seven: 19. The control still has to see a
+  // couple of dozen thin meals' worth, so the floor is set under today's measure, not at zero.
+  check('without them at least 15 meals fall under seven (measured 32 on 3 Nov, 22 on 23 Nov, 19 with simple dishes first), so the pass above is the dishes, not a blind walk', thinBefore.length >= 15, thinBefore.length)
   check('...and the vegan lunch is among them at every target (measured 2-4)', ['1700kcal/135g', '2000kcal/150g', '2300kcal/160g', '2700kcal/170g', '3100kcal/180g', '3040kcal/160g'].every(t => thinBefore.some(x => x.startsWith(`${t} vegan lunch `))), thinBefore.filter(x => x.includes('vegan lunch')))
 }
 

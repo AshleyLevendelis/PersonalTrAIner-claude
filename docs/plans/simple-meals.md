@@ -28,12 +28,13 @@ A dish a person makes on a weekday without a recipe:
 
 ## What changed
 
-1. **78 new simple dishes** in our library (`SIMPLE_EVERYDAY`): 36 snacks of one or two foods (yoghurt and berries, a
-   protein shake, cottage cheese on rice cakes, jerky and grapes), 20 lunches (wraps, jacket potatoes, rice bowls,
+1. **88 new simple dishes** in our library (`SIMPLE_EVERYDAY`): 46 snacks of one or two foods (yoghurt and berries, a
+   protein shake, cottage cheese on rice cakes, jerky and grapes, overnight oats with skyr and a cottage cheese bagel
+   for bigger appetites), 20 lunches (wraps, jacket potatoes, rice bowls,
    sandwiches), 22 dinners (salmon, rice and broccoli; steak, chips and peas; chicken fajita traybake). Plain names.
    Each passed every library rule (costed in full, served to at least one target in six, lean ones fitted at the lean
-   targets); 24 first drafts were dropped (16) or changed (8) because they failed one. Simple dishes now: 127 breakfasts, 113
-   lunches, 116 dinners, 45 snacks.
+   targets); 27 first drafts were dropped (19) or changed (8) because they failed one. Simple dishes now: 127 breakfasts, 113
+   lunches, 116 dinners, 55 snacks.
 2. **Simple first.** Unless someone has said they love cooking, the library offers every simple dish before any
    recipe (a sort KEY, after "meat for meat eaters", before every score).
 3. **Recipes are a minority** when a plan is filled from the library, by the cooking answer:
@@ -52,18 +53,25 @@ A dish a person makes on a weekday without a recipe:
 
 ## Measured (`npm run measure:simple-meals`)
 
-A new plan through the app's own `generateMealPools` (the writer stood in by a spread of real library dishes), then 28
-days served; 3 targets x 4 diets, three meals and a snack. Before = `main` at b11621d with the same script.
+A new plan through the app's own `generateMealPools` (the writer stood in by a spread of the library's first 725 dishes,
+the same on both checkouts), then 28 days served; 3 targets x 4 diets, three meals and a snack. Before = `main` at
+b11621d with the same script.
 
 | cooking answer | simple meals served | 2-food snacks | days on target | dishes a meal over 4 weeks |
 |---|---|---|---|---|
 | Moderate, before | 42% | 4% | 94% | 20.1 |
-| Moderate, after | **69%** | **57%** | 96% | 17.9 |
+| Moderate, after | **71%** | **64%** | 99% | 19.9 |
 | Quick, before | 43% | 7% | 97% | 19.4 |
-| Quick, after | **88%** | **68%** | 99% | 18.3 |
+| Quick, after | **89%** | **68%** | 99% | 17.7 |
+| Happy to cook, before | 44% | 8% | 98% | 20.5 |
+| Happy to cook, after | 47% | 24% | 100% | 20.3 |
 
-The cost is variety: about two fewer different dishes a meal over four weeks (a meal holds fewer dishes). Days on
-target did not fall. The writer's own seven dishes a meal will be simpler once `generate-meals` is deployed; the
+Days on target did not fall, and variety held on the default (Quick lost about two dishes a meal over four weeks).
+**Days on target moves with which dishes the writer offers**: an earlier run whose stand-in writer drew from the whole
+(changed) library read 89-96% on the same code, so read the on-target column as "did not fall", not as a gain.
+FOUND BY MEASURING: a first version of the snacks left a muscle-gain plan with 20 snacks (test:real-plates wants 30);
+letting a thin meal take recipes up to 30 cost the default 7 points of simple meals, so 13 two-food snacks for bigger
+appetites were written instead (11 kept). The writer's own seven dishes a meal will be simpler once `generate-meals` is deployed; the
 measure cannot see that (its writer is the library).
 
 ## CSCS / nutrition review (mine)
