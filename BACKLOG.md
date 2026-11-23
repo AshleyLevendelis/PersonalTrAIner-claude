@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **PROVEN LIVE ON HIS PHONE, 23 Nov 2026, AND THE CONFIRMED LINE PUSHES THE PAGE DOWN (his "yes make it push the
+  page down")**. His dashboard pass (Claude in his browser): personaltrainerapp.co.uk bought, Resend verified, production
+  Supabase sending through it, Site URL was `http://localhost:3000` (the dead link his own confirmation hit) and is now
+  the live app, both templates in his words. On his phone: the confirmation email arrived in the inbox from
+  hello@personaltrainerapp.co.uk, its link opened the app with "Your email is confirmed", and sign out then sign in
+  brought his plan back. The forgot-password reset is not yet tried. The confirmed line had been pinned over the top
+  and covered the greeting; it now sits in the page above the tabs. Seen in the whole app booted from a confirm link at
+  phone size (in flow, nothing under it); `test:account-auth` 6f (1 mutation, 1 caught). Frontend only.
 - [x] **EMAIL SIGN-UP, SIGN-IN AND SIGN-OUT: his report 23 Nov 2026, "I didn't receive a proper email to confirm my
   email address, and there's no way to sign out and sign back in with the email. Several times, it's asked me to change
   my password", then "Yes" to building the fix** (`docs/plans/account-signin.md`). Live testers in days.

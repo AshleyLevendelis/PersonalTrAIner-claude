@@ -3536,15 +3536,6 @@ function App() {
           is skipped, with no reload needed. */}
       {askForEmail && !tourRunning && <EmailPrompt onClose={() => setAskForEmail(false)} />}
 
-      {accountNotice && (
-        <div role="status" className="fixed inset-x-0 top-0 z-[60] px-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]" data-testid="account-notice">
-          <div className="mx-auto max-w-md rounded-lg border bg-background p-3 shadow-lg flex items-start gap-3">
-            <p className="text-sm flex-1">{accountNotice}</p>
-            <Button size="sm" variant="outline" className="min-h-[44px]" onClick={() => setAccountNotice(null)}>OK</Button>
-          </div>
-        </div>
-      )}
-
       {unsavedProfileWarning && (
         <div
           role="alert"
@@ -3598,6 +3589,13 @@ function App() {
       </div>
 
       <DockPaddedMain className="max-w-6xl mx-auto px-4 pt-12 space-y-6">
+        {/* In the page's flow, above the tabs (his ask 23 Nov 2026): pinned over the top it covered the greeting. */}
+        {accountNotice && (
+          <div role="status" className="rounded-lg border bg-background p-3 flex items-start gap-3" data-testid="account-notice">
+            <p className="text-sm flex-1">{accountNotice}</p>
+            <Button size="sm" variant="outline" className="min-h-[44px]" onClick={() => setAccountNotice(null)}>OK</Button>
+          </div>
+        )}
         {/* M29, 9 Oct 2026. This sat in the page's flow ABOVE the tabs, so a
             failed swap mid-session printed its sentence a screen and a half
             above the tap and the person saw nothing happen; it then followed
