@@ -436,6 +436,19 @@ const SECONDS_PER_RAMP_SET = 50
 // second main lift; a full 5-step cold-start scheme for every heavy compound
 // in a session would eat an unreasonable amount of session time for no real
 // safety benefit past the first one.
+/** Below this warm-up budget (a 20-30 minute session's 390 seconds) a later lift's build-up is one feeder set. */
+const SHORT_SESSION_WARMUP_SECONDS = 400
+const SHORT_SESSION_FEEDER_SCHEME: { load_percent: number; reps: number }[] = [{ load_percent: 70, reps: 3 }]
+/**
+ * ...and the first lift's build-up loses its empty-bar set and anything above 85% (the near-max single): the general
+ * warm-up and the movement-prep drill have already rehearsed the pattern, and the working sets of a short session are
+ * not near-maximal. An advanced lifter's five steps become three (50, 70, 85%).
+ */
+function shortFirstRamp(scheme: { load_percent: number; reps: number }[]): { load_percent: number; reps: number }[] {
+  const kept = scheme.filter(st => st.load_percent > 0 && st.load_percent <= 85)
+  return kept.length > 0 ? kept : scheme
+}
+
 const ABBREVIATED_RAMP_SCHEME: { load_percent: number; reps: number }[] = [
   { load_percent: 50, reps: 5 },
   { load_percent: 70, reps: 3 },
@@ -625,8 +638,12 @@ export function buildWarmup(ctx: WarmupContext): WarmupBlock {
   // budget: if a multi-main-lift day's ramps don't fit, general/mobility are
   // what shrink (see below), not the ramp coverage itself.
   const rampTargets = ctx.compounds.filter(c => needsRampUp(c.entry, c.suggestedLoadKg))
+  // A 20-30 MINUTE SESSION'S LATER LIFTS GET ONE FEEDER SET (22 Nov 2026, the persona audit's C8b; CSCS, mine): three
+  // build-up sets for every heavy lift put 8 to 11 ramp sets, seven to nine minutes, into a 25-minute session. The first
+  // lift keeps its full build-up; a later one, with the lifter already warm, needs one set to feel the weight.
+  const shortSession = budgetSeconds < SHORT_SESSION_WARMUP_SECONDS
   const rampUps: RampBlock[] = rampTargets.map((c, i) =>
-    buildRampSetsFor(c.entry, i === 0 ? RAMP_SCHEMES[ctx.experience] : ABBREVIATED_RAMP_SCHEME, i !== 0, c.loadSource)
+    buildRampSetsFor(c.entry, i === 0 ? (shortSession ? shortFirstRamp(RAMP_SCHEMES[ctx.experience]) : RAMP_SCHEMES[ctx.experience]) : shortSession ? SHORT_SESSION_FEEDER_SCHEME : ABBREVIATED_RAMP_SCHEME, i !== 0, c.loadSource)
   )
   const rampSeconds = rampUps.reduce((n, r) => n + r.sets.length * SECONDS_PER_RAMP_SET, 0)
 

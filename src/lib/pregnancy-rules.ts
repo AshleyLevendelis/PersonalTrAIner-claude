@@ -74,6 +74,11 @@ export const PREGNANCY_LATE_EXCLUDED: ReadonlySet<string> = new Set([
   // face-down trunk and push-up positions
   'Plank', 'Plank Shoulder Taps', 'Copenhagen Plank', 'Mountain Climbers', 'Push-Ups', 'Decline Push-Ups',
   'Archer Push-Ups', 'Deficit Push-Ups', 'Wide Push-Ups', 'Close-Grip Push-Ups', 'Knee Push-Ups',
+  // a row held in that position, one hand at a time: a plank with less support (22 Nov 2026, found reading the persona
+  // audit's plans: a woman 31 weeks pregnant had Renegade Rows while Plank Shoulder Taps were already out)
+  'Renegade Row',
+  // ...and crawled on hands and feet (the same plank, moving)
+  'Bear Crawl',
   // head below the hips, weight through the arms
   'Pike Push-Ups',
   // 22 NOV 2026, THE PREGNANCY AUDIT (his "build fixes 2 and 3"; CSCS, mine): near-copies of the above that got through.
@@ -87,7 +92,7 @@ export const PREGNANCY_LATE_EXCLUDED: ReadonlySet<string> = new Set([
 ])
 
 /** What takes a late-excluded exercise's place, first one the person's pool allows. */
-export type LateReplacementKind = 'legs' | 'hinge' | 'push' | 'core' | 'pull' | 'calf' | 'quad'
+export type LateReplacementKind = 'legs' | 'hinge' | 'push' | 'core' | 'pull' | 'calf' | 'quad' | 'cardio'
 export const PREGNANCY_LATE_REPLACEMENTS: Readonly<Record<LateReplacementKind, readonly string[]>> = {
   legs: ['Single-Leg Leg Press', 'Leg Press', 'Low Box Step-Up', 'Goblet Squats', 'Box Squat (Bodyweight)', 'Leg Extensions'],
   // A HINGE STAYS A HINGE (22 Nov 2026, the persona audit's C1): a single-leg RDL went to the legs list, all squats, so from
@@ -98,16 +103,20 @@ export const PREGNANCY_LATE_REPLACEMENTS: Readonly<Record<LateReplacementKind, r
   core: ['Side Plank', 'Bird Dog', 'Pallof Press', 'Cable Woodchops', 'Dumbbell Woodchop'],
   // 22 Nov 2026: a row stays a row (seated or one arm braced, never face-down or chest-on-a-bench); a calf raise stays a
   // calf raise on both feet; a quad isolation stays one.
-  pull: ['Seated Cable Row', 'Single-Arm Cable Row', 'Seated Machine Row', 'Iso-Lateral High Row', 'Single-Arm Kettlebell Row', 'Dumbbell Rows', 'Towel Row', 'Backpack Row'],
+  pull: ['Seated Cable Row', 'Single-Arm Cable Row', 'Seated Machine Row', 'Cable Rows', 'Iso-Lateral High Row', 'Single-Arm Kettlebell Row', 'Dumbbell Rows', 'Towel Row', 'Backpack Row'],
   calf: ['Standing Calf Raise Machine', 'Calf Raises', 'Seated Calf Raises', 'Leg Press Calf Raise', 'Calf Raises (Bodyweight)', 'Bent-Knee Calf Raise (Bodyweight)'],
   quad: ['Leg Extensions', 'Leg Press', 'Goblet Squats', 'Box Squat (Bodyweight)'],
+  // CARDIO STAYS CARDIO (22 Nov 2026, the persona audit's C10): Mountain Climbers were swapped for a side plank, and a
+  // fat-loss plan's only conditioning went with them. Upright and low-impact, as pregnancy guidance describes (ACOG).
+  cardio: ['Elliptical', 'Cycling Intervals', 'Treadmill Intervals', 'Shadow Boxing', 'Battle Ropes'],
 }
 
 export function lateReplacementKind(name: string, pattern: string): LateReplacementKind {
+  if (pattern === 'cardio') return 'cardio'
   if (pattern === 'core' || /plank|mountain/i.test(name)) return 'core'
   if (/push-up/i.test(name)) return 'push'
+  if (pattern === 'horizontal_pull' || pattern === 'vertical_pull') return 'pull'
   if (pattern === 'hip_hinge') return 'hinge'
-  if (pattern === 'horizontal_pull') return 'pull'
   if (pattern === 'isolation_calf') return 'calf'
   if (pattern === 'isolation_quad') return 'quad'
   return 'legs'

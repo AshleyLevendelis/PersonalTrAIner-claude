@@ -165,8 +165,10 @@ const RULES: Rule[] = [
         const sl = sum(['single_leg']) / 2, q = sum(['knee_dominant', 'isolation_quad']) + sl, h = sum(['hip_hinge', 'isolation_hamstring']) + sl; return q + h >= 8 && (q > h * 2.5 || h > q * 2.5) ? [`w${w.week_number} quad ${q} / hamstring ${h}`] : [] }).slice(0, 3) } },
   { id: 'C14', kind: 'coaching', text: 'a trained lifter\'s unweighted leg compound gets weight (or a tempo) at some point in the plan', applies: p => p.training_experience === 'intermediate' || p.training_experience === 'advanced',
     check: (p, m) => { if (p.equipment_access === 'bodyweight' || isPregnant(p) || !m.some(w => /hypertrophy|strength/i.test(w.phase_label ?? ''))) return []; const by = new Map<string, { n: number; loaded: boolean }>()
-      for (const w of loading(m)) for (const d of w.days) for (const e of d.exercises) { const x = entry(e.name); if (!x || x.mechanics_tier !== 'tier2_compound' || !['knee_dominant', 'single_leg'].includes(x.movement_pattern) || x.prescription_type !== 'reps' || e.tempo) continue
-        const r = by.get(e.name) ?? { n: 0, loaded: false }; r.n++; if ((e.suggested_load_kg ?? 0) > 0 || (e.suggested_added_load_kg ?? 0) > 0) r.loaded = true; by.set(e.name, r) }
+      for (const w of loading(m)) for (const d of w.days) for (const e of d.exercises) { const x = entry(e.name); if (!x || x.mechanics_tier !== 'tier2_compound' || !['knee_dominant', 'single_leg'].includes(x.movement_pattern) || x.prescription_type !== 'reps') continue
+        // A tempo is the other lever the rule names, so a week with one counts as progress (it used to skip the session
+        // instead, so a lift tempoed in one block and weighted in none still read "never weighted").
+        const r = by.get(e.name) ?? { n: 0, loaded: false }; r.n++; if ((e.suggested_load_kg ?? 0) > 0 || (e.suggested_added_load_kg ?? 0) > 0 || e.tempo) r.loaded = true; by.set(e.name, r) }
       return [...by.entries()].filter(([, r]) => r.n >= 12 && !r.loaded).map(([n, r]) => `${n} (${r.n} sessions, never weighted)`) } },
   { id: 'C15', kind: 'coaching', text: 'an even week: no lifting day under 60% of the heaviest day\'s working sets AND under 75% of its minutes (conditioning days aside)', applies: () => true,
     check: (_p, m) => loading(m).flatMap(w => { const ds = lifting(w).filter(d => d.focus !== 'Conditioning & Core' && !d.exercises.some(e => entry(e.name)?.mechanics_tier === 'cardio' || entry(e.name)?.movement_pattern === 'cardio'))
@@ -202,10 +204,11 @@ function describe(p: UserProfile): string {
     p.recovery_capacity && `recovery ${p.recovery_capacity}`, p.conditioning_preference && `cardio ${p.conditioning_preference}`, (p.injuries ?? []).length ? `injuries ${(p.injuries ?? []).join('+')}` : '',
     (p.health_conditions ?? []).length ? (p.health_conditions ?? []).join('+') + (due ? ` due ${due}` : '') : '', p.start_preference === 'move_more' ? 'walking start' : ''].filter(Boolean).join(', ')
 }
-function runShard(shard: number): Row[] {
+function runShard(shard: number, only?: number[]): Row[] {
   const rows: Row[] = []
   const quiet = console.log, warn = console.warn
-  for (let i = shard; i < N; i += SHARDS) {
+  const ids = only ?? Array.from({ length: Math.ceil((N - shard) / SHARDS) }, (_, k) => shard + k * SHARDS).filter(i => i < N)
+  for (const i of ids) {
     const { p, group, key } = profileFor(i)
     const row: Row = { i, group, breaches: {}, applies: [], summary: describe(p) }
     try {
@@ -230,6 +233,21 @@ function runShard(shard: number): Row[] {
   return rows
 }
 
+// A QUICK RE-CHECK OF NAMED PLANS (AUDIT_IDS="36,44,..." or a JSON file of them): the same rules, no report, in seconds.
+// For fixing: re-run only the plans a rule caught, then the full audit once before believing the fix.
+if (!process.env.AUDIT_LIB && process.env.AUDIT_IDS) {
+  const raw = process.env.AUDIT_IDS
+  const ids: number[] = raw.endsWith('.json') ? JSON.parse(readFileSync(raw, 'utf8')) : raw.split(',').map(Number)
+  const rows = runShard(0, [...new Set(ids)].sort((a, b) => a - b))
+  for (const r of RULES) {
+    const br = rows.filter(x => x.breaches[r.id])
+    if (br.length) console.log(`${r.id} ${br.length}: ${br.slice(0, 6).map(x => `#${x.i} ${x.breaches[r.id][0]}`).join(' · ')}`)
+  }
+  if (process.env.AUDIT_IDS_OUT) writeFileSync(process.env.AUDIT_IDS_OUT, JSON.stringify(Object.fromEntries(RULES.map(r => [r.id, rows.filter(x => x.breaches[r.id]).map(x => x.i)]))))
+  const crashes = rows.filter(x => x.crash)
+  console.log(`${rows.length} plans re-checked, ${crashes.length} crashed${crashes.length ? ` (#${crashes[0].i}: ${crashes[0].crash})` : ''}`)
+  process.exit(0)
+}
 if (process.env.AUDIT_LIB) { /* imported for its profiles only */ } else if (process.env.AUDIT_SHARD != null) {
   const s = Number(process.env.AUDIT_SHARD)
   writeFileSync(`${OUT}/shard-${s}.json`, JSON.stringify(runShard(s)))

@@ -188,6 +188,11 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `older-beginner.ts`): a beginner from 60 gets no technique, barbell, hanging or jumping lift and balance work from 60;
   from 65 at any level no jump with a real landing; pull-up negatives and kettlebell swings wait for novice; a beginner's
   or novice's full-body day is "Full Body Strength". Measured on 2,048 plans across ages 24-68. `test:older-beginner`
+- **A 20-30 minute session warms up in about five minutes, and a 20-30 week covers one plane each of push and pull**
+  (CSCS, mine, 22 Nov 2026, the persona audit's round two): the last time checks shorten the warm-up before any working
+  set (never ramps, pelvic floor or the balance hold), the first build-up drops its empty-bar set and near-max single,
+  later lifts get one feeder set; a missing second plane is neither added nor swapped in. A day that loads the knee gets
+  the knee's rehab whatever its name. `test:persona-audit-fixes` §9, `measure:personas`
 - **A beginner's session holds at most 18 working sets — his ruling 21 Nov 2026, "yes cap beginners at 18 sets"** (over
   filling the time with lifting): the spare minutes go to optional mobility. It narrows his session-length rulings for
   beginners only. `test:older-beginner` §14
