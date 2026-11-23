@@ -688,6 +688,14 @@ menu" stays true when a copy is also left outside it.
   that costs nothing. Anything built on a model JUDGEMENT should be split this
   way and the two halves named separately.
   `cardio-session`, `verify:cardio-session`, `coach-parity`
+- **An interval session on the plan runs on the round timer: his ruling 23 Nov 2026, "A"** (over a log line with a
+  timer button, from his "start the workout, it starts the round timer ... you log it completed at the end"): a planned
+  session keeps its rounds, work and rest; its card has Start (the round timer at those numbers, his countdown), and when
+  the rounds end one effort tap logs it under the session's own name, so the day reads done; the round timer's own Log
+  session asks the same one question. The coach's card carries the coach's three numbers, else the intervals of the
+  reply he said yes to when they fit the session. Another day shows the session as a preview, never one line. A saved
+  cardio log now re-reads the week strip. `test:planned-rounds`, `verify:planned-rounds`. Needs the `chat-gemini` deploy
+  for the coach to send rounds itself
 - **Swap the session for a circuit of timer blocks, block by block** — both surfaces since
   8 Oct 2026. Ashley, from the gym: rope, push-ups, sit-ups and the bike off the round timer could
   only be logged as "Intervals". His ruling, from three options: **A, one workout made of blocks**.

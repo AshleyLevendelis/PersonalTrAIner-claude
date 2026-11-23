@@ -8,6 +8,7 @@ import { getRecentActivityDurations, DEFAULT_ACTIVITY_MINUTES, readCardioLogs } 
 import { runForToday, RUN_ACTIVITY, type RunToday } from '@/lib/running'
 import { addDays } from '@/lib/session-move'
 import type { PlannedActivity } from '@/lib/types'
+import { PlannedRoundsStart, usePlannedRound } from './PlannedRoundsStart'
 import { PlannedCardioRow, UnplannedCardioEntry, CardioReceipts, useCardioReceiptsToday, type CardioPick } from './CardioSetRow'
 // Its own chunk — see the file for the measurement that put it there.
 const AddCardioSession = lazyWithReload(() => import('./AddCardioSessionSheet').then(m => ({ default: m.AddCardioSession })))
@@ -476,6 +477,7 @@ export function ActiveRecoveryCard({
   // did. This is not an add-on like recommendedCardio: it IS the session, which
   // is why it leads the card and why the card stops calling itself recovery.
   const planned = useRunHeldToLog(workout.plannedActivity, raceDate ?? null)
+  const roundState = usePlannedRound(planned)
   return (
     // THE RECOVERY COLOUR, as the rest day (Ashley's handoff, 4 Nov 2026, Exercise Screen option 4b): amber is for
     // warnings such as "That didn't save", and this card had kept it from before the 20 Sep rest-day rebuild.
@@ -505,7 +507,9 @@ export function ActiveRecoveryCard({
             row forgot on every tab change and offered to log it again. */}
         {planned && (
           <div className="space-y-1.5" data-testid="planned-activity">
-            <PlannedCardioRow prescription={planned} />
+            {/* ROUNDS RUN ON THE ROUND TIMER (23 Nov 2026): Start under the session's name, the effort tap when they
+                end, and the boxes step aside meanwhile so there is one way to log at a time. */}
+            <PlannedCardioRow prescription={planned} timer={<PlannedRoundsStart planned={planned} />} hideEntry={roundState === 'mine' || roundState === 'done'} />
             {planned.heldBack && (
               <p className="text-xs leading-[1.5] text-foreground px-0.5" data-testid="run-held-back">{planned.heldBack}</p>
             )}

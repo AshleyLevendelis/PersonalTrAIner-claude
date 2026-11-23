@@ -2,6 +2,31 @@
 
 Newest first. One line each.
 
+- [x] **AN INTERVAL SESSION ON THE PLAN RUNS ON THE ROUND TIMER (his ruling 23 Nov 2026, "A")**. His live test: the coach
+  suggested 4 × 3 min hard on the assault bike, 1 min rest, he said yes, put it on my rest days, and Wednesday read
+  "Wednesday: Assault Bike Rounds, 16 minutes." with nothing to start or log. Asked, from two options, he chose A (a
+  real workout card that starts the round timer and logs at the end) over B (a log line with a timer button). BUILT:
+  a planned session keeps its rounds, work and rest (the coach's tool takes rounds, work_seconds and rest_seconds; until
+  the `chat-gemini` deploy the card reads them from the coach's last reply when they fit the session's minutes, and
+  from a protocol written into the name); a session is never shorter than its rounds. The day's card: the session line,
+  its rounds, then "4 × 3 min, 1 min rest · Start · 10s countdown" (his countdown setting), which starts the round
+  timer at those numbers, tagged as this session on this date, and opens it on Tools; while it runs the card says
+  "Round timer running · Open it" and never restarts it; when the rounds end, "Done. How hard was it?" and one tap logs
+  it under the session's own name with the timer's minutes and the rounds as the note, so the day reads done and the
+  round is released only after the write. The round timer's own Log session asks the same one question (never "what
+  was this block?"). The minutes-and-effort row stays as the way to log it without the timer, and steps aside while the
+  round runs or asks, so there is one way to log at a time. Another day's preview is a card (name, effort, rounds,
+  reason), never one line. FOUND ON THE WAY, older than today: a logged walk or cardio session left the week strip on
+  "due" until he left the tab and came back (the week re-read on a saved set, never on a saved cardio log); it re-reads
+  now. Decided by me (presentation and wiring, no prescription changed): the logged minutes are the timer's (15 for
+  4 × 3/1), not the plan's 16, because that is what the app measured; effort is asked, never pre-chosen. CSCS review:
+  nothing about any prescription changes; the session is the coach's, now stored whole. `test:planned-rounds` (32
+  checks, 14 mutations caught), `verify:planned-rounds` (28 checks, 9 mutations caught, every state screenshotted and
+  read). Bundle limits raised by his "room to grow" rule (re-download 469 -> 480, first paint 628 -> 637, app chunk
+  1617 -> 1651, total 3287 -> 3323; measured 472, 629, 1626, 3298; the persona audit's passes and this build).
+  His third report ("after a refresh Wednesday went back to a rest day"): NOT reproduced; the session is saved and read
+  back; his screenshot showed last week (Mon 16-Sun 22), which the write leaves alone. Needs the `chat-gemini` deploy
+  for the coach to send the rounds itself.
 - [x] **THE PERSONA AUDIT AT ZERO (his "Yes fix all the problems", 23 Nov 2026)**. 6,000 plans, 31 rules: 126 plans broke a
   coaching rule before this round, 0 after (every rule, every group, safety included). Before -> after: pushing over
   1.5x pulling 42 -> 0, sessions past the time asked 32 -> 0, uneven weeks 32 -> 0, chest or back under four sets 14 -> 0,

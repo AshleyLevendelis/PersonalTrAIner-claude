@@ -13,6 +13,7 @@ import { isMovementPrepRow } from '@/lib/session-duration'
 import { useCallback, useEffect, useState } from 'react'
 import { getWeeklyDashboard, getSessionMovesInRange, type WeeklyDashboardDay } from '@/lib/daily-tracking'
 import { subscribeSetLogView } from '@/lib/set-log-store'
+import { subscribeCardioLogStore } from '@/lib/cardio-log-store'
 import { weekWithLocalWork } from '@/lib/week-local-work'
 import { sessionForDate, type SessionMove } from '@/lib/session-move'
 import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
@@ -436,11 +437,15 @@ export function useTrainingWeek(
   useEffect(() => {
     if (!profileId) return
     let timer: ReturnType<typeof setTimeout> | null = null
-    const off = subscribeSetLogView(() => {
+    const again = () => {
       if (timer) clearTimeout(timer)
       timer = setTimeout(() => { timer = null; refresh() }, 400)
-    })
-    return () => { off(); if (timer) clearTimeout(timer) }
+    }
+    const off = subscribeSetLogView(again)
+    // AND A SAVED CARDIO LOG (23 Nov 2026): a walk or a planned interval session logged from its card left the strip
+    // saying "due" until he left the tab and came back. A day whose session is an activity is done by its cardio log.
+    const offCardio = subscribeCardioLogStore(again)
+    return () => { off(); offCardio(); if (timer) clearTimeout(timer) }
   }, [profileId, refresh])
 
   const monday = windowStart ? new Date(windowStart + 'T12:00:00')

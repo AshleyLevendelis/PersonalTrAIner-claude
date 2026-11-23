@@ -726,7 +726,9 @@
     "verify:setup-why": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/setup-why.mjs",
     "test:report-email": "tsx scripts/test-report-email.ts",
     "test:chat-reply": "tsx scripts/test-chat-reply.ts",
-    "verify:chat-reply": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-reply.mjs"
+    "verify:chat-reply": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-reply.mjs",
+    "test:planned-rounds": "tsx scripts/test-planned-rounds.ts",
+    "verify:planned-rounds": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/planned-rounds.mjs"
   },
   "dependencies": {
     "@capacitor/android": "8.6.2",
