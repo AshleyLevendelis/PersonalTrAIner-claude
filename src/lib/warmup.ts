@@ -449,6 +449,34 @@ function shortFirstRamp(scheme: { load_percent: number; reps: number }[]): { loa
   return kept.length > 0 ? kept : scheme
 }
 
+/**
+ * THE SHORT SESSION'S BUILD-UP, FOR A DAY STILL OVER ITS TIME (23 Nov 2026, the persona audit's C8b; CSCS, mine): the
+ * first lift loses its empty-bar set and anything above 85%, every later lift keeps one feeder set (the one nearest
+ * 70%), exactly the shape a 20-30 minute session is built with. A 30-45 metabolic-conditioning Monday held eleven
+ * build-up sets in front of three high-rep lifts and ran past 45 minutes with every set at its floor. Returns the
+ * warm-up as it then stands; the caller copies each block back onto its exercise.
+ */
+export function shortenRampsToFit(warmup: WarmupBlock, firstRampSteps = Infinity, laterFeeders = true): WarmupBlock {
+  let removed = 0
+  // ...and at the very last a later lift, the lifter already warm from the first and its build-up, starts on its first
+  // working set: its feeder set goes.
+  if (!laterFeeders) removed += warmup.ramp_ups.slice(1).reduce((n, r) => n + r.sets.length, 0)
+  const ramp_ups = (laterFeeders ? warmup.ramp_ups : warmup.ramp_ups.slice(0, 1)).map((r, i) => {
+    let sets = r.sets
+    if (i === 0) {
+      const kept = sets.filter(st => st.load_percent > 0 && st.load_percent <= 85)
+      if (kept.length > 0) sets = kept
+      // ...and at the very last, the first lift's lowest rungs only (two: half and 70% of the working weight).
+      if (sets.length > firstRampSteps) sets = [...sets].sort((a, b) => a.load_percent - b.load_percent).slice(0, firstRampSteps)
+    } else if (sets.length > 1) {
+      sets = [[...sets].sort((a, b) => Math.abs(a.load_percent - 70) - Math.abs(b.load_percent - 70))[0]]
+    }
+    removed += r.sets.length - sets.length
+    return sets === r.sets ? r : { ...r, sets: sets.map((st, k) => ({ ...st, set_number: k + 1 })) }
+  })
+  return removed === 0 ? warmup : { ...warmup, ramp_ups, total_seconds: warmup.total_seconds - removed * SECONDS_PER_RAMP_SET }
+}
+
 const ABBREVIATED_RAMP_SCHEME: { load_percent: number; reps: number }[] = [
   { load_percent: 50, reps: 5 },
   { load_percent: 70, reps: 3 },

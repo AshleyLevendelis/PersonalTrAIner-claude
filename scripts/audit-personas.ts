@@ -233,6 +233,14 @@ function runShard(shard: number, only?: number[]): Row[] {
   return rows
 }
 
+/** One sampled person, every rule: the breaches found, by rule id (used by test:persona-audit-fixes so its pinned cases
+ *  are judged by the audit's own detectors, never a copy of them). */
+export function auditOne(i: number): Record<string, Breach[]> {
+  const [row] = runShard(0, [i])
+  if (row.crash) throw new Error(`#${i} failed to generate: ${row.crash}`)
+  return row.breaches
+}
+
 // A QUICK RE-CHECK OF NAMED PLANS (AUDIT_IDS="36,44,..." or a JSON file of them): the same rules, no report, in seconds.
 // For fixing: re-run only the plans a rule caught, then the full audit once before believing the fix.
 if (!process.env.AUDIT_LIB && process.env.AUDIT_IDS) {

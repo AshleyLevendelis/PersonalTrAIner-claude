@@ -2,6 +2,38 @@
 
 Newest first. One line each.
 
+- [x] **THE PERSONA AUDIT AT ZERO (his "Yes fix all the problems", 23 Nov 2026)**. 6,000 plans, 31 rules: 126 plans broke a
+  coaching rule before this round, 0 after (every rule, every group, safety included). Before -> after: pushing over
+  1.5x pulling 42 -> 0, sessions past the time asked 32 -> 0, uneven weeks 32 -> 0, chest or back under four sets 14 -> 0,
+  thigh imbalance 13 -> 0. CSCS, mine, each traced before it was fixed. (1) A day holding two presses swaps its later
+  non-main one for pulling the day may take (rear delts on a chest day), else trunk work, while the week presses over 1.5x
+  what it pulls; a day holding two hinges or two squats swaps the spare one for the other side while the thigh is over
+  2.5x one way (both in the week the plan is built from, so every week carries it). (2) The press-heavy week's row also
+  goes on a chest or shoulders day of a split, not only a full-body day, and a row added in one week of a block is added
+  in every week of it (the block's "same exercises" pass had been taking it back). (3) The beginner's 18-set cap drops a
+  press before a pull the week needs, keeps the week's four chest sets, and never takes a day's last squat, hinge, press
+  or pull; the thigh is weighed again inside the cap. (4) The last time check holds a set the week needs (pulling, four
+  chest sets) until no spare exercise is left to drop, and a required second press of the same plane may go where the
+  week keeps four chest sets. (5) A day under 60% of the heaviest day's sets and 75% of its minutes takes sets (never a
+  press in a press-heavy week, never past the time or the cap, never tipping the thigh), or the heaviest day gives one.
+  (6) A day still seconds over its time after every set is at its floor: the bike or rower gives up to a minute (one
+  minute kept), then the first build-up keeps two rungs (50 and 70%), then a later lift's feeder set goes. Never a
+  working set, a rest, the balance hold or pelvic floor work. CSCS review: training effect, the swaps keep the movement
+  pattern of the day's session and trade a duplicate for the missing side; what it takes away, a duplicate press or
+  hinge, trunk or shoulder isolation sets, warm-up seconds; fundamentals, every pattern still covered (C1 0, and the
+  cap's new guard is the reason); no floor or ceiling redefined; inside scope. MEASURED AND DELETED, five mechanisms that
+  changed nothing on 6,000 plans (a balance-aware block trim, dropping the last stretch, a first short-ramp step, a
+  post-cap pull bump, searching every day for a spare press). The first version of this round CREATED three breaches
+  (the cap took a week's only hinge; the light day tipped a knee trainee's thigh, twice): found by the full audit, fixed,
+  pinned. `test:persona-audit-fixes` 71 -> 78 checks: 43 named plans judged by the audit's own detectors (`auditOne`,
+  exported), 18 mutations caught, 5 missed and deleted as above. `test:thin-day` re-anchored on its rule's own definition
+  of thin (ten sets OR under ten minutes short), since the press swap can end a day's thinness on minutes.
+  ALSO, his live test the same morning: "Good morning. How can I improve my cardio conditioning for muay thai?" got
+  "Watch a video: Good Mornings". A greeting opening a message is no longer read as an exercise name; "how do I do good
+  mornings?" still is (`test:live-test-nov14`, 3 checks, the mutation caught). NOT FIXED, reported to him: the coach's
+  added cardio session is a line of text, not a loggable round-timer session (it stores only a name and minutes), and
+  his "it went back to a rest day after a refresh" reads as the strip showing last week (Wed 18): the write is saved to
+  the database and re-read (traced, not run).
 - [x] **SETUP'S BUTTONS, EVERY QUESTION: his "is the onboarding fixed for all questions? do they have the relevant quick
   reply buttons", 22 Nov 2026.** The morning's fix had covered the 59 phrasings tried then. Measured wider: 160 phrasings
   of every question setup asks with buttons, each in the state setup would ask it (earlier answers given), with and
