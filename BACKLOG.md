@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **THE PHONE APP ASKED FOR VO2 MAX AS WELL AS STEPS, 23 Nov 2026, found in the first native build on his laptop.**
+  The built app's final manifest declared `READ_VO2_MAX` and `WRITE_VO2_MAX` beside `READ_STEPS`, against the "steps
+  only" rule (Play refuses unused health permissions). Cause: the removal list named `READ_VO` / `WRITE_VO`, which are
+  not permissions, cut at the digit; and `test:phone-app` read both lists with `[A-Z_]+`, cut the plugin's names at the
+  same digit and so saw them match. Fixed both (real names; `[A-Z0-9_]+`). Mutations: the old short name back, and the
+  WRITE line deleted: 2 of 2 caught, 35 checks ran each. Proven on the BUILT app: its merged manifest now holds
+  INTERNET, READ_STEPS and AndroidX's own receiver permission, nothing else. **A permission check must read the names
+  the way Android does; the merged manifest after a build is the proof, the source manifest is not.** Also that day:
+  icons and launch screen cut into Android sizes (52 files changed of 74 written). The laptop build used a
+  build-folder-only `.env.production.local` (production address and the public publishable key taken from the live
+  app, his choice), because the only settings file on the laptop points at TEST; it is not committed.
+
 - [x] **THE PHONE APP'S PERMANENT ID IS `uk.co.personaltrainerapp`: his choice 23 Nov 2026** (over keeping
   `app.personaltrainer.coach`, his 20 Nov pick, made before he owned a domain). Nothing had been uploaded, so it was free
   to change: Capacitor's appId, Android's applicationId, namespace and the activity's package folder, the URL scheme,
