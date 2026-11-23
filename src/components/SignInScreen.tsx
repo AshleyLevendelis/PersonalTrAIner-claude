@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { signInWithEmail } from '@/lib/auth'
+import { sendPasswordReset, signInWithEmail } from '@/lib/auth'
 
 // ---------------------------------------------------------------------------
 // SIGNING BACK IN — the half of the account that was missing.
@@ -28,11 +28,24 @@ import { signInWithEmail } from '@/lib/auth'
 // new plan exactly as before.
 // ---------------------------------------------------------------------------
 
-export function SignInScreen({ onSignedIn, onCancel }: { onSignedIn: () => void; onCancel: () => void }) {
+export function SignInScreen({ onSignedIn, onCancel, cancelLabel = "I'm new — start a plan" }: { onSignedIn: () => void; onCancel: () => void; cancelLabel?: string }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+
+  // FORGOT PASSWORD (23 Nov 2026). The same answer whether or not the address has an account, so this screen cannot
+  // be used to ask which addresses do.
+  const forgot = async () => {
+    setBusy(true)
+    setError(null)
+    setNote(null)
+    const result = await sendPasswordReset(email)
+    setBusy(false)
+    if (!result.ok) { setError(result.error ?? "That didn't work."); return }
+    setNote(`If ${email.trim()} has an account, we've sent it a link to set a new password. Check your spam folder too.`)
+  }
 
   const submit = async () => {
     setBusy(true)
@@ -40,15 +53,9 @@ export function SignInScreen({ onSignedIn, onCancel }: { onSignedIn: () => void;
     const result = await signInWithEmail(email, password)
     setBusy(false)
     if (!result.ok) {
-      // Supabase says "Invalid login credentials" for both a wrong password
-      // and an address that was never registered, and it is right not to
-      // distinguish them. Passing that through unchanged is unhelpful, so
-      // this says the same thing in a way a person can act on.
-      setError(
-        /invalid login/i.test(result.error ?? '')
-          ? "That email and password don't match an account. Check them and try again."
-          : result.error ?? "That didn't work.",
-      )
+      // The words come from describeAuthError: Supabase says "Invalid login credentials" for a wrong password and an
+      // address never registered alike, and it is right not to tell them apart.
+      setError(result.error ?? "That didn't work.")
       return
     }
     onSignedIn()
@@ -83,6 +90,7 @@ export function SignInScreen({ onSignedIn, onCancel }: { onSignedIn: () => void;
         </div>
 
         {error && <p role="alert" className="text-sm text-destructive break-words">{error}</p>}
+        {note && <p className="text-sm text-muted-foreground break-words" data-signin-note>{note}</p>}
 
         <Button className="w-full" onClick={submit} disabled={busy || !email || !password}>
           {busy ? 'Signing in...' : 'Sign in'}
@@ -90,8 +98,12 @@ export function SignInScreen({ onSignedIn, onCancel }: { onSignedIn: () => void;
         {/* Equal prominence, same reasoning as the email prompt: a way out
             that looks like a mistake is not really a way out. */}
         <Button variant="outline" className="w-full" onClick={onCancel} disabled={busy}>
-          I'm new — start a plan
+          {cancelLabel}
         </Button>
+        <button type="button" className="w-full min-h-[44px] text-sm text-primary underline-offset-2 hover:underline disabled:opacity-50"
+          onClick={forgot} disabled={busy} data-signin-forgot>
+          Forgot your password?
+        </button>
       </div>
     </div>
   )
