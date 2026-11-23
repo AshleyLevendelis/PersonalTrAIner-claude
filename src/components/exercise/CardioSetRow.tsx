@@ -17,7 +17,7 @@ import { getAppNow } from '@/lib/dev-clock'
 import { setChatPrefill } from '@/lib/chat-prefill-store'
 import { tabHash } from '@/lib/app-route'
 import { plannedRoundsOf } from '@/lib/planned-rounds'
-import { blockShape } from '@/lib/timer-engine'
+import { blockShape, roundLogSummary, type RoundConfig } from '@/lib/timer-engine'
 
 // ---------------------------------------------------------------------------
 // CARDIO, LOGGED LIKE A LIFTING SET.
@@ -689,4 +689,20 @@ export function EaseOffAsk({ question, onDone }: { question: EaseOffQuestion; on
       </div>
     </div>
   )
+}
+
+// Lives here, beside the row, so every cardio log a screen writes goes through this one file (test:cardio-effort §5).
+/** LOGS A FINISHED ROUND AS THE PLANNED SESSION: its own name (so the day reads done), the timer's minutes, the
+ *  rounds as the note, and the effort he tapped. Returns false when the store did not take it. */
+export function logPlannedRound(args: { profileId: string; date: string; planned: { activity: string; targetRpe?: number }; config: RoundConfig; effort: EffortKey }): boolean {
+  const summary = roundLogSummary(args.config)
+  const view = saveCardioLog({
+    userId: args.profileId,
+    date: args.date,
+    activityName: args.planned.activity,
+    durationMinutes: summary.durationMinutes,
+    intensityRpe: rpeToStore(args.effort, args.planned.targetRpe),
+    notes: summary.detail,
+  })
+  return !!view
 }

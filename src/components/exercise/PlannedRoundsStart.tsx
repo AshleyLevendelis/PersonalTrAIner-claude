@@ -3,13 +3,12 @@ import { Button } from '@/components/ui/button'
 import { Play, Timer } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTimers } from '@/hooks/useTimers'
-import { blockShape, roundLogSummary, type RoundConfig } from '@/lib/timer-engine'
+import { blockShape, type RoundConfig } from '@/lib/timer-engine'
 import { startLabel } from '@/lib/round-setup'
-import { rpeToStore, type EffortKey } from '@/lib/cardio-effort'
-import { saveCardioLog } from '@/lib/cardio-log-store'
+import type { EffortKey } from '@/lib/cardio-effort'
 import { tabHash } from '@/lib/app-route'
 import { PLANNED_ROUNDS_WORDS, plannedRoundsOf, roundIsPlannedSession } from '@/lib/planned-rounds'
-import { EffortBox, useCardioLogsToday } from './CardioSetRow'
+import { EffortBox, logPlannedRound, useCardioLogsToday } from './CardioSetRow'
 
 // ---------------------------------------------------------------------------
 // START THE PLANNED ROUNDS, AND LOG THEM WHEN THEY END (Ashley, 23 Nov 2026, option A): "you could just start the
@@ -20,21 +19,6 @@ import { EffortBox, useCardioLogsToday } from './CardioSetRow'
 // ---------------------------------------------------------------------------
 
 type Planned = { activity: string; targetRpe?: number; rounds?: { rounds: number; workSeconds: number; restSeconds: number } }
-
-/** LOGS A FINISHED ROUND AS THE PLANNED SESSION: its own name (so the day reads done), the timer's minutes, the
- *  rounds as the note, and the effort he tapped. Returns false when the store did not take it. */
-export function logPlannedRound(args: { profileId: string; date: string; planned: Planned; config: RoundConfig; effort: EffortKey }): boolean {
-  const summary = roundLogSummary(args.config)
-  const view = saveCardioLog({
-    userId: args.profileId,
-    date: args.date,
-    activityName: args.planned.activity,
-    durationMinutes: summary.durationMinutes,
-    intensityRpe: rpeToStore(args.effort, args.planned.targetRpe),
-    notes: summary.detail,
-  })
-  return !!view
-}
 
 /** THE EFFORT QUESTION AT THE END, one tap logs it. Used on the day's card and in the round timer's own sheet. */
 export function PlannedRoundEffort({ planned, config, onLogged }: { planned: Planned; config: RoundConfig; onLogged?: () => void }) {
