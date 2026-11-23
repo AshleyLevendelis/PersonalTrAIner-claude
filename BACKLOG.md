@@ -2,6 +2,26 @@
 
 Newest first. One line each.
 
+- [x] **THE NEXT SET MOVES WITH THE REPS JUST DONE: his ruling 23 Nov 2026, "1"** (from three options: one question
+  per lift plus a tap-free nudge, over asking after every set every week, and over leaving it). His report: "The app
+  didnt ask me how the set felt", then "last week it was showing after each set". Both were by design: last week was
+  his testing week (his 15 Nov "Ask, then fill"), this week asks once per lift (his 11 Nov "One tap per lift"). Asked
+  which is best at CSCS level, I recommended neither alone. BUILT: when a logged working set lands 3+ reps over the top
+  of its range, the next set's blank box goes up ONE step (about 5%, at least one plate step); 2+ under the bottom, down
+  about 5%; a line under the row says why ("18 reps on set 1, so up to 37.5 kg"), and the Exercise tab's button and a
+  blank tick use the same number. The per-lift question is unchanged. CSCS basis (mine): reps fall about one a set at a
+  fixed load, so one either side is the plan working; three over is roughly three reps further from failure than asked,
+  about 7-10% of load, so the move takes the cautious half because fatigue builds through the session and the lift's
+  own question moves the next session; two under is a load the set cannot reach. Off where the effort question is off
+  (testing week, deload, a lift with no number), on the first session back from a break (its eased weights are the
+  point), on a stepped (pyramid) prescription, timed or distance sets, warm-ups, drops and bodyweight; never past a stated
+  kit limit. A typed weight always wins. CSCS review: (1) effect: keeps each set near its target effort instead of a
+  wasted easy set or a failed one; (2) takes away nothing (no set, rep or exercise); (3) fundamentals: overload is
+  kept, recovery protected by the one-step cap; (4) no floor or ceiling redefined, the progression engine still reads
+  what was logged; (5) in scope. NOT covered: a strength/power/consolidation block's compounds, which ramp across sets
+  (no nudge there), and a set over the range at a stated kit limit (no weight to add; nothing is said). `test:set-nudge`
+  (19 checks, 8 of 8 mutations caught), `verify:set-nudge` (11 checks, 2 of 2 caught). Frontend only.
+
 - [x] **SETUP'S BUTTONS, EVERY QUESTION: his "is the onboarding fixed for all questions? do they have the relevant quick
   reply buttons", 22 Nov 2026.** The morning's fix had covered the 59 phrasings tried then. Measured wider: 160 phrasings
   of every question setup asks with buttons, each in the state setup would ask it (earlier answers given), with and

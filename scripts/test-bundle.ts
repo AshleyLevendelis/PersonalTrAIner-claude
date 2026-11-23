@@ -247,8 +247,10 @@ console.log('\n1. The libraries are cached separately from the app')
   // MOVED 22 Nov 2026: 461 -> 469. Crossed at 461 by the persona fixes (the age, pregnancy and low-recovery rules, the
   // "Lift fast, lower slow" cue and the rest-day line, all plan logic). MEASURED 461 through this gate on the change.
   // His 15 Sep ruling, "raise it with room to grow": 8 gz over today.
-  headroom('a deploy re-downloads', appGzip, 469, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, under 469`, appGzip < 469, appGzip)
+  // MOVED 23 Nov 2026: 469 -> 477. Crossed by the next-set nudge (set-nudge.ts, his "1"): MEASURED 468 on a clean
+  // worktree of the branch head (1 left), 469 through this gate on the change. 8 gz over today, his 15 Sep ruling.
+  headroom('a deploy re-downloads', appGzip, 477, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, under 477`, appGzip < 477, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')

@@ -22,7 +22,8 @@ import { InlineRest, restBelongsToSet } from './InlineRest'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { prescriptionUnit } from '@/lib/set-log-store'
 import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, filterDropSets, rowKey, setLabel, setLabelLong, type SetRef } from '@/lib/session-derive'
-import { lastTime, sameAsSet, setReading, loggedSetReading, loggedCountLabel, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE, EFFORT_ASK, effortLabel, effortLine } from '@/lib/coach-voice'
+import { lastTime, sameAsSet, setReading, loggedSetReading, loggedCountLabel, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE, EFFORT_ASK, effortLabel, effortLine, setNudgeLine } from '@/lib/coach-voice'
+import { setNudgeFor, type SetNudge } from '@/lib/set-nudge'
 import { checkForPR, getTopPRSet, toSessionSets, isFirstTimeLogged, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, plateBarKg, probeNextKg, unloadedLoadLabel } from '@/lib/load-prescription'
@@ -519,7 +520,30 @@ export function SetGrid({
    * 10 Oct 2026: last session's 30 kg used to outrank today's plan of 24 and
    * the 24 she had just typed on the set above).
    */
+  /**
+   * THE NEXT SET NUDGED BY THE REPS JUST DONE (his ruling 23 Nov 2026, "1"; set-nudge.ts): on a working set whose
+   * set above landed clearly outside the rep range, the carried weight moves one step. Same gate as the lift's own
+   * effort question (askEffort: a loaded lift with a number, not a deload or testing week), and never on the first
+   * session back from a break, whose eased weights are the point.
+   */
+  const nudgeFor = (ref: SetRef): SetNudge | null => {
+    if (isWarm(ref) || isDrop(ref) || calibrationProbe) return null
+    return setNudgeFor({
+      setNumber: ref.setNumber,
+      loggedWorkingSets: existingLogs,
+      prescribedReps,
+      perSetLoadKg,
+      entry: catalogEntry,
+      profile,
+      enabled: askEffort && !ignoreLastTime && catalogEntryIsLoaded && prescriptionType !== 'time',
+    })
+  }
   const workingBlankFor = (ref: SetRef): BlankWeight => {
+    const blank = plainWorkingBlankFor(ref)
+    const nudge = blank.source === 'carried' ? nudgeFor(ref) : null
+    return nudge ? { ...blank, text: String(nudge.kg) } : blank
+  }
+  const plainWorkingBlankFor = (ref: SetRef): BlankWeight => {
     const setNumber = ref.setNumber
     const probeSet = calibrationProbe && setNumber > 1
     const ghost = ghostFor(ref)
@@ -1465,6 +1489,14 @@ export function SetGrid({
           {!isSaved && !warm && !drop && !isBW && (() => {
             const blank = workingBlankFor(ref)
             const plan = perSetLoadKg?.[ref.setNumber - 1] ?? suggestedLoadKg ?? null
+            const nudge = blank.source === 'carried' ? nudgeFor(ref) : null
+            if (nudge) {
+              return (
+                <p className="text-[0.625rem] text-primary-text px-1 -mt-0.5 text-right" data-testid="set-nudge" data-direction={nudge.direction}>
+                  {setNudgeLine(nudge)}
+                </p>
+              )
+            }
             // Not for a bodyweight carry: "0 · weight from set 1" says nothing.
             if (blank.source !== 'carried' || blank.fromSet == null || String(plan) === blank.text || !(Number(blank.text) > 0)) return null
             return (
