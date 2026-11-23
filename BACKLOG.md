@@ -2,6 +2,30 @@
 
 Newest first. One line each.
 
+- [x] **A PRESS ADDED TO BALANCE THE WEEK GOES IN WITH THE PRESSES, AND A SMITH LIFT CAN BE THE MAIN LIFT (23 Nov 2026,
+  CSCS, mine).** His report: his Push & Press day, rated by Gemini ("the Main Lift is sitting at the bottom"), ran Smith
+  bench 90 kg, push press, lateral raises, skull crushers, then Neutral-Grip Dumbbell Press labelled MAIN LIFT, held at
+  24 kg "short of 9 reps". Traced (engine-tracer), two causes, both generation: (1) the week's push:pull balance pass
+  runs AFTER the day's tier sort and appended its press to the end of the day (catalogue order makes it exactly
+  Neutral-Grip DB Press on a day already holding a bench); (2) with no tier-1 lift the label goes to the highest anchor
+  score, and Smith Machine Bench Press had no difficulty entry, so a 24 kg dumbbell press outranked the 90 kg Smith
+  bench that opened the day, while the block rotation (first compound) treated the Smith bench as main. Gemini was
+  right on both. FIXED: a compound the balance pass adds sits after the day's last compound and before its first
+  isolation, finisher, trunk or carry move (never inside a superset); the seven Smith compounds (squat, split squat,
+  bench, row, shoulder press, RDL, hip thrust) rank as main-lift candidates like their free-weight twins. MEASURED on
+  every 8th grid plan (1,152 plans, 4,608 days, `measure:compound-order`): a compound written after muscle isolation
+  735 days -> 88; the 88 are all knee-injury days whose rehab drills and leg curl open the day by design. CSCS review:
+  (1) the added press is now trained fresh instead of after the shoulders and triceps were tired, so it can reach its
+  reps and progress; (2) nothing removed, only reordered; (3) pattern coverage, push:pull and volume unchanged;
+  (4) no floor or ceiling moves, but the Smith bump also decides which lift gets the main-lift rest floor on a day
+  with no barbell lift: a Smith lift that opens its day now gets it; (5) in scope. NOT FIXED, named: on 826 of 4,499
+  labelled days the MAIN LIFT label sits on a harder lift that is not the day's first compound (e.g. a cable row
+  written after Iso-Lateral Pulldown, which has no difficulty entry either), so the label and the block rotation can
+  still disagree; the clean fix is one definition of "main lift" for both, which moves rest floors and needs its own
+  measured change. `test:compound-order` (5 checks; 5 mutations, 4 caught: counting trunk work as a compound changed
+  nothing because the pass never adds trunk work, an inert guard kept for clarity). Frontend only; existing plans keep
+  their order until rebuilt.
+
 - [x] **THE NEXT SET MOVES WITH THE REPS JUST DONE: his ruling 23 Nov 2026, "1"** (from three options: one question
   per lift plus a tap-free nudge, over asking after every set every week, and over leaving it). His report: "The app
   didnt ask me how the set felt", then "last week it was showing after each set". Both were by design: last week was

@@ -210,6 +210,8 @@
     "test:working-weight-words": "tsx scripts/test-working-weight-words.ts",
     "test:lift-effort": "tsx scripts/test-lift-effort.ts",
     "test:set-nudge": "tsx scripts/test-set-nudge.ts",
+    "test:compound-order": "tsx scripts/test-compound-order.ts",
+    "measure:compound-order": "tsx scripts/measure-compound-order.ts",
     "test:usual-meals": "tsx scripts/test-usual-meals.ts",
     "test:meals-elsewhere": "tsx scripts/test-meals-elsewhere.ts",
     "test:eating-out": "tsx scripts/test-eating-out.ts",

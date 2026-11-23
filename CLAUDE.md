@@ -193,6 +193,10 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   set (never ramps, pelvic floor or the balance hold), the first build-up drops its empty-bar set and near-max single,
   later lifts get one feeder set; a missing second plane is neither added nor swapped in. A day that loads the knee gets
   the knee's rehab whatever its name. `test:persona-audit-fixes` §9, `measure:personas`
+- **A compound added to balance the week goes in with the compounds, and a Smith lift can be the main lift** (CSCS,
+  mine, 23 Nov 2026, his Push & Press day): never after isolation, finisher or trunk work. `test:compound-order`,
+  `measure:compound-order` (735 -> 88 of 4,608 days; the 88 are knee-rehab days). The label and the block rotation can
+  still name different main lifts on 826 of 4,499 days (BACKLOG)
 - **A beginner's session holds at most 18 working sets — his ruling 21 Nov 2026, "yes cap beginners at 18 sets"** (over
   filling the time with lifting): the spare minutes go to optional mobility. It narrows his session-length rulings for
   beginners only. `test:older-beginner` §14
