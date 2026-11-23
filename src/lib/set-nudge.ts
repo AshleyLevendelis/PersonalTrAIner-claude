@@ -20,9 +20,9 @@ import type { UserProfile } from './types'
 import { carriedWeightFor, type CarrySet } from './set-row'
 
 /** Reps over the top of the range that move the next set up. */
-export const NUDGE_UP_OVER_TOP = 3
+const NUDGE_UP_OVER_TOP = 3
 /** Reps under the bottom of the range that move the next set down. */
-export const NUDGE_DOWN_UNDER_BOTTOM = 2
+const NUDGE_DOWN_UNDER_BOTTOM = 2
 
 export interface NudgeSet extends CarrySet {
   reps_completed: number
