@@ -2565,6 +2565,18 @@ const ADDED_LOAD_PHASE_SCALE: Readonly<Record<string, number>> = { hypertrophy: 
 const ADDED_LOAD_MAX_REPS = 10
 
 /**
+ * DUMBBELLS ON A STEP-UP ARE NOT A BELT ON A PULL-UP (22 Nov 2026, the persona audit's C14; CSCS, mine). The 10-rep guard
+ * was written for a belt on a hanging or dip movement; a step-up or step-down held with dumbbells at 12-15 reps is
+ * ordinary muscle-building work. Measured: ten trained lifters with a bad knee on a conditioning plan, whose
+ * muscle-building block runs 10-14 reps, did 48 sessions of unweighted step work over 16 weeks. Leg work takes weight
+ * up to 15 reps; the belt lifts keep 10.
+ */
+const ADDED_LOAD_MAX_REPS_LEGS = 15
+function addedLoadMaxReps(entry: ExerciseEntry): number {
+  return entry.movement_pattern === 'single_leg' || entry.movement_pattern === 'knee_dominant' ? ADDED_LOAD_MAX_REPS_LEGS : ADDED_LOAD_MAX_REPS
+}
+
+/**
  * Absolute backstop, in the spirit of SAFETY_CEILING_KG: a fraction no
  * arithmetic error may exceed regardless of how the number was derived.
  *
@@ -2615,7 +2627,7 @@ export function prescribeAddedLoad(
   if (fraction <= 0) return null
 
   const midReps = parseRepsMidpoint(options.repRangeLabel)
-  if (midReps == null || midReps > ADDED_LOAD_MAX_REPS) return null
+  if (midReps == null || midReps > addedLoadMaxReps(entry)) return null
 
   const body = resolveBodyBasis(profile)
   // Per-movement, because a dip is not a pull-up. See added_load_scale's own

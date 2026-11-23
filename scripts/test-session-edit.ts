@@ -370,6 +370,10 @@ console.log('\n4. Moving reorders, and a superset travels as one')
   resetRandomSource(); console.log = quiet2
   const oWeek = oMeso[1] ?? oMeso[0]
   const oDay = oWeek?.days.find(d => d.exercises.length > 2)
+  // CONSTRUCTED, 22 Nov 2026: the persona audit's back floor and coverage fixes left every generated week inside the
+  // balance band (0 offenders on a 256-plan search), so the week is pushed out of it on purpose: three more sets on
+  // every pulling exercise. The input is constructed; the passes that read it are the app's own.
+  for (const d of oWeek?.days ?? []) for (const e of d.exercises) if (/pull/.test(getExerciseEntry(e.name)?.movement_pattern ?? '')) e.sets += 3
   const orderOf = (m: MesocycleWeek[]) => (m.find(w => w.week_number === oWeek?.week_number)?.days.find(d => d.day === oDay?.day)?.exercises ?? []).map(e => e.name).join('|')
   const setsOf = (w: MesocycleWeek | undefined) => (w?.days ?? []).map(d => `${d.day}:${d.exercises.map(e => `${e.name}x${e.sets}`).sort().join(',')}`).join(' ')
   const balanced = oWeek && oDay ? settleWeek(oWeek, oDay.day, offender) : null

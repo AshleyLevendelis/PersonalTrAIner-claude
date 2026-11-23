@@ -118,6 +118,36 @@ Newest first. One line each.
   off unless the tour passes it), and `test:bundle`, 3 kB over the total line (3262 -> 3290, measured 3265 + 25, his
   15 Sep ruling). First paint has 1 kB left of 620: the next change that adds to it will cross.
 
+- [x] **THE REST OF THE AUDIT (his "yes fix the remaining ones too", 22 Nov 2026)**, 6,000 plans, before -> after:
+  over time 250 -> 32, push over 1.5x pull 102 -> 42, chest/back/legs under 4 sets 82 -> 14, thigh balance 63 -> 13,
+  uneven weeks 25 -> 32 (up; mostly two-day 20-30 weeks, 13 sets against 6; the cause not traced);
+  no squat 19 -> 0, rehab missing 6 -> 0, unweighted leg work 10 -> 0, a repeated movement 11 -> 0, fat loss with no
+  cardio 1 -> 0, under time 1 -> 0. 26 of 31 rules at 0, every safety rule at 0. CAUSES, each traced, decisions mine
+  (CSCS): (1) 244 of the 250 over-time sessions were 20-30 minutes with 7.5-10 minute warm-ups: the last time checks now
+  shorten the warm-up before any working set (stretches past two, general to 2 min, the prep drill to one set, then one
+  stretch; never ramps, pelvic floor or the balance hold), and a 20-30 session's first build-up drops its empty-bar set
+  and its near-max single while later lifts get one feeder set. (2) Two short sessions a week were made to cover both
+  planes of pushing and pulling, adding a row beside a pulldown (a 25-minute Monday at 46 minutes) or swapping a
+  two-day week's only squat for one; a 20-30 week now covers squat, hinge, push, pull and trunk, and a missing second
+  plane is neither added nor swapped in. (3) Knee rehab followed the day's NAME, so a Chest & Triceps day given the
+  week's leg press carried none; a day that loads the knee now gets the drill. (4) A step-up's dumbbells stopped at 10
+  reps, the belt rule for a pull-up; leg work takes weight to 15. (5) Late in pregnancy a one-leg exercise could become a
+  copy of a squat already on the day (now the slot comes out), mountain climbers became a side plank and took a fat-loss
+  plan's only cardio (cardio is now replaced by cardio), and Renegade Row and Bear Crawl, planks with less support, join
+  the late list beside Plank Shoulder Taps. (6) A dropped spare press left a day under its minimum (it is refilled); a
+  conditioning day's circuit counts as one of its three exercises; a second trunk exercise is spare only while the week
+  keeps two; a week keeps four back sets. CSCS review: training effect, shorter warm-ups only in 20-30 sessions where the
+  general warm-up and prep drill already rehearse the pattern; what it takes away, stretches and ramp steps, never a
+  working set or a rest; fundamentals, every pattern still covered (C1 0); no floor redefined except "a 20-30 week covers
+  one plane each of push and pull", recorded here; inside scope (the pregnancy additions follow his existing plank rule).
+  MEASURED AND DELETED, four guards that changed nothing on 6,000 plans (the week's-last-squat swap guard, a press guard
+  on the chest floor, an extra pull set, two isolation-first drops). The audit's C14 detector skipped tempoed sessions
+  instead of counting them, against its own wording; fixed. `measure:personas` gained AUDIT_IDS (re-check named plans in
+  seconds). `test:persona-audit-fixes` 36 -> 71 checks; 27 mutations, 7 missed at first: three got fixtures found by switching
+  the guard off across the audit, four were the inert guards above and were deleted. `test:tempo-prescription`: the belt-lift check excludes step work, plus a check that it keeps its tempo.
+  NAMED, NOT FIXED: 133 plans of 6,000 still break a coaching rule, nearly all 20-30 minute weeks at their set floors
+  (over by under 2 minutes, a five-day split with two chest days pressing 13 to 8, a two-day week's lighter day at 21 of
+  30 minutes). Kettlebell swings as a warm-up primer late in pregnancy: not changed, worth his look.
 - [x] **THE FOUR REMAINDERS (his "fix the four remaining issues, then merge", 22 Nov 2026)**, 6,000 plans: chest under
   four sets 203 -> 65 (the whole-exercise drop took a second chest press before an overhead one; and "chest" had counted
   dips and overhead presses, nine sets beside one bench); push over 1.5x pull 184 -> 48 (the time trims took the rows the
