@@ -101,3 +101,7 @@ app/src/main/assets/public
 app/src/main/assets/capacitor.config.json
 app/src/main/assets/capacitor.plugins.json
 app/src/main/res/xml/config.xml
+
+# Firebase (23 Nov 2026): kept off the repository; each machine copies its own in (docs/handover/android-notifications.md).
+app/google-services.json
+*firebase-adminsdk*.json

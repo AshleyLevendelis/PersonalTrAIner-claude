@@ -224,7 +224,15 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   // THIS PHONE STAYS LINKED TO THE PROFILE ON SCREEN (his report 17 Nov 2026, no reminders ever arriving): a phone
   // that said yes to notifications is written back for this profile once a day, so a new profile or a dropped row
   // cannot leave the coach with no phone to reach while Profile still reads "On".
-  useEffect(() => { if (profile.id) void keepPhoneLinked(profile.id) }, [profile.id])
+  useEffect(() => {
+    const id = profile.id
+    if (!id) return
+    // The phone app keeps its own token linked (native-push.ts); the browser route never works there.
+    if ((window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()) {
+      void import('@/lib/native-push').then(m => m.keepNativePhoneLinked(id)).catch(() => {})
+    }
+    else void keepPhoneLinked(id)
+  }, [profile.id])
 
   useEffect(() => {
     // Deliberately NOT gated on `macros`. computeTargets returns null for

@@ -2,6 +2,25 @@
 
 Newest first. One line each.
 
+- [x] **NOTIFICATIONS IN THE ANDROID APP (23 Nov 2026, his report "Now the app is on my phone as a proper app ...
+  Notifications dont seem to be working", then "yes build it for Android").** Cause: the phone app (Capacitor) has no
+  browser push service or service worker, so Profile > Reminders said "This browser can't show notifications from the
+  app". It was named as "native push is a separate job" in docs/plans/phone-app.md on 20 Nov and not flagged to him
+  when he installed the app. BUILT: the phone uses @capacitor/push-notifications (Firebase on Android), loaded by a
+  dynamic import only; asked only from his tap on "On this phone"; "on" only over a row the server saved; off removes
+  the row; Home re-links the phone daily and follows a rotated token; a tap opens only a tab of this app; a message
+  while the app is open makes the chat re-read. The server sends an `fcm:` row through Firebase's HTTP v1 API (signed
+  with a service account, `FCM_SERVICE_ACCOUNT`), with the same tags, high priority and 6-hour life as the browser
+  route; "gone" only on Firebase's UNREGISTERED/404, a missing secret is "failed" (row kept). Both senders
+  (coach-reach-out and chat-gemini's reply ping) go through `_shared/push.ts`, so both reach the app. NO MIGRATION: a
+  phone-app device is an ordinary push_subscriptions row, endpoint `fcm:<token>`, empty browser keys. The iPhone app
+  says "Notifications in the iPhone app aren't built yet." (Apple push key needed). `test:native-push` (50 checks;
+  17 mutations, 17 caught, one only after a check was added for a phone whose notifications were switched off in
+  Android settings), `verify:reminders` §6 (7 checks; 3 mutations, 3 caught), screenshot read. NOT PROVEN: a real
+  phone receiving one (needs his Firebase project, the secret, the two deploys and a native build:
+  docs/handover/android-notifications.md). Known: the status-bar icon is the app icon (may draw as a white circle).
+  Needs the `coach-reach-out` and `chat-gemini` deploys and the `FCM_SERVICE_ACCOUNT` secret.
+
 - [x] **A PRESS ADDED TO BALANCE THE WEEK GOES IN WITH THE PRESSES, AND A SMITH LIFT CAN BE THE MAIN LIFT (23 Nov 2026,
   CSCS, mine).** His report: his Push & Press day, rated by Gemini ("the Main Lift is sitting at the bottom"), ran Smith
   bench 90 kg, push press, lateral raises, skull crushers, then Neutral-Grip Dumbbell Press labelled MAIN LIFT, held at

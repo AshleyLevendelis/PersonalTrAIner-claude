@@ -34,11 +34,19 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- COACH NOTIFICATIONS (23 Nov 2026): a message Firebase shows with no channel named goes to this one, which
+             the app creates on the first "On this phone" tap (src/lib/native-push.ts). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="coach" />
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Coach notifications (23 Nov 2026). Asked only when he turns "On this phone" on, never at start. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- STEPS ONLY (20 Nov 2026). The health plugin declares read AND write for every kind of health data it supports;
          Google Play refuses an app that declares health permissions it does not use, so every one but READ_STEPS is
          removed here. Add a line back only when the app starts reading that kind of data. -->

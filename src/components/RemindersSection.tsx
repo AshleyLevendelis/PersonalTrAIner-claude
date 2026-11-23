@@ -29,6 +29,7 @@ import {
   DEFAULT_MOMENT_SWITCHES, REMINDER_FREQUENCIES, QUIET_BEFORE_HOUR, QUIET_AFTER_HOUR, MIN_HOURS_BETWEEN, dailyCap,
   type MomentKey, type NotificationSettings, type ReminderFrequency,
 } from '@/lib/coach-moments'
+import { inPhoneApp } from '@/lib/native-push'
 
 function Switch({ id, checked, disabled, label, onChange }: {
   id: string; checked: boolean; disabled?: boolean; label: string; onChange: (next: boolean) => void
@@ -132,7 +133,10 @@ export function RemindersSection({ profileId, onSummary }: { profileId: string; 
   }
 
   const phoneCanToggle = phone === 'on' || phone === 'off'
-  const stateNote = phone && !phoneCanToggle ? PHONE_NOTE[phone] : null
+  // The iPhone app has no route yet (Apple's push key is not set up): say that, not "this browser".
+  const stateNote = phone && !phoneCanToggle
+    ? (phone === 'unsupported' && inPhoneApp() ? "Notifications in the iPhone app aren't built yet." : PHONE_NOTE[phone])
+    : null
 
   return (
     <div className="space-y-2" data-testid="reminders-section">

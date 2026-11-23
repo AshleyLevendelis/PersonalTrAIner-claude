@@ -1784,6 +1784,11 @@ menu" stays true when a copy is also left outside it.
   must stay removed unless the app starts reading that data. Phone-only code loads only in the phone app.
   `test:phone-app`, `verify:health-steps`, `docs/plans/phone-app.md`. NOT BUILT natively yet: his machine
 
+- **Coach notifications reach the Android app: his request 23 Nov 2026, "yes build it for Android"**: the phone app
+  uses Firebase (an `fcm:` row in the same phones table, no migration); the same switch, tags and limits as the
+  website; the iPhone app says it is not built yet. `test:native-push`, `verify:reminders` §6. Needs the
+  `coach-reach-out` and `chat-gemini` deploys and the `FCM_SERVICE_ACCOUNT` secret
+
 ### His rulings of 17 Nov 2026
 - **The coach exam's judge is Fable 5.2: his ruling 17 Nov 2026, "Switch to Fable"** (over keeping Opus 5 and over
   marking once with both). The judge is stamped on the scores; scores marked by another judge are stale (re-grade the
