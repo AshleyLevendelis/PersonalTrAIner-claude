@@ -500,7 +500,9 @@ console.log('\n3. Nothing has crept back up')
   // between them). His 15 Sep ruling: 25 kB raw over today's number.
   // MOVED 22 Nov 2026: 1591 -> 1617. Spent by the persona fixes (older and pregnant beginners' rules, the low-recovery
   // days, the audit's six fixes); MEASURED 1592 through this gate on the change. His 15 Sep ruling: 25 kB over today.
-  const APP_CHUNK_BUDGET_KB = 1617
+  // MOVED 23 Nov 2026: 1617 -> 1644. Crossed by the persona audit's second round (main) meeting the email-account fixes
+  // on the merge; MEASURED 1619 through this gate on it. His 15 Sep ruling: 25 kB over today.
+  const APP_CHUNK_BUDGET_KB = 1644
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
