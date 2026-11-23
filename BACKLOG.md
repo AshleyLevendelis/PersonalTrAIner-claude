@@ -46,6 +46,34 @@ Newest first. One line each.
   (no nudge there), and a set over the range at a stated kit limit (no weight to add; nothing is said). `test:set-nudge`
   (19 checks, 8 of 8 mutations caught), `verify:set-nudge` (11 checks, 2 of 2 caught). Frontend only.
 
+- [x] **EMAIL SIGN-UP, SIGN-IN AND SIGN-OUT: his report 23 Nov 2026, "I didn't receive a proper email to confirm my
+  email address, and there's no way to sign out and sign back in with the email. Several times, it's asked me to change
+  my password", then "Yes" to building the fix** (`docs/plans/account-signin.md`). Live testers in days.
+  FOUND (code; the server half is inferred, because this session cannot reach either Supabase project and the
+  connector needs signing in): the weekly "add an email" prompt asked again while the address was waiting on its link
+  (`new_email` set, `email` empty), and every save set the password again, which is the "change my password" he saw;
+  no sign-out anywhere; sign-in only on a phone with no plan; no forgot-password; no link ever named where to come back
+  to, so it went to the dashboard's Site URL. ON THE SERVER, NOT VERIFIED: Supabase's built-in sender sends its stock
+  "Confirm Change of Email" only to the project's own team and a couple an hour, so no tester would ever get one.
+  BUILT: waiting is its own state everywhere (no prompt, no password box; **Resend link** and **Use a different
+  email**, the address alone); every link lands back on the app (the page's own address, the live app from the phone
+  app); **Sign out of this phone** on a saved account, asked first, refused while a set or plan change is still unsent,
+  then the phone forgets the last person (Supabase's own keys and the look of the app kept) and opens afresh; **Already
+  have an account? Sign in** on an account with no email, warning the plan here is left behind, nothing changing until
+  the sign-in works; **Forgot your password?** on both sign-in screens, answered the same whether or not the address has
+  an account; a reset link opens **Set a new password** INSTEAD of the start (the link signs the page in as its account,
+  and starting first would read the phone's old plan under it); a confirmed or spent link says so once; Profile reads
+  the account again every time it opens (a link tapped in the phone's browser confirms the address on the server, and
+  the home-screen app learns it only by asking); Supabase's sentences in plain words. Decisions mine (mechanical or
+  security): the sign-out scope is this phone only; the reset answer does not say whether an address has an account.
+  Changed from the plan: no live listener for the session changing; the read on open covers the same case.
+  `test:account-auth` (35 checks, 11 of 11 mutations caught), `verify:account-row` (34 checks, sections 5-9 new; 5 of 5 mutations caught).
+  The reset page's own screen is driven on the Profile test page; App's half (that it is shown instead of the start)
+  is held by source only, because no harness page boots App with a link in its address.
+  NOT DONE, HIS (dashboard, production): custom SMTP (Resend), Site URL and Redirect URLs, the two email templates in
+  the app's words, then a real end-to-end test with an address that is not his. Until the sender is set up, NO TESTER
+  GETS ANY EMAIL. Frontend only; no edge function, no migration.
+
 - [x] **SETUP'S BUTTONS, EVERY QUESTION: his "is the onboarding fixed for all questions? do they have the relevant quick
   reply buttons", 22 Nov 2026.** The morning's fix had covered the 59 phrasings tried then. Measured wider: 160 phrasings
   of every question setup asks with buttons, each in the state setup would ask it (earlier answers given), with and

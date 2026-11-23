@@ -1156,11 +1156,14 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // Steps from the phone (20 Nov 2026): only inside the phone app.
   const healthPlatform = phonePlatform()
   const [healthOn, setHealthOn] = useState(isHealthStepsConnected())
+  // Read again every time Profile opens (23 Nov 2026): a confirmation link tapped in the phone's browser confirms the
+  // address on the server, and the app installed on the home screen only learns it by asking.
   useEffect(() => {
+    if (!open) return
     let live = true
     void readAccountStatus().then(st => { if (live) setAccount(st) })
     return () => { live = false }
-  }, [])
+  }, [open])
   // THE PHONE'S BACK (the Profile walk, 18 Nov 2026): Profile is a layer and a sheet is a layer over it, so Back closes
   // the sheet, then Profile, where it used to leave the tab or the app. Profile first, so the sheet is the top layer.
   useBackCloses(open, () => onOpenChange(false))
