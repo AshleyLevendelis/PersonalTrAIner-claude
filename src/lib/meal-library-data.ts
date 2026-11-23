@@ -830,4 +830,95 @@ const VEGAN_GLUTEN_FREE: RawProposal[] = [
 
 ]
 
-export const MEAL_LIBRARY: readonly RawProposal[] = [...BREAKFASTS, ...LUNCHES, ...DINNERS, ...SNACKS, ...EVERYDAY, ...DEEP_POOL_ADDITIONS, ...VEGAN_GLUTEN_FREE]
+// SIMPLE EVERYDAY FOOD (23 Nov 2026; Ashley: "The meals are too complicated. Users are required to become gourmet
+// chefs"). Measured that day: the typical dish had six ingredients, over half had six or more, and 7 of 143 snacks were
+// one or two foods. These are the plates people actually eat on a weekday: a protein, a carb and a vegetable, five main
+// foods or fewer (oil, salt, pepper and dried spices are not counted), nothing to shape, layer or make a sauce from, and
+// snacks of one or two foods. Plain names, the way someone would say them. docs/plans/simple-meals.md.
+const SIMPLE_EVERYDAY: RawProposal[] = [
+  // Snacks: one or two foods, nothing to cook.
+  d('snack', 'Greek yoghurt and berries', BRIT, 'Spoon the yoghurt into a bowl and top with the berries. Ready in 2 minutes.', ['200g greek yoghurt 0%', '100g mixed berries']),
+  d('snack', 'Skyr and banana', NORD, 'Slice the banana over the skyr. Ready in 2 minutes.', ['200g skyr', '1 banana']),
+  d('snack', 'Cottage cheese on rice cakes', AMER, 'Spread the cottage cheese over the rice cakes. Ready in 2 minutes.', ['150g cottage cheese', '18g rice cakes']),
+  d('snack', 'Protein shake with milk', AMER, 'Shake the protein powder with the cold milk until smooth. Ready in 2 minutes.', ['30g whey protein powder', '300ml semi skimmed milk']),
+  d('snack', 'Protein shake and a banana', AMER, 'Shake the protein powder with cold water and have it with the banana. Ready in 2 minutes.', ['30g whey protein powder', '1 banana', '250ml water']),
+  d('snack', 'Quark with honey', BRIT, 'Stir the honey through the quark. Ready in 2 minutes.', ['250g quark', '1 tsp honey']),
+  d('snack', 'Boiled eggs and oatcakes', BRIT, 'Boil the eggs for 9 minutes, cool them in cold water, peel and have them with the oatcakes.', ['2 egg', '20g oatcakes']),
+  d('snack', 'Tuna and crackers', BRIT, 'Drain the tuna, season with pepper and pile onto the crackers. Ready in 3 minutes.', ['80g tuna canned in water', '20g crackers']),
+  d('snack', 'Turkey slices and an apple', AMER, 'Roll up the turkey slices and have them with the sliced apple. Ready in 2 minutes.', ['100g smoked turkey breast', '1 apple']),
+  d('snack', 'Salted edamame', JAPA, 'Microwave the edamame until hot and season with salt. Ready in 4 minutes.', ['220g edamame']),
+  d('snack', 'Ham and oatcakes', BRIT, 'Fold the ham onto the oatcakes. Ready in 2 minutes.', ['90g ham', '20g oatcakes']),
+  d('snack', 'Cottage cheese with peach', AMER, 'Slice the peach over the cottage cheese. Ready in 2 minutes.', ['200g cottage cheese', '1 peach']),
+  d('snack', 'Greek yoghurt with honey', MEDI, 'Drizzle the honey over the yoghurt. Ready in 1 minute.', ['250g greek yoghurt 0%', '1 tsp honey']),
+  d('snack', 'Skyr with granola', NORD, 'Scatter the granola over the skyr. Ready in 1 minute.', ['200g skyr', '20g granola']),
+  d('snack', 'Smoked salmon on crispbread', NORD, 'Lay the smoked salmon on the crispbreads and grind over some pepper.', ['60g smoked salmon', '20g rye crispbread']),
+  d('snack', 'Quark with strawberries', BRIT, 'Hull and halve the strawberries and stir them through the quark.', ['250g quark', '100g strawberries']),
+  d('snack', 'Greek yoghurt and kiwi', MEDI, 'Slice the kiwi over the yoghurt. Ready in 2 minutes.', ['200g greek yoghurt 2%', '1 kiwi']),
+  d('snack', 'Cottage cheese and cucumber', MEDI, 'Slice the cucumber and have it with the cottage cheese and a grind of pepper.', ['200g cottage cheese', '100g cucumber']),
+  d('snack', 'Tuna and sweetcorn pot', BRIT, 'Drain the tuna and sweetcorn and stir them together with pepper.', ['100g tuna canned in water', '60g sweetcorn']),
+  d('snack', 'Soy yoghurt protein pot', BRIT, 'Stir the protein powder into the soy yoghurt until smooth. Ready in 2 minutes.', ['200g soy yoghurt', '20g vegan protein powder']),
+  d('snack', 'Vegan protein shake', AMER, 'Shake the protein powder with the cold soy milk until smooth. Ready in 2 minutes.', ['30g vegan protein powder', '300ml soy milk']),
+  d('snack', 'Vegan protein shake and a banana', AMER, 'Shake the protein powder with cold water and have it with the banana.', ['30g vegan protein powder', '1 banana', '250ml water']),
+  d('snack', 'Edamame and an apple', JAPA, 'Microwave the edamame until hot and have them with the sliced apple.', ['150g edamame', '1 apple']),
+  d('snack', 'Smoked tofu and cherry tomatoes', JAPA, 'Cube the smoked tofu and have it with the cherry tomatoes.', ['100g smoked tofu', '100g cherry tomatoes']),
+  d('snack', 'Beef jerky and grapes', AMER, 'Have the jerky with the grapes.', ['40g beef jerky', '100g grapes']),
+  d('snack', 'Peppered tuna on rice cakes', AMER, 'Drain the tuna and pile it onto the rice cakes with pepper.', ['100g tuna canned in water', '18g rice cakes']),
+  d('snack', 'Ham and an apple', BRIT, 'Roll up the ham and have it with the sliced apple.', ['80g ham', '1 apple']),
+  d('snack', 'Casein shake', AMER, 'Shake the casein with the cold milk until smooth.', ['30g casein protein powder', '300ml skimmed milk']),
+  d('snack', 'Cottage cheese and grapes', AMER, 'Have the cottage cheese with the grapes.', ['200g cottage cheese', '100g grapes']),
+  d('snack', 'Skyr with blueberries', NORD, 'Top the skyr with the blueberries.', ['200g skyr', '80g blueberries']),
+  d('snack', 'Turkey and cheese roll-ups', AMER, 'Lay a strip of cheese on each turkey slice and roll up.', ['80g smoked turkey breast', '20g cheddar cheese']),
+  d('snack', 'Mozzarella and cherry tomatoes', ITAL, 'Tear the mozzarella and have it with the halved tomatoes and pepper.', ['125g mozzarella light', '100g cherry tomatoes']),
+  d('snack', 'Sardines on crackers', BRIT, 'Mash the sardines lightly and spread onto the crackers.', ['90g sardines canned', '20g crackers']),
+  d('snack', 'Greek yoghurt with pomegranate', MIDE, 'Scatter the pomegranate seeds over the yoghurt.', ['200g greek yoghurt 0%', '60g pomegranate']),
+  d('snack', 'Ricotta with figs', ITAL, 'Spoon the ricotta into a bowl and top with the sliced figs.', ['150g ricotta light', '80g figs']),
+  d('snack', 'Spiced paneer cubes', INDI, 'Cube the paneer and toss it in the chaat masala.', ['100g paneer', '1 tsp chaat masala']),
+
+  // Lunches: something to put together, not a recipe.
+  d('lunch', 'Chicken salad wrap', BRIT, 'Pan-fry the chicken until cooked through, slice it, and roll it in the wrap with the leaves, tomatoes and light mayo. Ready in 15 minutes.', ['140g raw chicken breast', '1 tortilla wrap', '40g mixed salad leaves', '60g cherry tomatoes', '1 tbsp mayonnaise light']),
+  d('lunch', 'Tuna and sweetcorn jacket potato', BRIT, 'Microwave the potato until soft, about 8 minutes, split it and fill with the tuna mixed with the sweetcorn and light mayo.', ['250g raw potato', '110g tuna canned in water', '60g sweetcorn', '1 tbsp mayonnaise light']),
+  d('lunch', 'Ham, cheese and salad sandwich', BRIT, 'Fill the bread with the ham, cheese and leaves. Ready in 3 minutes.', ['80g wholemeal bread', '70g ham', '25g cheddar cheese', '30g mixed salad leaves']),
+  d('lunch', 'Chicken rice bowl with peas and sweetcorn', AMER, 'Cook the rice with the peas and sweetcorn, pan-fry the chicken, slice it over the top and finish with soy sauce. Ready in 15 minutes.', ['150g raw chicken breast', '45g dry white rice', '60g peas', '50g sweetcorn', '1 tbsp soy sauce']),
+  d('lunch', 'Turkey and hummus pitta', MEDI, 'Warm the pitta, spread with the hummus and fill with the turkey and leaves. Ready in 3 minutes.', ['1 pitta bread', '90g smoked turkey breast', '40g hummus', '30g mixed salad leaves']),
+  d('lunch', 'Egg mayo sandwich', BRIT, 'Boil the eggs for 9 minutes, cool and peel, mash with the light mayo and fill the bread with it and the leaves.', ['3 egg', '70g wholemeal bread', '1 tbsp mayonnaise light', '20g mixed salad leaves']),
+  d('lunch', 'Tuna, sweetcorn and pasta salad', ITAL, 'Cook the pasta, cool it under the tap, and stir through the tuna, sweetcorn, tomatoes and light mayo.', ['60g dry pasta', '110g tuna canned in water', '60g sweetcorn', '60g cherry tomatoes', '1 tbsp mayonnaise light']),
+  d('lunch', 'Chicken and avocado salad with pitta', AMER, 'Pan-fry the chicken, slice it, and toss with the leaves, avocado and tomatoes in a little olive oil. Serve with the warm pitta.', ['150g raw chicken breast', '80g mixed salad leaves', '60g avocado', '60g cherry tomatoes', '1 pitta bread', '1 tsp olive oil']),
+  d('lunch', 'Cheesy beans on toast', BRIT, 'Heat the beans, pour over the toast and scatter with the cheese. Ready in 5 minutes.', ['200g baked beans', '70g wholemeal bread', '25g cheddar cheese']),
+  d('lunch', 'Chicken fajita wrap', MEXI, 'Fry the sliced chicken and pepper with the paprika until cooked, and roll into the wrap with the salsa. Ready in 15 minutes.', ['140g raw chicken breast', '1 tortilla wrap', '80g bell pepper', '40g salsa', '1 tsp paprika', '1 tsp olive oil']),
+  d('lunch', 'Salmon and edamame rice bowl', JAPA, 'Bake the salmon for 15 minutes while the rice cooks, and serve over the rice with the edamame, cucumber and soy sauce.', ['120g salmon', '45g dry white rice', '80g edamame', '60g cucumber', '1 tbsp soy sauce']),
+  d('lunch', 'Chicken noodle soup', BRIT, 'Simmer the sliced chicken and carrot in the broth for 10 minutes, add the noodles for the last 4 and finish with spring onion.', ['130g raw chicken breast', '40g dry egg noodles', '500ml chicken broth', '60g carrot', '20g spring onion']),
+  d('lunch', 'Turkey and bacon club wrap', AMER, 'Grill the bacon, and roll it in the wrap with the turkey, leaves and light mayo. Ready in 10 minutes.', ['100g smoked turkey breast', '1 tortilla wrap', '30g bacon medallions', '30g mixed salad leaves', '1 tbsp mayonnaise light']),
+  d('lunch', 'Halloumi, chickpea and couscous salad', MEDI, 'Pour boiling water over the couscous and leave 5 minutes. Fry the halloumi slices until golden, and toss with the couscous, chickpeas, tomatoes and cucumber.', ['80g halloumi', '45g dry couscous', '80g chickpeas canned', '60g cherry tomatoes', '60g cucumber']),
+  d('lunch', 'Chicken, tzatziki and cucumber pitta', MEDI, 'Pan-fry the chicken with the oregano, and stuff into the warm pitta with the tzatziki, cucumber and tomato.', ['140g raw chicken breast', '1 pitta bread', '40g tzatziki', '40g cucumber', '40g tomato', '1 tsp dried oregano']),
+  d('lunch', 'Tuna and chickpea salad', MEDI, 'Drain the tuna and chickpeas and toss with the tomatoes, onion and a little olive oil. Ready in 5 minutes.', ['100g tuna canned in water', '120g chickpeas canned', '60g cherry tomatoes', '30g onion', '1 tsp olive oil']),
+  d('lunch', 'Sardines on toast with tomatoes', BRIT, 'Toast the bread, mash the sardines on top and serve with the tomatoes. Ready in 5 minutes.', ['120g sardines canned', '70g wholemeal bread', '60g cherry tomatoes']),
+  d('lunch', 'Chicken pesto pasta', ITAL, 'Cook the pasta, fry the sliced chicken, and toss everything with the pesto and spinach until it wilts. Ready in 15 minutes.', ['130g raw chicken breast', '60g dry pasta', '1 tbsp pesto', '40g spinach']),
+  d('lunch', 'Ham and mozzarella toastie', ITAL, 'Fill the bread with the ham and mozzarella and toast in a dry pan until golden on both sides. Ready in 8 minutes.', ['70g white bread', '60g ham', '50g mozzarella light']),
+  d('lunch', 'Tofu and edamame rice bowl', JAPA, 'Fry the cubed tofu until golden while the rice cooks, and serve over the rice with the edamame and soy sauce.', ['150g tofu firm', '45g dry brown rice', '80g edamame', '1 tbsp soy sauce']),
+
+  // Dinners: a protein, a carb and a vegetable, one pan or one tray where it can be.
+  d('dinner', 'Salmon with rice and broccoli', BRIT, 'Bake the salmon for 15 minutes while the rice cooks and the broccoli steams, and drizzle with the soy sauce.', ['150g salmon', '60g dry basmati rice', '120g broccoli', '1 tbsp soy sauce']),
+  d('dinner', 'Chicken, new potatoes and green beans', BRIT, 'Roast the chicken and halved potatoes in a little oil for 25 minutes, and boil the green beans for the last 5.', ['180g raw chicken breast', '250g raw potato', '100g green beans', '1 tsp olive oil']),
+  d('dinner', 'Steak, chips and peas', BRIT, 'Oven-bake the chips, cook the steak in a hot pan for 3 minutes a side, and boil the peas.', ['180g beef rump steak', '180g chips', '80g peas']),
+  d('dinner', 'Pork chop with mash and carrots', BRIT, 'Boil the potato and carrots, grill the pork chop for 5 minutes a side, and mash the potato with salt and pepper.', ['180g pork chop', '250g raw potato', '100g carrot']),
+  d('dinner', 'Cod with new potatoes and peas', BRIT, 'Bake the cod for 12 minutes while the potatoes boil, and add the peas for the last 3.', ['180g raw cod', '250g raw potato', '100g peas']),
+  d('dinner', 'Turkey mince chilli and rice', MEXI, 'Brown the turkey mince with the onion and spices, add the tomatoes and beans, simmer 15 minutes and serve over the rice.', ['170g turkey mince', '60g onion', '200g chopped tomatoes canned', '120g kidney beans canned', '50g dry white rice', '1 tsp chili powder', '1 tsp cumin']),
+  d('dinner', 'Beef mince pasta', ITAL, 'Brown the mince with the onion, add the passata and herbs and simmer while the pasta cooks, then toss together.', ['130g beef mince 5% fat', '60g onion', '200g tomato passata', '70g dry pasta', '1 tsp dried oregano']),
+  d('dinner', 'Teriyaki chicken noodles', JAPA, 'Stir-fry the sliced chicken and pepper until cooked, add the cooked noodles and teriyaki sauce and toss. Ready in 15 minutes.', ['160g raw chicken breast', '60g dry egg noodles', '100g bell pepper', '2 tbsp teriyaki sauce']),
+  d('dinner', 'Fish fingers, potatoes and green beans', BRIT, 'Oven-bake the fish fingers, boil the potatoes and green beans, and serve together.', ['140g fish fingers', '220g raw potato', '100g green beans']),
+  d('dinner', 'Chicken fajita traybake', MEXI, 'Toss the sliced chicken, pepper and onion with the oil and spices and roast for 20 minutes. Serve in the warm wraps.', ['180g raw chicken breast', '120g bell pepper', '60g onion', '2 tortilla wrap', '1 tsp paprika', '1 tsp cumin', '1 tsp olive oil']),
+  d('dinner', 'Prawn and tomato pasta', ITAL, 'Cook the pasta. Fry the garlic, add the tomatoes and simmer 5 minutes, add the prawns until pink, and toss with the pasta.', ['150g raw prawns', '70g dry pasta', '200g chopped tomatoes canned', '6g garlic']),
+  d('dinner', 'Lamb chops with couscous and peas', MEDI, 'Grill the lamb chops for 4 minutes a side, pour boiling water over the couscous, and serve with the peas and tzatziki.', ['200g lamb chop', '60g dry couscous', '80g peas', '60g tzatziki']),
+  d('dinner', 'Soy mince and bean chilli with rice', MEXI, 'Brown the soy mince with the spices, add the tomatoes and beans and simmer 15 minutes. Serve over the rice.', ['140g soy mince', '120g kidney beans canned', '200g chopped tomatoes canned', '60g dry white rice', '1 tsp chili powder', '1 tsp cumin']),
+  d('dinner', 'Soy mince and lentil bolognese', ITAL, 'Soften the onion, add the soy mince, lentils and passata and simmer 20 minutes until thick, and serve over the pasta.', ['120g soy mince', '40g red lentils dry', '70g dry pasta', '250g tomato passata', '60g onion']),
+  d('dinner', 'Tofu and broccoli stir-fry with rice', JAPA, 'Fry the cubed tofu until golden, add the broccoli and pepper and stir-fry 4 minutes, finish with soy sauce and serve with the rice.', ['180g tofu firm', '50g dry brown rice', '150g broccoli', '80g bell pepper', '1 tbsp soy sauce']),
+  d('dinner', 'Pesto salmon with potatoes and green beans', ITAL, 'Spread the pesto over the salmon and bake 15 minutes while the potatoes and green beans boil.', ['150g salmon', '1 tbsp pesto', '250g raw potato', '100g green beans']),
+  d('dinner', 'Burger and sweet potato wedges', AMER, 'Roast the sweet potato wedges for 25 minutes, grill the burger for 5 minutes a side, and serve in the bun with the leaves.', ['150g beef burger', '1 burger bun', '220g raw sweet potato', '30g mixed salad leaves']),
+  d('dinner', 'Chicken thighs with rice and peas', CARI, 'Rub the chicken with the jerk seasoning and roast 25 minutes, and cook the rice with the kidney beans.', ['200g raw chicken thigh', '1 tsp jerk seasoning', '60g dry white rice', '120g kidney beans canned']),
+  d('dinner', 'Cheese omelette with new potatoes and salad', BRIT, 'Boil the potatoes, beat the eggs and cook in a hot pan, add the cheese and fold, and serve with the leaves.', ['3 egg', '40g cheddar cheese', '200g raw potato', '60g mixed salad leaves']),
+  d('dinner', 'Haddock with mash and peas', BRIT, 'Bake the haddock for 12 minutes while the potato boils, mash it, and serve with the peas.', ['180g raw haddock', '250g raw potato', '100g peas']),
+  d('dinner', 'Pork with roast veg and rice', MEDI, 'Roast the sliced pork, courgette and pepper with a little oil for 20 minutes, and serve over the rice.', ['180g raw pork loin', '150g courgette', '100g bell pepper', '60g dry white rice', '1 tsp olive oil']),
+  d('dinner', 'Steak and pepper fajitas', MEXI, 'Fry the sliced steak and pepper with the paprika over a high heat for 4 minutes, and fold into the warm wraps with the salsa.', ['170g beef steak sirloin', '120g bell pepper', '2 tortilla wrap', '40g salsa', '1 tsp paprika']),
+]
+
+export const MEAL_LIBRARY: readonly RawProposal[] = [...BREAKFASTS, ...LUNCHES, ...DINNERS, ...SNACKS, ...EVERYDAY, ...DEEP_POOL_ADDITIONS, ...VEGAN_GLUTEN_FREE, ...SIMPLE_EVERYDAY]

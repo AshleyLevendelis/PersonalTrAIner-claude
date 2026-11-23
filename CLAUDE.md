@@ -1756,6 +1756,13 @@ menu" stays true when a copy is also left outside it.
   over the 64 real exam replies first. One ("That's what we love to hear") was the reply's only answer to good news,
   and came off the list.
 
+### His request of 23 Nov 2026, meals ("Do whatever you think is best"; `docs/plans/simple-meals.md`)
+- **Meals are simple unless he loves cooking** (mine, on his delegation): five main foods or fewer, a snack two, nothing
+  to shape, layer or make a sauce from (`meal-effort.ts`); the library offers simple dishes first; recipes are at most a
+  quarter of a meal on Moderate (the default), none on Quick, unlimited on Happy to cook, and a thin meal always keeps
+  choices; the meal writer is asked for plain names. `test:simple-meals`, `measure:simple-meals`. Needs the
+  `generate-meals` deploy for the writer's half
+
 ### His requests of 20 Nov 2026
 - **Profile has an Account row, "Email & sign-in" (his request 20 Nov 2026, "Build the account row")**: an email can be
   saved any time, not only from the weekly prompt; it says saved, waiting on the email's link (never "saved"), or not

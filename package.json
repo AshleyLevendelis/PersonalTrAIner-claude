@@ -674,6 +674,8 @@
     "test:setup-card-question": "tsx scripts/test-setup-card-question.ts",
     "test:meal-menu": "tsx scripts/test-meal-menu.ts",
     "measure:deep-pool": "tsx scripts/measure-deep-pool.ts",
+    "test:simple-meals": "tsx scripts/test-simple-meals.ts",
+    "measure:simple-meals": "tsx scripts/measure-simple-meals.ts",
     "measure:usual-meals": "tsx scripts/measure-usual-meals.ts",
     "test:greek-yoghurt-asked": "tsx scripts/test-greek-yoghurt-asked.ts",
     "test:mince-asked": "tsx scripts/test-mince-asked.ts",

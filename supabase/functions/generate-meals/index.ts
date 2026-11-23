@@ -136,10 +136,13 @@ function buildDietarySafetyBlock(preferences: string[]): string {
   return `\n\nDIETARY REQUIREMENTS (${preferences.join(", ")}):\n${rules.join("\n")}\nFind a compliant alternative for any ingredient that would violate these — never include a restricted ingredient "just this once".`;
 }
 
+// SIMPLE BY DEFAULT (23 Nov 2026; Ashley: "The meals are too complicated. Users are required to become gourmet chefs").
+// A "main food" is any ingredient except oil, salt, pepper, garlic, lemon, dried spices and herbs: the app counts the
+// same way (src/lib/meal-effort.ts) and fills a plan with simple dishes first. docs/plans/simple-meals.md.
 function cookingTimeGuidance(pref: string | undefined): string {
-  if (pref === "quick") return "Keep prep to 15 minutes or less: minimal steps, few ingredients, no long marinades or slow-cooked elements.";
+  if (pref === "quick") return "Every dish is SIMPLE: five main foods or fewer (oil, salt, pepper, garlic, lemon, dried spices and herbs do not count), about 15 minutes, one pan, one tray or no cooking at all, and nothing to shape, layer, batter or make a sauce from.";
   if (pref === "loves_cooking") return "Feel free to use real recipes with proper technique and a few more steps — this user enjoys cooking.";
-  return "Keep prep to a realistic 20-30 minutes with straightforward steps.";
+  return "Most dishes are SIMPLE: five main foods or fewer (oil, salt, pepper, garlic, lemon, dried spices and herbs do not count), about 20-30 minutes, one pan or one tray where it can be, nothing to shape, layer, batter or make a sauce from. At most one dish in four may be a proper recipe.";
 }
 
 // ---------------------------------------------------------------------------
@@ -152,8 +155,8 @@ function cookingTimeGuidance(pref: string | undefined): string {
 const SLOT_GUIDANCE: Record<string, string> = {
   breakfast: "BREAKFAST FOOD ONLY: eggs, oats/porridge, yoghurt, toast, smoothies, breakfast meats (bacon, sausage), pancakes/waffles, cereal-style bowls, breakfast burritos. Never propose a curry, stew, roast dinner, casserole, or other dinner-style dish just wearing a breakfast label.",
   lunch: "LUNCH FOOD: sandwiches, wraps, salads, grain bowls, quick hot meals, leftovers-style dishes — lighter and faster than a big dinner.",
-  dinner: "DINNER FOOD: a full cooked meal — this is where the heavier, more involved dishes belong.",
-  snack: "GENUINELY SNACK-SIZED: yoghurt, a protein shake, a handful of nuts, fruit with a protein source, a bar-style combo. 2-4 ingredients, no real 'cooking' — NOT a miniature version of a restaurant dish.",
+  dinner: "DINNER FOOD: a full cooked meal: a protein, a carb and vegetables, the kind of plate people make on a weekday.",
+  snack: "GENUINELY SNACK-SIZED: yoghurt and fruit, a protein shake, cottage cheese on rice cakes, jerky and an apple. One or two foods, no cooking — NOT a miniature version of a restaurant dish.",
 };
 
 function slotGuidance(slot: string, breakfastStyle: string | undefined): string {
@@ -313,7 +316,7 @@ Deno.serve(async (req: Request) => {
       (s) => `- ${s.slot} — ${slotGuidance(s.slot, breakfast_style)}\n  Propose ${s.count} DIFFERENT dish variants, each targeting ~${s.calories} kcal, ~${s.protein}g protein, ~${s.carbs}g carbs, ~${s.fat}g fat — hit all four as closely as you can; protein must not fall meaningfully short, but don't overshoot it at the expense of carbs/fat either`
     ).join("\n");
 
-    const prompt = `You are a chef and sports nutritionist proposing meal options for an app that will independently verify every number — your job is variety and plausibility, not precision; code will re-measure and scale every ingredient you list.
+    const prompt = `You are a sports nutritionist who plans everyday home food, proposing meal options for an app that will independently verify every number — your job is variety and plausibility, not precision; code will re-measure and scale every ingredient you list.
 
 CUISINE: default to familiar, everyday food — most of your proposals across a slot should be recognisably ordinary (British/Western/simple international staples), with at most ONE dish per slot drawing from something more regional. Draw from this mix: ${selectedCuisines.join(", ")}. Variety should come from ingredients, protein source, and cooking style — not from touring a different continent every dish. Do not propose near-duplicate dishes within the same slot.
 ${avoidBlock}${likedBlock}
@@ -323,7 +326,7 @@ ${dietaryBlock}
 ${macroGuidance}
 
 RULES:
-1. Each dish needs a specific, appetizing name (not "Chicken and Rice" — something like "Sichuan Mapo Tofu with Charred Bok Choy").
+1. Each dish gets a plain name, the way a person would say it: "Chicken, rice and broccoli", "Tuna jacket potato", "Greek yoghurt and berries". Never a restaurant-menu name ("Charred", "Drizzle", "Medley", "Infused").
 2. Every ingredient MUST be ONE parseable line with an exact quantity and unit: "220g raw chicken breast", "2 tbsp olive oil", "1 medium egg", "70g dry basmati rice". Grams or millilitres wherever you know the weight; spoons for oils and sauces; a plain count for eggs, slices and cloves. NEVER ounces, pounds, kilograms, cups, tins, cans, pinches or handfuls (a line the app cannot read is dropped with its whole dish). No ranges, no "to taste", no combined items. Each line is ONE food, never a dish ("chicken caesar wrap", "tuna mayo") or two foods joined ("salt and pepper", "chicken with rice"): a line the app cannot match to a single food is dropped with its whole dish. Weigh as it is bought: pasta, rice, noodles, couscous, quinoa and lentils DRY, potatoes, meat and fish RAW, and say so in the line ("75g dry pasta", "250g raw potato", "150g raw chicken breast"); the app shows the cooked weight beside it. A weight with no state word is read as cooked. Name the fat level where the numbers depend on it: Greek yoghurt as 0%, 2% or full fat ("170g greek yoghurt 0%") and beef mince with its fat ("150g raw beef mince 5% fat"); a bare "Greek yoghurt" or "beef mince" cannot be counted and its dish is dropped. Squid is the same: write "squid" for plain squid and "fried calamari" when it is floured, breaded or battered; a bare "calamari" cannot be counted and its dish is dropped.
 3. Include all cooking fats with exact amounts.
 4. Aim your ingredient quantities at ALL FOUR stated macro targets, not just calories — exact precision isn't required (the app rescales), but stay in the right neighborhood on protein, carbs AND fat so rescaling doesn't need to be extreme in any one direction. Undershooting protein is a rejection; so is padding it out so far that carbs/fat are starved (see HIT ALL THREE MACROS above).

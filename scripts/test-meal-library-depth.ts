@@ -68,7 +68,12 @@ async function main() {
   const vgEnd = vgStart < 0 ? -1 : src.indexOf('\n]\n', vgStart)
   const vgNames = new Set([...(vgStart >= 0 && vgEnd > vgStart ? src.slice(vgStart, vgEnd) : '').matchAll(/d\('(?:breakfast|lunch|dinner|snack)', '([^']+)'/g)].map(m => m[1]))
   check('the vegan, gluten-free block is found and holds its 16 dishes', vgNames.size === 16 && MEAL_LIBRARY.filter(d => vgNames.has(d.name)).length === 16, vgNames.size)
-  const before = await libraryDepth({ library: MEAL_LIBRARY.filter(d => !names.has(d.name) && !deepNames.has(d.name) && !vgNames.has(d.name)) })
+  // ...and the simple everyday dishes added on 23 Nov 2026 (SIMPLE_EVERYDAY, docs/plans/simple-meals.md), for the same reason.
+  const seStart = src.indexOf('const SIMPLE_EVERYDAY: RawProposal[] = [')
+  const seEnd = seStart < 0 ? -1 : src.indexOf('\n]\n', seStart)
+  const seNames = new Set([...(seStart >= 0 && seEnd > seStart ? src.slice(seStart, seEnd) : '').matchAll(/d\('(?:breakfast|lunch|dinner|snack)', '([^']+)'/g)].map(m => m[1]))
+  check('the simple everyday block is found and every name in it is a dish in the library (measured 78)', seNames.size >= 60 && MEAL_LIBRARY.filter(d => seNames.has(d.name)).length === seNames.size, seNames.size)
+  const before = await libraryDepth({ library: MEAL_LIBRARY.filter(d => !names.has(d.name) && !deepNames.has(d.name) && !vgNames.has(d.name) && !seNames.has(d.name)) })
   const thinBefore = before.flatMap(r => Object.entries(r.depth).filter(([, n]) => n < 7).map(([slot, n]) => `${r.target} ${r.diet} ${slot} ${n}`))
   check('without them at least 20 meals fall under seven (measured 32), so the pass above is the dishes, not a blind walk', thinBefore.length >= 20, thinBefore.length)
   check('...and the vegan lunch is among them at every target (measured 2-4)', ['1700kcal/135g', '2000kcal/150g', '2300kcal/160g', '2700kcal/170g', '3100kcal/180g', '3040kcal/160g'].every(t => thinBefore.some(x => x.startsWith(`${t} vegan lunch `))), thinBefore.filter(x => x.includes('vegan lunch')))
