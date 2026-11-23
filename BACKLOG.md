@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **REPORTED COACH REPLIES NOW EMAIL HIM, LIVE ON PRODUCTION, 23 Nov 2026.** Migration 20261122120000 applied on
+  both projects (`test:schema-parity` PASS, 76 each), `report-email` deployed, function secrets and both Vault secrets
+  set, and a real report from the app reached his Gmail. Two failures on the way, both in setup, none in code: the
+  placeholders' angle brackets were typed into the secrets (Resend answered 400 and logged nothing, because the key was
+  unreadable), then the two copies of the shared secret differed (401 "refused"). Found by reading `net._http_response`
+  and by comparing fingerprints (the CLI's secret digests against a sha256 of the Vault value), never the values.
+  **A handover with `<...>` placeholders gets them typed literally; generate a value once and hand it to both places
+  from the terminal (`Set-Clipboard`).** Open: `net._http_response` shows a call timing out at 5 s on every hour (the
+  reach-out schedule, likely); unexamined. The function logs only Resend's status, not its reason.
 - [x] **THE PHONE APP ASKED FOR VO2 MAX AS WELL AS STEPS, 23 Nov 2026, found in the first native build on his laptop.**
   The built app's final manifest declared `READ_VO2_MAX` and `WRITE_VO2_MAX` beside `READ_STEPS`, against the "steps
   only" rule (Play refuses unused health permissions). Cause: the removal list named `READ_VO` / `WRITE_VO`, which are
