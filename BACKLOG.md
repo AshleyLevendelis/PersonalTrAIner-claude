@@ -2,6 +2,11 @@
 
 Newest first. One line each.
 
+- [x] **THE STORE APP UPDATES THROUGH GOOGLE'S REVIEW, NO LIVE-UPDATE SERVICE: his ruling 23 Nov 2026, "I think its
+  fine to do the Google review version"** (over a paid live-update service and over loading the live website inside the
+  app). Each change reaches the phone app only as a new upload (versionCode +1) and Google's review; the website still
+  updates on merge. My recommendation was the same for the closed test, revisiting a live-update service once real users
+  arrive and updates are frequent.
 - [x] **REPORTED COACH REPLIES NOW EMAIL HIM, LIVE ON PRODUCTION, 23 Nov 2026.** Migration 20261122120000 applied on
   both projects (`test:schema-parity` PASS, 76 each), `report-email` deployed, function secrets and both Vault secrets
   set, and a real report from the app reached his Gmail. Two failures on the way, both in setup, none in code: the

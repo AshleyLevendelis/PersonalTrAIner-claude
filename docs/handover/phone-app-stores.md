@@ -46,6 +46,9 @@ Table editor, `coach_reply_reports`.
 
 ## Worth knowing
 
+- **Updates go through the store: his ruling 23 Nov 2026.** No live-update service for now; every change to the
+  phone app is a new upload (versionCode +1) and a Google review.
+
 - **The phone app carries a copy of the website inside it.** A change to the website reaches the phone app only when
   a new version goes through the store (a day or two of review), unless a live-update service is added later. The
   website itself keeps updating as now.
