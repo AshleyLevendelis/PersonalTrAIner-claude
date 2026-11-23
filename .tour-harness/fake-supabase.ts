@@ -171,6 +171,13 @@ const rejectAsPostgres = (tableName: string, v: { column: string; value: number 
  * ensureSignedIn, and a per-client delay so the fixture can be laid down with none and then read with ?slow.
  * Every other page passes nothing and gets exactly what it always got.
  */
+function authCall(name: string, args: Record<string, unknown>): void {
+  try {
+    const was = JSON.parse(sessionStorage.getItem('__fakeAuthCalls') ?? '[]') as unknown[]
+    sessionStorage.setItem('__fakeAuthCalls', JSON.stringify([...was, { name, ...args }]))
+  } catch { /* a page with no storage records nothing */ }
+}
+
 export function makeFakeSupabase(db: Db, opts: { session?: { user: { id: string; email: string | null; new_email?: string | null } }; slowMs?: number; alwaysUp?: boolean; confirmEmail?: boolean } = {}) {
   const down = () => !opts.alwaysUp && netDown()
   const slowMs = opts.slowMs ?? SLOW_MS
@@ -383,13 +390,34 @@ export function makeFakeSupabase(db: Db, opts: { session?: { user: { id: string;
       // The Account row (20 Nov 2026). A project that asks for the address to be confirmed holds it as new_email
       // until the link is tapped; one that does not sets email at once. Writes into the session's own user, so a
       // later getUser reads what the save did, as the real client does.
-      updateUser: async (attrs: { email?: string; password?: string }) => {
+      updateUser: async (attrs: { email?: string; password?: string }, options?: { emailRedirectTo?: string }) => {
         await wait()
         const user = opts.session?.user
         if (!user) return { data: { user: null }, error: { message: 'Auth session missing!' } }
         if (attrs.email) { if (opts.confirmEmail) user.new_email = attrs.email; else user.email = attrs.email }
         ;(window as unknown as { __authWrites?: unknown[] }).__authWrites = [...((window as unknown as { __authWrites?: unknown[] }).__authWrites ?? []), attrs]
+        authCall('updateUser', { ...attrs, ...(options?.emailRedirectTo ? { redirect: options.emailRedirectTo } : {}) })
         return { data: { user }, error: null }
+      },
+      // The rest of an account (23 Nov 2026). Each call is recorded in sessionStorage, which a sign-out's fresh load
+      // keeps, so a driver can read what the screen asked for after the page has reloaded.
+      resend: async (args: { type: string; email: string; options?: { emailRedirectTo?: string } }) => {
+        await wait(); authCall('resend', { type: args.type, email: args.email, redirect: args.options?.emailRedirectTo ?? null })
+        return { data: {}, error: null }
+      },
+      resetPasswordForEmail: async (email: string, options?: { redirectTo?: string }) => {
+        await wait(); authCall('resetPasswordForEmail', { email, redirect: options?.redirectTo ?? null })
+        return { data: {}, error: null }
+      },
+      signOut: async (args?: { scope?: string }) => {
+        await wait(); authCall('signOut', { scope: args?.scope ?? null })
+        return { error: null }
+      },
+      signInWithPassword: async (args: { email: string; password: string }) => {
+        await wait(); authCall('signInWithPassword', { email: args.email })
+        return args.password === 'right-password'
+          ? { data: { user: { id: 'u2', email: args.email } }, error: null }
+          : { data: { user: null }, error: { message: 'Invalid login credentials' } }
       },
     },
     // claim_profile and friends: one round trip, "yes".

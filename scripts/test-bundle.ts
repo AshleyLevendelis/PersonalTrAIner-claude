@@ -247,8 +247,11 @@ console.log('\n1. The libraries are cached separately from the app')
   // MOVED 22 Nov 2026: 461 -> 469. Crossed at 461 by the persona fixes (the age, pregnancy and low-recovery rules, the
   // "Lift fast, lower slow" cue and the rest-day line, all plan logic). MEASURED 461 through this gate on the change.
   // His 15 Sep ruling, "raise it with room to grow": 8 gz over today.
-  headroom('a deploy re-downloads', appGzip, 469, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, under 469`, appGzip < 469, appGzip)
+  // MOVED 23 Nov 2026: 469 -> 477. Crossed at 469 by the email-account fixes (sign out, sign in from Profile, forgot
+  // password, the reset screen, plain error words). MEASURED 469 through this gate on the change. His 15 Sep ruling,
+  // "raise it with room to grow": 8 gz over today.
+  headroom('a deploy re-downloads', appGzip, 477, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, under 477`, appGzip < 477, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -497,7 +500,9 @@ console.log('\n3. Nothing has crept back up')
   // between them). His 15 Sep ruling: 25 kB raw over today's number.
   // MOVED 22 Nov 2026: 1591 -> 1617. Spent by the persona fixes (older and pregnant beginners' rules, the low-recovery
   // days, the audit's six fixes); MEASURED 1592 through this gate on the change. His 15 Sep ruling: 25 kB over today.
-  const APP_CHUNK_BUDGET_KB = 1617
+  // MOVED 23 Nov 2026: 1617 -> 1644. Crossed by the persona audit's second round (main) meeting the email-account fixes
+  // on the merge; MEASURED 1619 through this gate on it. His 15 Sep ruling: 25 kB over today.
+  const APP_CHUNK_BUDGET_KB = 1644
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -806,7 +811,9 @@ console.log('\n3. Nothing has crept back up')
   // did not move. His 15 Sep ruling: 25 kB raw over today's number (3237 + 25).
   // MOVED 22 Nov 2026: 3262 -> 3287, the persona fixes (plan logic only). MEASURED 3262 through this gate on the
   // change. His 15 Sep ruling: 25 kB raw over today's number (3262 + 25).
-  const TOTAL_BUDGET_KB = 3287
+  // MOVED 23 Nov 2026: 3287 -> 3316, the email-account fixes. MEASURED 3291 through this gate on the change. His 15 Sep
+  // ruling: 25 kB raw over today's number (3291 + 25).
+  const TOTAL_BUDGET_KB = 3316
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')

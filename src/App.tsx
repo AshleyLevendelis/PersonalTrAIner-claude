@@ -69,7 +69,8 @@ import { checkForBeatTargetOffer, confirmBeatTargetOffer, declineBeatTargetOffer
 import { applyCalibrationAnchors, calibrationAnchorMessage, sweepCalibrationWeek } from '@/lib/calibration-anchor'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { readBootSnapshot, saveBootSnapshot, clearBootSnapshot, type BootSnapshot } from '@/lib/boot-cache'
-import { ensureSignedIn, claimProfile, hasClaimedOnThisPhone, markClaimedOnThisPhone, shouldAskForEmail, findOwnedProfileId, describeSignInFailure } from '@/lib/auth'
+import { ensureSignedIn, claimProfile, hasClaimedOnThisPhone, markClaimedOnThisPhone, shouldAskForEmail, findOwnedProfileId, describeSignInFailure, AUTH_LINK_AT_LOAD, reloadApp } from '@/lib/auth'
+import { SetNewPasswordScreen } from '@/components/SetNewPasswordScreen'
 import { rebuildFromCurrentWeek, detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
 import { updateProfileField, savePlanPause } from '@/lib/profile-store'
 import { setPlanPausedSince, PAUSE_WORDS, setPlanPauseHandler } from '@/lib/plan-pause'
@@ -870,7 +871,18 @@ function App() {
   const [coachDataVersion, setCoachDataVersion] = useState(0)
   const bumpCoachData = () => setCoachDataVersion(v => v + 1)
 
+  // AN EMAILED LINK (23 Nov 2026, docs/plans/account-signin.md). A reset link opens "Set a new password" INSTEAD of
+  // the start: the link signs this page in as its account, and starting first would read this phone's old plan
+  // under it. A confirmation link, or one that had expired, says so once on the app.
+  const [recoveryOpen, setRecoveryOpen] = useState(AUTH_LINK_AT_LOAD?.kind === 'recovery')
+  const [accountNotice, setAccountNotice] = useState<string | null>(
+    AUTH_LINK_AT_LOAD?.kind === 'email-confirmed' ? 'Your email is confirmed. Your plan is saved to it, and you can sign in with it on any phone.'
+      : AUTH_LINK_AT_LOAD?.kind === 'link-failed' ? `${AUTH_LINK_AT_LOAD.message} Open Profile, then Account, to send a new one.`
+        : null,
+  )
+
   useEffect(() => {
+    if (recoveryOpen) return
     restoreSession()
   }, [])
 
@@ -3345,6 +3357,11 @@ function App() {
     if (patch.weight_kg != null && patch.weight_kg !== previousKg) void handleWeightLogged({ kg: patch.weight_kg, previousKg })
   }
 
+  if (recoveryOpen) {
+    // "Not now" leaves the link behind and starts as usual, at the app's own address.
+    return <SetNewPasswordScreen onCancel={() => { setRecoveryOpen(false); reloadApp() }} />
+  }
+
   if (isRestoring) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -3518,6 +3535,15 @@ function App() {
           minutes is nothing to it. It appears the moment the tour finishes or
           is skipped, with no reload needed. */}
       {askForEmail && !tourRunning && <EmailPrompt onClose={() => setAskForEmail(false)} />}
+
+      {accountNotice && (
+        <div role="status" className="fixed inset-x-0 top-0 z-[60] px-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]" data-testid="account-notice">
+          <div className="mx-auto max-w-md rounded-lg border bg-background p-3 shadow-lg flex items-start gap-3">
+            <p className="text-sm flex-1">{accountNotice}</p>
+            <Button size="sm" variant="outline" className="min-h-[44px]" onClick={() => setAccountNotice(null)}>OK</Button>
+          </div>
+        </div>
+      )}
 
       {unsavedProfileWarning && (
         <div

@@ -167,12 +167,11 @@ export function markClaimedOnThisPhone(profileId: string): void {
 
 /** True when the signed-in account is still anonymous — no email, so nothing to recover it with. */
 export async function needsEmail(): Promise<boolean> {
-  try {
-    const { data } = await supabase.auth.getUser()
-    return !!data?.user && !data.user.email
-  } catch {
-    return false
-  }
+  // NOT WHILE A LINK IS WAITING (23 Nov 2026, his report "several times it's asked me to change my password"). An
+  // address waiting on its link is `new_email` with `email` still empty, so this used to say yes, the prompt came
+  // back every week, and every "Save it" set the password again. Waiting is its own state: Profile, Account offers
+  // Resend there, and nothing asks for the password twice.
+  return (await readAccountStatus()).kind === 'not-saved'
 }
 
 /**
@@ -263,12 +262,12 @@ export async function attachEmail(email: string, password: string): Promise<Atta
   }
 
   try {
-    const { error } = await supabase.auth.updateUser({ email: trimmed, password })
-    if (error) return { ok: false, error: error.message }
+    const { error } = await supabase.auth.updateUser({ email: trimmed, password }, { emailRedirectTo: appAddress() })
+    if (error) return { ok: false, error: describeAuthError(error.message) }
     clearEmailPromptSnooze()
     return { ok: true }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    return { ok: false, error: describeAuthError(err instanceof Error ? err.message : String(err)) }
   }
 }
 
@@ -280,7 +279,7 @@ function clearEmailPromptSnooze(): void {
 export async function signInWithEmail(email: string, password: string): Promise<AttachResult> {
   try {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
-    if (error) return { ok: false, error: error.message }
+    if (error) return { ok: false, error: describeAuthError(error.message) }
     return { ok: true }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
@@ -317,3 +316,174 @@ export async function findOwnedProfileId(): Promise<string | null> {
     return null
   }
 }
+
+// ---------------------------------------------------------------------------
+// THE REST OF AN ACCOUNT (23 Nov 2026, his report: "I didn't receive a proper email to confirm my email address,
+// and there's no way to sign out and sign back in with the email. Several times, it's asked me to change my
+// password." Live testers in days; docs/plans/account-signin.md).
+// ---------------------------------------------------------------------------
+
+/** The live app's address: where every emailed link brings him back to. */
+export const LIVE_APP_ADDRESS = 'https://personal-tr-a-iner-claude-yco8.vercel.app/'
+
+/**
+ * Where an emailed link should land. The page's own address when it is a web page (so a preview or the live app
+ * each come back to themselves), the live app from the phone app, whose address is not a web address an email
+ * can open. A link to an address the project does not allow falls back to the project's Site URL.
+ */
+export function appAddress(origin: string | null = typeof location !== 'undefined' ? location.origin : null): string {
+  return origin && /^https?:\/\//.test(origin) ? `${origin}/` : LIVE_APP_ADDRESS
+}
+
+/**
+ * Supabase's error sentences, in words a person can act on. Unknown ones pass through unchanged: a message we
+ * have not seen is still more use than a guess.
+ */
+export function describeAuthError(message: string): string {
+  if (/invalid login credentials/i.test(message)) return "That email and password don't match an account. Check them and try again."
+  if (/email not confirmed/i.test(message)) return "That email hasn't been confirmed yet. Tap the link in the email we sent, then sign in."
+  if (/already (been )?registered|already (in use|exists)|email_exists/i.test(message)) {
+    return 'That email already has an account. Sign in with it instead, or use a different email.'
+  }
+  if (/rate limit|too many|for security purposes|only request this after/i.test(message)) {
+    return 'Too many emails were sent just now. Wait a few minutes, then try again.'
+  }
+  if (/password/i.test(message) && /(at least|characters|weak|short|should contain)/i.test(message)) {
+    return 'Choose a longer password: at least 8 characters.'
+  }
+  if (/same.*password|different from the old/i.test(message)) return 'That is the password you already have. Choose a new one.'
+  if (/expired|invalid.*(link|token|otp)|otp_expired|session missing|missing.*session/i.test(message)) {
+    return 'That link has expired or was already used. Ask for a new one.'
+  }
+  if (/unable to validate email|invalid.*email|email.*invalid/i.test(message)) return "That doesn't look like an email address."
+  if (/failed to fetch|network|timeout|offline|econn/i.test(message)) return "Couldn't reach the server. Check your connection and try again."
+  return message
+}
+
+/** Send the confirmation link again, to the address waiting on it. The password is never asked for twice. */
+export async function resendConfirmation(email: string): Promise<AttachResult> {
+  try {
+    const { error } = await supabase.auth.resend({ type: 'email_change', email: email.trim(), options: { emailRedirectTo: appAddress() } })
+    if (error) return { ok: false, error: describeAuthError(error.message) }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: describeAuthError(err instanceof Error ? err.message : String(err)) }
+  }
+}
+
+/** A different address while one is waiting: the address only, so the password set the first time stands. */
+export async function changePendingEmail(email: string): Promise<AttachResult> {
+  const trimmed = email.trim()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return { ok: false, error: "That doesn't look like an email address." }
+  try {
+    const { error } = await supabase.auth.updateUser({ email: trimmed }, { emailRedirectTo: appAddress() })
+    if (error) return { ok: false, error: describeAuthError(error.message) }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: describeAuthError(err instanceof Error ? err.message : String(err)) }
+  }
+}
+
+/** "Forgot your password?" Always answered the same way, so it cannot be used to ask whether an address has an account. */
+export async function sendPasswordReset(email: string): Promise<AttachResult> {
+  const trimmed = email.trim()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return { ok: false, error: 'Type your email above first.' }
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(trimmed, { redirectTo: appAddress() })
+    if (error) return { ok: false, error: describeAuthError(error.message) }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: describeAuthError(err instanceof Error ? err.message : String(err)) }
+  }
+}
+
+/** The new password, from the reset link's page. */
+export async function setNewPassword(password: string): Promise<AttachResult> {
+  if (password.length < 8) return { ok: false, error: 'Use at least 8 characters, so this is worth having.' }
+  try {
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) return { ok: false, error: describeAuthError(error.message) }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: describeAuthError(err instanceof Error ? err.message : String(err)) }
+  }
+}
+
+/**
+ * Forget everything this phone holds about the last person, keeping the sign-in itself (Supabase's own `sb-` keys)
+ * and the look of the app. Used after a sign-out and after signing into a different account, followed by a fresh
+ * load, so not one screen can keep the old person's plan in memory ("Start a new plan carries nothing of the last
+ * person", 14 Nov 2026).
+ */
+export function clearThisPhone(storage: Storage | null = typeof localStorage !== 'undefined' ? localStorage : null): void {
+  if (!storage) return
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < storage.length; i++) { const k = storage.key(i); if (k) keys.push(k) }
+    for (const k of keys) if (!k.startsWith('sb-') && !/appearance/i.test(k)) storage.removeItem(k)
+  } catch { /* a phone refusing storage has nothing kept to clear */ }
+}
+
+/** Load the app afresh at its own address, with nothing of a link left in it. */
+export function reloadApp(): void {
+  try { window.location.replace(`${window.location.origin}${window.location.pathname}${window.location.search}`) } catch { /* nothing to do */ }
+}
+
+/** What would be lost by signing out now: sets or a plan change made with no signal that have not reached the server. */
+export interface UnsentWork { sets: number; planChange: boolean }
+
+/** Why a sign-out is refused, or null when it may go ahead. Never with unsent work on the phone: it lives only here. */
+export function signOutBlockedBy(unsent: UnsentWork): string | null {
+  if (unsent.sets === 0 && !unsent.planChange) return null
+  const what = unsent.sets > 0
+    ? `${unsent.sets} set${unsent.sets === 1 ? '' : 's'}${unsent.planChange ? ' and a plan change' : ''}`
+    : 'A plan change'
+  const one = unsent.sets + (unsent.planChange ? 1 : 0) === 1
+  return `${what} ${one ? "hasn't" : "haven't"} reached the server yet, and signing out would lose ${one ? 'it' : 'them'}. ` +
+    `Open the app with signal so ${one ? 'it sends' : 'they send'}, then sign out.`
+}
+
+/** Sign out of this phone. The account and everything on it stay on the server. */
+export async function signOutOfThisPhone(unsent: UnsentWork): Promise<AttachResult> {
+  const blocked = signOutBlockedBy(unsent)
+  if (blocked) return { ok: false, error: blocked }
+  try {
+    const { error } = await supabase.auth.signOut({ scope: 'local' })
+    if (error) return { ok: false, error: describeAuthError(error.message) }
+    clearThisPhone()
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: describeAuthError(err instanceof Error ? err.message : String(err)) }
+  }
+}
+
+/**
+ * WHAT AN EMAILED LINK BROUGHT HIM BACK WITH, read off the address the page opened at, before anything changes it.
+ * Supabase puts the outcome in the address: `type=recovery` from a reset link, `type=email_change` (or `signup`)
+ * from a confirmation, `error_description` when the link was spent or expired. Reading is all this does: Supabase
+ * itself takes the sign-in out of the same address.
+ */
+export type AuthLink =
+  | { kind: 'recovery' }
+  | { kind: 'email-confirmed' }
+  | { kind: 'link-failed'; message: string }
+
+export function readAuthLink(href: string | null): AuthLink | null {
+  if (!href) return null
+  let url: URL
+  try { url = new URL(href) } catch { return null }
+  const params = new URLSearchParams(url.search)
+  new URLSearchParams(url.hash.replace(/^#/, '')).forEach((v, k) => params.set(k, v))
+  const err = params.get('error_description') ?? params.get('error_code') ?? params.get('error')
+  if (err) return { kind: 'link-failed', message: describeAuthError(err) }
+  // Only with the sign-in the link carries: a bare "type=" in an address is somebody's typing, not a link.
+  const type = params.get('type')
+  const signedIn = params.has('access_token') || params.has('code') || params.has('token_hash')
+  if (!signedIn) return null
+  if (type === 'recovery') return { kind: 'recovery' }
+  if (type === 'email_change' || type === 'signup' || type === 'email') return { kind: 'email-confirmed' }
+  return null
+}
+
+/** The link this page opened with, read once at load. */
+export const AUTH_LINK_AT_LOAD: AuthLink | null = readAuthLink(typeof location !== 'undefined' ? location.href : null)
