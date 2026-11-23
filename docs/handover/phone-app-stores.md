@@ -94,7 +94,7 @@ WINDOWS: use PowerShell syntax, not bash (no "export", no "~/"). The ios/ folder
    "unauthorized"). If it is not listed at all, Windows may need the phone maker's USB driver (Samsung: "Samsung
    Android USB Driver"; Pixel: Android Studio > SDK Manager > SDK Tools > "Google USB Driver").
    npx cap run android     (pick his phone). If that fails, npx cap open android and press Run in Android Studio.
-7. Report any build error word for word. Do not change the app id (app.personaltrainer.coach) without asking.
+7. Report any build error word for word. Do not change the app id (uk.co.personaltrainerapp) without asking.
 
 What Ashley checks on the phone:
 - The app opens with the launch screen and the new coach-bubble icon, then his Home (sign in with his email on the

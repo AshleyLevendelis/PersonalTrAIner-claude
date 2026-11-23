@@ -3,10 +3,10 @@ import type { CapacitorConfig } from '@capacitor/cli'
 // The phone app (20 Nov 2026): the same web app, built by `npm run build`, shipped inside a native shell so it can
 // read steps from Apple Health and Health Connect. See docs/plans/phone-app.md.
 //
-// appId IS A PLACEHOLDER UNTIL THE FIRST STORE UPLOAD, and permanent after it: Apple and Google tie the listing to it.
-// Change it before that upload if Ashley wants a different one (reverse of a domain he owns is the convention).
+// appId is his choice of 23 Nov 2026, the reverse of personaltrainerapp.co.uk, which he owns. PERMANENT after the first
+// store upload: Apple and Google tie the listing to it.
 const config: CapacitorConfig = {
-  appId: 'app.personaltrainer.coach',
+  appId: 'uk.co.personaltrainerapp',
   appName: 'Personal TrAIner',
   webDir: 'dist',
 }

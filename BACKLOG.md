@@ -2,6 +2,10 @@
 
 Newest first. One line each.
 
+- [x] **THE PHONE APP'S PERMANENT ID IS `uk.co.personaltrainerapp`: his choice 23 Nov 2026** (over keeping
+  `app.personaltrainer.coach`, his 20 Nov pick, made before he owned a domain). Nothing had been uploaded, so it was free
+  to change: Capacitor's appId, Android's applicationId, namespace and the activity's package folder, the URL scheme,
+  iPhone's bundle id, and the handover prompts. Permanent from the first upload. His Google Play identity is verified.
 - [x] **PROVEN LIVE ON HIS PHONE, 23 Nov 2026, AND THE CONFIRMED LINE PUSHES THE PAGE DOWN (his "yes make it push the
   page down")**. His dashboard pass (Claude in his browser): personaltrainerapp.co.uk bought, Resend verified, production
   Supabase sending through it, Site URL was `http://localhost:3000` (the dead link his own confirmation hit) and is now
