@@ -13,6 +13,9 @@ Newest first. One line each.
   icons and launch screen cut into Android sizes (52 files changed of 74 written). The laptop build used a
   build-folder-only `.env.production.local` (production address and the public publishable key taken from the live
   app, his choice), because the only settings file on the laptop points at TEST; it is not committed.
+  **ON HIS PHONE, 23 Nov 2026** (Samsung SM-S948B, Android 17, debug build installed by cable, opened with no crash):
+  his words, "steps work and look correct" and "timers work and beep". Not yet reported: which permissions Health
+  Connect's screen listed, the report flag on coach replies. Nothing sent to any store.
 
 - [x] **THE PHONE APP'S PERMANENT ID IS `uk.co.personaltrainerapp`: his choice 23 Nov 2026** (over keeping
   `app.personaltrainer.coach`, his 20 Nov pick, made before he owned a domain). Nothing had been uploaded, so it was free
