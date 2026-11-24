@@ -100,6 +100,7 @@ const probes: [string, string][] = [
   ['how many messages a day will the coach send me', 'dailyCap'],
   ['why is the rest on my squats so long between sets', 'mainLiftRestFloor'],
   ['why does my plan only have one deadlift a week', 'isSecondFloorPull'],
+  ['why is my lunch the same size as my dinner', 'BASE_RATIOS'],
 ]
 for (const [q, token] of probes) {
   const got = pickAppDecisions(q).map(d => d.anchor.token)
