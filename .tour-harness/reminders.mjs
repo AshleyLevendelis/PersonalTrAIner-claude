@@ -250,6 +250,53 @@ await backToRows()
 const offRow = await rowValue()
 check('4n3. ...nor does the Profile row: it states no level it did not read', /^Reminders$/.test(offRow ?? ''), offRow)
 
+// --- 6. The phone app (23 Nov 2026) -------------------------------------------------------------
+// His report: in the installed app the screen said "This browser can't show notifications". The app uses the phone's
+// own route there (src/lib/native-push.ts). STUBBED: the plugin (permission, Firebase token) via its test seam;
+// everything the screen and the database do around it is real. Whether a real phone buzzes is a real phone.
+console.log('  6. Inside the phone app')
+const stubApp = (platform, withPlugin) => send('Page.addScriptToEvaluateOnNewDocument', { source: `
+  window.Capacitor = { isNativePlatform: () => true, getPlatform: () => ${JSON.stringify(platform)} }
+  window.__nativeAsk = { asked: 0, perm: 'prompt', unregistered: 0 }
+  ${withPlugin ? `window.__nativePushForTest = {
+    checkPermission: async () => window.__nativeAsk.perm,
+    requestPermission: async () => { window.__nativeAsk.asked++; window.__nativeAsk.perm = 'granted'; return 'granted' },
+    register: async () => 'ANDROID-TOKEN-1',
+    unregister: async () => { window.__nativeAsk.unregistered++ },
+    createChannel: async () => {},
+    onTap: () => {}, onReceived: () => {},
+  }` : ''}
+` })
+if (stubId) { await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: stubId }); stubId = null }
+let appStub = (await stubApp('android', true)).result?.identifier
+await navigate('/?reminders=live', null)
+await until(sectionText, s => /up to 3 a day/.test(s))
+const appPhone = await until(() => switches().then(v => v?.find(s => s.id === 'reminders-phone')), v => v && v.disabled === false)
+const appText = await sectionText()
+check('6a. Android app: the phone switch is offered, off', appPhone?.disabled === false && appPhone?.on === false, appPhone)
+check('6b. ...and never says "this browser can\'t"', !/browser can.t/i.test(appText), appText)
+check('6c. ...and loading asked nothing', (await ev('window.__nativeAsk.asked')) === 0)
+await tap('#reminders-phone')
+const appOn = await until(() => switches().then(v => v?.find(s => s.id === 'reminders-phone')), v => v?.on === true)
+check('6d. tapping it asks the phone once and turns it on', appOn?.on === true && (await ev('window.__nativeAsk.asked')) === 1, { appOn, asked: await ev('window.__nativeAsk.asked') })
+const appRows = await until(() => db(`(db.push_subscriptions ?? []).map(r => ({ endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth, user_id: r.user_id }))`), v => Array.isArray(v) && v.length > 0)
+check('6e. ...and the server now has this phone, as a phone-app row for this profile',
+  appRows?.length === 1 && appRows[0].endpoint === 'fcm:ANDROID-TOKEN-1' && appRows[0].p256dh === '' && !!appRows[0].user_id, appRows)
+await ev(`document.getElementById('reminders-phone')?.scrollIntoView({ block: 'center' })`)
+await shoot('reminders-android-app')
+await tap('#reminders-phone')
+const appOff = await until(() => switches().then(v => v?.find(s => s.id === 'reminders-phone')), v => v?.on === false)
+check('6f. tapping again turns it off, and the server forgets this phone', appOff?.on === false && (await db(`(db.push_subscriptions ?? []).length`)) === 0, await db('db.push_subscriptions'))
+await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: appStub })
+appStub = (await stubApp('ios', false)).result?.identifier
+await navigate('/?reminders=live', null)
+await until(sectionText, s => /up to 3 a day/.test(s))
+const iosApp = await until(() => switches().then(v => v?.find(s => s.id === 'reminders-phone')), v => v?.disabled === true)
+const iosAppText = await sectionText()
+check('6g. iPhone app: no dead switch, and it says the iPhone app is not built yet (not "this browser")',
+  iosApp?.disabled === true && /iPhone app aren.t built yet/.test(iosAppText) && !/browser can.t/i.test(iosAppText), iosAppText)
+await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: appStub })
+
 // --- 5. Home sends the facts ahead ------------------------------------------------------------
 console.log('  5. Home tells the server what only the plan knows')
 if (stubId) { await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: stubId }); stubId = null }

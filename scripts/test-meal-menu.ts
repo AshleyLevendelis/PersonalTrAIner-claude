@@ -91,7 +91,11 @@ function main() {
   const offMenu: string[] = []
   for (const d of served) for (const s of SLOTS) {
     const o = d.day.chosen[s]
-    if (o && !menuFor(deep, d.date)[s]!.includes(o)) offMenu.push(`${d.date} ${s} ${o.name}`)
+    // BY NAME, and a leftover lunch is yesterday's dinner (24 Nov 2026: lunch and dinner are now the same size, so
+    // leftovers form here where a lunch a third bigger used to fail and be cooked fresh; a quiet resize is a new object).
+    const menuDate = s === 'lunch' && o?.leftoverFrom === 'dinner' ? addDays(d.date, -1) : d.date
+    const menuSlot = s === 'lunch' && o?.leftoverFrom === 'dinner' ? 'dinner' : s
+    if (o && !menuFor(deep, menuDate)[menuSlot]!.some(x => x.name === o.name)) offMenu.push(`${d.date} ${s} ${o.name}`)
   }
   check('every dish served on a date is on that date\'s menu', served.length === 28 && offMenu.length === 0, offMenu.slice(0, 4))
   const distinct = SLOTS.map(s => new Set(served.map(d => d.day.chosen[s]?.name).filter(Boolean)).size)

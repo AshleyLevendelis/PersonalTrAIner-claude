@@ -535,6 +535,10 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   STILL TRUE AND NAMED: there is no ketogenic derivation, and the keto filter
   is the low-carb filter — fresh banana, grapes and mango pass it, which the
   sentence admits rather than hides
+- **Lunch and dinner are the same size on three meals, so no meal carries a lopsided share of the protein** (his
+  "Build it", 24 Nov 2026, after a 67 g lunch; the split is mine, CSCS): 0.30 / 0.35 / 0.35, every macro at the meal's
+  calorie share; a leftover lunch is the dinner portion. An exactly even protein split was measured and not kept (a
+  heavier breakfast, a fifth fewer breakfasts). `test:meal-protein-spread`, `measure:meal-protein-spread`
 - A measured floor for meals — `meal-quality` exists but needs a live
   database, so it NEVER runs in a cloud sweep: `UNGUARDED` in practice
 
@@ -576,6 +580,8 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   history, an incoming lift in a plan with a calibration week starts at the calibration price in every week, as the
   plan's own unverified lifts do. Measured 62 of 200 swaps over 1.5x the plan's own figure before, 0 after.
   `test:replacement-prescription`, `docs/plans/swap-load-anchor.md`
+- **A ban tapped during today's running session takes it off that session** when none of it is logged yet (his report
+  24 Nov 2026; rebuilds still never redraw a running session). `test:ban-running-session`, `verify:ban-running-session`
 - Ban it from every future plan — **both**; `audit-fixes`, `silent-writes`,
   `coach-parity` §3. CORRECTED 15 Sep 2026, measured: this said `screen only`
   and quoted the decline "NOT WIRED UP YET… point the user at the ban button"
@@ -1810,6 +1816,11 @@ menu" stays true when a copy is also left outside it.
   lowers a typed number. Android declares READ_STEPS alone: the plugin's 46 other health permissions are removed and
   must stay removed unless the app starts reading that data. Phone-only code loads only in the phone app.
   `test:phone-app`, `verify:health-steps`, `docs/plans/phone-app.md`. NOT BUILT natively yet: his machine
+
+- **Coach notifications reach the Android app: his request 23 Nov 2026, "yes build it for Android"**: the phone app
+  uses Firebase (an `fcm:` row in the same phones table, no migration); the same switch, tags and limits as the
+  website; the iPhone app says it is not built yet. `test:native-push`, `verify:reminders` §6. Needs the
+  `coach-reach-out` and `chat-gemini` deploys and the `FCM_SERVICE_ACCOUNT` secret
 
 ### His rulings of 17 Nov 2026
 - **The coach exam's judge is Fable 5.2: his ruling 17 Nov 2026, "Switch to Fable"** (over keeping Opus 5 and over

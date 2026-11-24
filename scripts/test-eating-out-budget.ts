@@ -114,7 +114,9 @@ console.log('\n3. A protein-rich meal out (his order told to the coach: a steak 
   const total = Object.values(day.chosen).reduce((n, o) => n + (o?.macros.calories ?? 0), 0)
   console.log(`  (shares of planned size: ${shares.map(x => x.toFixed(2)).join(', ')}; day ${Math.round(total)} kcal of ${T.calories})`)
   check('the other meals are made smaller, and stop at three quarters of their size (the cap binds here)',
-    shares.length === 2 && shares.every(x => x >= 0.74 && x <= 0.77), shares)
+    // 0.80, not 0.77 (24 Nov 2026): whole items round a dish UP from 0.75 (resizeAtLeast), measured 0.78 on this
+    // fixture once protein was spread evenly across the meals. Still the cap, not a shrink "only as far as needed".
+    shares.length === 2 && shares.every(x => x >= 0.74 && x <= 0.80), shares)
   check('...so the day says it runs over rather than cutting a meal further', total > T.calories * 1.05, Math.round(total))
 }
 {

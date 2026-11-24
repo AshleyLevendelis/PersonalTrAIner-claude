@@ -9,6 +9,7 @@
 // Secrets (set per project, see docs/handover/): VAPID_KEYS, VAPID_CONTACT.
 // ---------------------------------------------------------------------------
 import * as webpush from "jsr:@negrel/webpush@0.5.0";
+import { FCM_PREFIX, makeFcmSender, parseServiceAccount } from "./fcm.ts";
 
 export interface PushTarget {
   endpoint: string;
@@ -51,6 +52,8 @@ export async function sendPush(
   payload: unknown,
   opts: { topic?: string } = {},
 ): Promise<PushOutcome> {
+  // THE PHONE APP (23 Nov 2026): an `fcm:` row goes through Firebase, the browser's route cannot reach it.
+  if (target.endpoint.startsWith(FCM_PREFIX)) return await sendFcm(target.endpoint, payload, opts);
   try {
     const subscriber = server.subscribe({ endpoint: target.endpoint, keys: { p256dh: target.p256dh, auth: target.auth } });
     await subscriber.pushTextMessage(JSON.stringify(payload), { ttl: 6 * 3600, urgency: webpush.Urgency.High, ...(opts.topic ? { topic: opts.topic } : {}) });
@@ -60,4 +63,15 @@ export async function sendPush(
     console.error("[push] send failed:", String(err));
     return "failed";
   }
+}
+
+let fcmSender: ReturnType<typeof makeFcmSender> | null = null;
+async function sendFcm(endpoint: string, payload: unknown, opts: { topic?: string }): Promise<PushOutcome> {
+  if (!fcmSender) {
+    const sa = parseServiceAccount(Deno.env.get("FCM_SERVICE_ACCOUNT"));
+    // Not set yet: "failed", so the row is kept and tried again once the secret is there.
+    if (!sa) { console.error("[push] FCM_SERVICE_ACCOUNT is not set; the phone app cannot be reached"); return "failed"; }
+    fcmSender = makeFcmSender(sa, { fetch: (...a) => fetch(...a), now: () => Date.now() });
+  }
+  return await fcmSender(endpoint, (payload ?? {}) as Record<string, unknown>, opts);
 }

@@ -7,6 +7,93 @@ Newest first. One line each.
 - [x] **THE SWING WARM-UP IS A REAL BELL, PRICED ONE WAY (his report 24 Nov 2026, "Kettlebell Swings at 8kg was way too light"; CSCS, mine)**. TRACED and RUN: fresh plans priced it at 14 kg (male, intermediate, 85 kg) and every edit at 8 (the testing week's half, then the warm-up half); a halved weight could feed back as last week's; a logged swing stepped up every session; the anchor treated a warm-up as a test. NOW: a primer is priced from the person on every route, never discounted or progressed from its log; a ballistic primer (the swing) carries its easy estimate unhalved (26 kg for him; a trained man warms up with 16-24); wrist and forearm drills keep the half; a saved plan's warm-ups are corrected on open. Changes what the 18 Sep "half the working load" means for the swing. `test:primer-dose` (16, 7/7 mutations), `docs/plans/primer-dose.md`. Frontend only.
 
 - [x] **THE TESTING WEEK SETS WEEK 2 BOTH WAYS (his report 24 Nov 2026, "Week 2 and some prescribed sets are too light while others are too heavy"; CSCS, mine)**. TRACED (engine-tracer) and RUN: week 2 is printed at the guess plus a step and only a heavier set could move it, so a Hard or short testing session still went up a step (`cardLoadFor` gave 45 over a Hard 40), the "How was set 1?" answer was never saved, a heavy low-rep set was copied into a higher-rep week (34 kg x 8 into 10-12), and the heaviest set was taken even when called Hard. FIXED: the answer is stored on its set (5 / 7 / 9.5); every set becomes an estimated max with the reps he had left (no answer = taken to the limit) carried to the top of next week's range, capped at 10% over the heaviest lifted; up takes the heaviest set done for next week's reps not called Hard, the outgrown step, or that estimate; DOWN is new: a Hard set, a short set or a lighter session scales the rest of the testing block by one ratio (climb and deload kept, never raises, evidence used once); the card follows the plan the week after. NOT DONE: the last set of a lift is never rated (asking would switch on the set nudge in the testing week); his own week 1 answers were never saved, so his plan moves only on short, lighter or heavier-for-the-reps sets; later blocks keep the guess. `test:testing-week-both-ways` (33 checks, 17 mutations, 16 caught, 1 equivalent), `verify:calibration-search` 10c, `verify:testing-week-sweep` (fixture now does next week's reps), `docs/plans/testing-week-both-ways.md`. Frontend only.
+- [x] **NO LOPSIDED LUNCH: LUNCH AND DINNER ARE THE SAME SIZE (his "Build it", 24 Nov 2026; the split is mine, CSCS).**
+  His report, with Gemini's review of his day: a 1,969 kcal day "on target" served lunch 67 g of protein (about 240 g raw
+  tuna), breakfast 51 g, a 23 g snack. TRACED (engine-tracer): not the day search; every macro takes the meal's CALORIE
+  share, and a three-meal day gave lunch 0.40 (36% with a snack), so lunch carried 36% of the protein, and last night's
+  dinner came back as a lunch a third bigger. CHANGED: three meals are 0.30 / 0.35 / 0.35, so lunch and dinner are one
+  size and a leftover lunch is the dinner portion. CSCS basis: protein spread across the day's meals serves muscle better
+  than one big serving (Areta 2013, Mamerow 2014, Schoenfeld & Aragon 2018); calories are unchanged. MEASURED
+  (`measure:meal-protein-spread`, real library through the real verifier, 6 targets x 3 diets, 28 days, leftovers on):
+  his lunch 72 -> 63 g average, the largest meal anyone gets 86 -> 75 g, days on target 99.2% -> 100%, pools and variety
+  unchanged. ALSO MEASURED AND NOT KEPT: an exactly even protein split between the main meals took lunch only 3 g further,
+  made breakfast heavier (54 -> 59 g, Gemini's other complaint) and cut breakfast choice by a fifth (vegan 53 -> 40); with
+  the old 0.40 lunch it left only 14% of days on target, because the leftover lunch outgrew it. Gemini was half right:
+  "smart carb timing" is coincidence (the app does not plan carbs around training) and a bedtime casein snack adds little
+  at ~188 g a day. FOUND ON THE WAY, FIXED: after a night out the step that tops protein back to 95% asked for a 2%
+  bigger portion, which rounds back to the same grams, so the day sat at 94%; it now steps up until it holds, never past
+  the planned size. Fixtures re-anchored (each says why): eating-out (a leftover lunch's dish is the dinner's),
+  eating-out-budget (whole-item rounding to 0.78), meal-addition (rice for today's dinner share), meal-knock-on (the
+  share-line rule itself, 1 mutation caught), meal-library (plate-limited count 3 -> 2, measured), meal-menu (by name;
+  a leftover lunch is yesterday's dinner), meal-rebalance (a fattier tray bake on Tuesday, measured), meal-refit (3x,
+  past the 2.5x scaler), meal-top-up (seeds g3 7 -> 1, g0 10 -> 8, leftover 4242 -> 4200, both-kinds 20 -> 10, scanned).
+  `test:meal-protein-spread` (12 checks; 2 mutations, both caught). Frontend only; new plans and refits get the new split,
+  stored meals keep their portions until he regenerates or the refit offer appears.
+  MERGED WITH SIMPLE MEALS (24 Nov 2026): test:flexible-nutrition's "never a dinner back to back" rode on one seed
+  (1311), which went 0 -> 1 with the equal split. Measured over 300 seeds the equal split has FEWER runs with a
+  back-to-back dinner (46 vs 53), so the check now holds a rate over 40 seeds (at most a quarter, and fewer than "Same
+  meals most days"); 2 mutations, both caught.
+  THE FULL SWEEP ON THE MERGE found two drivers whose fixtures stopped binding (both pass on main, both app-correct):
+  verify:meal-knock-on added food to LUNCH, and with lunch and dinner equal, dinner now absorbs it by resizing at every
+  amount tried (ten), so no other DISH moved and the card-names-the-dish checks had nothing to read. It now adds to
+  DINNER, where 10 g of oil moves breakfast's dish (mutation: the card names a wrong dish, caught). verify:usual-meals'
+  "Chicken, rice and veg" had 6 g of fat; dinner's share is now 958 kcal / 26 g fat (was 821 / 23), and sized that
+  big it could not make a day land, so it was KEPT at his amounts. Real consequence, named: a very lean usual dinner is
+  sized less often on the equal split. The fixture gained its cooking oil (10 g) and is sized as before (mutation:
+  never size, caught).
+- [x] **A BAN TAPPED MID-SESSION LEFT THE EXERCISE ON THE SESSION (his report 24 Nov 2026, with screenshots)**. With
+  the session running and nothing logged, ⋮ → Ban Clamshell said "It isn't in any session still to come, so nothing
+  changes ahead of you … The session already behind you keeps it", the receipt said "out for good", and Clamshell
+  stayed on his day. CAUSE (traced): since run 5 (H28, 11 Oct) a RUNNING session counts as trained for the day guard,
+  so no rebuild redraws a session under him. The ban wrote through that same guard and skipped today. Right for a
+  rebuild, wrong for a ban: he is asking for that one exercise gone from the session in front of him, the edit a
+  mid-session swap already makes. FIX (mine, CSCS: the record is what was LOGGED, not what was on the card): a ban has
+  its own guard (`buildBanGuard`, loaded as `banGuard(name)`) that opens today's running session for an exercise with
+  nothing of it logged today; a set of it logged, a missed/rested/swapped day, a past day, or an unreadable day keep
+  today as it is. Every ban path uses it: the Exercise tab's sheet, Profile's, the screen ban, the coach's card and its
+  confirm, so the sheet's count and the write agree. Rebuilds are unchanged. Two lines I first wrote (a closed-day test
+  and a today-rows set) turned out to repeat what the underlying guard already does (MISSED mutations) and were
+  deleted. `test:ban-running-session` (23 checks, 8 mutations, 8 caught), `verify:ban-running-session` (11 checks;
+  with the fix removed it reproduces his report, Side Plank staying on the running session; 2 mutations, 2 caught);
+  `test:ban-scope` and `test:rebuild-honours` re-anchored (the guard's new shape; 4 mutations, 4 caught). All 91
+  gates that read the touched files pass. WORDING FIXED the same day (his "Fix the weird wording"): one
+  session to change now reads "It's in one session still to come, so that one gets rebuilt with the closest
+  alternative your kit and injuries allow." (it had read "This is every week of your plan, not just today — 1 session
+  gets rebuilt"); two or more keep the old sentence. Both sheets and the coach's card, one function
+  (`test:sheet-manners`, `test:ban-running-session`, 2 mutations, 2 caught). No Undo was needed beyond the
+  existing one, which puts the whole plan back. Frontend only: no edge function, no migration.
+
+- [x] **NOTIFICATIONS IN THE ANDROID APP (23 Nov 2026, his report "Now the app is on my phone as a proper app ...
+  Notifications dont seem to be working", then "yes build it for Android").** Cause: the phone app (Capacitor) has no
+  browser push service or service worker, so Profile > Reminders said "This browser can't show notifications from the
+  app". It was named as "native push is a separate job" in docs/plans/phone-app.md on 20 Nov and not flagged to him
+  when he installed the app. BUILT: the phone uses @capacitor/push-notifications (Firebase on Android), loaded by a
+  dynamic import only; asked only from his tap on "On this phone"; "on" only over a row the server saved; off removes
+  the row; Home re-links the phone daily and follows a rotated token; a tap opens only a tab of this app; a message
+  while the app is open makes the chat re-read. The server sends an `fcm:` row through Firebase's HTTP v1 API (signed
+  with a service account, `FCM_SERVICE_ACCOUNT`), with the same tags, high priority and 6-hour life as the browser
+  route; "gone" only on Firebase's UNREGISTERED/404, a missing secret is "failed" (row kept). Both senders
+  (coach-reach-out and chat-gemini's reply ping) go through `_shared/push.ts`, so both reach the app. NO MIGRATION: a
+  phone-app device is an ordinary push_subscriptions row, endpoint `fcm:<token>`, empty browser keys. The iPhone app
+  says "Notifications in the iPhone app aren't built yet." (Apple push key needed). `test:native-push` (50 checks;
+  17 mutations, 17 caught, one only after a check was added for a phone whose notifications were switched off in
+  Android settings), `verify:reminders` §6 (7 checks; 3 mutations, 3 caught), screenshot read. NOT PROVEN: a real
+  phone receiving one (needs his Firebase project, the secret, the two deploys and a native build:
+  docs/handover/android-notifications.md). Known: the status-bar icon is the app icon (may draw as a white circle).
+  Needs the `coach-reach-out` and `chat-gemini` deploys and the `FCM_SERVICE_ACCOUNT` secret.
+  **PROVEN LIVE 24 Nov 2026** on his Samsung (SM-S948B), production: Firebase app `uk.co.personaltrainerapp` added to
+  project personal-trainer-43bee (the earlier google-services.json named only the placeholder id); secret set on TEST
+  and production (his yes); `coach-reach-out` and `chat-gemini` deployed by him from this branch; device row `fcm:`
+  saved 16:29; the test send reached the phone with the app shut, and the tap opened the chat. Three snags on the way,
+  worth knowing: (1) the first secret was stored with an extra layer of JSON quoting (I set it through an env file
+  with a double-stringified value), `parseServiceAccount` returned null and the log said "FCM_SERVICE_ACCOUNT is not
+  set" — a set-but-unreadable secret logs as unset, so read that line as "missing OR unparseable". Fixed by a
+  single-quoted literal env value; the CLI's digest then matched sha256 of the compact JSON on both projects. (2) In a
+  OneDrive worktree the deploy refused with "stale" shared copies that differed only in CRLF line endings
+  (`core.autocrlf=true`); `npm run sync:shared` rewrote them, nothing to commit. (3) OneDrive left node_modules files as
+  cloud placeholders ("not a regular file" in Gradle) and locked app\build; replaced the placeholders with real copies
+  and deleted app\build. The app now asks POST_NOTIFICATIONS, WAKE_LOCK, ACCESS_NETWORK_STATE and c2dm RECEIVE, so the
+  next Play bundle's permission list grows by those. Key file moved out of Downloads to C:\Users\Ashley\app-keys.
 
 - [x] **SIMPLE MEALS BY DEFAULT (his "Do whatever you think is best", 23 Nov 2026)**. His report: "Meal plans are the
   app's biggest weakness. The meals are too complicated. Users are required to become gourmet chefs", plus own meals

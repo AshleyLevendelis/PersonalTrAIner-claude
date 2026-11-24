@@ -46,7 +46,7 @@ const build = (rawArgs: Record<string, unknown>, dietaryPreferences: string[] = 
 const CLEAN_DINNER = {
   meal_slot: 'dinner',
   meal_name: 'Chicken and rice',
-  ingredients: ['200g chicken breast', '150g white rice', '100g broccoli', '1 tbsp olive oil'],
+  ingredients: ['200g chicken breast', '200g white rice', '100g broccoli', '1 tbsp olive oil'],
   prep: 'Grill the chicken and serve, 25 minutes',
   cuisine: 'British',
 }
@@ -140,7 +140,7 @@ console.log('\n3. An accepted dish is re-portioned and re-measured, not taken on
     // The model said 200g chicken. If that number survived into the payload
     // unchanged for every ingredient, nothing rescaled and the "verified"
     // claim is decoration.
-    const asked = [200, 150, 100]
+    const asked = [200, 200, 100]
     const got = result.payload.option.ingredients.slice(0, 3).map(i => Math.round(i.quantity))
     check('quantities are the app\'s, not the model\'s', JSON.stringify(got) !== JSON.stringify(asked), { asked, got })
 
