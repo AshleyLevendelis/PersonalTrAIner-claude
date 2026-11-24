@@ -4,6 +4,7 @@ import type { CookingTimePreference } from './types'
 import { containsPhrase } from './meal-ingredients'
 import { parseIngredientLine, withParsedQuantity, kitchenRound, scaleToTarget, meetsProteinFloor, isWithinCalorieTolerance, settlePieces, unrealisticPlate } from './portion-scaler'
 import { computeMealMacros } from './food-db'
+import { isSimpleDish, namesOfLines } from './meal-effort'
 import type { MacroTargets } from './types'
 
 // ---------------------------------------------------------------------------
@@ -230,6 +231,8 @@ export function sinksAsStandIn(dish: RawProposal, wants: Pick<LibraryWants, 'eat
  * the five chosen are not five of one cuisine), and the cooking time she said
  * (quick: +2 for a dish ready in fifteen minutes or under; loves cooking: +1
  * for one that is not). A second exotic cuisine is pushed to the back (-6).
+ * Two KEYS come before the score: a stand-in for a food he eats anyway goes last, and, unless she loves cooking, a
+ * dish that needs a recipe goes behind every simple one (meal-effort.ts).
  */
 export function chooseFromLibrary(library: readonly RawProposal[], wants: LibraryWants): RawProposal[] {
   const have = new Set(wants.haveNames.map(norm))
@@ -242,6 +245,7 @@ export function chooseFromLibrary(library: readonly RawProposal[], wants: Librar
 
   const fixed = new Map<RawProposal, number>()
   const sinks = new Set<RawProposal>()
+  const involved = new Set<RawProposal>()
   const fitted = new Map<RawProposal, RawProposal>()
   for (const d of pool) {
     let score = 0
@@ -260,6 +264,8 @@ export function chooseFromLibrary(library: readonly RawProposal[], wants: Librar
     }
     // A stand-in for a food he eats anyway goes behind every other dish (a KEY, compared before the score below).
     if (sinksAsStandIn(d, wants)) sinks.add(d)
+    // A dish that needs a recipe goes behind the simple ones, unless she loves cooking (23 Nov 2026, meal-effort.ts).
+    if (wants.cookingTime !== 'loves_cooking' && !isSimpleDish(d.slot, namesOfLines(d.ingredients), d.prep)) involved.add(d)
     const quick = QUICK.test(d.prep)
     if (wants.cookingTime === 'quick' && quick) score += 2
     if (wants.cookingTime === 'loves_cooking' && !quick) score += 1
@@ -271,6 +277,7 @@ export function chooseFromLibrary(library: readonly RawProposal[], wants: Librar
   while (chosen.length < limit && remaining.length > 0) {
     let best = -1
     let bestSinks = true
+    let bestInvolved = true
     let bestScore = -Infinity
     let bestTie = Infinity
     for (let i = 0; i < remaining.length; i++) {
@@ -280,9 +287,14 @@ export function chooseFromLibrary(library: readonly RawProposal[], wants: Librar
       if (exotic && exotic.has(d.cuisine) && exoticTaken) score -= 6
       const tie = rotationHash(d.name, rotation)
       const dSinks = sinks.has(d)
-      if (best < 0 || (dSinks !== bestSinks ? !dSinks : score > bestScore || (score === bestScore && tie < bestTie))) {
+      const dInvolved = involved.has(d)
+      const better = dSinks !== bestSinks ? !dSinks
+        : dInvolved !== bestInvolved ? !dInvolved
+        : score > bestScore || (score === bestScore && tie < bestTie)
+      if (best < 0 || better) {
         best = i
         bestSinks = dSinks
+        bestInvolved = dInvolved
         bestScore = score
         bestTie = tie
       }

@@ -822,7 +822,11 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 23 Nov 2026: 3287 -> 3316, the email-account fixes. MEASURED 3291 through this gate on the change. His 15 Sep
   // ruling: 25 kB raw over today's number (3291 + 25).
   // MOVED 23 Nov 2026: 3287 -> 3323, the same two changes. MEASURED 3298 through this gate; 25 kB over today.
-  const TOTAL_BUDGET_KB = 3323
+  // MOVED 23 Nov 2026: 3323 -> 3352. Crossed by the 78 simple everyday dishes (docs/plans/simple-meals.md), all in the
+  // meal library's own chunk, which is fetched when meals are made and never on first paint. MEASURED 3311 on the branch
+  // head before it, 3327 through this gate on the change (OVER by 4). His 15 Sep ruling, "raise it with room to grow":
+  // 25 kB raw over today.
+  const TOTAL_BUDGET_KB = 3352
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)

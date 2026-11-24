@@ -28,6 +28,7 @@
 // shortfall; it is never padded with a placeholder claiming false macros.
 // ---------------------------------------------------------------------------
 
+import { isSimpleDish, mayAddComplicated, namesOfLines } from './meal-effort'
 import { checkMethod, type MethodRules } from './meal-method-check'
 import { supabase, resolveEnv } from './supabase'
 import { computeMealMacros, kindsItCouldBe, lookupIngredient, toTasteLine, type Macros100g } from './food-db'
@@ -1029,7 +1030,19 @@ export async function generateMealPools(params: {
         // seed asks for the whole DEEP_POOL_SIZE. Never past DEEP_POOL_SIZE a meal either way.
         const cap = !deep ? poolSize : params.appendToExisting ? Math.min(DEEP_POOL_SIZE, existing.length + poolSize) : DEEP_POOL_SIZE
         // A dish built on a stand-in for a food he eats anyway is taken only while the meal is thin (STAND_IN_FLOOR).
-        for (const dish of candidates) considerProposal(dish, true, sinksAsStandIn(dish, wants) ? Math.min(cap, STAND_IN_FLOOR) : cap, deep, leeway)
+        // A dish that needs a recipe is taken only up to the share her cooking answer allows, then only while the meal
+        // is thin (23 Nov 2026, meal-effort.ts): the chooser has already put every simple dish ahead of them.
+        const isSimple = (o: PoolOption) => isSimpleDish(o.slot, o.ingredients.map(i => i.name), o.prep)
+        const held = [...(deep ? existing : []), ...(accepted[slot] ?? [])]
+        let simpleHeld = held.filter(isSimple).length
+        let complicatedHeld = held.length - simpleHeld
+        for (const dish of candidates) {
+          const simple = isSimpleDish(dish.slot, namesOfLines(dish.ingredients), dish.prep)
+          if (!simple && !mayAddComplicated(params.cookingTimePreference, simpleHeld, complicatedHeld)) continue
+          const had = accepted[slot]?.length ?? 0
+          considerProposal(dish, true, sinksAsStandIn(dish, wants) ? Math.min(cap, STAND_IN_FLOOR) : cap, deep, leeway)
+          if ((accepted[slot]?.length ?? 0) > had) { if (simple) simpleHeld++; else complicatedHeld++ }
+        }
       }
     } catch (err) {
       // The library is a convenience. Without it the meal writer is asked for everything, as before.
