@@ -1703,6 +1703,19 @@ const toolDeclarations = [
     },
   },
   {
+    name: "move_logged_sets",
+    description:
+      "Moves sets ALREADY LOGGED today from the exercise he logged them under by mistake to the exercise he actually did ('I logged leg curl but I actually did leg extensions', 'those were incline not flat bench'). The app takes every set, weight and rep from its OWN log and writes them under the exercise he names, removing them from the wrong one, with an Undo. Pass no numbers. Use this, never log_workout, when the exercise was wrong and the sets were right. Copy both names verbatim from his message.",
+    parameters: {
+      type: "object",
+      properties: {
+        from_phrase: { type: "string", description: "The exercise he logged by mistake, verbatim from his message (e.g. 'leg curl')." },
+        to_phrase: { type: "string", description: "The exercise he actually did, verbatim from his message (e.g. 'leg extensions')." },
+      },
+      required: ["from_phrase", "to_phrase"],
+    },
+  },
+  {
     name: "log_workout",
     description:
       "Logs a natural-language description of completed exercise sets (VISION-ARCHITECTURE.md §3.1: 'the model segments, code owns every number'). Segment the user's message into one entry per exercise — identify WHICH SPAN OF TEXT is the exercise name and which is the sets/reps/weight/RPE description. Copy those spans VERBATIM from the user's message. Do NOT compute, convert, round, or reinterpret any number yourself — the app parses every quantity deterministically from the phrases you pass through. Prefer this over log_workout_session whenever the user describes more than one exercise in natural language (e.g. 'did 6x8 @100kg bench, 4x12 @20kg DB flyes, felt like RPE 7 on the last set').",
@@ -3000,6 +3013,7 @@ PERIODIZATION COACHING RULES:
 - THE ONE EXCEPTION: a WARM-UP/BUILD-UP set or a DROP set (e.g. "did a couple of light warm-ups first", "then dropped to 60kg for 8 more", "I did a drop after my third set of squats"). log_workout's parser has no way to mark either kind — it would log it as an ordinary working set, indistinguishable from a real one, which is the exact mistake the app spent 19-22 Sep closing everywhere else it could happen. Use log_workout_set instead, with is_warmup or is_drop set correctly, even for just one set. If the SAME message also reports ordinary working sets, split it: log_workout for those, log_workout_set for the warm-up/drop line.
 - CRITICAL — never invent an exercise name. exercise_phrase/exercise_name must be a span of text the user actually wrote. If the message states sets/reps/weight but names no exercise at all (e.g. "I did 5x5 at 80kg", "just hit 3x10 at 60"), do NOT guess one from today's plan, their history, or the conversation so far — however confident the guess feels, a wrong guess silently writes sets against the wrong exercise with no easy way to notice. Ask a single short question instead ("Which exercise was that?") and wait for their answer before calling any log tool.
 - CRITICAL — NEVER INVENT REPS OR SETS EITHER. The same rule as the exercise name above, and it was learned the same way. If the user says "3" when asked for sets and reps, that is a SET COUNT and the rep count is still missing — do not complete it from the prescription, the plan, their history, or what would be typical. Measured live: the plan said 3x8, she answered "3", and the app recorded 3x8 @100kg. The 8 was never said by anyone but the app. Ask "how many reps?" and wait. A number you supplied is indistinguishable from a number they reported the moment it is written.
+- THE WRONG EXERCISE IS A MOVE, NOT A NEW LOG. "I logged leg curl but I actually did leg extensions", "those were incline, not flat": call move_logged_sets with both names in his words. The app moves every set as logged and removes them from the wrong exercise; never call log_workout for this, and never write sets or numbers he did not say (measured live 24 Nov 2026: one invented set was added and the three wrong ones stayed).
 - A CORRECTION REPLACES; IT NEVER ADDS. When a message fixes something just logged — "no, 3x10 deadlifts", "actually 100kg", "sorry, only 2 sets" — call log_workout with corrects_previous: true. Getting this wrong is not a cosmetic error: logged as an addition, the same session is counted twice and every future weight builds on sets that never happened. Live example: 3x8 was logged wrongly, she said "No 3x10 deadlifts", and her log ended up with SIX sets against three prescribed. If you genuinely cannot tell a correction from extra work, ask which — do not guess.
 - DO NOT THROW AWAY WHAT THEY JUST TOLD YOU. "No 3x10 deadlifts" contains the exercise, the sets AND the reps. Carry every stated value into the tool call and ask only for what is actually still missing. Re-asking for something they said in the very message you are replying to reads as not listening, and it is how a two-turn exchange becomes six.
 - NEVER ASK THE SAME QUESTION TWICE IN A ROW. If you asked for a weight and their answer did not get you there, do NOT repeat the identical sentence — either the question was ambiguous or their answer was, and repeating it verbatim changes neither. Say what you have and what is missing ("got 100kg for the deadlifts — how many reps per set?"), or ask a narrower question. Measured live: "What weight did you use for Deadlifts?" three times running, answered "100kg" every time.
@@ -4859,6 +4873,19 @@ Keep this context in mind to ensure your greetings and questions naturally align
         });
         return new Response(
           JSON.stringify({ reply: spoken.reply }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "move_logged_sets") {
+        // Forwarded untouched, as log_workout is: the client reads the sets from today's own log and writes the move,
+        // so no number the model wrote is ever recorded (src/lib/move-logged-sets.ts). `reply` is empty on purpose:
+        // the client's receipt is what he sees.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            moveLoggedSets: { from_phrase: String(args.from_phrase ?? ""), to_phrase: String(args.to_phrase ?? "") },
+          }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

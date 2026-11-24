@@ -248,11 +248,16 @@ console.log('\n[8] "Kept light" is half the working weight, and the app already 
     PREP_LOAD_PERCENT === 50, { PREP_LOAD_PERCENT })
 
   const bell = getExerciseEntry('Kettlebell Swings')!
+  // THE HALF IS FOR A DRILL THAT IS A BUILD-UP (24 Nov 2026, test:primer-dose): the ballistic swing carries its own
+  // easy estimate, so the half is held here on a wrist drill, the loaded primer that is one.
+  const drill = getExerciseEntry('Eccentric Wrist Extension')!
   check('8c. a prep weight is half the working weight, plate-rounded',
-    prepLoadKg(bell, 40) === Math.max(getEquipmentFloorKg(bell), roundToPlate(20, loadingMode(bell))),
-    { got: prepLoadKg(bell, 40), working: 40 })
+    prepLoadKg(drill, 40) === Math.max(getEquipmentFloorKg(drill), roundToPlate(20, loadingMode(drill))),
+    { got: prepLoadKg(drill, 40), working: 40 })
   check('8d. ...and it is genuinely lighter than the working weight it came from',
-    (prepLoadKg(bell, 40) ?? Infinity) < 40, { got: prepLoadKg(bell, 40) })
+    (prepLoadKg(drill, 40) ?? Infinity) < 40, { got: prepLoadKg(drill, 40) })
+  check('8c2. the swing is the exception: its prep weight is its own easy estimate, not half',
+    prepLoadKg(bell, 24) === roundToPlate(24, loadingMode(bell)), { got: prepLoadKg(bell, 24) })
   // Held one layer down, on roundToPlate, because that is where the floor
   // actually is — prepLoadKg applies none of its own, and the second Math.max
   // it was written with was removed for being unkillable by mutation.
@@ -282,9 +287,9 @@ console.log('\n[8] "Kept light" is half the working weight, and the app already 
     && working.suggested_load === load.display
     && working.per_set_load === load.per_set,
     { got: working.suggested_load_kg, expected: load.starting_weight_kg })
-  check('8j. ...and it really is the heavier of the two, so 8c is not vacuous',
-    (working.suggested_load_kg ?? 0) > (fields.suggested_load_kg ?? 0),
-    { working: working.suggested_load_kg, prep: fields.suggested_load_kg })
+  check('8j. ...and a halved drill really is lighter than its working weight, so 8c is not vacuous',
+    (prepLoadKg(drill, 30) ?? Infinity) < 30 && 30 > 0,
+    { working: 30, prep: prepLoadKg(drill, 30) })
 
   // Detector proof, the same habit as section 7: the 8a regex must FAIL on a
   // hand-written constant, or it would pass the very thing it forbids.

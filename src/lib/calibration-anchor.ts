@@ -131,7 +131,8 @@ export function calibrationAnchorsFor(
   day.exercises.forEach((ex, exIndex) => {
     if (ex.suggested_load_kg == null) return
     const entry = getExerciseEntry(ex.name)
-    if (!entry || !isExternallyLoaded(entry)) return
+    // A WARM-UP MOVE IS NOT A TEST (24 Nov 2026): its weight is a dose priced from the person (warmup.ts).
+    if (!entry || !isExternallyLoaded(entry) || entry.mechanics_tier === 'primer') return
     const id = getExerciseId(ex.name)
     const mine = working.filter(s => (s.exercise_id ?? getExerciseId(s.exercise_name)) === id)
     const ev = testingWeekEvidence(mine, ex.reps, nextSlot(exIndex)?.reps ?? ex.reps)
@@ -174,7 +175,8 @@ export function calibrationLowersFor(
     const next = nextSlot(exIndex)
     if (next?.suggested_load_kg == null || next.name !== ex.name) return
     const entry = getExerciseEntry(ex.name)
-    if (!entry || !isExternallyLoaded(entry)) return
+    // A WARM-UP MOVE IS NOT A TEST (24 Nov 2026): its weight is a dose priced from the person (warmup.ts).
+    if (!entry || !isExternallyLoaded(entry) || entry.mechanics_tier === 'primer') return
     const id = getExerciseId(ex.name)
     const ev = testingWeekEvidence(working.filter(s => (s.exercise_id ?? getExerciseId(s.exercise_name)) === id), ex.reps, next.reps)
     if (!ev || ev.supportedKg == null) return

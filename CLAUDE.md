@@ -201,6 +201,13 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   "How was set 1?" answer is kept on the set; every set becomes an estimated max carried to next week's reps; a Hard,
   short or lighter testing session LOWERS the rest of the testing block (the one exception to "never downward"), a
   heavy low-rep set is never copied into a higher-rep week. `test:testing-week-both-ways`, `verify:calibration-search` 10c
+- **A warm-up move weighs the same on every route, and the swing is not halved** (CSCS, mine, 24 Nov 2026, his "8kg was
+  way too light"): priced from the person (never the testing week's discount, never its log); a ballistic primer carries
+  its easy estimate, the 18 Sep half stays for wrist and forearm drills; a saved plan is corrected on open.
+  `test:primer-dose`
+- **Sets logged under the wrong exercise move to the one he did** (24 Nov 2026, his live report): chat
+  (`move_logged_sets`, names from his words and today's log, never numbers) and the ⋮ menu, one planner, with Undo.
+  `test:move-logged-sets`, `verify:wrong-exercise`. Needs the `chat-gemini` deploy
 - **A beginner's session holds at most 18 working sets — his ruling 21 Nov 2026, "yes cap beginners at 18 sets"** (over
   filling the time with lifting): the spare minutes go to optional mobility. It narrows his session-length rulings for
   beginners only. `test:older-beginner` §14
