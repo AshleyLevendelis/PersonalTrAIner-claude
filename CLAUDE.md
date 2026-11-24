@@ -720,7 +720,7 @@ menu" stays true when a copy is also left outside it.
   session asks the same one question. The coach's card carries the coach's three numbers, else the intervals of the
   reply he said yes to when they fit the session. Another day shows the session as a preview, never one line. A saved
   cardio log now re-reads the week strip. A session with its numbers only in the coach's reason (his Wednesday, 24 Nov
-  2026) reads them from there, when they fit its minutes. `test:planned-rounds`, `verify:planned-rounds`. Needs the `chat-gemini` deploy
+  2026) reads them from there, when they fit its minutes. A day early it stays a preview with no Start: his ruling 24 Nov 2026, "Keep it as is". `test:planned-rounds`, `verify:planned-rounds`. Needs the `chat-gemini` deploy
   for the coach to send rounds itself
 - **Swap the session for a circuit of timer blocks, block by block** — both surfaces since
   8 Oct 2026. Ashley, from the gym: rope, push-ups, sit-ups and the bike off the round timer could
