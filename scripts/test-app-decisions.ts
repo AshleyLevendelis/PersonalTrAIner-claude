@@ -101,11 +101,20 @@ const probes: [string, string][] = [
   ['why is the rest on my squats so long between sets', 'mainLiftRestFloor'],
   ['why does my plan only have one deadlift a week', 'isSecondFloorPull'],
   ['why is my lunch the same size as my dinner', 'BASE_RATIOS'],
+  ['why did my week 2 weights go down after the testing week', 'calibrationLowersFor'],
+  ['why are my warm up kettlebell swings so heavy', 'export function prepLoadKg'],
 ]
 for (const [q, token] of probes) {
   const got = pickAppDecisions(q).map(d => d.anchor.token)
   check(`"${q}" reaches its entry`, got.includes(token), got)
 }
+// RARE WORDS COUNT FOR MORE (24 Nov 2026): measured against ranking by the number of shared words, these two moved into
+// the top three, and the old ranking left them out ("plank" and "once a week" are rarer than "time" and "week").
+for (const [q, token] of [['why is my plank time going up', 'stepHoldSeconds'], ['why is my deadlift only once a week', 'isSecondFloorPull']] as const) {
+  const top = pickAppDecisions(q).slice(0, 3).map(d => d.anchor.token)
+  check(`"${q}" has its entry in the top three`, top.includes(token), top)
+}
+check('a word and its plural are the same word (swing, swings; lunge, lunges)', pickAppDecisions('why is my kettlebell swing so heavy').map(d => d.anchor.token).join() === pickAppDecisions('why are my kettlebell swings so heavy').map(d => d.anchor.token).join())
 check('small talk reaches nothing', pickAppDecisions('hello how are you today').length === 0 && pickAppDecisions('what is the capital of france').length === 0)
 const sizes = probes.map(([q]) => appDecisionsFor(q).length)
 const biggest = Math.max(...sizes)

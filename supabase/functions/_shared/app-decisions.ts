@@ -46,9 +46,9 @@ export const APP_DECISIONS: AppDecision[] = [
   { area: 'Warm-up', anchor: { file: 'src/lib/exercise-plan.ts', token: 'shortenWarmupToFit' }, also: ['warmup', 'short session', 'stretches'],
     rule: 'In a 20-30 minute session the warm-up is trimmed to about five minutes before any working set is cut; build-up sets, pelvic floor work and the balance hold are never cut.',
     why: 'A coach warms up for about five minutes in a session that short, instead of spending a third of it before the first working set.' },
-  { area: 'Warm-up', anchor: { file: 'src/lib/warmup.ts', token: 'PREP_LOAD_PERCENT' }, also: ['movement prep', 'kettlebell', 'warmup'],
-    rule: 'A movement-prep drill that needs a weight starts at half the working load.',
-    why: 'A warm-up set is meant to be easy, and half the working load is the usual first step of a build-up.' },
+  { area: 'Warm-up', anchor: { file: 'src/lib/warmup.ts', token: 'export function prepLoadKg' }, also: ['movement prep', 'kettlebell', 'warmup', 'swing', 'too light'],
+    rule: 'A movement-prep drill that needs a weight starts at half the working load, except a kettlebell swing, which uses its own easy-effort weight, not halved.',
+    why: 'Half is the usual first step of a build-up; a warm-up swing is there for a hard hip snap before a hinge, which a bell half that weight cannot ask for.' },
   { area: 'Warm-up', anchor: { file: 'src/lib/exercise-plan.ts', token: 'movementPrepReps' }, also: ['movement prep', 'activation', 'warmup', 'drill'],
     rule: 'Movement-prep drills are 5 reps for explosive ones (jumps, slams, swings) and 10 controlled reps for activation and mobility drills, the same every week.',
     why: 'Prep is not progressed like training: explosive prep is a few fast reps at full quality, activation and mobility about ten controlled ones.' },
@@ -111,6 +111,10 @@ export const APP_DECISIONS: AppDecision[] = [
   { area: 'Load', anchor: { file: 'src/lib/beat-target-offer.ts', token: 'carriedForRepRange' }, also: ['new block', 'rep range', 'carried over'],
     rule: 'When a new block changes the rep range, the weight carried over is worked from your best set last block, taken down to the top of the new range and rounded down.',
     why: 'Last block\'s weight is the wrong number for different reps, so it is re-expressed with a rep or two in reserve.' },
+
+  { area: 'Load', anchor: { file: 'src/lib/calibration-anchor.ts', token: 'calibrationLowersFor' }, numbersFrom: [{ file: 'src/lib/calibration-anchor.ts', token: 'heaviestKg * 1.1' }], also: ['testing week', 'week 2', 'too heavy', 'too light', 'first week'],
+    rule: 'The testing week sets the week after it in both directions: sets called Hard, short of the range or lighter than printed bring that lift down; easy sets bring it up, never more than 10% over the heaviest set lifted.',
+    why: 'The testing week exists to find your real numbers, so what you lifted and how hard it felt decides the next week, not the first guess.' },
 
   // ---- Progression ------------------------------------------------------------------------------------------------
   { area: 'Progression', anchor: { file: 'src/lib/progression-engine.ts', token: 'getDoubleProgressionRecommendation' }, also: ['weight not going up', 'increase', 'progress', 'stuck', 'top of range'],
@@ -440,24 +444,33 @@ const STOP = new Set('a an and are as at be but by can do does dont don\'t for f
 function words(text: string): string[] {
   return text.toLowerCase().replace(/[^a-z0-9%\s-]/g, ' ').split(/[\s-]+/)
     .filter(w => w.length > 1 && !STOP.has(w))
-    .map(w => w.replace(/(ies)$/, 'y').replace(/(ing|ed|es|s)$/, ''))
+    // One ending at a time, plural first, so "swings" and "swing" meet ("swings" had become "swing", "swing" "sw").
+    .map(w => w.replace(/ies$/, 'y').replace(/([^s])s$/, '$1').replace(/(ing|ed|e)$/, ''))
     .filter(w => w.length > 1)
 }
+
+/** Each entry's own words, worked out once. */
+const ENTRY_WORDS: Set<string>[] = APP_DECISIONS.map(d => new Set(words(`${d.rule} ${(d.also ?? []).join(' ')}`)))
+/** How telling a word is: one that few entries use ("swing") counts for more than one most use ("warm"). */
+const RARITY = new Map<string, number>()
+for (const set of ENTRY_WORDS) for (const w of set) RARITY.set(w, (RARITY.get(w) ?? 0) + 1)
+const weightOf = (w: string) => Math.log((APP_DECISIONS.length + 1) / (RARITY.get(w) ?? APP_DECISIONS.length))
 
 /** The entries a message is about, best first. Empty when nothing matches well enough. */
 export function pickAppDecisions(message: string): AppDecision[] {
   const asked = new Set(words(message))
   if (asked.size === 0) return []
+  const lower = message.toLowerCase()
   const scored = APP_DECISIONS.map((d, i) => {
-    const own = new Set(words(`${d.rule} ${(d.also ?? []).join(' ')}`))
-    let score = 0
-    for (const w of asked) if (own.has(w)) score++
+    let shared = 0
+    let weight = 0
+    for (const w of asked) if (ENTRY_WORDS[i].has(w)) { shared++; weight += weightOf(w) }
     // A phrase from `also` said whole is worth more than the words it is made of.
-    const lower = message.toLowerCase()
-    for (const phrase of d.also ?? []) if (phrase.includes(' ') && lower.includes(phrase)) score += 2
-    return { d, i, score }
+    for (const phrase of d.also ?? []) if (phrase.includes(' ') && lower.includes(phrase)) { shared += 2; weight += 2 }
+    return { d, i, shared, weight }
   })
-  return scored.filter(s => s.score >= 2).sort((a, b) => b.score - a.score || a.i - b.i).slice(0, MAX_PICKED).map(s => s.d)
+  // At least two words in common to count at all; then the rarer the words shared, the better the match.
+  return scored.filter(s => s.shared >= 2).sort((a, b) => b.weight - a.weight || a.i - b.i).slice(0, MAX_PICKED).map(s => s.d)
 }
 
 /** The block the coach is given for this message. Always carries the rule; the entries only when some match. */
