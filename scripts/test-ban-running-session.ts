@@ -102,6 +102,7 @@ async function main() {
     const only = banBlastRadius(onlyToday, victim, onlyGuard)
     check('only on today: one session changes, none kept', only.sessions === 1 && only.kept === 0, only)
     const onlyLines = banConfirmLines(only)
+    check('only on today: the sheet says one session changes, not "every week"', /one session still to come/.test(onlyLines.warn ?? '') && !/every week/.test(onlyLines.warn ?? ''), onlyLines)
     check('only on today: no "behind you", no "nothing changes ahead"',
       !/behind you|nothing changes ahead/.test(`${onlyLines.warn ?? ''} ${onlyLines.info}`), onlyLines)
   }

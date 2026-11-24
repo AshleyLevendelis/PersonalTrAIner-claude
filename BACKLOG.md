@@ -17,8 +17,11 @@ Newest first. One line each.
   deleted. `test:ban-running-session` (23 checks, 8 mutations, 8 caught), `verify:ban-running-session` (11 checks;
   with the fix removed it reproduces his report, Side Plank staying on the running session; 2 mutations, 2 caught);
   `test:ban-scope` and `test:rebuild-honours` re-anchored (the guard's new shape; 4 mutations, 4 caught). All 91
-  gates that read the touched files pass. NOT DONE: the sheet still opens with "This is every week of your plan, not
-  just today" when today's session is the only one changing (true, slightly odd); no Undo was needed beyond the
+  gates that read the touched files pass. WORDING FIXED the same day (his "Fix the weird wording"): one
+  session to change now reads "It's in one session still to come, so that one gets rebuilt with the closest
+  alternative your kit and injuries allow." (it had read "This is every week of your plan, not just today — 1 session
+  gets rebuilt"); two or more keep the old sentence. Both sheets and the coach's card, one function
+  (`test:sheet-manners`, `test:ban-running-session`, 2 mutations, 2 caught). No Undo was needed beyond the
   existing one, which puts the whole plan back. Frontend only: no edge function, no migration.
 - [x] **SIMPLE MEALS BY DEFAULT (his "Do whatever you think is best", 23 Nov 2026)**. His report: "Meal plans are the
   app's biggest weakness. The meals are too complicated. Users are required to become gourmet chefs", plus own meals
