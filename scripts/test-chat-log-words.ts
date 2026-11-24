@@ -91,11 +91,14 @@ async function main() {
 
   console.log('\n6. The chat uses it')
   const chat = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-  const at = chat.indexOf("kind: 'log_workout',\n        title,")
-  const ret = chat.slice(chat.lastIndexOf('return {', at), at)
+  // Every log_workout receipt's return (the wrong-exercise move, 24 Nov 2026, is one too, with its own line); the log's
+  // own is the one asked about the WRITTEN sets.
+  const rets: string[] = []
+  for (let at = chat.indexOf("kind: 'log_workout',\n        title,"); at > 0; at = chat.indexOf("kind: 'log_workout',\n        title,", at + 1)) rets.push(chat.slice(chat.lastIndexOf('return {', at), at))
+  const ret = rets.find(r => /bestAmongLogged/.test(r)) ?? ''
   check('the line above a chat log is logBubble(...), asked about the sets that were WRITTEN',
-    at > 0 && /text: logBubble\(\{ saved: savedAnything, corrected: replacedSets > 0, title, best: bestAmongLogged\([^)]*written, activeSession\.date\) \}\)/.test(ret), ret)
-  check('...and never the bare title', !/text: title,/.test(ret))
+    /text: logBubble\(\{ saved: savedAnything, corrected: replacedSets > 0, title, best: bestAmongLogged\([^)]*written, activeSession\.date\) \}\)/.test(ret), ret)
+  check('...and no log receipt is the bare title', rets.length >= 1 && rets.every(r => !/text: title,/.test(r)), rets.length)
   check('the rows it asks about are the ones logSet returned', /logSet: input => \{ const row = activeSession\.logSet\(input\); if \(row\) written\.push\(row\); return row \}/.test(chat))
   // A message's words live in `content` (found by verify:chat-log-words, 19 Nov 2026: this check once pinned `text`,
   // passed, and the bubble never changed). What the screen shows after Undo is the driver's to prove; this only holds

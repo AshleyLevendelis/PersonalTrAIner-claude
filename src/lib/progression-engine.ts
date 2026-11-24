@@ -529,6 +529,11 @@ export interface PlanWeekContext {
   todayIsDeload: boolean
   /** The last session fell in a deload week. */
   lastWasDeload: boolean
+  /**
+   * The last session was the testing week's, and the plan has already been set from it (the testing-week slot carries
+   * `calibration_anchored_kg`). Then the plan's number IS the answer to those sets, read both ways, and wins.
+   */
+  testingWeekDecided?: boolean
 }
 
 export interface CardLoad {
@@ -564,6 +569,13 @@ export function cardLoadFor(rec: DoubleProgressionRecommendation, plan: PlanWeek
     const weightKg = Math.min(plan.printedKg, before + step)
     return { weightKg, note: weightKg === plan.printedKg ? `Back from your deload: this block's weight.` : `Back from your deload: picking up from about where you were.`,
       didProgress: false, findWeight: false }
+  }
+
+  // THE WEEK AFTER THE TESTING WEEK (24 Nov 2026, docs/plans/testing-week-both-ways.md): the plan was rewritten from
+  // those very sets, up or down, with next week's reps and his answers in it. Reading them again here could only
+  // disagree with it (it had held a weight he could not lift for the reps, and pushed a Hard one up a step).
+  if (plan.testingWeekDecided) {
+    return { weightKg: plan.printedKg, note: `Set from your testing week — ${plan.printedKg}kg.`, didProgress: plan.printedKg > last, findWeight: false }
   }
 
   // Did the last session keep up with the plan? Only then may the plan's own next number raise today's.

@@ -4,7 +4,7 @@ import type { EquipmentAccess, TrainingExperience } from './types'
 import type { ExerciseEntry, MovementPattern } from './exercise-db'
 import {
   isExternallyLoaded, primerCarriesWeight, roundToPlate, loadingMode,
-  formatLoad, labelModeForEntry,
+  formatLoad, labelModeForEntry, categorize, prescribeLoad,
   type PrescribedLoadSource, type LoadPrescription,
 } from './load-prescription'
 import { getExerciseEntry, isContraindicatedFor, INJURED_JOINTS } from './exercise-db'
@@ -526,7 +526,32 @@ export const PREP_LOAD_PERCENT: number = Math.min(
  */
 export function prepLoadKg(entry: ExerciseEntry, workingKg: number | null | undefined): number | null {
   if (workingKg == null || !(workingKg > 0)) return null
+  // A BALLISTIC PRIMER IS NOT HALVED (24 Nov 2026, CSCS, mine; Ashley: "Kettlebell Swings at 8kg was way too light",
+  // beside a 95 kg trap bar deadlift). Its price is already its own easy-effort estimate (RPE 6 at ten reps, run for
+  // five), and a swing's job before a hinge is a hard hip snap, which a bell half that weight cannot ask for: a trained
+  // man swings 16-24 kg to warm up. Halving is the first rung of a barbell build-up, and stays for the drills that
+  // are one (wrist and forearm work).
+  if (isBallisticPrimer(entry)) return roundToPlate(workingKg, loadingMode(entry))
   return roundToPlate(workingKg * (PREP_LOAD_PERCENT / 100), loadingMode(entry))
+}
+
+/** A primer whose point is speed and power under a real load: the kettlebell swing family. */
+export function isBallisticPrimer(entry: ExerciseEntry): boolean {
+  return categorize(entry) === 'kettlebell_swing'
+}
+
+/** The label a primer is priced under, everywhere: easy, movement prep. */
+export const PRIMER_INTENSITY = 'Light — movement prep'
+
+/**
+ * WHAT A WARM-UP MOVE WEIGHS, ONE ANSWER FOR EVERY ROUTE (24 Nov 2026). Generation priced it from the person alone;
+ * a swap, rebuild or adaptation priced it through the working-lift path, which added the testing week's discount (a
+ * half again) and could feed the halved weight back in as last week's, so the same swing read 14 kg on a new plan and
+ * 8 kg after an edit (measured: male, intermediate, 85 kg). A primer is a dose for the person, never a test result and
+ * never progressed from its log, so it is priced from the profile, the same way on every route.
+ */
+export function primerPrescription(entry: ExerciseEntry, profile: UserProfile, sets: number): LoadPrescription {
+  return prescribeLoad(entry, profile, { targetRpeLabel: PRIMER_INTENSITY, isFirstBlock: true, sets })
 }
 
 /**

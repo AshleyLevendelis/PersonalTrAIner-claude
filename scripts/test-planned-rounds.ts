@@ -48,6 +48,15 @@ async function main() {
   check('the bounds are the ones the chat\'s timer button uses', isSensibleRoundConfig({ rounds: 2, workSeconds: 5, restSeconds: 5 }) && isSensibleRoundConfig({ rounds: 50, workSeconds: 900, restSeconds: 900 })
     && !isSensibleRoundConfig({ rounds: 51, workSeconds: 30, restSeconds: 30 }) && !isSensibleRoundConfig({ rounds: 4, workSeconds: 30, restSeconds: 4 }) && !isSensibleRoundConfig({ rounds: 2.5, workSeconds: 30, restSeconds: 30 }))
 
+  console.log('\n1b. A session whose numbers are only in the coach\'s reason (his Wednesday, 24 Nov 2026)')
+  const HIS = { activity: 'Assault Bike Rounds', duration: 16, reason: '4 rounds of 3-min hard effort with 60s rest to match Muay Thai rounds without blunting leg recovery.' }
+  check('his Wednesday reads as 4 x 3 min, 60s rest', same(plannedRoundsOf(HIS), { rounds: 4, workSeconds: 180, restSeconds: 60 }), plannedRoundsOf(HIS))
+  check('...a hyphen or a space, the same minutes', same(plannedRoundsOf({ ...HIS, reason: '4 rounds of 3 min hard with 60 second rest' }), { rounds: 4, workSeconds: 180, restSeconds: 60 }))
+  check('a reason whose rounds do not fit the session is not this session', plannedRoundsOf({ ...HIS, duration: 10 }) === null, plannedRoundsOf({ ...HIS, duration: 10 }))
+  check('...and with no minutes to check against, none is read', plannedRoundsOf({ activity: HIS.activity, reason: HIS.reason }) === null)
+  check('a reason with no rounds in it is no timer', plannedRoundsOf({ activity: 'Easy Spin', duration: 30, reason: 'Keeps the legs moving between hard days.' }) === null)
+  check('the stored rounds still win over the reason', same(plannedRoundsOf({ ...HIS, rounds: BIKE }), BIKE))
+
   console.log('\n2. The coach\'s card carries the rounds')
   const said = 'For Muay Thai conditioning, try 4 × 3 min hard on the assault bike, 1 min rest between, like a fight. Would you like me to add this to your plan?'
   check('the coach\'s own three numbers', same(cardioSessionRounds({ rounds: 5, work_seconds: 120, rest_seconds: 60 }, 20, said), { rounds: 5, workSeconds: 120, restSeconds: 60 }))
@@ -87,6 +96,10 @@ async function main() {
   check('...and a round from anywhere else is none', !roundIsPlannedSession(BIKE, 'Assault Bike Rounds', '2026-11-25') && !roundIsPlannedSession(null, 'Assault Bike Rounds', '2026-11-25'))
 
   console.log('\n5. Wired to the screens and the coach (source; verify:planned-rounds drives them)')
+  {
+    const row = readFileSync('src/components/exercise/CardioSetRow.tsx', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    check('the cardio row reads the rounds off the session whether or not they were stored', /const storedRounds = !split\.protocol \? plannedRoundsOf\(prescription\) : null/.test(row))
+  }
   const fn = strip(readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8'))
   const tool = fn.slice(fn.indexOf('name: "propose_cardio_session"'), fn.indexOf('required: ["activity", "minutes", "target_rpe"'))
   check('the coach\'s tool takes rounds, work_seconds and rest_seconds', tool.length > 0 && /\brounds:\s*\{/.test(tool) && /work_seconds:\s*\{/.test(tool) && /rest_seconds:\s*\{/.test(tool))

@@ -197,6 +197,17 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   mine, 23 Nov 2026, his Push & Press day): never after isolation, finisher or trunk work. `test:compound-order`,
   `measure:compound-order` (735 -> 88 of 4,608 days; the 88 are knee-rehab days). The label and the block rotation can
   still name different main lifts on 826 of 4,499 days (BACKLOG)
+- **The testing week sets week 2 both ways** (CSCS, mine, 24 Nov 2026, his "some too light, others too heavy"): the
+  "How was set 1?" answer is kept on the set; every set becomes an estimated max carried to next week's reps; a Hard,
+  short or lighter testing session LOWERS the rest of the testing block (the one exception to "never downward"), a
+  heavy low-rep set is never copied into a higher-rep week. `test:testing-week-both-ways`, `verify:calibration-search` 10c
+- **A warm-up move weighs the same on every route, and the swing is not halved** (CSCS, mine, 24 Nov 2026, his "8kg was
+  way too light"): priced from the person (never the testing week's discount, never its log); a ballistic primer carries
+  its easy estimate, the 18 Sep half stays for wrist and forearm drills; a saved plan is corrected on open.
+  `test:primer-dose`
+- **Sets logged under the wrong exercise move to the one he did** (24 Nov 2026, his live report): chat
+  (`move_logged_sets`, names from his words and today's log, never numbers) and the ⋮ menu, one planner, with Undo.
+  `test:move-logged-sets`, `verify:wrong-exercise`. Needs the `chat-gemini` deploy
 - **A beginner's session holds at most 18 working sets — his ruling 21 Nov 2026, "yes cap beginners at 18 sets"** (over
   filling the time with lifting): the spare minutes go to optional mobility. It narrows his session-length rulings for
   beginners only. `test:older-beginner` §14
@@ -708,7 +719,8 @@ menu" stays true when a copy is also left outside it.
   the rounds end one effort tap logs it under the session's own name, so the day reads done; the round timer's own Log
   session asks the same one question. The coach's card carries the coach's three numbers, else the intervals of the
   reply he said yes to when they fit the session. Another day shows the session as a preview, never one line. A saved
-  cardio log now re-reads the week strip. `test:planned-rounds`, `verify:planned-rounds`. Needs the `chat-gemini` deploy
+  cardio log now re-reads the week strip. A session with its numbers only in the coach's reason (his Wednesday, 24 Nov
+  2026) reads them from there, when they fit its minutes. `test:planned-rounds`, `verify:planned-rounds`. Needs the `chat-gemini` deploy
   for the coach to send rounds itself
 - **Swap the session for a circuit of timer blocks, block by block** — both surfaces since
   8 Oct 2026. Ashley, from the gym: rope, push-ups, sit-ups and the bike off the round timer could

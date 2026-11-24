@@ -50,6 +50,7 @@ import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@
 import { supabase } from '@/lib/supabase'
 import { describeRebuild } from '@/lib/rebuild-card'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, restoreMesocycle } from '@/lib/mesocycle-persistence'
+import { repricePrimerSlots } from '@/lib/primer-repair'
 import { snapPlanStart } from '@/lib/plan-week'
 import { buildRestartedPlan } from '@/lib/plan-restart'
 import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } from '@/lib/reprice-plan'
@@ -2780,6 +2781,18 @@ function App() {
     return () => { live = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id, planReady, mesocycleCreatedAt, sweepToday, logsVersion, coachDataVersion])
+
+  // A SAVED PLAN TAKES THE CURRENT WARM-UP PRICE (24 Nov 2026, primer-repair.ts): a warm-up weight written by an older
+  // rule (his 8 kg swing) is corrected once the plan is read from the server, and saved. Quiet: no live users yet.
+  useEffect(() => {
+    if (!profile?.id || !planReady) return
+    const profileId = profile.id
+    const { next, changed } = repricePrimerSlots(mesocycleNow.current, profile)
+    if (changed.length === 0) return
+    setMesocycle(next)
+    Promise.all(changed.map(w => saveMesocycleWeek(profileId, w))).catch(err => console.error('[primer-repair] could not save:', err))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id, planReady, profile?.weight_kg, profile?.training_experience, profile?.gender])
 
   /**
    * The write behind a ban — recording the preference, rewriting the plan,

@@ -18,7 +18,7 @@ import { EffortBox, logPlannedRound, useCardioLogsToday } from './CardioSetRow'
 // what reads the session back as done: the effort tap here writes the same activity name that row reads.
 // ---------------------------------------------------------------------------
 
-type Planned = { activity: string; targetRpe?: number; rounds?: { rounds: number; workSeconds: number; restSeconds: number } }
+type Planned = { activity: string; targetRpe?: number; rounds?: { rounds: number; workSeconds: number; restSeconds: number }; reason?: string; duration?: number }
 
 /** THE EFFORT QUESTION AT THE END, one tap logs it. Used on the day's card and in the round timer's own sheet. */
 export function PlannedRoundEffort({ planned, config, onLogged }: { planned: Planned; config: RoundConfig; onLogged?: () => void }) {
