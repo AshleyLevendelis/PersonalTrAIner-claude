@@ -19,6 +19,13 @@ import { supabase } from './supabase'
 import { isMissingColumnError } from './missing-column'
 import { MOMENT_KEYS, DEFAULT_FREQUENCY, REMINDER_FREQUENCIES, dailyCap, type MomentKey, type NotificationSettings, type ReminderFrequency } from './coach-moments'
 
+/** The phone app (23 Nov 2026). Read off Capacitor's global here so native-push.ts loads only inside the app. */
+function inPhoneApp(): boolean {
+  const g = globalThis as { Capacitor?: { isNativePlatform?: () => boolean }; __nativePushForTest?: unknown }
+  if (g.__nativePushForTest !== undefined) return g.__nativePushForTest !== null
+  return !!g.Capacitor?.isNativePlatform?.()
+}
+
 /**
  * WHAT EACH SWITCH DOES, in the words the plan asked for ("Remind me if I
  * haven't logged a session"): named for what arrives, never for a mechanism.
@@ -143,6 +150,8 @@ async function registration(): Promise<ServiceWorkerRegistration | null> {
 
 export type PushState = 'on' | 'off' | 'blocked' | PushSupport
 export async function currentPushState(): Promise<PushState> {
+  // THE PHONE APP has no browser push; it uses the phone's own route (native-push.ts, 23 Nov 2026).
+  if (inPhoneApp()) return await (await import('./native-push')).nativePushState()
   const support = pushSupport()
   if (support !== 'ok') return support
   if (Notification.permission === 'denied') return 'blocked'
@@ -180,6 +189,7 @@ export type TurnOnOutcome = 'on' | 'blocked' | 'not_live_yet' | 'unsupported' | 
  * prompt cannot be asked again.
  */
 export async function turnOnPush(profileId: string): Promise<TurnOnOutcome> {
+  if (inPhoneApp()) return await (await import('./native-push')).turnOnNativePush(profileId)
   if (pushSupport() !== 'ok') return 'unsupported'
   const reg = await registration()
   if (!reg) return 'unsupported'
@@ -213,6 +223,7 @@ export async function turnOnPush(profileId: string): Promise<TurnOnOutcome> {
 }
 
 export async function turnOffPush(): Promise<boolean> {
+  if (inPhoneApp()) return await (await import('./native-push')).turnOffNativePush()
   const reg = await registration()
   const sub = await reg?.pushManager.getSubscription()
   if (!sub) return true

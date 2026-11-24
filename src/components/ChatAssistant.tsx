@@ -2015,7 +2015,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     window.addEventListener('focus', onFocus)
     window.addEventListener('hashchange', onHash)
     navigator.serviceWorker?.addEventListener?.('message', onWorker)
+    // The phone app's own notifications say the same (native-push.ts, COACH_MESSAGE_EVENT).
+    const onNative = () => { void refreshRef.current(true) }
+    window.addEventListener('coach-message', onNative)
     return () => {
+      window.removeEventListener('coach-message', onNative)
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('focus', onFocus)
       window.removeEventListener('hashchange', onHash)

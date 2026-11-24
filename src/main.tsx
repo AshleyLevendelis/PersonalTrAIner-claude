@@ -61,3 +61,6 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !inPhoneApp) {
     }).catch(() => {})
   })
 }
+// THE PHONE APP'S NOTIFICATIONS (23 Nov 2026): listen as early as possible, so a tap that started the app still opens
+// the tab it names. The plugin itself is loaded by a dynamic import inside native-push.ts.
+if (inPhoneApp) void import('./lib/native-push').then(m => m.listenForNativePush()).catch(() => {})
