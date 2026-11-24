@@ -178,13 +178,21 @@ check('F1. tomorrow\'s session is a preview with its name, effort, rounds and re
 check('F2. ...not the old one sentence', !/Assault Bike Rounds, 16 minutes\./.test(await ev('document.body.innerText')))
 await shoot('planned-rounds-peek')
 
-console.log('\n  G. His saved Wednesday: rounds only in the coach\'s note still start the round timer (24 Nov 2026)')
-kind = 'note'
+console.log('\n  G. His Wednesday: the numbers only in the coach\'s reason (24 Nov 2026)')
 await clearTimer()
-await load(`&today=${target?.date}`, 'exercise')
-const noteStart = await until(`${q('[data-testid="planned-rounds-start"]')}?.innerText?.replace(/\\s+/g, ' ').trim() ?? null`, 6000)
-check('G1. the card offers Start for 4 × 3 min, 1 min rest', /4 × 3 min, 1 min rest/.test(noteStart ?? ''), noteStart)
-await shoot('planned-rounds-note')
+await load(`&roundsInReason=1&today=${target?.date}`, 'exercise')
+await until(q('[data-testid="planned-activity"]'))
+const gStart = await until(`${q('[data-testid="planned-rounds-start"]')}?.innerText?.replace(/\\s+/g, ' ').trim() ?? null`, 5000)
+check('G1. the day has a Start running 4 × 3 min, 1 min rest', /4 × 3 min, 1 min rest/.test(gStart ?? ''), gStart)
+const gRow = await textOf('[data-testid="planned-activity"]')
+check('G2. ...and the rounds under the name', /Assault Bike Rounds/.test(gRow ?? '') && /4 × 3 min, 1 min rest/.test(gRow ?? ''), gRow)
+await shoot('planned-rounds-reason-day')
+await load(`&roundsInReason=1&today=${dayBefore}`, 'exercise')
+await until(q(`[data-strip-date="${target?.date}"]`))
+await tap(`[data-strip-date="${target?.date}"]`)
+const gPeek = await until(`${q('[data-testid="peek-planned-shape"]')}?.innerText?.trim() ?? null`, 5000)
+check('G3. the day before, its preview shows the rounds', /4 × 3 min, 1 min rest/.test(gPeek ?? ''), gPeek)
+await shoot('planned-rounds-reason-peek')
 
 console.log('\n  H. A 30-minute jog runs on a 30-minute timer and logs in one tap (24 Nov 2026)')
 kind = 'jog'

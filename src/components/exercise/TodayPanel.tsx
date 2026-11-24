@@ -372,7 +372,10 @@ export function TodayPanel({
       workout.exercises
         // ONLY A REP PRESCRIPTION (19 Nov 2026, his summary: "Suitcase Carry — Hit 40 reps on every set"): a carry's
         // "40m" and a hold's "30-45s" were read as rep counts. They follow the plan's own distance and load ramp.
-        .filter(ex => (ex.suggested_load_kg != null || ex.suggested_added_load_kg != null) && prescribedRepsHigh(ex.reps) != null)
+        .filter(ex => (ex.suggested_load_kg != null || ex.suggested_added_load_kg != null) && prescribedRepsHigh(ex.reps) != null
+          // A WARM-UP MOVE IS NOT PROGRESSED FROM ITS LOG (24 Nov 2026, warmup.ts primerPrescription): a dose for the
+          // person, priced the same on every route (checkDoubleProgression already leaves primers out).
+          && getExerciseEntry(ex.name)?.mechanics_tier !== 'primer')
         .map(async ex => {
           const rec = ex.suggested_added_load_kg != null
             ? await getAddedLoadProgression(profileId!, ex.name, dayAfterStr, parseRepsHigh(ex.reps))
@@ -1002,7 +1005,10 @@ export function TodayPanel({
       workout.exercises
         // ONLY A REP PRESCRIPTION (19 Nov 2026, his summary: "Suitcase Carry — Hit 40 reps on every set"): a carry's
         // "40m" and a hold's "30-45s" were read as rep counts. They follow the plan's own distance and load ramp.
-        .filter(ex => (ex.suggested_load_kg != null || ex.suggested_added_load_kg != null) && prescribedRepsHigh(ex.reps) != null)
+        .filter(ex => (ex.suggested_load_kg != null || ex.suggested_added_load_kg != null) && prescribedRepsHigh(ex.reps) != null
+          // A WARM-UP MOVE IS NOT PROGRESSED FROM ITS LOG (24 Nov 2026, warmup.ts primerPrescription): a dose for the
+          // person, priced the same on every route (checkDoubleProgression already leaves primers out).
+          && getExerciseEntry(ex.name)?.mechanics_tier !== 'primer')
         .map(async ex => {
           if (ex.suggested_added_load_kg != null) {
             const added = await getAddedLoadProgression(profileId, ex.name, today, parseRepsHigh(ex.reps))
@@ -1054,11 +1060,13 @@ export function TodayPanel({
         if (printed == null) { nextLoads[name] = load.weightKg; nextNotes[name] = { note: load.note, didProgress: load.didProgress }; continue }
         const then = load.lastDate ? planDaysForDate(load.lastDate, today, liveWeekPlan, mesocycle, planCreatedAt) : null
         const thenWeek = then?.week != null ? mesocycle?.find(w => w.week_number === then.week) : undefined
+        const thenSlot = then?.days.flatMap(d => d.exercises).find(e => e.name === name)
         const card = cardLoadFor(load, {
           printedKg: printed,
-          printedThenKg: then?.days.flatMap(d => d.exercises).find(e => e.name === name)?.suggested_load_kg ?? undefined,
+          printedThenKg: thenSlot?.suggested_load_kg ?? undefined,
           todayIsDeload: !!currentMesoWeekObj?.is_deload,
           lastWasDeload: !!thenWeek?.is_deload,
+          testingWeekDecided: !!thenWeek?.isCalibrationWeek && thenSlot?.calibration_anchored_kg != null,
         }, name)
         nextLoads[name] = card.weightKg
         nextNotes[name] = { note: card.note, didProgress: card.didProgress, findWeight: card.findWeight }

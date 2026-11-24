@@ -39,21 +39,28 @@ function asConfig(r: Partial<PlannedRounds> | null | undefined): RoundConfig | n
   return isSensibleRoundConfig(config) ? config : null
 }
 
-/** WHAT THE TIMER RUNS FOR THIS SESSION: the stored rounds, else its own protocol, else nothing. */
-export function plannedRoundsOf(
-  planned: (Pick<PlannedActivity, 'activity' | 'rounds'> & Partial<Pick<PlannedActivity, 'reason' | 'duration'>>) | null | undefined,
-): RoundConfig | null {
+/**
+ * WHAT THE TIMER RUNS FOR THIS SESSION: the stored rounds, else its own protocol, else the coach's reason on the card
+ * he approved, else nothing.
+ *
+ * THE REASON (24 Nov 2026, his Wednesday "Assault Bike Rounds · 16 min · Hard", reason "4 rounds of 3-min hard effort
+ * with 60s rest to match Muay Thai rounds"): a session the coach added with its numbers in its reason and not in its
+ * fields had no Start, so a rounds session read as a line of words. The reason is the coach's sentence on the card he
+ * said yes to, read by the same parser, and only when the rounds fit inside the session's own minutes (the rule the
+ * coach's card already follows for the reply he said yes to): a reason about something else is not this session.
+ */
+export function plannedRoundsOf(planned: (Pick<PlannedActivity, 'activity' | 'rounds'> & { reason?: string; duration?: number }) | null | undefined): RoundConfig | null {
   if (!planned) return null
   const stored = asConfig(planned.rounds)
   if (stored) return stored
   const { protocol } = splitActivity(planned.activity)
-  const read = protocol ? (parseIntervalSuggestion(protocol) ?? parseConditioningInterval(protocol)) : null
-  if (read && isSensibleRoundConfig(read)) return read
-  // ELSE THE COACH'S OWN NOTE ON THE SESSION (24 Nov 2026): his Wednesday was saved before rounds were stored, and its
-  // rounds lived only in the note under it ("4 rounds of 3-min hard effort with 60s rest ..."). Taken only when they
-  // fit inside the session's minutes, so a note about something else is never a timer.
+  if (protocol) {
+    const read = parseIntervalSuggestion(protocol) ?? parseConditioningInterval(protocol)
+    return read && isSensibleRoundConfig(read) ? read : null
+  }
   const said = parseIntervalSuggestion(planned.reason)
-  return said && isSensibleRoundConfig(said) && (planned.duration == null || roundsMinutes(said) <= planned.duration + 1) ? said : null
+  if (said && isSensibleRoundConfig(said) && planned.duration != null && roundsMinutes(said) <= planned.duration) return said
+  return null
 }
 
 /** Whole minutes the rounds take, work plus the rests between them (none after the last). */

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ArrowDown, ArrowRightLeft, ArrowUp, Ban, BookOpen, History, Info, MoreVertical, Trash2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
+import { WrongExerciseSheet, type MoveUndo } from './WrongExerciseSheet'
 import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, prescribedDose, formatCompletedSummary, setProgress } from '@/lib/session-derive'
 import { LoadChip, TempoChip, loadSourceLabel, type LoadSource } from './LoadChip'
@@ -112,6 +113,8 @@ export function ExerciseRow({
   isCurrent = false,
 }: ExerciseRowProps) {
   const { logs, setsFor, requestedSetFocus, clearSetFocusRequest, date } = useActiveSession()
+  const [wrongOpen, setWrongOpen] = useState(false)
+  const [moveUndo, setMoveUndo] = useState<MoveUndo | null>(null)
   const exerciseId = ex.id ?? getExerciseId(ex.name)
   const loggedSets = setsFor(exerciseId, ex.name)
   const completedSets = loggedSets.length
@@ -194,7 +197,20 @@ export function ExerciseRow({
       banBusy={banBusy}
       tourOpen={tourAnchor && tourStage === TOUR_OPENS.exerciseMenu}
       anchor={tourAnchor}
+      onWrongExercise={loggedSets.length > 0 ? () => setWrongOpen(true) : undefined}
     />
+  )
+  // THE MOVE'S SHEET AND ITS UNDO LINE (24 Nov 2026), drawn on this row in either layout.
+  const wrongExercise = (
+    <>
+      <WrongExerciseSheet open={wrongOpen} onOpenChange={setWrongOpen} exerciseId={exerciseId} exerciseName={ex.name} onMoved={setMoveUndo} />
+      {moveUndo && (
+        <div className="flex items-center justify-between gap-2 px-1 pt-1.5 text-xs text-text-secondary" data-testid="wrong-exercise-moved">
+          <span>{moveUndo.line}</span>
+          <button type="button" className="min-h-[44px] px-2 font-semibold text-primary-text" onClick={() => { moveUndo.undo(); setMoveUndo(null) }}>Undo</button>
+        </div>
+      )}
+    </>
   )
 
   // THE LOAD, IN THE PLAN'S OWN UNIT ("72.5 kg", "14 kg per hand"): the string
@@ -231,6 +247,7 @@ export function ExerciseRow({
           eyebrow={sectionLabel && sectionLabel !== 'Accessory' ? sectionLabel : undefined}
           trailing={menu}
         />
+        {wrongExercise}
       </div>
     )
   }
@@ -281,6 +298,7 @@ export function ExerciseRow({
         {loadBadge && <div className="pt-0.5"><LoadBadgeView badge={loadBadge} valueTestId={loadText ? 'exercise-load' : unloadedLabel ? 'bodyweight-load' : undefined} /></div>}
         <div className="-mr-1.5 shrink-0">{menu}</div>
       </div>
+      {wrongExercise}
 
       {/* ONE CONTINUOUS SET BAR, WARM-UPS THEN WORKING. Violet is the build-up, mint the work, the space between them
           the only separator needed. The counts are said for a screen reader; the segments say them to the eye. */}
@@ -392,8 +410,10 @@ const rampFoldChoice = new Map<string, boolean>()
  * and the ban rewrites every week — so only the ban is styled destructive.
  * "How to do it" leads: mid-set, "how does this go?" is the commoner question.
  */
-function ExerciseMenu({ ex, onOpenDetail, onOpenHistory, onSwap, onMove, canMoveUp, canMoveDown, onRemove, onBan, banBusy, tourOpen = false, anchor = false }: {
+function ExerciseMenu({ ex, onOpenDetail, onOpenHistory, onSwap, onMove, canMoveUp, canMoveDown, onRemove, onBan, banBusy, tourOpen = false, anchor = false, onWrongExercise }: {
   ex: Exercise
+  /** Shown once sets are logged: they were the wrong exercise (24 Nov 2026, WrongExerciseSheet). */
+  onWrongExercise?: () => void
   onOpenDetail?: (exerciseName: string) => void
   onOpenHistory?: () => void
   onSwap: () => void
@@ -448,6 +468,12 @@ function ExerciseMenu({ ex, onOpenDetail, onOpenHistory, onSwap, onMove, canMove
           <DropdownMenuItem onClick={onRemove} data-testid="remove-exercise">
             <Trash2 className="size-3.5" />
             Take out of this session
+          </DropdownMenuItem>
+        )}
+        {onWrongExercise && (
+          <DropdownMenuItem onClick={onWrongExercise} data-testid="wrong-exercise">
+            <ArrowRightLeft className="size-3.5" />
+            Logged the wrong exercise?
           </DropdownMenuItem>
         )}
         <DropdownMenuItem variant="destructive" disabled={banBusy} onClick={onBan} data-testid="ban-exercise">

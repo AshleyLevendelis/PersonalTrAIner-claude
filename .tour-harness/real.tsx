@@ -461,6 +461,7 @@ const thursdayed = !THURSDAY ? tilted : tilted.map(w => w.week_number < 2 ? w : 
 // ?rounds=jog — a 30-minute jog the coach added: minutes, no rounds (a countdown, 24 Nov 2026).
 const ROUNDS_KIND = new URLSearchParams(location.search).get('rounds')
 const ROUNDS = ROUNDS_KIND === '1' || ROUNDS_KIND === 'note' || ROUNDS_KIND === 'jog'
+const ROUNDS_IN_REASON = ROUNDS_KIND === 'note' || new URLSearchParams(location.search).get('roundsInReason') === '1'
 const ROUNDS_DAY = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
   .find(dn => thursdayed.every(w => !(w.days.find(d => d.day === dn)?.exercises.length)))
 const mesocycle = !ROUNDS || !ROUNDS_DAY ? thursdayed : thursdayed.map(w => ({
@@ -469,7 +470,7 @@ const mesocycle = !ROUNDS || !ROUNDS_DAY ? thursdayed : thursdayed.map(w => ({
     day: ROUNDS_DAY, focus: ROUNDS_KIND === 'jog' ? 'Easy jog' : 'Assault Bike Rounds', exercises: [], is_scheduled: true,
     plannedActivity: ROUNDS_KIND === 'jog'
       ? { activity: 'Easy jog', duration: 30, targetRpe: 4, reason: 'An easy aerobic base between the hard days.' }
-      : ROUNDS_KIND === 'note'
+      : ROUNDS_IN_REASON
       ? { activity: 'Assault Bike Rounds', duration: 16, targetRpe: 8, reason: '4 rounds of 3-min hard effort with 60s rest to match Muay Thai rounds without blunting leg recovery.' }
       : { activity: 'Assault Bike Rounds', duration: 16, targetRpe: 8, reason: 'Fight-length rounds build the engine Muay Thai asks for.', rounds: { rounds: 4, workSeconds: 180, restSeconds: 60 } },
   } as typeof w.days[number]],

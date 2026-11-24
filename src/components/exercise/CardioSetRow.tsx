@@ -340,7 +340,7 @@ export function PlannedCardioRow({
   timer,
   hideEntry,
 }: {
-  prescription: { activity: string; duration: number; targetRpe?: number; reason?: string; rounds?: { rounds: number; workSeconds: number; restSeconds: number } }
+  prescription: { activity: string; duration: number; targetRpe?: number; rounds?: { rounds: number; workSeconds: number; restSeconds: number }; reason?: string }
   /** A planned interval session's Start (PlannedRoundsStart), drawn under the prescription and over the boxes. */
   timer?: ReactNode
   /** The boxes step aside while the session's round runs or asks how hard it was: one way to log at a time. */
@@ -354,7 +354,8 @@ export function PlannedCardioRow({
   const logs = useCardioLogsToday()
   const split = splitActivity(prescription.activity)
   const { name } = split
-  // A session's rounds stored beside its name read as its protocol line, the way one written into the name does.
+  // A session's rounds stored beside its name (or read off the coach's reason) read as its protocol line, the way one
+  // written into the name does.
   const storedRounds = !split.protocol ? plannedRoundsOf(prescription) : null
   const protocol = split.protocol ?? (storedRounds ? blockShape(storedRounds) : null)
   const [minutes, setMinutes] = useState('')
