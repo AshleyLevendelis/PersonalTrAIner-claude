@@ -311,6 +311,9 @@ const WALKER = new URLSearchParams(location.search).get('walker') === '1'
 // Strategy slice 6: ?runner=1 is a 5 km running goal with "I run 30 minutes now" (his Profile row or the coach's card, as
 // App provides it); &ranlong=1 adds a 30-minute run logged three days before the run day verify:running-day opens.
 const RUNNER = new URLSearchParams(location.search).get('runner') === '1'
+// ?cardiodays=2 — TWO CARDIO DAYS A WEEK (his ruling 24 Nov 2026, "A"; verify:cardio-days): the INPUT is the answer; the
+// days, their sessions and their rounds are the generator's own.
+const CARDIO_DAYS = new URLSearchParams(location.search).get('cardiodays') === '2'
 const RAN_LONG = new URLSearchParams(location.search).get('ranlong') === '1'
 // Strategy slice 4: ?numbers=off is the starter tier (his Profile switch, as App provides it); ?pastate=1 seeds the week.
 const NUMBERS_OFF = new URLSearchParams(location.search).get('numbers') === 'off'
@@ -359,6 +362,7 @@ const profile: UserProfile = {
   created_at: EFFORT_PLAN_AGE > 0 ? (() => { const d = daysAgo(EFFORT_PLAN_AGE); d.setHours(8, 0, 0, 0); return d.toISOString() })() : AWAY > 0 ? (() => { const d = daysAgo(awayPlanAge(AWAY)); d.setHours(8, 0, 0, 0); return d.toISOString() })() : THURSDAY ? (() => { const d = daysAgo(6); d.setHours(18, 30, 0, 0); return d.toISOString() })() : new Date(anchorNowMs() - (JOINED_TODAY ? 0 : 9) * 86400000).toISOString(),
   ...(ABSURD ? { max_dumbbell_kg: STATED_DUMBBELL_KG } : {}),
   ...(RUNNER ? { running_goal: '5k', running_base_minutes: 30 } : {}),
+  ...(CARDIO_DAYS ? { cardio_days_per_week: 2 } : {}),
   // ?pregnant=1&due=YYYY-MM-DD (the pregnancy audit, 22 Nov 2026): the Pregnant tick and a due date, as INPUT. The plan is
   // the generator's own for her.
   ...(PREGNANT ? { gender: 'female' as const, health_conditions: ['pregnancy'], due_date: DUE_DATE } : {}),
@@ -373,6 +377,11 @@ const profile: UserProfile = {
 const MSEED = new URLSearchParams(location.search).get('mseed') ?? MOBILITY_SEED
 setRandomSource(seededRngFromKey(MOBILITY ? `tour-real-screens|mobility|${MSEED}` : 'tour-real-screens'))
 const generated0 = generateMesocycle(profile)
+// Where the generator put them in week 1, as dates the driver can stand on (read off the plan, never typed).
+;(window as unknown as { __cardioDays: unknown }).__cardioDays = CARDIO_DAYS
+  ? (generated0[0]?.days ?? []).filter(d => d.plannedActivity && /^(Cardio intervals|Steady cardio)$/.test(d.plannedActivity.activity))
+      .map(d => ({ day: d.day, activity: d.plannedActivity!.activity, date: planWeekOneDate(d.day), rounds: d.plannedActivity!.rounds ?? null, duration: d.plannedActivity!.duration }))
+  : null
 // &cleared=1 (with sam=1) — THE LIVE TEST'S STALE DAY (19 Oct 2026). The plan is made while the shoulder is flagged,
 // then the flag is taken off and nothing rebuilds it: the Shoulders day keeps no press while presses now fit the kit.
 // The INPUT is chosen (when the flag came off); the plan is the generator's own.

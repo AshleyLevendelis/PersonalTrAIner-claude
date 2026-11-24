@@ -714,6 +714,11 @@ menu" stays true when a copy is also left outside it.
   workout with timer built in", "even optional cardio on rest days"): rounds on the round timer (read from his own words,
   the coach's reply, or the session's note when they fit), minutes on a countdown tagged with the session; the minutes it
   ran are logged under the session's name. `test:planned-rounds`, `verify:planned-rounds` G-I
+- **Cardio days a week: his ruling 24 Nov 2026, "A, build it"** (over coach only and Profile only): setup asks someone who
+  loves cardio how many (0-3), Profile asks anyone; they take training days from lifting down to two (CSCS, mine), one
+  intervals / one steady / two intervals at three, low impact by feel, a health condition capped at RPE 7, and count as
+  the goal's conditioning; a running goal wins. The conditioning after lifting has the same Start. `test:cardio-days`,
+  `verify:cardio-days`, `verify:finisher` 5c. Needs the `cardio_days_per_week` migration
 - **Swap the session for a circuit of timer blocks, block by block** — both surfaces since
   8 Oct 2026. Ashley, from the gym: rope, push-ups, sit-ups and the bike off the round timer could
   only be logged as "Intervals". His ruling, from three options: **A, one workout made of blocks**.

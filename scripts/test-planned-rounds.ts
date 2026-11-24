@@ -117,7 +117,7 @@ async function main() {
   const row = strip(readFileSync('src/components/exercise/CardioSetRow.tsx', 'utf8'))
   check('...and the row draws it under the session\'s name, over the boxes', row.indexOf('{!saved && timer}') > row.indexOf('data-testid="cardio-prescription"') && row.indexOf('{!saved && timer}') < row.indexOf('<EntryBoxes', row.indexOf('{!saved && timer}')) && /hideEntry \? null : \(/.test(row))
   const tools = strip(readFileSync('src/components/ToolsTab.tsx', 'utf8'))
-  check('the round timer logs a planned round as the session (one effort tap)', /roundIsPlannedSession\(timers\.roundConfig, todaysPlanned\.activity, todayDate\)/.test(tools) && /<PlannedRoundEffort/.test(tools))
+  check('the round timer logs a planned round as the session (one effort tap)', /roundIsPlannedSession\(timers\.roundConfig, p\.activity, todayDate\)/.test(tools) && /\[todaysPlanned, todaysConditioning\]/.test(tools) && /<PlannedRoundEffort/.test(tools))
   const peek = strip(readFileSync('src/components/exercise/TodayPanel.tsx', 'utf8'))
   check('another day\'s planned session is a preview, not one sentence', /peekWorkout\?\.plannedActivity \? \(\s*<PlannedActivityPreview /.test(peek) && !/plannedActivity\.duration\} minutes\./.test(peek))
 

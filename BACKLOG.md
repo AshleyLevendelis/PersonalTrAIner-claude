@@ -2,6 +2,34 @@
 
 Newest first. One line each.
 
+- [x] **CARDIO DAYS A WEEK, AND A START ON THE CONDITIONING AFTER LIFTING (his ruling 24 Nov 2026, "A, build it")**.
+  His question: "can't the coach prescribe cardio or HIIT as part of the plans if that is what the user wants". Options
+  put to him: A setup asks someone who loves cardio how many cardio days (0-3) and the plan builds them; B coach only;
+  C a Profile setting only. He chose A. BUILT: `cardio-days.ts`; a setup question shown only after "love it" (one more
+  screen for them, none for anyone else; the same answer on Profile → Goal → "Cardio days", which offers the rebuild);
+  the plan takes the cardio days out of lifting the way run days are and adds them back every week, last, so no lifting
+  pass trims them; interval days start the round timer, steady days a countdown, both logged in one tap (the 24 Nov
+  timer work). And the plan's conditioning after lifting ("Finisher", "Separate session") now has the same Start, and a
+  round finished on Tools logs as it. CSCS, mine, with the basis: (1) the training effect: aerobic work the person
+  asked for, at a dose a coach would write (8 x 30s hard / 60s easy plus 10 easy minutes, one round more a week of the
+  block to +2, a lighter deload, 5s longer work each later block to 45s; steady 30 min to 40, a beginner 20 to 30);
+  (2) what it takes away: training days from lifting, never below two lifting days (two strength sessions a week is
+  the common floor for keeping strength and muscle), and the goal's own conditioning is reduced by the cardio days so
+  nothing is doubled (measured: a muscle-building cardio lover with two cardio days had also been given two blocks after
+  lifting, four in a week, before that rule); (3) fundamentals: lifting keeps its days and patterns (the lifting plan is
+  built for the days left, as for a runner); an interval day is never the day before lifting or another interval day
+  where the week allows (every 1-7 day set checked against a brute-force minimum); a beginner or low recovery gets one
+  interval day at most; (4) no floor redefined: the two-lifting-day floor matches running's; (5) scope: low impact by
+  default (bike, rower, cross-trainer, brisk uphill walk; a sore knee, hip or ankle keeps to the bike or cross-trainer),
+  effort in words, never a heart rate; a health condition, pregnancy included, caps intervals at RPE 7, never all-out,
+  with 90s easy. A running goal wins: its runs are the cardio. Needs the `cardio_days_per_week` migration
+  (20261124160000); until it runs the answer is dropped on save, and Profile says it is not switched on yet.
+  `test:cardio-days` (28 checks, 11 mutations, all caught, one only after a check was added where the rule binds),
+  `verify:cardio-days` (12 checks, 2 mutations caught), `verify:finisher` 5c (1 mutation caught), `test:planned-rounds`.
+  Coach: `screen only` for the count (parity list); "make Wednesday my HIIT day" already works per day. NOT proven: the
+  plan-quality grid (the full sweep runs it), and the setup question on a real setup (the app asks it with its own
+  card; no `onboarding-chat` deploy is needed for that).
+
 - [x] **CARDIO ON THE PLAN RUNS ON A TIMER AND LOGS IN ONE TAP, INTERVALS OR NOT (his report 24 Nov 2026)**. His
   screenshots: Wednesday's "Assault Bike Rounds" still read as one line in the PHONE APP (it carries its own copy of the
   app, built before 23 Nov's fix; the web app showed the new card), and on the web the card had nothing to start,

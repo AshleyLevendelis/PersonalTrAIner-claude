@@ -94,7 +94,7 @@ console.log('\n2. Every question the app can ask is recognised as itself')
     // ...and, since 13 Nov 2026 (slice 6, his "Only if they like cardio"), someone who loves cardio: the only person
     // asked about a running goal.
     const values = s.key === 'startPreference' ? starter : s.key === 'enjoyedActivities' ? { ...starter, startPreference: 'move_more' } as OnboardingSlotValues
-      : s.key === 'runningGoal' ? { ...lifter, conditioningPreference: 'love' } as OnboardingSlotValues : lifter
+      : s.key === 'runningGoal' || s.key === 'cardioDays' ? { ...lifter, conditioningPreference: 'love' } as OnboardingSlotValues : lifter
     const got = chooseCard({ hostText: `Right, next thing I need — ${s.question}`, requested: [s.key], liveCards: [], values, confirmed: new Set(), corrected: new Set(), cardedThisTurn: [] })
     return !got || !numericGroupFor(s.key).includes(got)
   }).map(s => s.key)

@@ -156,6 +156,8 @@ export interface UserProfile {
   running_race_date?: string | null
   /** The longest he says he runs non-stop now, in minutes (told to the coach). Column `running_base_minutes`. */
   running_base_minutes?: number | null
+  /** How many cardio days a week he wants as sessions of their own, 0-3 (his ruling 24 Nov 2026, "A"; src/lib/cardio-days.ts). Asked in setup only of someone who loves cardio; on Profile for everyone. Column `cardio_days_per_week` (migration 20261124160000, not run); missing before it runs. */
+  cardio_days_per_week?: number | null
   /** NOT A COLUMN: the plan week the running ladder starts, worked out by a rebuild from the plan it replaces (running.ts runningStartWeek). Absent means week 1. */
   running_start_week?: number
   /** How much he is happy to repeat meals (slice 4e): 'variety' (default) | 'some' | 'same'. Column `meal_variety`, migration 20261113140000, not run. */

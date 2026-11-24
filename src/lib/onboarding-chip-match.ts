@@ -120,6 +120,7 @@ const ASKS: Record<SlotKey, Asks> = {
   kitTicks: /which of these do you have|tick everything you'?ve got|untick anything you don.t have|what (kit|equipment) do you (actually )?(have|own) at home|what (kit|equipment) do you (actually )?own\b/i,
   enjoyedActivities: /(enjoy|like) (swimming|cycling)|swimming or cycling|besides walking/i,
   runningGoal: /running goal|work towards a run|run (a )?(5|10) ?k|half marathon|20 minutes non-stop/i,
+  cardioDays: /cardio (session|day)s? of (its|their) own|days a week .*cardio|cardio days/i,
 }
 
 /**

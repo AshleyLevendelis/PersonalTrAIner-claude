@@ -260,8 +260,10 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
   // A ROUND STARTED FROM TODAY'S PLANNED SESSION (23 Nov 2026) is logged AS that session: one effort tap, its own
   // name so the day reads done, never "what was this block?".
   const todaysPlanned = (todayCell?.movedTo ? null : todayCell?.session)?.plannedActivity ?? null
-  const plannedRound = todaysPlanned && roundIsPlannedSession(timers.roundConfig, todaysPlanned.activity, todayDate) && timers.roundConfig
-    ? { planned: todaysPlanned, config: timers.roundConfig }
+  // ...and today's conditioning after lifting (24 Nov 2026): its Start tags the round the same way.
+  const roundSession = [todaysPlanned, todaysConditioning].find(p => !!p && roundIsPlannedSession(timers.roundConfig, p.activity, todayDate)) ?? null
+  const plannedRound = roundSession && timers.roundConfig
+    ? { planned: roundSession, config: timers.roundConfig }
     : null
   const countdownSession = [todaysSession?.plannedActivity, todaysSession?.recommendedCardio]
     .find(p => !!p && !!timers.countdownPlanned && timers.countdownPlanned.activity === p.activity && timers.countdownPlanned.date === todayDate) ?? null

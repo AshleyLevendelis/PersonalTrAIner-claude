@@ -1118,7 +1118,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
       onProfileChanged(revertPatch)
       // A SETTING WHOSE DATABASE STEP HAS NOT RUN is not a connection problem, and saying so would send him to
       // check his signal for nothing.
-      if ((['enjoyed_activities', 'meal_variety', 'show_numbers', 'running_goal', 'health_conditions', 'due_date', 'allergies'] as const).some(c => c in patch && isMissingColumnError(err, c))) {
+      if ((['enjoyed_activities', 'meal_variety', 'show_numbers', 'running_goal', 'health_conditions', 'due_date', 'allergies', 'cardio_days_per_week'] as const).some(c => c in patch && isMissingColumnError(err, c))) {
         setSaveError("That setting isn't switched on yet, so it couldn't be saved. Nothing else has changed.")
         return
       }
@@ -1328,6 +1328,15 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               options={[{ value: 'none', label: 'Not for now' }, ...RUNNING_GOAL_OPTIONS.map(o => ({ value: o.value, label: o.label }))]}
               onSave={v => savePatch({ running_goal: v === 'none' ? null : v })}
             /></div></Row>
+            {/* CARDIO DAYS A WEEK (his 24 Nov 2026 "A"): sessions of their own, lifting keeps two. A running goal's runs are
+                the cardio, so the row says so instead of offering a choice that would do nothing. */}
+            <Row label="Cardio days"><div data-testid="profile-cardio-days">{isRunningGoal(profile.running_goal)
+              ? <span className="text-[0.875rem] text-muted-foreground">Your runs</span>
+              : <EditableSelectField
+                  value={String(profile.cardio_days_per_week ?? 0)}
+                  options={[{ value: '0', label: 'None' }, { value: '1', label: '1 a week' }, { value: '2', label: '2 a week' }, { value: '3', label: '3 a week' }]}
+                  onSave={v => savePatch({ cardio_days_per_week: Number(v) })}
+                />}</div></Row>
             {isRunningGoal(profile.running_goal) && profile.running_race_date && (
               <Row label="Race day"><span className="text-[0.875rem]" data-testid="profile-race-date">{raceDateWords(profile.running_race_date)}</span></Row>
             )}

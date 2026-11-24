@@ -162,7 +162,8 @@ console.log('\n2. And nothing else does')
     // week, so changing it changes what the plan contains.
     // + running_goal and running_base_minutes, slice 6 (13 Nov): runs join the week and replace lifting days.
     // + health_conditions, his ruling 14 Nov 2026: a condition caps every set at RPE 8 and the cardio at 7, by effort.
-    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'conditioning_preference,enjoyed_activities,equipment_access,fitness_goal,health_conditions,injuries,known_bench_kg,known_deadlift_kg,known_squat_kg,recovery_capacity,running_base_minutes,running_goal,session_duration_preference,start_preference,training_days,training_experience,training_style',
+    // + cardio_days_per_week, his ruling 24 Nov 2026 "A": cardio days take some training days from lifting.
+    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'cardio_days_per_week,conditioning_preference,enjoyed_activities,equipment_access,fitness_goal,health_conditions,injuries,known_bench_kg,known_deadlift_kg,known_squat_kg,recovery_capacity,running_base_minutes,running_goal,session_duration_preference,start_preference,training_days,training_experience,training_style',
     PLAN_INVALIDATING_FIELDS)
   // HIS RULING, 8 Nov 2026, "Offer a rebuild": each of the three offers one, in words about what it shapes, and only
   // when it actually changed.
