@@ -162,7 +162,14 @@ async function main() {
     check('...it still says the food joins at her amount', said.some(t => /100g banana joins it at the amount you said/.test(t)), said)
     // Since 17 Nov 2026 the share line is said only past the day's 5% calorie band (shareLineIfReal); a 100g banana is
     // inside it, so the card says nothing about the share. The past-the-band case is held in test:offer-fixes §5.
-    check('...and no "usual share" line for a gap inside the day\'s band (a 100g banana)', !said.some(t => /usual lunch share/.test(t)), said)
+    // 24 Nov 2026: lunch's share fell from 40% to 35% of the day (lunch and dinner equal), so this fixture's lunch now
+    // sits a little over its share and the 100 g banana tips it past the 5% band. The rule itself is held instead: a
+    // share line names a gap past 5% of the day, and a small addition inside the band gets none.
+    const shareGap = said.map(t => t.match(/That is (\d[\d,]*) kcal (?:over|under) the usual lunch share/)).find(Boolean)
+    check('...a "usual share" line, when said, names a gap past the day\'s 5% band', !shareGap || Number(shareGap[1].replace(/,/g, '')) > targets.calories * 0.05, { said, band: Math.round(targets.calories * 0.05) })
+    const small = addFood(serving, today, 'lunch', ['20g banana'])
+    const smallSaid = small.ok ? text(small.diff) : ['(refused)']
+    check('...and no "usual share" line for a gap inside the band (20 g of banana)', small.ok && !smallSaid.some(t => /usual lunch share/.test(t)), smallSaid)
     check('...and names the day in words ("today"), never as a stored date', said.some(t => /^Just for today\. On other days your lunch stays /.test(t)) && !said.some(t => /\d{4}-\d{2}-\d{2}/.test(t)), said)
     const tuesday = addFood(serving, dates[2], 'lunch', ['100g banana'])
     check('...and another day by its weekday', tuesday.ok && text(tuesday.diff).some(t => /^Just for Tuesday\. On other days your lunch stays /.test(t)) && !text(tuesday.diff).some(t => /\d{4}-\d{2}-\d{2}/.test(t)), tuesday.ok ? text(tuesday.diff) : tuesday)

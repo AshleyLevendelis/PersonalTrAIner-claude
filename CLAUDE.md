@@ -524,6 +524,10 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   STILL TRUE AND NAMED: there is no ketogenic derivation, and the keto filter
   is the low-carb filter — fresh banana, grapes and mango pass it, which the
   sentence admits rather than hides
+- **Lunch and dinner are the same size on three meals, so no meal carries a lopsided share of the protein** (his
+  "Build it", 24 Nov 2026, after a 67 g lunch; the split is mine, CSCS): 0.30 / 0.35 / 0.35, every macro at the meal's
+  calorie share; a leftover lunch is the dinner portion. An exactly even protein split was measured and not kept (a
+  heavier breakfast, a fifth fewer breakfasts). `test:meal-protein-spread`, `measure:meal-protein-spread`
 - A measured floor for meals — `meal-quality` exists but needs a live
   database, so it NEVER runs in a cloud sweep: `UNGUARDED` in practice
 

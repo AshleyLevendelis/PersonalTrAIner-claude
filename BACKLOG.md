@@ -2,6 +2,28 @@
 
 Newest first. One line each.
 
+- [x] **NO LOPSIDED LUNCH: LUNCH AND DINNER ARE THE SAME SIZE (his "Build it", 24 Nov 2026; the split is mine, CSCS).**
+  His report, with Gemini's review of his day: a 1,969 kcal day "on target" served lunch 67 g of protein (about 240 g raw
+  tuna), breakfast 51 g, a 23 g snack. TRACED (engine-tracer): not the day search; every macro takes the meal's CALORIE
+  share, and a three-meal day gave lunch 0.40 (36% with a snack), so lunch carried 36% of the protein, and last night's
+  dinner came back as a lunch a third bigger. CHANGED: three meals are 0.30 / 0.35 / 0.35, so lunch and dinner are one
+  size and a leftover lunch is the dinner portion. CSCS basis: protein spread across the day's meals serves muscle better
+  than one big serving (Areta 2013, Mamerow 2014, Schoenfeld & Aragon 2018); calories are unchanged. MEASURED
+  (`measure:meal-protein-spread`, real library through the real verifier, 6 targets x 3 diets, 28 days, leftovers on):
+  his lunch 72 -> 63 g average, the largest meal anyone gets 86 -> 75 g, days on target 99.2% -> 100%, pools and variety
+  unchanged. ALSO MEASURED AND NOT KEPT: an exactly even protein split between the main meals took lunch only 3 g further,
+  made breakfast heavier (54 -> 59 g, Gemini's other complaint) and cut breakfast choice by a fifth (vegan 53 -> 40); with
+  the old 0.40 lunch it left only 14% of days on target, because the leftover lunch outgrew it. Gemini was half right:
+  "smart carb timing" is coincidence (the app does not plan carbs around training) and a bedtime casein snack adds little
+  at ~188 g a day. FOUND ON THE WAY, FIXED: after a night out the step that tops protein back to 95% asked for a 2%
+  bigger portion, which rounds back to the same grams, so the day sat at 94%; it now steps up until it holds, never past
+  the planned size. Fixtures re-anchored (each says why): eating-out (a leftover lunch's dish is the dinner's),
+  eating-out-budget (whole-item rounding to 0.78), meal-addition (rice for today's dinner share), meal-knock-on (the
+  share-line rule itself, 1 mutation caught), meal-library (plate-limited count 3 -> 2, measured), meal-menu (by name;
+  a leftover lunch is yesterday's dinner), meal-rebalance (a fattier tray bake on Tuesday, measured), meal-refit (3x,
+  past the 2.5x scaler), meal-top-up (seeds g3 7 -> 1, g0 10 -> 8, leftover 4242 -> 4200, both-kinds 20 -> 10, scanned).
+  `test:meal-protein-spread` (12 checks; 2 mutations, both caught). Frontend only; new plans and refits get the new split,
+  stored meals keep their portions until he regenerates or the refit offer appears.
 - [x] **FIRST PLAY STORE BUNDLE BUILT, 23 Nov 2026** (closed test only; nothing published). `app-release.aab`, 6.61 MB,
   versionCode 1 / versionName 1.0, production database (4 references to the production project in the bundled app, 0
   to TEST). Signed with his upload key (`%USERPROFILE%\personal-trainer-upload.jks`, alias `upload`, owner "CN=Ashley

@@ -734,7 +734,9 @@
     "test:planned-rounds": "tsx scripts/test-planned-rounds.ts",
     "verify:planned-rounds": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/planned-rounds.mjs",
     "test:account-auth": "tsx scripts/test-account-auth.ts",
-    "verify:welcome": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/welcome.mjs"
+    "verify:welcome": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/welcome.mjs",
+    "measure:meal-protein-spread": "tsx scripts/measure-meal-protein-spread.ts",
+    "test:meal-protein-spread": "tsx scripts/test-meal-protein-spread.ts"
   },
   "dependencies": {
     "@capacitor/android": "8.6.2",

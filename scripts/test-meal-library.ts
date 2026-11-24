@@ -105,7 +105,9 @@ async function main() {
   const sizeLimited = (x: { servedAt: number[]; refusedAt: number[] }) => x.servedAt.length > 0 && x.refusedAt.length > 0 && Math.max(...x.servedAt) < median0(x.refusedAt)
   const unexplained = underHalf.filter(x => x.dens >= 7 && !sizeLimited(x))
   check('...and a dish served to under half is a LEAN one (under 7 g of protein per 100 kcal as written) or one the PLATE limits to the smaller meals: a protein-dense dish that few can be served for any other reason is a defect', unexplained.length === 0, unexplained.map(x => `${x.d.name} ${x.dens.toFixed(1)} served at ${x.servedAt.join(',')} refused at ${x.refusedAt.join(',')}`))
-  check('...the plate does limit some (so that half of the rule is not idle), and never a dinner-sized majority: under 40 of them', underHalf.filter(x => x.dens >= 7).length >= 3 && underHalf.filter(x => x.dens >= 7).length < 40, underHalf.filter(x => x.dens >= 7).length)
+  // At least 2, measured 24 Nov 2026 (was 3): lunch fell from 40% to 35% of a three-meal day, so fewer meals are big
+  // enough for the plate to bind. Still more than one, so the rule is not idle.
+  check('...the plate does limit some (so that half of the rule is not idle), and never a dinner-sized majority: under 40 of them', underHalf.filter(x => x.dens >= 7).length >= 2 && underHalf.filter(x => x.dens >= 7).length < 40, underHalf.filter(x => x.dens >= 7).length)
   // MOVED 18 Nov 2026: 78 -> 72. Measured 87, 77, 91 and 91 with the plate rules in (they were 82, 89, 91, 94 on 30 Sep):
   // lunch is the biggest meal of the day, and a sandwich or a soup is no longer served as one of 970 kcal.
   const servableBy = SLOTS.map(s => { const r = served.filter(x => x.d.slot === s); return Math.round(100 * r.reduce((a, x) => a + x.pass / Math.max(1, x.of), 0) / r.length) })

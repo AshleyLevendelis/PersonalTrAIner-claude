@@ -82,7 +82,15 @@ const ALL_SLOTS: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
 const BASE_RATIOS: Record<2 | 3 | 4, Partial<Record<MealSlotName, number>>> = {
   // Two meals are breakfast and dinner (his ruling 14 Nov 2026, "A"), unless breakfast is skipped: see TWO_MEALS_NO_BREAKFAST.
   2: { breakfast: 0.45, dinner: 0.55 },
-  3: { breakfast: 0.30, lunch: 0.40, dinner: 0.30 },
+  // LUNCH AND DINNER EQUAL (his "Build it", 24 Nov 2026; the split is mine, CSCS). Every macro takes the meal's calorie
+  // share, and lunch was 0.40, so lunch carried 36% of the day's protein with a snack: a 67 g lunch on a 188 g day
+  // (about 240 g of raw tuna), and last night's dinner came back as a lunch a third bigger. Protein spread across the
+  // day's meals serves muscle better than one big serving (Areta 2013, Mamerow 2014, Schoenfeld & Aragon 2018).
+  // Measured (measure:meal-protein-spread, real library, 28 days, leftovers on): his lunch 72 -> 63 g on average, the
+  // largest meal anyone is served 86 -> 75 g, days on target 99% -> 100%, pools unchanged. An exactly even split of
+  // protein was measured too and NOT kept: 3 g more off lunch, for a heavier breakfast and a fifth fewer breakfasts
+  // (vegan 53 -> 40). Cook once, eat twice is two equal portions; the day's calories are unchanged.
+  3: { breakfast: 0.30, lunch: 0.35, dinner: 0.35 },
   4: { breakfast: 0.25, lunch: 0.30, dinner: 0.30, snack: 0.15 },
 }
 
