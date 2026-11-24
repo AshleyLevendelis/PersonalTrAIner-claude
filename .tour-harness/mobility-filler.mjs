@@ -77,6 +77,8 @@ const readRows = async () => (await ev(`(() => {
       label: (card.querySelector('p')?.textContent || '').trim(),
       text: card.innerText.replace(/\\s+/g, ' ').trim(),
       saved: !!card.querySelector('[data-testid="cardio-readback"]'),
+      // The Start button (his 23-24 Nov 2026 rulings) is its own row; the 170px bound is for the rest of the block.
+      startH: Math.round([...card.querySelectorAll('[data-testid="planned-rounds-start"],[data-testid="planned-timed-start"]')].reduce((a, b) => a + b.getBoundingClientRect().height, 0)),
       clipped, top: Math.round(r.top + window.scrollY), h: Math.round(r.height), w: Math.round(r.width),
     }
   })
@@ -100,8 +102,10 @@ check('5. exactly one of each — the cardio was not replaced and the mobility i
 check('6. neither row cuts its own text off', rows.length > 0 && rows.every(r => r.clipped === 0), rows.map(r => ({ label: r.label, clipped: r.clipped })))
 // A row is now a heading and one 44px row of boxes (Ashley's "like a lifting
 // set", 24 Sep 2026), so the height bound is the whole block's, measured at
-// 390px: under 170px each, never a form that pushes the session off screen.
-check('7. both fit the phone', rows.length > 0 && rows.every(r => r.w <= 390 && r.h > 0 && r.h <= 170), rows.map(r => ({ w: r.w, h: r.h })))
+// 390px: under 170px each, never a form that pushes the session off screen. A
+// session's Start button (24 Nov 2026) adds its own height and no more: a 60px
+// cap on it, so a second button or a tall one still fails.
+check('7. both fit the phone', rows.length > 0 && rows.every(r => r.w <= 390 && r.h > 0 && r.startH <= 60 && r.h - r.startH <= 170), rows.map(r => ({ w: r.w, h: r.h, startH: r.startH })))
 
 // ONE CANDIDATE CANNOT TEST A CHOICE. Two rows are on screen, so logging the
 // FINISHER must tick the finisher and leave the optional row open — a read-back
