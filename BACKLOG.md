@@ -20,6 +20,19 @@ Newest first. One line each.
   phone receiving one (needs his Firebase project, the secret, the two deploys and a native build:
   docs/handover/android-notifications.md). Known: the status-bar icon is the app icon (may draw as a white circle).
   Needs the `coach-reach-out` and `chat-gemini` deploys and the `FCM_SERVICE_ACCOUNT` secret.
+  **PROVEN LIVE 24 Nov 2026** on his Samsung (SM-S948B), production: Firebase app `uk.co.personaltrainerapp` added to
+  project personal-trainer-43bee (the earlier google-services.json named only the placeholder id); secret set on TEST
+  and production (his yes); `coach-reach-out` and `chat-gemini` deployed by him from this branch; device row `fcm:`
+  saved 16:29; the test send reached the phone with the app shut, and the tap opened the chat. Three snags on the way,
+  worth knowing: (1) the first secret was stored with an extra layer of JSON quoting (I set it through an env file
+  with a double-stringified value), `parseServiceAccount` returned null and the log said "FCM_SERVICE_ACCOUNT is not
+  set" — a set-but-unreadable secret logs as unset, so read that line as "missing OR unparseable". Fixed by a
+  single-quoted literal env value; the CLI's digest then matched sha256 of the compact JSON on both projects. (2) In a
+  OneDrive worktree the deploy refused with "stale" shared copies that differed only in CRLF line endings
+  (`core.autocrlf=true`); `npm run sync:shared` rewrote them, nothing to commit. (3) OneDrive left node_modules files as
+  cloud placeholders ("not a regular file" in Gradle) and locked app\build; replaced the placeholders with real copies
+  and deleted app\build. The app now asks POST_NOTIFICATIONS, WAKE_LOCK, ACCESS_NETWORK_STATE and c2dm RECEIVE, so the
+  next Play bundle's permission list grows by those. Key file moved out of Downloads to C:\Users\Ashley\app-keys.
 
 - [x] **SIMPLE MEALS BY DEFAULT (his "Do whatever you think is best", 23 Nov 2026)**. His report: "Meal plans are the
   app's biggest weakness. The meals are too complicated. Users are required to become gourmet chefs", plus own meals
