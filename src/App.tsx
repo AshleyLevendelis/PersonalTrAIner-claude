@@ -3878,7 +3878,7 @@ function App() {
         exercisePlan={exercisePlan}
         planBan={{
           mesocycle,
-          loadGuard: () => loadPlanEditContext(profile, mesocycle, mesocycleCreatedAt ?? profile.created_at).then(c => c.isProtected),
+          loadGuard: name => loadPlanEditContext(profile, mesocycle, mesocycleCreatedAt ?? profile.created_at).then(c => c.banGuard(name)),
           ban: handleBanExercise,
         }}
         // Open for the app tour's Profile stop too (22 Nov 2026, tour-stage.ts), and shut again when it moves on.

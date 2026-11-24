@@ -194,6 +194,31 @@ export function buildDayGuard(mesocycle: MesocycleWeek[], input: DayGuardInput):
 }
 
 /**
+ * THE GUARD A BAN WRITES THROUGH (24 Nov 2026). Ashley, mid-session, banned Clamshell from the ⋮ menu: the sheet
+ * said "It isn't in any session still to come … The session already behind you keeps it", and the exercise stayed
+ * on the session he was looking at. A RUNNING session counts as trained for rule 1, which is right for a rebuild (it
+ * would redraw the session under him) and wrong for a ban: he is asking for that exercise gone from the session in
+ * front of him, the edit a mid-session swap already makes.
+ *
+ * So today's row is open to a ban when a session is running today, today is not closed (missed, rested, swapped),
+ * and NOTHING of this exercise has been logged today. An exercise with one logged set keeps today as the record; a
+ * past date, and a row today shares with a date already behind him, stay shut. `loggedTodayNames` null means the
+ * day's sets could not be read: nothing is opened (the guard errs protective, as its loader does).
+ */
+export function buildBanGuard(mesocycle: MesocycleWeek[], input: DayGuardInput & {
+  runningToday: boolean
+  /** Exercise names with a set logged today, lower-cased; null when they could not be read. */
+  loggedTodayNames: ReadonlySet<string> | null
+  exerciseName: string
+}): DayGuard {
+  const open = input.runningToday && input.loggedTodayNames !== null
+    && !input.loggedTodayNames.has(input.exerciseName.toLowerCase())
+  // Running counts as logged; taking today out of the logged dates is the whole change. A day he closed (missed,
+  // rested, swapped) and a row another past date serves stay protected by the same rule as ever.
+  return buildDayGuard(mesocycle, open ? { ...input, loggedDates: [...input.loggedDates].filter(d => d !== input.today) } : input)
+}
+
+/**
  * For gates and for a plan nobody has trained on yet (onboarding). NOT for any
  * path that changes a live plan: those load the real guard, and
  * `test:adaptations-respect-trained` fails if this is named under `src/`

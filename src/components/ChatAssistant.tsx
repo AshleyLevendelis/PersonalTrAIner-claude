@@ -3300,7 +3300,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // 2026 and must not describe the same change in different words.
     // Sessions already trained keep it (runs 3-4, M35): counted with the same
     // guard the confirm writes through, so the card states what will happen.
-    const { isProtected } = await loadPlanEditContext(profile, mesocycle, planCreatedAt ?? profile.created_at)
+    const isProtected = (await loadPlanEditContext(profile, mesocycle, planCreatedAt ?? profile.created_at)).banGuard(name)
     const radius = banBlastRadius(mesocycle, name, isProtected)
     const banLines = banConfirmLines(radius)
     const sessions = radius.sessions

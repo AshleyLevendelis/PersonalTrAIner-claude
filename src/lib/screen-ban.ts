@@ -153,7 +153,8 @@ export async function banOnScreen(input: {
 
   if (mesocycle.length === 0) return { error: null, banned: true, undo: undoWith(false) }
 
-  const { isProtected } = await loadPlanEditContext(profile, mesocycle, planCreatedAt ?? profile.created_at)
+  // banGuard, not isProtected: a running session he has logged none of this exercise in is open to the ban.
+  const isProtected = (await loadPlanEditContext(profile, mesocycle, planCreatedAt ?? profile.created_at)).banGuard(exerciseName)
   const updated = await banExerciseFromMesocycle({
     mesocycle, profile, bannedName: exerciseName,
     exclusions: [...new Set([...exclusions, exerciseName])],
