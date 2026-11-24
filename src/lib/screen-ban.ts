@@ -73,8 +73,12 @@ export function banConfirmLines(radius: BanBlastRadius): { warn: string | null; 
         : `It isn't on this plan anywhere, so nothing changes today — but it will never be chosen for you again, in this plan or the next one, and it won't be offered as a swap.`,
     }
   }
+  // ONE SESSION IS SAID AS ONE (24 Nov 2026, his "fix the weird wording"): "This is every week of your plan, not just
+  // today — 1 session gets rebuilt" read oddly when that one session IS today's, the case a mid-session ban now reaches.
   return {
-    warn: `This is every week of your plan, not just today — ${sessions} session${sessions === 1 ? '' : 's'} get${sessions === 1 ? 's' : ''} rebuilt. Each one gets the closest alternative your kit and injuries allow.`,
+    warn: sessions === 1
+      ? `It's in one session still to come, so that one gets rebuilt with the closest alternative your kit and injuries allow.`
+      : `This is every week of your plan, not just today — ${sessions} sessions get rebuilt. Each one gets the closest alternative your kit and injuries allow.`,
     info: `Where there's no good alternative, that slot comes out rather than being filled with something worse. It will never be chosen for you again, in this plan or the next.${keptLine}`,
   }
 }
@@ -153,7 +157,8 @@ export async function banOnScreen(input: {
 
   if (mesocycle.length === 0) return { error: null, banned: true, undo: undoWith(false) }
 
-  const { isProtected } = await loadPlanEditContext(profile, mesocycle, planCreatedAt ?? profile.created_at)
+  // banGuard, not isProtected: a running session he has logged none of this exercise in is open to the ban.
+  const isProtected = (await loadPlanEditContext(profile, mesocycle, planCreatedAt ?? profile.created_at)).banGuard(exerciseName)
   const updated = await banExerciseFromMesocycle({
     mesocycle, profile, bannedName: exerciseName,
     exclusions: [...new Set([...exclusions, exerciseName])],

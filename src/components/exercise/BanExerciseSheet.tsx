@@ -31,7 +31,7 @@ export function BanExerciseSheet({
   exerciseName: string | null
   mesocycle: MesocycleWeek[]
   /** Which sessions are already trained (they keep it). The ban itself loads the same guard. */
-  loadGuard: () => Promise<DayGuard>
+  loadGuard: (exerciseName: string) => Promise<DayGuard>
   onConfirm: (exerciseName: string) => Promise<BanOutcome | void> | void
   onClose: () => void
 }) {
@@ -50,7 +50,7 @@ export function BanExerciseSheet({
     let live = true
     // Counted with the trained-day guard, so "N sessions get rebuilt" is the
     // number the ban will change (M35). While it loads, Ban waits.
-    loadGuard()
+    loadGuard(exerciseName)
       .then(guard => { if (live) setLines(banConfirmLines(banBlastRadius(mesocycle, exerciseName, guard))) })
       .catch(() => { if (live) setLines(banConfirmLines(banBlastRadius(mesocycle, exerciseName, null))) })
     return () => { live = false }

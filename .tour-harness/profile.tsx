@@ -359,7 +359,7 @@ function Harness() {
           // App's ban, through the app's own function (screen-ban.ts); __meso lets a driver read what the plan holds.
           planBan={{
             mesocycle,
-            loadGuard: () => loadPlanEditContext(shown, mesocycle, shown.created_at).then(c => c.isProtected),
+            loadGuard: name => loadPlanEditContext(shown, mesocycle, shown.created_at).then(c => c.banGuard(name)),
             ban: name => banOnScreen({ profile: shown, mesocycle, exerciseName: name, exclusions: [], planCreatedAt: shown.created_at, show: m => { setMesocycle(m); (window as unknown as { __meso: MesocycleWeek[] }).__meso = m }, reloadMemory: async () => { setFacts(readFacts()) } }),
           }}
           open={open}

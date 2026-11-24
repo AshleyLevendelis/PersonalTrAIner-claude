@@ -2,6 +2,62 @@
 
 Newest first. One line each.
 
+- [x] **NO LOPSIDED LUNCH: LUNCH AND DINNER ARE THE SAME SIZE (his "Build it", 24 Nov 2026; the split is mine, CSCS).**
+  His report, with Gemini's review of his day: a 1,969 kcal day "on target" served lunch 67 g of protein (about 240 g raw
+  tuna), breakfast 51 g, a 23 g snack. TRACED (engine-tracer): not the day search; every macro takes the meal's CALORIE
+  share, and a three-meal day gave lunch 0.40 (36% with a snack), so lunch carried 36% of the protein, and last night's
+  dinner came back as a lunch a third bigger. CHANGED: three meals are 0.30 / 0.35 / 0.35, so lunch and dinner are one
+  size and a leftover lunch is the dinner portion. CSCS basis: protein spread across the day's meals serves muscle better
+  than one big serving (Areta 2013, Mamerow 2014, Schoenfeld & Aragon 2018); calories are unchanged. MEASURED
+  (`measure:meal-protein-spread`, real library through the real verifier, 6 targets x 3 diets, 28 days, leftovers on):
+  his lunch 72 -> 63 g average, the largest meal anyone gets 86 -> 75 g, days on target 99.2% -> 100%, pools and variety
+  unchanged. ALSO MEASURED AND NOT KEPT: an exactly even protein split between the main meals took lunch only 3 g further,
+  made breakfast heavier (54 -> 59 g, Gemini's other complaint) and cut breakfast choice by a fifth (vegan 53 -> 40); with
+  the old 0.40 lunch it left only 14% of days on target, because the leftover lunch outgrew it. Gemini was half right:
+  "smart carb timing" is coincidence (the app does not plan carbs around training) and a bedtime casein snack adds little
+  at ~188 g a day. FOUND ON THE WAY, FIXED: after a night out the step that tops protein back to 95% asked for a 2%
+  bigger portion, which rounds back to the same grams, so the day sat at 94%; it now steps up until it holds, never past
+  the planned size. Fixtures re-anchored (each says why): eating-out (a leftover lunch's dish is the dinner's),
+  eating-out-budget (whole-item rounding to 0.78), meal-addition (rice for today's dinner share), meal-knock-on (the
+  share-line rule itself, 1 mutation caught), meal-library (plate-limited count 3 -> 2, measured), meal-menu (by name;
+  a leftover lunch is yesterday's dinner), meal-rebalance (a fattier tray bake on Tuesday, measured), meal-refit (3x,
+  past the 2.5x scaler), meal-top-up (seeds g3 7 -> 1, g0 10 -> 8, leftover 4242 -> 4200, both-kinds 20 -> 10, scanned).
+  `test:meal-protein-spread` (12 checks; 2 mutations, both caught). Frontend only; new plans and refits get the new split,
+  stored meals keep their portions until he regenerates or the refit offer appears.
+  MERGED WITH SIMPLE MEALS (24 Nov 2026): test:flexible-nutrition's "never a dinner back to back" rode on one seed
+  (1311), which went 0 -> 1 with the equal split. Measured over 300 seeds the equal split has FEWER runs with a
+  back-to-back dinner (46 vs 53), so the check now holds a rate over 40 seeds (at most a quarter, and fewer than "Same
+  meals most days"); 2 mutations, both caught.
+  THE FULL SWEEP ON THE MERGE found two drivers whose fixtures stopped binding (both pass on main, both app-correct):
+  verify:meal-knock-on added food to LUNCH, and with lunch and dinner equal, dinner now absorbs it by resizing at every
+  amount tried (ten), so no other DISH moved and the card-names-the-dish checks had nothing to read. It now adds to
+  DINNER, where 10 g of oil moves breakfast's dish (mutation: the card names a wrong dish, caught). verify:usual-meals'
+  "Chicken, rice and veg" had 6 g of fat; dinner's share is now 958 kcal / 26 g fat (was 821 / 23), and sized that
+  big it could not make a day land, so it was KEPT at his amounts. Real consequence, named: a very lean usual dinner is
+  sized less often on the equal split. The fixture gained its cooking oil (10 g) and is sized as before (mutation:
+  never size, caught).
+- [x] **A BAN TAPPED MID-SESSION LEFT THE EXERCISE ON THE SESSION (his report 24 Nov 2026, with screenshots)**. With
+  the session running and nothing logged, ⋮ → Ban Clamshell said "It isn't in any session still to come, so nothing
+  changes ahead of you … The session already behind you keeps it", the receipt said "out for good", and Clamshell
+  stayed on his day. CAUSE (traced): since run 5 (H28, 11 Oct) a RUNNING session counts as trained for the day guard,
+  so no rebuild redraws a session under him. The ban wrote through that same guard and skipped today. Right for a
+  rebuild, wrong for a ban: he is asking for that one exercise gone from the session in front of him, the edit a
+  mid-session swap already makes. FIX (mine, CSCS: the record is what was LOGGED, not what was on the card): a ban has
+  its own guard (`buildBanGuard`, loaded as `banGuard(name)`) that opens today's running session for an exercise with
+  nothing of it logged today; a set of it logged, a missed/rested/swapped day, a past day, or an unreadable day keep
+  today as it is. Every ban path uses it: the Exercise tab's sheet, Profile's, the screen ban, the coach's card and its
+  confirm, so the sheet's count and the write agree. Rebuilds are unchanged. Two lines I first wrote (a closed-day test
+  and a today-rows set) turned out to repeat what the underlying guard already does (MISSED mutations) and were
+  deleted. `test:ban-running-session` (23 checks, 8 mutations, 8 caught), `verify:ban-running-session` (11 checks;
+  with the fix removed it reproduces his report, Side Plank staying on the running session; 2 mutations, 2 caught);
+  `test:ban-scope` and `test:rebuild-honours` re-anchored (the guard's new shape; 4 mutations, 4 caught). All 91
+  gates that read the touched files pass. WORDING FIXED the same day (his "Fix the weird wording"): one
+  session to change now reads "It's in one session still to come, so that one gets rebuilt with the closest
+  alternative your kit and injuries allow." (it had read "This is every week of your plan, not just today — 1 session
+  gets rebuilt"); two or more keep the old sentence. Both sheets and the coach's card, one function
+  (`test:sheet-manners`, `test:ban-running-session`, 2 mutations, 2 caught). No Undo was needed beyond the
+  existing one, which puts the whole plan back. Frontend only: no edge function, no migration.
+
 - [x] **NOTIFICATIONS IN THE ANDROID APP (23 Nov 2026, his report "Now the app is on my phone as a proper app ...
   Notifications dont seem to be working", then "yes build it for Android").** Cause: the phone app (Capacitor) has no
   browser push service or service worker, so Profile > Reminders said "This browser can't show notifications from the

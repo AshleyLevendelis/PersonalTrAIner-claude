@@ -59,7 +59,10 @@ const today = dates[0]
 
 console.log('\n1. The sheet works it out before she can agree\n')
 check('1a. the week is served: seven days, each with a lunch and a dinner', dates.length === 7 && dates.every(x => w0[x].lunch && w0[x].dinner), w0)
-check('1b. the lunch row opens', await clickAt(`[...document.querySelectorAll('button')].find(b => /^\\s*Lunch/i.test(b.textContent || '') && !b.hasAttribute('data-ingredient-row'))`))
+// 24 Nov 2026: the food goes on DINNER. Since lunch and dinner are equal, food on lunch is absorbed by resizing dinner
+// (no dish moves at any amount tried); on dinner a small amount moves breakfast's dish, so the fixture binds again.
+const SLOT = 'dinner'
+check('1b. the dinner row opens', await clickAt(`[...document.querySelectorAll('button')].find(b => /^\\s*Dinner/i.test(b.textContent || '') && !b.hasAttribute('data-ingredient-row'))`))
 await until(() => ev(`!!document.querySelector('[data-testid="meal-food-add-open"]')`), v => v === true, 20)
 check('1c. ...and offers Add food', await ev(`(() => { const b = document.querySelector('[data-testid="meal-food-add-open"]'); if (!b) return false; b.scrollIntoView({ block: 'center' }); b.click(); return true })()`))
 await until(() => ev(`!!document.querySelector('[data-testid="meal-food-add-search"]')`), v => v === true, 20)
@@ -68,7 +71,7 @@ await until(() => ev(`!!document.querySelector('[data-testid="meal-food-add-sear
 // asking the app's own trial, amount by amount, not assumed.
 let chosen = null
 let firstState = null
-for (const [food, amount] of [['banana', 100], ['banana', 200], ['white rice', 150], ['banana', 300], ['white rice', 250], ['olive oil', 20]]) {
+for (const [food, amount] of [['banana', 100], ['banana', 200], ['white rice', 150], ['banana', 300], ['banana', 200], ['banana', 250], ['banana', 350], ['banana', 400], ['white rice', 200], ['white rice', 300], ['olive oil', 10], ['olive oil', 15], ['chicken breast', 150], ['cheddar', 40]]) {
   await setInput('meal-food-add-search', food)
   await wait(350)
   const picked = await ev(`(() => { const b = [...document.querySelectorAll('[data-testid="meal-food-add-result"]')].find(x => x.textContent.trim() === ${JSON.stringify(food)}); if (!b) return false; b.click(); return true })()`)
@@ -79,11 +82,11 @@ for (const [food, amount] of [['banana', 100], ['banana', 200], ['white rice', 1
   const early = await sheetState()
   if (!firstState) firstState = early
   const settled = await until(sheetState, v => v.lines.length > 0 && v.checking === false, 60)
-  const named = parseLines(settled.lines, today, dates)
+  const named = parseLines(settled.lines, today, dates); console.log('DBG', food, amount, JSON.stringify(settled.lines.slice(5))); console.log("DBG", food, amount, JSON.stringify(settled.lines))
   if (named.some(n => n.kind === 'dish')) { chosen = { food, amount, settled, named }; break }
 }
 check('1d. while it is working it out the card says so, and the button cannot be tapped', firstState?.checking === true && firstState?.disabled === true, firstState)
-check('1e. a food was found that changes another DISH on this plan (the fixture is under pressure)', !!chosen, chosen ? `${chosen.amount} g ${chosen.food}` : 'none of six moved a dish')
+check('1e. a food was found that changes another DISH on this plan (the fixture is under pressure)', !!chosen, chosen ? `${chosen.amount} g ${chosen.food}` : 'none of ten moved a dish')
 const lines = chosen?.settled.lines ?? []
 check('1f. once it is back, the button can be tapped', chosen?.settled.disabled === false && chosen?.settled.checking === false, chosen?.settled)
 
@@ -91,7 +94,7 @@ console.log('\n2. The card names what else will change\n')
 check('2a. the old assertion is gone: nothing says the day "re-fits around it"', lines.length > 0 && !lines.some(l => /re-?fits? around/i.test(l)), lines)
 check('2b. each other meal that changes is named with its day, its meal and the dish it becomes', (chosen?.named ?? []).filter(n => n.kind === 'dish').length >= 1 && (chosen?.named ?? []).every(n => !n.date.startsWith('?')), chosen?.named)
 check('2c. it does not also claim nothing else changes', !lines.includes('No other meal on your plan changes.'), lines)
-check('2d. the day is named in words, never as a stored date', lines.some(l => /^Just for today\. On other days your lunch stays /.test(l)) && !lines.some(l => /\d{4}-\d{2}-\d{2}/.test(l)), lines)
+check('2d. the day is named in words, never as a stored date', lines.some(l => l.startsWith(`Just for today. On other days your ${SLOT} stays `)) && !lines.some(l => /\d{4}-\d{2}-\d{2}/.test(l)), lines)
 const box = await ev(`(() => { const n = document.querySelector('[data-testid="meal-food-add-preview"]'); if (!n) return null; n.scrollIntoView({ block: 'center' }); const r = n.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), h: innerHeight } })()`)
 check('2e. the whole card is on screen where she is about to tap', !!box && box.top >= 0 && box.bottom <= box.h, box)
 await shoot('meal-knock-on-card')
@@ -99,12 +102,12 @@ await shoot('meal-knock-on-card')
 console.log('\n3. After the tap, the week changed exactly where the card said\n')
 const before = await week()
 check('3a. tapping Add it', await ev(`(() => { const b = document.querySelector('[data-testid="meal-food-add-confirm"]'); if (!b || b.disabled) return false; b.click(); return true })()`))
-const after = await until(week, v => v && v[today] && v[today].lunch !== before[today].lunch, 60)
-check('3b. today\'s lunch is now the lunch with the food in it', new RegExp(`\\+ .*${chosen?.food ?? 'zzz'}`).test(after?.[today]?.lunch ?? ''), after?.[today]?.lunch)
+const after = await until(week, v => v && v[today] && v[today][SLOT] !== before[today][SLOT], 60)
+check(`3b. today's ${SLOT} is now the ${SLOT} with the food in it`, new RegExp(`\\+ .*${chosen?.food ?? 'zzz'}`).test(after?.[today]?.[SLOT] ?? ''), after?.[today]?.[SLOT])
 // INDEPENDENT OF THE CARD: every cell whose dish differs, read off the app's hook.
 const moved = []
 for (const date of dates) for (const slot of ['breakfast', 'lunch', 'dinner', 'snack']) {
-  if (date === today && slot === 'lunch') continue
+  if (date === today && slot === SLOT) continue
   if ((before[date] ?? {})[slot] !== (after?.[date] ?? {})[slot]) moved.push(`${date}|${slot}|${(after?.[date] ?? {})[slot]}`)
 }
 const said = (chosen?.named ?? []).filter(n => n.kind === 'dish').map(n => `${n.date}|${n.slot}|${n.to}`)
@@ -115,9 +118,9 @@ check('3c. every dish the card named did change, to the dish it named', said.len
 check('3d. ...and NOTHING changed that the card did not account for: the dishes it named plus the "N more" it counted cover every dish that moved',
   moved.length >= 1 && (more === 0 ? moved.length === said.length : moved.length > said.length && moved.length <= said.length + more) && said.length + sizes <= 4, { moved: moved.length, named: said.length, sizes, more, lines })
 // Ashley, 2 Nov 2026, "Today only": the edited lunch is today's, and no later day's search can serve it.
-const editedLunch = after?.[today]?.lunch ?? null
+const editedLunch = after?.[today]?.[SLOT] ?? null
 const servedLater = dates.filter(dt => dt !== today && Object.values(after?.[dt] ?? {}).includes(editedLunch))
-check('3e. the edited lunch is served today only: no later day serves it', !!editedLunch && servedLater.length === 0, { editedLunch, servedLater })
+check(`3e. the edited ${SLOT} is served today only: no later day serves it`, !!editedLunch && servedLater.length === 0, { editedLunch, servedLater })
 await ev(`window.scrollTo(0, 0)`)
 await wait(400)
 await shoot('meal-knock-on-after')
@@ -131,7 +134,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
       const json = b => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } })
       // The model only PARSES: which meal, which food, how much. The card is the app's.
       // (The same answer to the follow-up tap: the app may ask a trade-off question before it shows the card.)
-      return json({ reply: '', proposal: { kind: 'propose_meal_food_add', rawArgs: { meal_slot: 'lunch', food_lines: ['${chosen?.amount ?? 100}g ${chosen?.food ?? 'banana'}'], origin_verbatim_quote: said } } })
+      return json({ reply: '', proposal: { kind: 'propose_meal_food_add', rawArgs: { meal_slot: '${SLOT}', food_lines: ['${chosen?.amount ?? 100}g ${chosen?.food ?? 'banana'}'], origin_verbatim_quote: said } } })
     }
     return realFetch(url, init)
   }
@@ -142,7 +145,7 @@ await until(() => ev(`window.__weekMeals ? Object.keys(window.__weekMeals()).len
 // RE-ANCHORED 18 Nov 2026: an amount on a coach card is one HE said (17 Nov, amount-said.ts). This typed "add a
 // banana" while the stand-in coach wrote "200g banana", which the app now rightly asks about instead of carding. The
 // subject here is the knock-on, so he says the amount the coach then writes.
-const SAID = `add ${chosen?.amount ?? 100}g of ${chosen?.food ?? 'banana'} to my lunch`
+const SAID = `add ${chosen?.amount ?? 100}g of ${chosen?.food ?? 'banana'} to my ${SLOT}`
 await ev(`(() => { const t = document.querySelector('textarea'); Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set.call(t, ${JSON.stringify(SAID)}); t.dispatchEvent(new Event('input', { bubbles: true })) })()`)
 await wait(300)
 check('4a. the request is sent', await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /send/i.test(x.getAttribute('aria-label') || '')); if (!b || b.disabled) return false; b.click(); return true })()`))

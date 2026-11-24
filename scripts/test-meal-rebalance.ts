@@ -145,7 +145,7 @@ async function main() {
   const pools = {
     breakfast: [dish('breakfast', 'Oats bowl', 60, 150, 8), dish('breakfast', 'Rice porridge', 55, 160, 7), dish('breakfast', 'Egg rice', 65, 140, 9)],
     lunch: [dish('lunch', 'Chicken salad', 150, 200, 12), dish('lunch', 'Rice and greens', 140, 220, 11), dish('lunch', 'Grain bowl', 160, 190, 13)],
-    dinner: [dish('dinner', 'Tray bake', 170, 220, 14), dish('dinner', 'Rice pot', 160, 240, 12), dish('dinner', 'Baked chicken', 180, 210, 15)],
+    dinner: [dish('dinner', 'Tray bake', 170, 180, 26), dish('dinner', 'Rice pot', 160, 240, 12), dish('dinner', 'Baked chicken', 180, 210, 15)],
   } as unknown as Record<'breakfast' | 'lunch' | 'dinner', Opt[]>
   const targets = sum([pools.breakfast[0].macros, pools.lunch[0].macros, pools.dinner[0].macros])
   const today = '2026-09-27'
@@ -303,11 +303,16 @@ async function main() {
     // with it, the tight bands (18 Oct) put the day just outside, and her 10 Oct hold rule ("Resize, else leave")
     // re-fits the day's other meal around the two pins. That is the app's rule for any pin, so it is said on the card
     // before the tap, and the day's line says why the total moved instead of blaming the rounding (it first did).
-    const refitLine = r?.diff.implications?.find(x => isRefitLine(x.text))
-    const sameDayResize = r?.diff.implications?.some(x => x.text.startsWith(`${dName}'s breakfast goes from`))
-    check('the fixture is under pressure: this move pushes the day out of band, so the hold re-fits breakfast', !!sameDayResize, r?.diff.implications)
+    // ITS OWN DAY (24 Nov 2026): with lunch and dinner the same size, a move on the leftovers day above no longer leaves
+    // the bands, so the pushed case is a measured one: the Tray bake (fattier since then) on Tuesday, 150 kcal.
+    const PUSHED = dates[2]
+    const pushed = okOf(build(on, { from_slot: 'lunch', to_slot: 'dinner', kcal: 150, date: PUSHED }))
+    const pName = new Intl.DateTimeFormat('en-GB', { weekday: 'long', timeZone: 'UTC' }).format(new Date(PUSHED + 'T00:00:00Z'))
+    const refitLine = pushed?.diff.implications?.find(x => isRefitLine(x.text))
+    const sameDayResize = pushed?.diff.implications?.some(x => x.text.startsWith(`${pName}'s breakfast goes from`))
+    check('the fixture is under pressure: this move pushes the day out of band, so the hold re-fits breakfast', !!sameDayResize, pushed?.diff.implications)
     check('...said on the card, and the total said as a re-fit around the two, never as rounding',
-      !!refitLine && !r?.diff.implications?.some(x => /Rounding/.test(x.text)), r?.diff.implications)
+      !!refitLine && !pushed?.diff.implications?.some(x => /Rounding/.test(x.text)), pushed?.diff.implications)
     // THE LAST DAY OF THE STRIP has no next day served after it, so the rotation's own "cook both portions" answer is
     // the only one there is (serveDates' second pass cannot reach it). Found by a MISSED mutation of that line.
     const last = dates[6]

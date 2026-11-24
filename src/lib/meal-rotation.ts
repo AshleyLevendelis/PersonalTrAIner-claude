@@ -338,10 +338,11 @@ export function batchCookingOn(shape: MealShape | undefined): boolean {
  * Last night's dinner, re-portioned as today's lunch — or null when it cannot
  * honestly be one.
  *
- * WHY IT IS NOT "COOK DOUBLE". Lunch takes a different share of the day from
- * dinner (0.40 against 0.30 on a three-meal split), so serving the same
- * portion twice would leave lunch a third short. Measured over 400 profiles,
- * the factor needed is a median 1.26x.
+ * WHY IT IS STILL RE-PORTIONED. Until 24 Nov 2026 lunch took a bigger share
+ * of the day than dinner (0.40 against 0.30 on a three-meal split), so the
+ * leftover was scaled up about a third. Lunch and dinner now share equally on
+ * three meals (protein spread evenly, meal-generation.ts), so on that shape the
+ * factor is about 1; a two- or four-meal day can still differ.
  *
  * RECOMPUTED, NOT MULTIPLIED, the same rule meal-refit lives under: scaling
  * rounds per ingredient, so the achieved size is never exactly the requested
@@ -721,8 +722,15 @@ function keepProteinAroundEatingOut(day: AssembledDay, pins: Partial<Record<Meal
   const room = Math.min(...free.map(s => planned.chosen[s]!.macros.calories / day.chosen[s]!.macros.calories))
   const factor = Math.min(room, (need - fixedP) / freeP)
   if (!(factor > 1)) return day
-  const chosen = { ...day.chosen }
-  for (const s of free) chosen[s] = resizeDish(day.chosen[s]!, factor) ?? day.chosen[s]
+  // WHOLE GRAMS ROUND (24 Nov 2026, found when protein was spread evenly): a 2% bigger portion rounds back to the same
+  // grams, so the step that promised 95% changed nothing and the day sat at 94%. Asked a step bigger, never past the
+  // planned size, until the protein holds.
+  let chosen = { ...day.chosen }
+  for (let f = factor; f <= room + 1e-9; f = Math.min(room, f + 0.01)) {
+    chosen = { ...day.chosen }
+    for (const s of free) chosen[s] = resizeDish(day.chosen[s]!, f) ?? day.chosen[s]
+    if (fixedP + free.reduce((n, s) => n + (chosen[s]?.macros.protein ?? 0), 0) >= need || f >= room) break
+  }
   const totals = (Object.values(chosen) as PoolOption[]).reduce((a, o) => ({
     calories: a.calories + o.macros.calories, protein: a.protein + o.macros.protein, carbs: a.carbs + o.macros.carbs, fat: a.fat + o.macros.fat,
   }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
