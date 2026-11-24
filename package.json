@@ -12,6 +12,8 @@
     "test:added-load": "tsx scripts/test-added-load.ts",
     "test:audit": "NODE_ENV=production tsx scripts/run-constraint-audit.ts",
     "test:kit-list": "tsx scripts/test-kit-list.ts",
+    "test:health-heart": "tsx scripts/test-health-heart.ts",
+    "test:heart-strap": "tsx scripts/test-heart-strap.ts",
     "test:health-conditions": "tsx scripts/test-health-conditions.ts",
     "test:first-session-lifts": "tsx scripts/test-first-session-lifts.ts",
     "test:band-slots": "tsx scripts/test-band-slots.ts",

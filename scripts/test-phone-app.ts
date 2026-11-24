@@ -33,8 +33,10 @@ console.log('\n1. Android declares READ_STEPS and removes every other health per
   const declared = [...app.matchAll(/<uses-permission android:name="android\.permission\.health.([A-Z0-9_]+)"\s*\/>/g)].map(m => m[1])
   const removed = new Set([...app.matchAll(/<uses-permission android:name="android\.permission\.health.([A-Z0-9_]+)" tools:node="remove"\s*\/>/g)].map(m => m[1]))
   check('the plugin was read (sanity check on this check: it brings more than one health permission)', pluginPerms.length > 10, pluginPerms.length)
-  check('READ_STEPS is declared, and it is the only health permission declared', JSON.stringify(declared) === JSON.stringify(['READ_STEPS']), declared)
-  const kept = pluginPerms.filter(p => p !== 'READ_STEPS' && !removed.has(p))
+  // + READ_HEART_RATE and READ_RESTING_HEART_RATE, his ruling 24 Nov 2026 "1 + 2" (health-heart.ts). An enumerated list ON PURPOSE: a
+  // health permission joins only by a decision, and Google reviews every one.
+  check('READ_STEPS, READ_HEART_RATE and READ_RESTING_HEART_RATE are declared, and nothing else', JSON.stringify([...declared].sort()) === JSON.stringify(['READ_HEART_RATE', 'READ_RESTING_HEART_RATE', 'READ_STEPS']), declared)
+  const kept = pluginPerms.filter(p => !['READ_STEPS', 'READ_HEART_RATE', 'READ_RESTING_HEART_RATE'].includes(p) && !removed.has(p))
   check('every other health permission the plugin declares is removed', kept.length === 0, kept)
   check('the tools namespace the removals need is on the manifest', /xmlns:tools="http:\/\/schemas\.android\.com\/tools"/.test(app))
   const minSdk = Number((read('android/variables.gradle').match(/minSdkVersion\s*=\s*(\d+)/) ?? [])[1])
@@ -60,7 +62,9 @@ console.log('\n3. The code asks for what the settings say, and the website never
 {
   const src = strip(read('src/lib/health-steps.ts'))
   const asks = [...src.matchAll(/requestAuthorization\(\{([^}]*)\}\)/g)].map(m => m[1].replace(/\s+/g, ''))
-  check('one permission request, for reading steps and nothing else', JSON.stringify(asks) === JSON.stringify(["read:['steps']"]), asks)
+  // Two requests since 24 Nov 2026 (his "1 + 2", health-heart.ts): steps, and heart rate with resting heart rate, each
+  // asked only from its own switch. Read only, both.
+  check('two permission requests, steps and heart rate, read only and nothing else', JSON.stringify(asks) === JSON.stringify(["read:['steps']", "read:['heartRate','restingHeartRate']"]), asks)
   check('nothing is ever written to Health', !/saveSample|write:/.test(src))
   check('the plugin is loaded by a dynamic import only (the website\'s download does not grow)', /await import\('@capgo\/capacitor-health'\)/.test(src))
   const statics = ['src/components/Dashboard.tsx', 'src/components/ProfileScreen.tsx', 'src/components/HealthStepsSection.tsx', 'src/lib/health-steps.ts', 'src/main.tsx', 'src/App.tsx']

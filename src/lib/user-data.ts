@@ -37,6 +37,7 @@ export const EXPORTED_TABLES: { table: string; column: string }[] = [
   { table: 'fitness_profiles', column: 'id' },
   { table: 'daily_metrics', column: 'profile_id' },
   { table: 'daily_steps', column: 'profile_id' },
+  { table: 'daily_resting_heart_rate', column: 'profile_id' },
   { table: 'water_logs', column: 'profile_id' },
   { table: 'workout_sessions', column: 'profile_id' },
   { table: 'exercise_set_logs', column: 'user_id' },

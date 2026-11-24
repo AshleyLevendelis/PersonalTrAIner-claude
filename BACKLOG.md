@@ -2,6 +2,25 @@
 
 Newest first. One line each.
 
+- [x] **HEART RATE FROM A WATCH OR STRAP, AFTER EACH SESSION AND AT REST (his "1 + 2, build it", 24 Nov 2026)**.
+  His question: pair heart sensors from a watch or monitor and feed the data in. Options put to him: 1 heart rate after
+  each session, 2 resting heart rate on Home, 3 live heart rate from a Bluetooth strap during a session. He chose 1 and
+  2 to build, then 3. BUILT (phone app only, read only, its own switch on Profile → "Steps from your phone" → "Heart
+  rate from your watch"): after a session the average and highest heart rate over that session's own time show under
+  the cardio log ("♥ 147 avg · 171 max") and in session history; Progress on Home shows "Resting heart rate 58 · 2
+  lower than last week". Read from Health Connect / Apple Health, which the watch or strap already writes to; nothing
+  is written back. Mine (measurement): a reading is believed at 30-230 bpm, a session's figure needs 3 readings inside
+  its time, a resting figure is the lowest reading of the day (25-140), the week's line needs 3 days this week (and 3
+  last week to compare). A cardio log typed in later has a guessed time, so its figure is kept only if the heart clearly
+  worked (highest 100+): measured in the gate, a desk's 70 bpm is never put on a typed-in run. CSCS: NOTHING is
+  prescribed by heart rate; effort stays in words (his health-conditions and cardio-days rulings), and a gate fails on
+  any shown sentence setting a zone or target. Android declares READ_HEART_RATE and READ_RESTING_HEART_RATE (and keeps
+  every write permission removed), so the Play listing's health declaration needs heart rate added; the privacy page
+  now names heart rate (his to approve). Needs migration 20261124180000 (two heart columns, one resting table with
+  owner-only access) and a phone app rebuild. `test:health-heart` (21 checks, 10 mutations), `verify:health-steps` §6-7
+  (6 checks, 3 mutations: 2 caught on screen, the third, the sync's own switch check, is behind the screen's own check
+  and caught by `test:health-heart`), `test:phone-app`. NOT proven: a real watch on his phone; iPhone (not built);
+  the coach is not told these figures yet. NEXT: 3, live heart rate from a Bluetooth strap during a session.
 - [x] **CARDIO DAYS A WEEK, AND A START ON THE CONDITIONING AFTER LIFTING (his ruling 24 Nov 2026, "A, build it")**.
   His question: "can't the coach prescribe cardio or HIIT as part of the plans if that is what the user wants". Options
   put to him: A setup asks someone who loves cardio how many cardio days (0-3) and the plan builds them; B coach only;
