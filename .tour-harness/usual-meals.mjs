@@ -106,7 +106,9 @@ check('4a. a meal holding a food he avoids is refused, naming the food', /mushro
 check('4b. ...and nothing was saved', (await rows()).length === N)
 
 // 5. A MEAL THE APP CAN SIZE: SHOWN AS COSTED BEFORE ANYTHING IS KEPT.
-await fill('Chicken, rice and veg', 'dinner', ['150g chicken breast', '70g dry rice', '100g broccoli'])
+// 24 Nov 2026: with its cooking oil. Since lunch and dinner are equal, dinner is a bigger share of the day, and a dinner
+// with 6 g of fat (against a 26 g share) can no longer be sized into a day that lands; with the oil it is sized as before.
+await fill('Chicken, rice and veg', 'dinner', ['150g chicken breast', '70g dry rice', '100g broccoli', '10g olive oil'])
 await checkIt()
 await until(() => has('[data-testid="my-meal-card"]'), v => v)
 const numbers = await text('[data-testid="my-meal-numbers"]')
@@ -131,7 +133,7 @@ const saved = await until(() => text('[data-testid="my-meals-note"]'), v => v.le
 check('6a. a line says it was added', saved === 'Chicken, rice and veg added to your meals.', saved)
 const afterOne = await mine()
 check('6b. the table holds ONE new row, in dinner, marked as his', (await rows()).length === N + 1 && afterOne.length === 1 && afterOne[0].slot === 'dinner' && afterOne[0].name === 'Chicken, rice and veg', afterOne)
-check('6c. ...with the portions the card showed', afterOne.length === 1 && afterOne[0].ing.length === 3 && afterOne[0].ing.every(i => /^\d/.test(i)), afterOne[0]?.ing)
+check('6c. ...with the portions the card showed', afterOne.length === 1 && afterOne[0].ing.length === 4 && afterOne[0].ing.every(i => /^\d/.test(i)), afterOne[0]?.ing)
 const list1 = await until(listed, l => l.length === 1)
 check('6d. it is listed, with its meal and numbers, on a 44px row', list1.length === 1 && list1[0].name === 'Chicken, rice and veg' && /Dinner · \d{3,4} kcal · \d+g protein/.test(list1[0].line) && list1[0].h >= 44, list1)
 check('6e. the form has closed and Add is back', !(await has('[data-testid="my-meals-form"]')) && await has('[data-testid="my-meals-add"]'))

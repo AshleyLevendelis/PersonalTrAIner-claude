@@ -295,7 +295,8 @@ if (Array.isArray(results) && results.length > 0) {
 // The tester took the banana out of an eaten breakfast: the card said "lunch goes from 822 to 957", lunch landed at
 // 894, and the line said the others were 7% smaller. The correction now reaches the eaten record, and the card reads
 // today the way this screen draws it. A fixture where the correction moves another meal, so the claim has something
-// to be wrong about (9b's lunch line).
+// to be wrong about (9b's lunch line). 24 Nov 2026: it takes out the RICE, not the oil. Since lunch and dinner are equal
+// a 162 kcal gap spreads over both and moves lunch 6%, under the 10% a card names, so the oil no longer bound.
 console.log('\n9. Correcting a meal already eaten: the card, the eaten number and the rows agree, and Undo puts it all back\n')
 {
   const pageErr0 = await ev('window.__err ?? null')
@@ -308,7 +309,7 @@ console.log('\n9. Correcting a meal already eaten: the card, the eaten number an
   await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^I ate this$/.test((x.textContent||'').trim())); if (b) b.click() })()`)
   await wait(1200)
   check('9a. breakfast is logged as eaten, at its own size', Number(await hero()) === before.breakfast && before.breakfast > 0, { hero: await hero(), before })
-  const oil = ((await rows()) ?? []).find(l => /olive oil/.test(l)) ?? null
+  const oil = ((await rows()) ?? []).find(l => /basmati rice/.test(l)) ?? null
   await tapRow(oil ?? '')
   await wait(400)
   await tapVerb('remove')
