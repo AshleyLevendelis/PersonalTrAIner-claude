@@ -4,8 +4,9 @@ Two parts: about 10 minutes in a browser (you), then one prompt for Claude Code 
 
 ## Part 1, you, in a browser (Firebase is Google's free notification service)
 
-1. Go to console.firebase.google.com and sign in with your Google account. **Create a project**, name it
-   "Personal TrAIner". Turn Google Analytics **off** (not needed). Create.
+1. Go to console.firebase.google.com and sign in with your Google account. If a "Personal Trainer" project is already
+   there, **open it and use it** (one project is all the app needs). Otherwise create one; Google Analytics is not
+   needed. If the project already lists an Android app with the package below, skip to step 2's download.
 2. On the project's home page press the **Android** icon ("Add app").
    - Android package name: `app.personaltrainer.coach` (exactly this).
    - Nickname: anything. Leave the SHA-1 box empty. Press **Register app**.
