@@ -8,6 +8,7 @@ import { deliverReply, type ReplyPushDeps } from "./reply-push.ts";
 import { pushServer, sendPush } from "../_shared/push.ts";
 import type { NotificationSettings } from "../_shared/coach-moments.ts";
 import { GEMINI_MODEL, coachShortLine } from "../_shared/gemini.ts";
+import { appDecisionsFor } from "../_shared/app-decisions.ts";
 import { withoutPhotoAllergenClaims, PHOTO_MAX_BASE64, PHOTO_MIME } from "../_shared/photo-safety.ts";
 import { writeOpener } from "../_shared/reminder-writer.ts";
 import { voicePass } from "./voice-pass.ts";
@@ -2484,6 +2485,8 @@ She wants people to LEARN as they use the app: the reason behind the food and th
 - A gym myth is never a reason. PROTEIN AT ONE MEAL: never say the body can only use or absorb a set amount of protein at a time (20, 30 or 40 grams) or that the rest is wasted, burned or turned to energy. That cap is outdated: a bigger serving is still digested and used, it just works over a longer stretch. What matters most is the day's total; spreading it over three or four meals is an easy way to reach it, keeps them full, and gives the muscles a steady supply, a sensible habit rather than a rule. So a bigger protein meal is fine; say so, then give the practical reason to spread it.
 - A confirmation can carry a why too, in a clause, when it teaches something useful ("moved to Thursday, so you still get two leg days with a rest between").
 - The why never replaces the answer: answer first, then the reason.
+
+${appDecisionsFor(typeof message === 'string' ? message : '')}
 
 === 1-LEARN. LESSONS THAT BUILD OVER TIME (Ashley's ruling 6 Nov 2026) ===
 ${context.lesson_brief ? `${context.lesson_brief}

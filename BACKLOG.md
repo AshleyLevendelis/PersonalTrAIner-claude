@@ -2,6 +2,26 @@
 
 Newest first. One line each.
 
+- [x] **THE WHY SHEET: THE COACH GIVES THE APP'S OWN REASONS (his question and "build the why sheet", 24 Nov 2026).**
+  His question: "Does the chat have the same cscs logic so it can answer questions correctly or will it take answers
+  from somewhere else?" MEASURED: the coach (Gemini) gets the plan's NUMBERS as data, and a REASON only where one is
+  written into its ~175k-character prompt; deloads, calibration and the main lift were there, protected rest, the
+  18-set cap, the 20-rep ceiling, the too-easy question and simple meals were not, so it answered "why" from its own
+  general knowledge. Its app map also said the rest timer starts after every set (false for warm-ups since September).
+  BUILT: `supabase/functions/_shared/app-decisions.ts`, 124 entries (what the app does, the code's own numbers, and the
+  reason its own record gives), drafted file by file from the 62 `src/lib` files that record a CSCS decision by three
+  read-only helpers, then rewritten as a coach's reasons (no dates, names or internal history) and checked by the gate.
+  IT TRAVELS BY TOPIC (mine): the whole sheet would add a quarter to every message, so each message carries only the
+  entries its words match (at most 8; the largest probe block is about 3.4k characters), and the coach is told to give
+  the app's reason, and when none matches to say what the plan shows and not invent one. One entry has no recorded
+  reason (late pregnancy's effort cap) and is passed as such. The app-map timer line is corrected in both copies.
+  `test:app-decisions` (30 checks, 14 mutations, 14 caught, one only after the number check was narrowed to the lines
+  near the rule: a whole 7,000-line file holds almost every small number, so "18 sets" changed to 19 passed). New exam
+  case `why-no-rest-between-warmups`. All 126 runnable gates that read the coach's files pass (the exam itself needs his
+  machine; running its grader here overwrote the saved scores, put back). LIMITS, named: the gate is per FILE, so a new
+  rule added to a file that already has an entry is not caught; retrieval is word matching, so a question in words
+  the entry does not share can miss (12 real questions probed, all reached); whether the coach USES the sheet is model
+  behaviour, unproven until the exam runs after the `chat-gemini` deploy.
 - [ ] **A SHORT REST AFTER THE LAST WARM-UP (his question and "build it", 24 Nov 2026) — BUILT ON THE BRANCH, NOT
   FINISHED.** "I noticed that warm up sets don't get rest timers. Why not?" They never had one, on purpose (a build-up
   is followed by the next build-up). Right between warm-ups, wrong after the LAST one, where the next thing is the

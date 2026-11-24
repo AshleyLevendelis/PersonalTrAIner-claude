@@ -496,6 +496,7 @@
     "test:ban-scope": "tsx scripts/test-ban-scope.ts",
     "test:ban-running-session": "tsx scripts/test-ban-running-session.ts",
     "test:warmup-rest": "tsx scripts/test-warmup-rest.ts",
+    "test:app-decisions": "tsx scripts/test-app-decisions.ts",
     "test:drop-sets": "tsx scripts/test-drop-sets.ts",
     "test:working-sets": "tsx scripts/test-working-sets.ts",
     "report:rest-floors": "tsx scripts/measure-rest-floors.ts",
