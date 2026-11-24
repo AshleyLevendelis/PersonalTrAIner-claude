@@ -197,6 +197,10 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   mine, 23 Nov 2026, his Push & Press day): never after isolation, finisher or trunk work. `test:compound-order`,
   `measure:compound-order` (735 -> 88 of 4,608 days; the 88 are knee-rehab days). The label and the block rotation can
   still name different main lifts on 826 of 4,499 days (BACKLOG)
+- **The testing week sets week 2 both ways** (CSCS, mine, 24 Nov 2026, his "some too light, others too heavy"): the
+  "How was set 1?" answer is kept on the set; every set becomes an estimated max carried to next week's reps; a Hard,
+  short or lighter testing session LOWERS the rest of the testing block (the one exception to "never downward"), a
+  heavy low-rep set is never copied into a higher-rep week. `test:testing-week-both-ways`, `verify:calibration-search` 10c
 - **A beginner's session holds at most 18 working sets — his ruling 21 Nov 2026, "yes cap beginners at 18 sets"** (over
   filling the time with lifting): the spare minutes go to optional mobility. It narrows his session-length rulings for
   beginners only. `test:older-beginner` §14

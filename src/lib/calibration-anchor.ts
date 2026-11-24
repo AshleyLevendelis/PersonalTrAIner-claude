@@ -26,14 +26,15 @@
 // run it. `applyCalibrationAnchors` is the shell that reads the logs, calls
 // the shared patch helper, and saves.
 // ---------------------------------------------------------------------------
-import type { MesocycleWeek, UserProfile, WorkoutDay, ExerciseSetLog } from './types'
+import type { MesocycleWeek, UserProfile, WorkoutDay, ExerciseSetLog, Exercise } from './types'
 import { getActiveMesocycleWeek } from './calculations'
 import { getExerciseEntry, getExerciseId } from './exercise-db'
 import { isExternallyLoaded, statedCeilingKg, getLoadIncrementKg, categorize } from './load-prescription'
 import { outgrownWeightKg } from './outgrown'
 import { getSetsForDate, getSetsForDates } from './set-log-store'
 import { saveMesocycleWeek } from './mesocycle-persistence'
-import { patchBlockFromLiftedKg, type LiftedAnchor } from './beat-target-offer'
+import { patchBlockFromLiftedKg, lowerBlockFromKg, carriedForRepRange, type LiftedAnchor } from './beat-target-offer'
+import { effortFromRpe } from './lift-effort'
 import { sessionForDate, addDays, type SessionMove } from './session-move'
 import { getSessionMovesInRange } from './daily-tracking'
 import { getLocalDateString } from './dev-clock'
@@ -45,6 +46,8 @@ export interface CalibrationAnchor {
   liftedKg: number
   /** Set when the weight was worked out from far more reps than asked (outgrown.ts): the heaviest set actually lifted. */
   fromRepsAtKg?: number
+  /** Set when the testing week said the printed guess was too heavy: next week was LOWERED to `liftedKg`. */
+  lowered?: boolean
   /**
    * What next week's row for this lift reads AFTER the re-anchor, taken from
    * the patched plan itself — the number and the printed string ("~24kg per
@@ -67,16 +70,60 @@ export interface CalibrationAnchor {
   }
 }
 
+/** Reps left in the tank a testing-week set is read at (24 Nov 2026, docs/plans/testing-week-both-ways.md). */
+function repsInReserve(s: ExerciseSetLog): number {
+  // An answer he gave ("How was set 1 at 40 kg?") is kept as an effort on the set (SetGrid, PROBE_RPE): 10 minus it.
+  if (s.rpe != null && Number.isFinite(Number(s.rpe))) return Math.max(0, 10 - Number(s.rpe))
+  // No answer: read as taken to the limit, the app's standing safe read of a set (setup's "recent hard set" too).
+  return 0
+}
+
+const repRange = (label: string | undefined | null): [number, number] | null => {
+  const n = (label ?? '').match(/\d+/g)?.map(Number).filter(x => x > 0) ?? []
+  return n.length === 0 ? null : [Math.min(...n), Math.max(...n)]
+}
+
 /**
- * Which lifts on this day earned a re-anchor: externally loaded, prescribed
- * a number, and lifted for a working set HEAVIER than that number. Equal or
- * lighter changes nothing — a calibration set at the guess, or under it, is
- * not evidence the guess was low. Warm-ups and bodyweight rows never count.
+ * What the testing week's sets say a lift's working weight is, for the week after it. One estimate from every set:
+ * the best estimated one-rep max (Epley, the formula every record here uses) with the reps he had left, carried to the
+ * top of NEXT week's range (carriedForRepRange, the block carry's own rule). Capped at 10% over the heaviest weight he
+ * lifted, the find-your-weight search's own one-session ceiling.
+ */
+export function testingWeekEvidence(
+  mine: ExerciseSetLog[],
+  thisRepsLabel: string | undefined | null,
+  nextRepsLabel: string | undefined | null,
+): { heaviestKg: number; provenKg: number; supportedKg: number | null; tooHeavy: boolean } | null {
+  const sets = mine.filter(s => Number(s.weight_kg) > 0)
+  if (sets.length === 0) return null
+  const range1 = repRange(thisRepsLabel)
+  const range2 = repRange(nextRepsLabel) ?? range1
+  const low1 = range1?.[0] ?? 1
+  const low2 = range2?.[0] ?? low1
+  const heaviestKg = Math.max(...sets.map(s => Number(s.weight_kg)))
+  const hard = (s: ExerciseSetLog) => effortFromRpe(s.rpe) === 'hard'
+  // PROVEN: the heaviest weight lifted for next week's reps without it being Hard. Next week can start there.
+  const provenKg = sets.filter(s => s.reps_completed >= low2 && !hard(s)).reduce((m, s) => Math.max(m, Number(s.weight_kg)), 0)
+  const e1rm = Math.max(...sets.map(s => Number(s.weight_kg) * (1 + (s.reps_completed + repsInReserve(s)) / 30)))
+  const carried = nextRepsLabel || thisRepsLabel ? carriedForRepRange(e1rm, nextRepsLabel || thisRepsLabel) : null
+  const supportedKg = carried == null ? null : Math.min(carried, heaviestKg * 1.1)
+  // TOO HEAVY: a set he called Hard, a set short of the range, or a session he chose to lift lighter than printed is
+  // the caller's to compare (it knows the printed number).
+  const tooHeavy = sets.some(s => hard(s) || s.reps_completed < low1)
+  return { heaviestKg, provenKg, supportedKg, tooHeavy }
+}
+
+/**
+ * Which lifts on this day earned a re-anchor UP: externally loaded, prescribed a number, and the sets say more than
+ * that number. Read from what the sets PROVE for next week's reps (a heavy triple is not a weight for ten, and a set
+ * he called Hard is not a working weight), or what they support worked through the reps he had left. Warm-ups and
+ * bodyweight rows never count. A lift its sets say is too heavy is `calibrationLowersFor`'s.
  */
 export function calibrationAnchorsFor(
   week: MesocycleWeek | undefined,
   day: WorkoutDay | undefined,
   sets: ExerciseSetLog[],
+  nextSlot: (exIndex: number) => Exercise | undefined = () => undefined,
 ): CalibrationAnchor[] {
   if (!week?.isCalibrationWeek || !day) return []
   const working = sets.filter(s => !s.is_warmup && !s.is_bodyweight && Number(s.weight_kg) > 0)
@@ -87,19 +134,56 @@ export function calibrationAnchorsFor(
     if (!entry || !isExternallyLoaded(entry)) return
     const id = getExerciseId(ex.name)
     const mine = working.filter(s => (s.exercise_id ?? getExerciseId(s.exercise_name)) === id)
-    const lifted = mine.reduce((m, s) => Math.max(m, Number(s.weight_kg)), 0)
+    const ev = testingWeekEvidence(mine, ex.reps, nextSlot(exIndex)?.reps ?? ex.reps)
+    if (!ev) return
     // THE SAME WEIGHT FOR FAR MORE REPS THAN ASKED IS A HEAVIER WEIGHT (18 Nov 2026, outgrown.ts): 40 kg x 20 against
     // 8-12 used to anchor nothing, because only a heavier number counted. Read from the sets at the heaviest weight.
-    const range = (ex.reps ?? '').match(/\d+/g)?.map(Number) ?? []
+    const range = repRange(ex.reps)
+    const lifted = ev.heaviestKg
     const atTop = mine.filter(s => Number(s.weight_kg) === lifted).map(s => s.reps_completed)
-    const outgrown = range.length >= 2 && lifted > 0
-      ? outgrownWeightKg(lifted, atTop, Math.min(...range), Math.max(...range), getLoadIncrementKg(entry, categorize(entry), lifted))
+    const outgrown = range && range[1] > range[0] && !mine.some(s => Number(s.weight_kg) === lifted && effortFromRpe(s.rpe) === 'hard')
+      ? outgrownWeightKg(lifted, atTop, range[0], range[1], getLoadIncrementKg(entry, categorize(entry), lifted))
       : null
-    const heaviest = Math.max(lifted, outgrown ?? 0)
+    const up = Math.max(ev.provenKg, outgrown ?? 0, ev.supportedKg ?? 0)
     // EVIDENCE IS USED ONCE (18 Nov 2026): a weight this slot was already anchored from does not anchor again.
-    if (heaviest > Math.max(ex.suggested_load_kg, ex.calibration_anchored_kg ?? 0)) {
-      out.push({ exIndex, exerciseName: ex.name, plannedKg: ex.suggested_load_kg, liftedKg: heaviest, ...(heaviest > lifted ? { fromRepsAtKg: lifted } : {}) })
+    if (up > Math.max(ex.suggested_load_kg, ex.calibration_anchored_kg ?? 0)) {
+      out.push({ exIndex, exerciseName: ex.name, plannedKg: ex.suggested_load_kg, liftedKg: up, ...(up > ev.provenKg && up > lifted ? { fromRepsAtKg: lifted } : {}) })
     }
+  })
+  return out
+}
+
+/**
+ * Which lifts the testing week says were printed TOO HEAVY for the week after it (24 Nov 2026): a set he called
+ * Hard, a set short of the range, or the heaviest set lighter than printed, AND what the sets support for next week's
+ * reps is under next week's printed number. The anchor's `liftedKg` is what next week becomes. A lift that earned an
+ * anchor up is never also lowered.
+ */
+export function calibrationLowersFor(
+  week: MesocycleWeek | undefined,
+  day: WorkoutDay | undefined,
+  sets: ExerciseSetLog[],
+  nextSlot: (exIndex: number) => Exercise | undefined,
+): (CalibrationAnchor & { fromKg: number })[] {
+  if (!week?.isCalibrationWeek || !day) return []
+  const working = sets.filter(s => !s.is_warmup && !s.is_bodyweight && Number(s.weight_kg) > 0)
+  const ups = new Set(calibrationAnchorsFor(week, day, sets, nextSlot).map(a => a.exIndex))
+  const out: (CalibrationAnchor & { fromKg: number })[] = []
+  day.exercises.forEach((ex, exIndex) => {
+    if (ex.suggested_load_kg == null || ups.has(exIndex)) return
+    const next = nextSlot(exIndex)
+    if (next?.suggested_load_kg == null || next.name !== ex.name) return
+    const entry = getExerciseEntry(ex.name)
+    if (!entry || !isExternallyLoaded(entry)) return
+    const id = getExerciseId(ex.name)
+    const ev = testingWeekEvidence(working.filter(s => (s.exercise_id ?? getExerciseId(s.exercise_name)) === id), ex.reps, next.reps)
+    if (!ev || ev.supportedKg == null) return
+    if (!ev.tooHeavy && !(ev.heaviestKg < ex.suggested_load_kg)) return
+    const to = Math.max(ev.provenKg, ev.supportedKg)
+    // EVIDENCE IS USED ONCE: the same sets lower the block once, however often the plan is read (a ratio applied on
+    // every read would shrink it each time rounding left it above `to`).
+    if (!(to > 0) || to >= next.suggested_load_kg || ex.calibration_anchored_kg === to) return
+    out.push({ exIndex, exerciseName: ex.name, plannedKg: next.suggested_load_kg, liftedKg: to, fromKg: next.suggested_load_kg, lowered: true })
   })
   return out
 }
@@ -122,6 +206,8 @@ export function calibrationAnchorMessage(nextWeekNumber: number, applied: Calibr
   if (told.length === 0) return null
   const parts = told.map(a => {
     const n = a.nextWeek
+    // Lowered: the guess was too heavy, and the sentence says next week's number and where it came from.
+    if (a.lowered) return `${a.exerciseName} at ${(n?.label ?? `${a.liftedKg}kg`).replace(/^~/, '')}, from how your sets went`
     // Worked out from reps: the sentence names what he lifted, never a set he did not do.
     if (a.fromRepsAtKg != null && (!n || n.kg >= a.liftedKg)) return `${a.exerciseName} at ${a.liftedKg}kg, from your easy sets at ${a.fromRepsAtKg}kg`
     if (!n || n.kg >= a.liftedKg) return `${a.exerciseName} from your ${a.liftedKg}kg set`
@@ -164,7 +250,11 @@ export function planCalibrationAnchors(
 ): CalibrationAnchorPlan {
   const week = mesocycle.find(w => w.week_number === weekNumber)
   const day = week?.days.find(d => d.day === dayName)
-  const anchors = calibrationAnchorsFor(week, day, sets)
+  // Next week's row for the same lift: its reps say what the testing week's sets are read against, and its number is
+  // what a too-heavy guess is lowered from.
+  const nextDay = mesocycle.find(w => w.week_number === weekNumber + 1 && w.block_number === week?.block_number)?.days.find(d => d.day === dayName)
+  const nextSlot = (i: number) => (nextDay?.exercises[i]?.name === day?.exercises[i]?.name ? nextDay?.exercises[i] : undefined)
+  const anchors: CalibrationAnchor[] = [...calibrationAnchorsFor(week, day, sets, nextSlot), ...calibrationLowersFor(week, day, sets, nextSlot)]
   if (!week || anchors.length === 0) return NOTHING(mesocycle)
 
   const blockNumber = week.block_number ?? 1
@@ -185,7 +275,9 @@ export function planCalibrationAnchors(
   const applied: CalibrationAnchor[] = []
   for (const a of anchors) {
     const anchor: LiftedAnchor = { blockNumber, dayName, exIndex: a.exIndex, exerciseName: a.exerciseName, liftedKg: a.liftedKg, fromWeekInBlock }
-    const r = patchBlockFromLiftedKg(next, profile, anchor)
+    const r = a.lowered
+      ? lowerBlockFromKg(next, profile, { ...anchor, fromKg: (a as CalibrationAnchor & { fromKg: number }).fromKg })
+      : patchBlockFromLiftedKg(next, profile, anchor)
     if (!r.patched) continue
     // READ THE RECEIPT OFF THE PLAN. Next week's row, before and after.
     const slotIn = (plan: MesocycleWeek[]) => plan
@@ -201,7 +293,7 @@ export function planCalibrationAnchors(
         kg: after.suggested_load_kg,
         label: after.suggested_load ?? `${after.suggested_load_kg}kg`,
         moved: after.suggested_load_kg !== before?.suggested_load_kg,
-        atStatedLimit: stated != null && after.suggested_load_kg < a.liftedKg && after.suggested_load_kg >= stated,
+        atStatedLimit: !a.lowered && stated != null && after.suggested_load_kg < a.liftedKg && after.suggested_load_kg >= stated,
       },
     })
   }

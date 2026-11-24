@@ -1054,11 +1054,13 @@ export function TodayPanel({
         if (printed == null) { nextLoads[name] = load.weightKg; nextNotes[name] = { note: load.note, didProgress: load.didProgress }; continue }
         const then = load.lastDate ? planDaysForDate(load.lastDate, today, liveWeekPlan, mesocycle, planCreatedAt) : null
         const thenWeek = then?.week != null ? mesocycle?.find(w => w.week_number === then.week) : undefined
+        const thenSlot = then?.days.flatMap(d => d.exercises).find(e => e.name === name)
         const card = cardLoadFor(load, {
           printedKg: printed,
-          printedThenKg: then?.days.flatMap(d => d.exercises).find(e => e.name === name)?.suggested_load_kg ?? undefined,
+          printedThenKg: thenSlot?.suggested_load_kg ?? undefined,
           todayIsDeload: !!currentMesoWeekObj?.is_deload,
           lastWasDeload: !!thenWeek?.is_deload,
+          testingWeekDecided: !!thenWeek?.isCalibrationWeek && thenSlot?.calibration_anchored_kg != null,
         }, name)
         nextLoads[name] = card.weightKg
         nextNotes[name] = { note: card.note, didProgress: card.didProgress, findWeight: card.findWeight }
