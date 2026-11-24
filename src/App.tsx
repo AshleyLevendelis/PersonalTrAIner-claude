@@ -75,6 +75,7 @@ import { rebuildFromCurrentWeek, detectPlanInvalidation, type PlanInvalidation }
 import { updateProfileField, savePlanPause } from '@/lib/profile-store'
 import { setPlanPausedSince, PAUSE_WORDS, setPlanPauseHandler } from '@/lib/plan-pause'
 import { SignInScreen } from '@/components/SignInScreen'
+import { WelcomeScreen } from '@/components/WelcomeScreen'
 
 // ---------------------------------------------------------------------------
 // SPLIT OUT OF THE MAIN BUNDLE — audit §12, the 1.55 MB single chunk.
@@ -714,6 +715,14 @@ function App() {
    * exactly as before.
    */
   const [signInOpen, setSignInOpen] = useState(false)
+  /** Where sign-in was opened from: the welcome page's Back returns there, setup's link back to setup. */
+  const [signInFromWelcome, setSignInFromWelcome] = useState(false)
+  /**
+   * THE WELCOME PAGE (his request 24 Nov 2026): shown before setup when this phone holds no plan and no setup in
+   * progress (the first open, and after signing out, which reloads the app). A setup already under way goes straight
+   * back to it, and New Plan (he chose to start again) skips it.
+   */
+  const [welcomeOpen, setWelcomeOpen] = useState(() => loadOnboardingDraft() === null)
   const [generatingStatus, setGeneratingStatus] = useState('')
   const [exerciseExclusions, setExerciseExclusions] = useState<string[]>(() => boot?.exclusions ?? [])
   const [profileInfoOpen, setProfileInfoOpen] = useState(false)
@@ -3104,6 +3113,8 @@ function App() {
       // not plan data, and queued sets carry their own profile id so they can
       // still sync). `test:reset-clears-draft` holds the whole list.
       clearOnboardingDraft()
+      // New Plan is a choice to start again, so it goes straight to setup, past the welcome page.
+      setWelcomeOpen(false)
       // A question parked during the OLD plan's setup ("I'll answer that once
       // you're set up") is owed to that setup's first chat, not the next
       // one's. test:reset-clears-draft caught this key the day it was added.
@@ -3479,7 +3490,16 @@ function App() {
       return (
         <SignInScreen
           onCancel={() => setSignInOpen(false)}
+          cancelLabel={signInFromWelcome ? 'Back' : undefined}
           onSignedIn={() => { setSignInOpen(false); setIsRestoring(true); void restoreSession() }}
+        />
+      )
+    }
+    if (welcomeOpen) {
+      return (
+        <WelcomeScreen
+          onStart={() => setWelcomeOpen(false)}
+          onSignIn={() => { setSignInFromWelcome(true); setSignInOpen(true) }}
         />
       )
     }
@@ -3496,7 +3516,7 @@ function App() {
       <Suspense fallback={<ScreenLoading />}>
         <ConversationalOnboarding
           onComplete={handleOnboardingComplete}
-          onSignIn={() => setSignInOpen(true)}
+          onSignIn={() => { setSignInFromWelcome(false); setSignInOpen(true) }}
         />
       </Suspense>
     )

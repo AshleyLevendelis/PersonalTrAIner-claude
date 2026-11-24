@@ -727,7 +727,8 @@
     "test:report-email": "tsx scripts/test-report-email.ts",
     "test:chat-reply": "tsx scripts/test-chat-reply.ts",
     "verify:chat-reply": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-reply.mjs",
-    "test:account-auth": "tsx scripts/test-account-auth.ts"
+    "test:account-auth": "tsx scripts/test-account-auth.ts",
+    "verify:welcome": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/welcome.mjs"
   },
   "dependencies": {
     "@capacitor/android": "8.6.2",

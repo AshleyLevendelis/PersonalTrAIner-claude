@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **A WELCOME PAGE BEFORE SETUP: his request 24 Nov 2026, "Option 1, build it. Make the one line good. Something
+  that really sells it"** (from two options: one simple page, over three swipeable slides). He noticed on signing out
+  that the app dropped straight into the setup chat. Now a phone with no plan and no setup under way (the first open,
+  and after signing out) opens on: the icon, "Personal TrAIner", **"A personal trainer in your pocket"** and **"Workouts
+  and meals built around you, a coach you can text any time, and a plan that changes when your week does."**, with Get
+  started (setup) and I already have an account (sign-in, whose way out now says Back and returns here). The words are
+  mine on his delegation and his to change; every clause is something the app does today (tailored plan and meals, the
+  chat, moves, swaps and resizes). A setup part-way through goes straight back to it; New Plan skips the page (he chose
+  to start again); never a wall. `verify:welcome` (15 checks, 5 mutations, 5 caught), the whole app booted at phone
+  size, screenshots read. Frontend only.
 - [x] **THE STORE APP UPDATES THROUGH GOOGLE'S REVIEW, NO LIVE-UPDATE SERVICE: his ruling 23 Nov 2026, "I think its
   fine to do the Google review version"** (over a paid live-update service and over loading the live website inside the
   app). Each change reaches the phone app only as a new upload (versionCode +1) and Google's review; the website still
