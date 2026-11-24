@@ -98,7 +98,7 @@ const browser = await chromium.launch({ executablePath: CHROME })
  * 390x844 is an iPhone 14/15. The bug reproduced on a taller Android too; the
  * failure is not width-dependent, it is two fixed layers sharing one anchor.
  */
-async function onboardingPage(): Promise<{ page: Page; close: () => Promise<void> }> {
+async function onboardingPage(stopAtWelcome = false): Promise<{ page: Page; close: () => Promise<void> }> {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
     deviceScaleFactor: 3,
@@ -166,6 +166,10 @@ async function onboardingPage(): Promise<{ page: Page; close: () => Promise<void
       throw new Error('rebuilt dist with placeholder Supabase env and the app STILL renders the sign-in error — this is not the build, look at ensureSignedIn')
     }
   }
+  // THE WELCOME PAGE (24 Nov 2026) comes first on a phone with no plan, and setup is one tap behind it: Get started.
+  await page.waitForSelector('[data-testid="welcome"], input', { timeout: 15000 })
+  if (stopAtWelcome) return { page, close: () => context.close() }
+  if (await page.$('[data-welcome-start]')) await page.click('[data-welcome-start]')
   await page.waitForSelector('input', { timeout: 15000 })
   return { page, close: () => context.close() }
 }
@@ -199,6 +203,17 @@ const hitTest = (page: Page, selector: string) => page.evaluate((sel) => {
     inViewport: r.top >= 0 && r.bottom <= window.innerHeight,
   }
 }, selector)
+
+console.log('\n0. The welcome page: both of its buttons take a tap (24 Nov 2026)')
+{
+  const { page, close } = await onboardingPage(true)
+  for (const [name, sel] of [['Get started', '[data-welcome-start]'], ['I already have an account', '[data-welcome-signin]']] as const) {
+    const h = await hitTest(page, sel)
+    check(`${name}: a tap in its middle reaches it, on screen`,
+      h.found && h.sized && h.reachesSelf && h.inViewport, h.found && h.sized ? { blockedBy: h.blockedBy, rect: h.rect } : h)
+  }
+  await close()
+}
 
 console.log('\n1. The name box — the very first thing a new user has to touch')
 {
