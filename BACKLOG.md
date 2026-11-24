@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [ ] **A SHORT REST AFTER THE LAST WARM-UP (his question and "build it", 24 Nov 2026) — BUILT ON THE BRANCH, NOT
+  FINISHED.** "I noticed that warm up sets don't get rest timers. Why not?" They never had one, on purpose (a build-up
+  is followed by the next build-up). Right between warm-ups, wrong after the LAST one, where the next thing is the
+  first heavy set. BUILT: ticking the last warm-up row before any working set starts a rest counting down to Set 1,
+  drawn under that row, or above Set 1 once the build-up folds shut (it folds when every row is logged, which first hid
+  the rest entirely: found by the driver). CSCS (mine): 60 s before ordinary work, 90 s before a main lift, 120 s before
+  a heavy main lift (top of the range 6 or fewer), never longer than the plan's working rest; nothing between earlier
+  warm-ups, nothing for a warm-up logged after the work started. `test:warmup-rest` (14 checks, 9 mutations, 9 caught),
+  `verify:warmup-rest` (7 checks; its mutation round was STOPPED by him part-way and NOT completed; the stop left one
+  mutation in the tree, found by `git diff` and removed). NOT DONE: the browser mutation round, the gates that read the
+  set grid, a sweep. AND THE COACH WOULD ANSWER IT WRONGLY: its instructions say "the rest timer starts on its own the
+  moment a set is logged", which was already false for warm-ups. His question, the same day: does the coach have the
+  app's CSCS reasoning? Measured: it is given the plan's numbers, and a reason only where one is written into its
+  prompt (deloads, calibration, the main lift: yes; protected rest, the 18-set cap, the 20-rep ceiling, the
+  too-easy question, simple meals: no). Proposed to him: one "how the app decides" sheet the coach reads, held complete
+  by a check. Awaiting his answer.
 - [x] **A BAN TAPPED MID-SESSION LEFT THE EXERCISE ON THE SESSION (his report 24 Nov 2026, with screenshots)**. With
   the session running and nothing logged, ⋮ → Ban Clamshell said "It isn't in any session still to come, so nothing
   changes ahead of you … The session already behind you keeps it", the receipt said "out for good", and Clamshell
