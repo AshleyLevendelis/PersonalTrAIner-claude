@@ -731,6 +731,7 @@
     "verify:account-row": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/account-row.mjs",
     "verify:health-steps": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/health-steps.mjs",
     "test:phone-app": "tsx scripts/test-phone-app.ts",
+    "test:native-push": "tsx scripts/test-native-push.ts",
     "phone:sync": "npm run build && npx cap sync",
     "verify:countdown-timer": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/countdown-timer.mjs",
     "verify:report-reply": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/report-reply.mjs",
@@ -741,12 +742,15 @@
     "test:planned-rounds": "tsx scripts/test-planned-rounds.ts",
     "verify:planned-rounds": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/planned-rounds.mjs",
     "test:account-auth": "tsx scripts/test-account-auth.ts",
-    "verify:welcome": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/welcome.mjs"
+    "verify:welcome": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/welcome.mjs",
+    "measure:meal-protein-spread": "tsx scripts/measure-meal-protein-spread.ts",
+    "test:meal-protein-spread": "tsx scripts/test-meal-protein-spread.ts"
   },
   "dependencies": {
     "@capacitor/android": "8.6.2",
     "@capacitor/core": "8.6.2",
     "@capacitor/ios": "8.6.2",
+    "@capacitor/push-notifications": "8.1.3",
     "@capgo/capacitor-health": "8.13.0",
     "@radix-ui/react-label": "^2.1.4",
     "@radix-ui/react-progress": "^1.1.4",
