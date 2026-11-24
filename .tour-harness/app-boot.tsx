@@ -54,6 +54,9 @@ const TRAIN_TODAY = new URLSearchParams(location.search).has('session-day')
 // reaches Home and Profile. Without them the page is unchanged.
 const NO_CARDIO = new URLSearchParams(location.search).has('no-cardio')
 const MEALS_A_DAY = Number(new URLSearchParams(location.search).get('meals')) || 3
+// ?fresh: a phone that holds no plan (a first open, or after signing out), for verify:welcome. An INPUT: what the
+// phone remembers, nothing about what the app shows.
+const FRESH_PHONE = new URLSearchParams(location.search).has('fresh')
 const NO_SNACKS = new URLSearchParams(location.search).has('no-snacks')
 const WEIGH = Number(new URLSearchParams(location.search).get('weigh')) || 80
 // ?setup-typo: he signed up TODAY and setup kept 187 kg (his live report, 14 Nov 2026). INPUTS only: the weight on the
@@ -94,7 +97,7 @@ if (STALE_OFFER) {
 }
 try {
   // Returning, not new: this phone already knows whose profile it holds, and has seen the tour.
-  localStorage.setItem('fitplan_profile_id', PROFILE_ID)
+  if (!FRESH_PHONE) localStorage.setItem('fitplan_profile_id', PROFILE_ID)
   localStorage.setItem(`fitplan_tour_v1:${PROFILE_ID}`, 'done')
   localStorage.setItem('fitplan_last_tab', 'dashboard')
 } catch { /* a page without storage boots as a new phone, which a driver will see */ }
@@ -153,7 +156,7 @@ const meal = (slot: string, idx: number, name: string, ingredients: { name: stri
 }
 
 const db: Db = {
-  fitness_profiles: [profileRow],
+  fitness_profiles: FRESH_PHONE ? [] : [profileRow],
   mesocycle_weeks: PLAN_SUNDAY ? weeks.map(w => ({ ...toRow(PROFILE_ID, w), created_at: created })) : [], exercise_plans: [],
   meal_plan_slots: [
     meal('breakfast', 0, 'Porridge with berries', [{ name: 'dry oats', quantity: 90, unit: 'g' }, { name: 'whole milk', quantity: 300, unit: 'ml' }, { name: 'blueberries', quantity: 100, unit: 'g' }]),

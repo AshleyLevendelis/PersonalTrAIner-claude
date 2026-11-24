@@ -2,8 +2,8 @@
 <resources>
     <string name="app_name">Personal TrAIner</string>
     <string name="title_activity_main">Personal TrAIner</string>
-    <string name="package_name">app.personaltrainer.coach</string>
-    <string name="custom_url_scheme">app.personaltrainer.coach</string>
+    <string name="package_name">uk.co.personaltrainerapp</string>
+    <string name="custom_url_scheme">uk.co.personaltrainerapp</string>
     <!-- Shown by Health Connect when he taps "Privacy policy" on its permission screen. -->
     <string name="health_connect_privacy_policy_url">https://personal-tr-a-iner-claude-yco8.vercel.app/privacy.html</string>
 </resources>

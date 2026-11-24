@@ -1,4 +1,4 @@
-package app.personaltrainer.coach;
+package uk.co.personaltrainerapp;
 
 import com.getcapacitor.BridgeActivity;
 

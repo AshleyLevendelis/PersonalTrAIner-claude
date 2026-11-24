@@ -29,6 +29,66 @@ Newest first. One line each.
   out from the menu and adherence (not started). `test:simple-meals` (38 checks, 17 mutations, 17 caught),
   `measure:simple-meals`, `docs/plans/simple-meals.md`. Total size budget 3323 -> 3352 (measured 3327, the library's
   own lazy chunk), his "room to grow".
+
+- [x] **FIRST PLAY STORE BUNDLE BUILT, 23 Nov 2026** (closed test only; nothing published). `app-release.aab`, 6.61 MB,
+  versionCode 1 / versionName 1.0, production database (4 references to the production project in the bundled app, 0
+  to TEST). Signed with his upload key (`%USERPROFILE%\personal-trainer-upload.jks`, alias `upload`, owner "CN=Ashley
+  Levendelis", valid to 2054); the key's settings file is git-ignored and the key lives outside the repo. Merged release
+  manifest: INTERNET, health.READ_STEPS and AndroidX's DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION, nothing else.
+  `test:phone-app` 35 checks green. **The release build needs Java 21**: with the laptop's default JDK 17 it fails
+  "invalid source release: 21" in `:capacitor-android`; set `JAVA_HOME` to Android Studio's `jbr` (21.0.5) first. Next:
+  he uploads to Closed testing; every later upload raises versionCode by one.
+- [x] **A WELCOME PAGE BEFORE SETUP: his request 24 Nov 2026, "Option 1, build it. Make the one line good. Something
+  that really sells it"** (from two options: one simple page, over three swipeable slides). He noticed on signing out
+  that the app dropped straight into the setup chat. Now a phone with no plan and no setup under way (the first open,
+  and after signing out) opens on: the icon, "Personal TrAIner", **"A personal trainer in your pocket"** and **"Workouts
+  and meals built around you, a coach you can text any time, and a plan that changes when your week does."**, with Get
+  started (setup) and I already have an account (sign-in, whose way out now says Back and returns here). The words are
+  mine on his delegation and his to change; every clause is something the app does today (tailored plan and meals, the
+  chat, moves, swaps and resizes). A setup part-way through goes straight back to it; New Plan skips the page (he chose
+  to start again); never a wall. `verify:welcome` (15 checks, 5 mutations, 5 caught), the whole app booted at phone
+  size, screenshots read. Frontend only.
+- [x] **THE STORE APP UPDATES THROUGH GOOGLE'S REVIEW, NO LIVE-UPDATE SERVICE: his ruling 23 Nov 2026, "I think its
+  fine to do the Google review version"** (over a paid live-update service and over loading the live website inside the
+  app). Each change reaches the phone app only as a new upload (versionCode +1) and Google's review; the website still
+  updates on merge. My recommendation was the same for the closed test, revisiting a live-update service once real users
+  arrive and updates are frequent.
+- [x] **REPORTED COACH REPLIES NOW EMAIL HIM, LIVE ON PRODUCTION, 23 Nov 2026.** Migration 20261122120000 applied on
+  both projects (`test:schema-parity` PASS, 76 each), `report-email` deployed, function secrets and both Vault secrets
+  set, and a real report from the app reached his Gmail. Two failures on the way, both in setup, none in code: the
+  placeholders' angle brackets were typed into the secrets (Resend answered 400 and logged nothing, because the key was
+  unreadable), then the two copies of the shared secret differed (401 "refused"). Found by reading `net._http_response`
+  and by comparing fingerprints (the CLI's secret digests against a sha256 of the Vault value), never the values.
+  **A handover with `<...>` placeholders gets them typed literally; generate a value once and hand it to both places
+  from the terminal (`Set-Clipboard`).** Open: `net._http_response` shows a call timing out at 5 s on every hour (the
+  reach-out schedule, likely); unexamined. The function logs only Resend's status, not its reason.
+- [x] **THE PHONE APP ASKED FOR VO2 MAX AS WELL AS STEPS, 23 Nov 2026, found in the first native build on his laptop.**
+  The built app's final manifest declared `READ_VO2_MAX` and `WRITE_VO2_MAX` beside `READ_STEPS`, against the "steps
+  only" rule (Play refuses unused health permissions). Cause: the removal list named `READ_VO` / `WRITE_VO`, which are
+  not permissions, cut at the digit; and `test:phone-app` read both lists with `[A-Z_]+`, cut the plugin's names at the
+  same digit and so saw them match. Fixed both (real names; `[A-Z0-9_]+`). Mutations: the old short name back, and the
+  WRITE line deleted: 2 of 2 caught, 35 checks ran each. Proven on the BUILT app: its merged manifest now holds
+  INTERNET, READ_STEPS and AndroidX's own receiver permission, nothing else. **A permission check must read the names
+  the way Android does; the merged manifest after a build is the proof, the source manifest is not.** Also that day:
+  icons and launch screen cut into Android sizes (52 files changed of 74 written). The laptop build used a
+  build-folder-only `.env.production.local` (production address and the public publishable key taken from the live
+  app, his choice), because the only settings file on the laptop points at TEST; it is not committed.
+  **ON HIS PHONE, 23 Nov 2026** (Samsung SM-S948B, Android 17, debug build installed by cable, opened with no crash):
+  his words, "steps work and look correct" and "timers work and beep". Health Connect's screen listed steps only (his
+  "yes steps only"), and the report flag shows on coach replies. Sign-in worked. Nothing sent to any store.
+
+- [x] **THE PHONE APP'S PERMANENT ID IS `uk.co.personaltrainerapp`: his choice 23 Nov 2026** (over keeping
+  `app.personaltrainer.coach`, his 20 Nov pick, made before he owned a domain). Nothing had been uploaded, so it was free
+  to change: Capacitor's appId, Android's applicationId, namespace and the activity's package folder, the URL scheme,
+  iPhone's bundle id, and the handover prompts. Permanent from the first upload. His Google Play identity is verified.
+- [x] **PROVEN LIVE ON HIS PHONE, 23 Nov 2026, AND THE CONFIRMED LINE PUSHES THE PAGE DOWN (his "yes make it push the
+  page down")**. His dashboard pass (Claude in his browser): personaltrainerapp.co.uk bought, Resend verified, production
+  Supabase sending through it, Site URL was `http://localhost:3000` (the dead link his own confirmation hit) and is now
+  the live app, both templates in his words. On his phone: the confirmation email arrived in the inbox from
+  hello@personaltrainerapp.co.uk, its link opened the app with "Your email is confirmed", and sign out then sign in
+  brought his plan back. The forgot-password reset is not yet tried. The confirmed line had been pinned over the top
+  and covered the greeting; it now sits in the page above the tabs. Seen in the whole app booted from a confirm link at
+  phone size (in flow, nothing under it); `test:account-auth` 6f (1 mutation, 1 caught). Frontend only.
 - [x] **AN INTERVAL SESSION ON THE PLAN RUNS ON THE ROUND TIMER (his ruling 23 Nov 2026, "A")**. His live test: the coach
   suggested 4 × 3 min hard on the assault bike, 1 min rest, he said yes, put it on my rest days, and Wednesday read
   "Wednesday: Assault Bike Rounds, 16 minutes." with nothing to start or log. Asked, from two options, he chose A (a
