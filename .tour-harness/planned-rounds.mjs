@@ -64,9 +64,10 @@ await send('Page.enable'); await send('Runtime.enable')
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
 
 let loads = 0
+let kind = '1'
 const load = async (extra, tab) => {
   loads++
-  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&rounds=1&n=${loads}${extra}#/tab/${tab}` })
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&rounds=${kind}&n=${loads}${extra}#/tab/${tab}` })
   await wait(4000)
 }
 // TIME PASSES, in the one place the round reads it: the anchor in the timer's own record moves back.
@@ -77,7 +78,7 @@ const ageRound = minutes => ev(`(() => {
   if (!r.startedAtIso) return null
   r.startedAtIso = new Date(new Date(r.startedAtIso).getTime() - ${minutes} * 60000).toISOString()
   localStorage.setItem(k, JSON.stringify(r))
-  return r.roundConfig
+  return r.roundConfig ?? r.countdownMs ?? null
 })()`)
 const timerRecord = () => ev(`(() => { const k = Object.keys(localStorage).find(k => k.startsWith('fitplan_timers_v1:')); return k ? JSON.parse(localStorage.getItem(k)) : null })()`)
 const clearTimer = () => ev(`Object.keys(localStorage).filter(k => k.startsWith('fitplan_timers_v1:')).forEach(k => localStorage.removeItem(k))`)
@@ -176,6 +177,64 @@ const peek = await until(`${q('[data-testid="peek-planned-activity"]')}?.innerTe
 check('F1. tomorrow\'s session is a preview with its name, effort, rounds and reason', /Assault Bike Rounds/.test(peek ?? '') && /Hard/.test(peek ?? '') && /4 × 3 min, 1 min rest/.test(peek ?? '') && /Muay Thai/.test(peek ?? ''), peek)
 check('F2. ...not the old one sentence', !/Assault Bike Rounds, 16 minutes\./.test(await ev('document.body.innerText')))
 await shoot('planned-rounds-peek')
+
+console.log('\n  G. His saved Wednesday: rounds only in the coach\'s note still start the round timer (24 Nov 2026)')
+kind = 'note'
+await clearTimer()
+await load(`&today=${target?.date}`, 'exercise')
+const noteStart = await until(`${q('[data-testid="planned-rounds-start"]')}?.innerText?.replace(/\\s+/g, ' ').trim() ?? null`, 6000)
+check('G1. the card offers Start for 4 × 3 min, 1 min rest', /4 × 3 min, 1 min rest/.test(noteStart ?? ''), noteStart)
+await shoot('planned-rounds-note')
+
+console.log('\n  H. A 30-minute jog runs on a 30-minute timer and logs in one tap (24 Nov 2026)')
+kind = 'jog'
+await clearTimer()
+await load(`&today=${target?.date}`, 'exercise')
+const jogStart = await until(`${q('[data-testid="planned-timed-start"]')}?.innerText?.replace(/\\s+/g, ' ').trim() ?? null`, 6000)
+check('H1. the jog has "Start 30 min timer"', jogStart === 'Start 30 min timer', jogStart)
+check('H1b. ...and no round timer Start', !(await ev(`!!${q('[data-testid="planned-rounds-start"]')}`)))
+const jogBox = await ev(`(() => { const r = ${q('[data-testid="planned-timed-start"]')}?.getBoundingClientRect(); return r ? Math.round(r.height) : 0 })()`)
+check('H1c. ...a 44px target', jogBox >= 44, jogBox)
+await shoot('planned-timed-card')
+check('H2. Start is tapped', await tap('[data-testid="planned-timed-start"]'))
+await wait(1500)
+const jrec = await timerRecord()
+check('H3. a 30-minute countdown runs, tagged as this session on this date', jrec?.mode === 'countdown' && jrec?.running === true && jrec?.countdownMs === 1800000 && jrec?.countdownPlanned?.activity === 'Easy jog' && jrec?.countdownPlanned?.date === target?.date, jrec)
+check('H4. ...and the countdown is open on Tools', /#\/tab\/tools/.test(await ev('location.hash')) && !!(await until(`/Timer/.test(document.querySelector('[role="dialog"]')?.innerText ?? '')`, 4000)))
+await shoot('planned-timed-running')
+await ev(`location.hash = '#/tab/exercise'`)
+await wait(1500)
+check('H5. back on the day: running, with Open it and Finish, and no boxes', /Timer running · Open it/.test((await textOf('[data-testid="planned-timed-open"]')) ?? '') && !!(await ev(`!!${q('[data-testid="planned-timed-finish"]')}`))
+  && await ev(`document.querySelectorAll('[data-testid="planned-activity"] [role="radiogroup"]').length`) === 0)
+check('H6a. twenty-two minutes pass', !!(await ageRound(22)))
+await load(`&today=${target?.date}`, 'exercise')
+await until(q('[data-testid="planned-timed-finish"]'))
+check('H6. he taps Finish', await tap('[data-testid="planned-timed-finish"]'))
+await wait(1200)
+const jask = await textOf('[data-testid="planned-timed-effort"]')
+check('H7. the card asks how hard, with the 22 minutes it ran', /^22 min · Done\. How hard was it\?/.test(jask ?? '') && /Keep going/.test(jask ?? ''), jask)
+check('H8. ...nothing logged before the tap', (await logs()).length === 0, await logs())
+await shoot('planned-timed-ask')
+await tap('[data-testid="planned-timed-effort"] [data-effort="steady"]')
+await wait(1500)
+const jlogs = await logs()
+check('H9. logged as the jog, 22 minutes, Steady, on its date', jlogs.length === 1 && jlogs[0].a === 'Easy jog' && jlogs[0].m === 22 && jlogs[0].rpe >= 5 && jlogs[0].rpe <= 6 && jlogs[0].date === target?.date, jlogs)
+check('H10. ...the timer released, and the card reads it back as done', (await timerRecord())?.countdownPlanned == null && !!(await ev(`!!${q('[data-testid="planned-activity"] [data-testid="cardio-readback"]')}`)) && !(await ev(`!!${q('[data-testid="planned-timed-start"]')}`)))
+await shoot('planned-timed-logged')
+
+console.log('\n  I. A countdown that runs to zero asks on Tools too')
+await clearTimer()
+await ev(`window.__fakeDb && (window.__fakeDb.cardio_logs = [])`)
+await load(`&today=${target?.date}`, 'exercise')
+await until(q('[data-testid="planned-timed-start"]'))
+await tap('[data-testid="planned-timed-start"]')
+await wait(1200)
+await ageRound(31)
+await load(`&today=${target?.date}`, 'tools')
+await ev(`[...document.querySelectorAll('button')].find(b => /Timer/.test(b.textContent || '') && /Counts down/.test(b.textContent || ''))?.click()`)
+const toolsAsk = await until(`${q('[data-testid="planned-timed-effort"]')}?.innerText?.replace(/\\s+/g, ' ').trim() ?? null`, 6000)
+check('I1. under the finished countdown: "30 min · Done. How hard was it?", no Keep going', /^30 min · Done\. How hard was it\?/.test(toolsAsk ?? '') && !/Keep going/.test(toolsAsk ?? ''), toolsAsk)
+await shoot('planned-timed-tools')
 
 const txt = await ev('document.body.innerText')
 check('Z. nothing leaked onto the page', !/undefined|NaN|\[object Object\]/.test(txt ?? ''))

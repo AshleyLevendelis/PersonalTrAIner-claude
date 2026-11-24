@@ -40,14 +40,20 @@ function asConfig(r: Partial<PlannedRounds> | null | undefined): RoundConfig | n
 }
 
 /** WHAT THE TIMER RUNS FOR THIS SESSION: the stored rounds, else its own protocol, else nothing. */
-export function plannedRoundsOf(planned: Pick<PlannedActivity, 'activity' | 'rounds'> | null | undefined): RoundConfig | null {
+export function plannedRoundsOf(
+  planned: (Pick<PlannedActivity, 'activity' | 'rounds'> & Partial<Pick<PlannedActivity, 'reason' | 'duration'>>) | null | undefined,
+): RoundConfig | null {
   if (!planned) return null
   const stored = asConfig(planned.rounds)
   if (stored) return stored
   const { protocol } = splitActivity(planned.activity)
-  if (!protocol) return null
-  const read = parseIntervalSuggestion(protocol) ?? parseConditioningInterval(protocol)
-  return read && isSensibleRoundConfig(read) ? read : null
+  const read = protocol ? (parseIntervalSuggestion(protocol) ?? parseConditioningInterval(protocol)) : null
+  if (read && isSensibleRoundConfig(read)) return read
+  // ELSE THE COACH'S OWN NOTE ON THE SESSION (24 Nov 2026): his Wednesday was saved before rounds were stored, and its
+  // rounds lived only in the note under it ("4 rounds of 3-min hard effort with 60s rest ..."). Taken only when they
+  // fit inside the session's minutes, so a note about something else is never a timer.
+  const said = parseIntervalSuggestion(planned.reason)
+  return said && isSensibleRoundConfig(said) && (planned.duration == null || roundsMinutes(said) <= planned.duration + 1) ? said : null
 }
 
 /** Whole minutes the rounds take, work plus the rests between them (none after the last). */
@@ -66,11 +72,16 @@ export function cardioSessionRounds(
   args: { rounds?: unknown; work_seconds?: unknown; rest_seconds?: unknown; activity?: unknown },
   minutes: number,
   lastCoachReply?: string | null,
+  userSaid?: string | null,
 ): RoundConfig | null {
   const own = asConfig({ rounds: args.rounds as number, workSeconds: args.work_seconds as number, restSeconds: args.rest_seconds as number })
   if (own) return own
   const fromActivity = plannedRoundsOf({ activity: String(args.activity ?? '') })
   if (fromActivity) return fromActivity
+  // HIS OWN WORDS (24 Nov 2026): "add an interval workout 8 x 30 secs with 30 secs rest" names all three numbers, and
+  // the session he asked for is that one whatever the minutes the coach rounded it to.
+  const asked = parseIntervalSuggestion(userSaid)
+  if (asked && isSensibleRoundConfig(asked)) return asked
   const said = parseIntervalSuggestion(lastCoachReply)
   if (said && isSensibleRoundConfig(said) && roundsMinutes(said) <= minutes) return said
   return null

@@ -143,7 +143,9 @@ export interface TimersValue {
   countdownRemainingMs: number | null
   isCountdownDone: boolean
   /** Starts a countdown of this many milliseconds from now, replacing whatever stopwatch or lap timer was there. */
-  startCountdown: (ms: number) => void
+  startCountdown: (ms: number, planned?: { activity: string; date: string }) => void
+  /** The planned session the countdown was started for, else null (see TimerRecord.countdownPlanned). */
+  countdownPlanned: { activity: string; date: string } | null
   /** Countdown, beeps, buzz, full screen on Start — her settings, kept apart from any one run (4c). */
   timerPrefs: TimerPrefs
   setTimerPrefs: (patch: Partial<TimerPrefs>) => void
@@ -242,7 +244,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, persist, record])
 
-  const startCountdown = useCallback((ms: number) => {
+  const startCountdown = useCallback((ms: number, planned?: { activity: string; date: string }) => {
     if (!profileId || !(ms > 0)) return
     setRoundFullScreen(false)
     persist({
@@ -250,6 +252,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
       selectedRoundConfig: record.selectedRoundConfig ?? null,
       customRoundConfig: record.customRoundConfig ?? null,
       countdownMs: Math.round(ms),
+      ...(planned ? { countdownPlanned: planned } : {}),
       running: true,
       startedAtIso: new Date(nowMs()).toISOString(),
     })
@@ -565,6 +568,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     roundFullScreen,
     setRoundFullScreen,
     countdownMs,
+    countdownPlanned: record.mode === 'countdown' ? (record.countdownPlanned ?? null) : null,
     countdownRemainingMs,
     isCountdownDone,
     startCountdown,

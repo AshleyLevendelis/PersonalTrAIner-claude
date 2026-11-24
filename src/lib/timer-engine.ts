@@ -572,7 +572,8 @@ export function roundLogSummary(config: RoundConfig): RoundLogSummary {
 // numbers in Tools by hand). The APP reads the reply and draws the button, the way the video button is the app's: the
 // coach never writes a control. Read only when all three numbers are there, work, rest and rounds, never guessed.
 // ---------------------------------------------------------------------------
-const DURATION = String.raw`(\d+(?:\.\d+)?)\s*(s|secs?|seconds?|mins?|minutes?)\b`
+// "3-min" reads as 3 minutes (24 Nov 2026: "4 rounds of 3-min hard effort with 60s rest" read as nothing).
+const DURATION = String.raw`(\d+(?:\.\d+)?)\s*-?\s*(s|secs?|seconds?|mins?|minutes?)\b`
 const toSeconds = (n: string, unit: string) => Math.round(parseFloat(n) * (/^m/i.test(unit) ? 60 : 1))
 
 /** "30 seconds of jumping followed by 30 seconds of rest for 10 rounds", "10 rounds of 40s on / 20s off", "8 × 20s on, 10s rest". Null when any of the three is missing, or the numbers are not a sensible round timer. */

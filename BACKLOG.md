@@ -2,6 +2,26 @@
 
 Newest first. One line each.
 
+- [x] **CARDIO ON THE PLAN RUNS ON A TIMER AND LOGS IN ONE TAP, INTERVALS OR NOT (his report 24 Nov 2026)**. His
+  screenshots: Wednesday's "Assault Bike Rounds" still read as one line in the PHONE APP (it carries its own copy of the
+  app, built before 23 Nov's fix; the web app showed the new card), and on the web the card had nothing to start,
+  because the session was saved without its rounds: they lived only in the coach's note ("4 rounds of 3-min hard effort
+  with 60s rest ..."), and "3-min" did not even read as a duration. His words: "add an interval workout 8x30secs with
+  30secs rest ... add the workout with the round timer and be able to log it", "add a 30min jog to my plan could add a
+  workout with timer built in", "even optional cardio on rest days". BUILT: (1) "3-min" reads as 3 minutes; (2) a
+  planned session with no stored rounds takes them from its own note when they fit its minutes (his Wednesday now has
+  Start); (3) the coach's card takes the rounds from HIS OWN WORDS as well as its last reply, so "8x30secs with 30secs
+  rest" makes a round-timer session without waiting on the coach's deploy; (4) a session with minutes and no rounds (a
+  jog) gets "Start 30 min timer": a countdown tagged with the session, "Timer running · Open it" and "Finish and log
+  it" on the card, and at zero or on Finish one effort tap logs the minutes it ran under the session's name ("Keep
+  going" while it was stopped early); the same question sits under the finished countdown on Tools; (5) the rest day's
+  OPTIONAL cardio gets the same Start. Decided by me (mechanical/presentation, his request named the behaviour): the
+  minutes logged are the minutes the timer ran, at least one. CSCS review: nothing prescribed changes (no minutes,
+  effort or rounds are altered; timers and logging only). test:planned-rounds 41 checks (6 new-behaviour mutations,
+  all caught); verify:planned-rounds 43 checks (G: his note-only Wednesday, H: the jog end to end, I: Tools; one
+  mutation, caught); 166 logic gates and 17 screen drivers over the changed files green. NOT proven: the real chat turn
+  "add 8x30s ..." on a live coach (the card builder is gate-held, the coach must still call its cardio tool), and the
+  phone app until it is rebuilt from main.
 - [x] **NO LOPSIDED LUNCH: LUNCH AND DINNER ARE THE SAME SIZE (his "Build it", 24 Nov 2026; the split is mine, CSCS).**
   His report, with Gemini's review of his day: a 1,969 kcal day "on target" served lunch 67 g of protein (about 240 g raw
   tuna), breakfast 51 g, a 23 g snack. TRACED (engine-tracer): not the day search; every macro takes the meal's CALORIE

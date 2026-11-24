@@ -710,6 +710,10 @@ menu" stays true when a copy is also left outside it.
   reply he said yes to when they fit the session. Another day shows the session as a preview, never one line. A saved
   cardio log now re-reads the week strip. `test:planned-rounds`, `verify:planned-rounds`. Needs the `chat-gemini` deploy
   for the coach to send rounds itself
+- **Every planned cardio session starts a timer and logs in one tap: his report 24 Nov 2026** ("add a 30min jog ... a
+  workout with timer built in", "even optional cardio on rest days"): rounds on the round timer (read from his own words,
+  the coach's reply, or the session's note when they fit), minutes on a countdown tagged with the session; the minutes it
+  ran are logged under the session's name. `test:planned-rounds`, `verify:planned-rounds` G-I
 - **Swap the session for a circuit of timer blocks, block by block** — both surfaces since
   8 Oct 2026. Ashley, from the gym: rope, push-ups, sit-ups and the bike off the round timer could
   only be logged as "Intervals". His ruling, from three options: **A, one workout made of blocks**.

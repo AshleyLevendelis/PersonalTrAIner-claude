@@ -58,6 +58,12 @@ export interface TimerRecord {
    * the same anchor the stopwatch uses, so a locked phone or a reload never loses a second.
    */
   countdownMs?: number
+  /**
+   * THE PLANNED SESSION THIS COUNTDOWN IS (24 Nov 2026, his "add a 30min jog to my plan ... a workout with timer built
+   * in"): set only when Start on a timed session's card began it, so its end asks one effort question and logs it as
+   * that session. Dropped by every reset, like the round's own tag.
+   */
+  countdownPlanned?: { activity: string; date: string }
 }
 
 export function defaultTimerRecord(mode: TimerMode): TimerRecord {
