@@ -28,6 +28,14 @@ Newest first. One line each.
   (1311), which went 0 -> 1 with the equal split. Measured over 300 seeds the equal split has FEWER runs with a
   back-to-back dinner (46 vs 53), so the check now holds a rate over 40 seeds (at most a quarter, and fewer than "Same
   meals most days"); 2 mutations, both caught.
+  THE FULL SWEEP ON THE MERGE found two drivers whose fixtures stopped binding (both pass on main, both app-correct):
+  verify:meal-knock-on added food to LUNCH, and with lunch and dinner equal, dinner now absorbs it by resizing at every
+  amount tried (ten), so no other DISH moved and the card-names-the-dish checks had nothing to read. It now adds to
+  DINNER, where 10 g of oil moves breakfast's dish (mutation: the card names a wrong dish, caught). verify:usual-meals'
+  "Chicken, rice and veg" had 6 g of fat; dinner's share is now 958 kcal / 26 g fat (was 821 / 23), and sized that
+  big it could not make a day land, so it was KEPT at his amounts. Real consequence, named: a very lean usual dinner is
+  sized less often on the equal split. The fixture gained its cooking oil (10 g) and is sized as before (mutation:
+  never size, caught).
 - [x] **SIMPLE MEALS BY DEFAULT (his "Do whatever you think is best", 23 Nov 2026)**. His report: "Meal plans are the
   app's biggest weakness. The meals are too complicated. Users are required to become gourmet chefs", plus own meals
   and eating out being hard. I proposed four improvements (simple meals, fast logging, eating out from the menu,
