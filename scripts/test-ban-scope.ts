@@ -107,16 +107,19 @@ async function main() {
     const coachExec = stripComments(readFileSync(join(ROOT, 'src/lib/pending-action-executor.ts'), 'utf8'))
     const coachCard = stripComments(readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8'))
     const sheet = stripComments(readFileSync(join(ROOT, 'src/components/exercise/BanExerciseSheet.tsx'), 'utf8'))
-    const loadsAndPasses = (src: string) => /const \{ isProtected \} = await loadPlanEditContext\(/.test(src)
+    // Re-anchored 24 Nov 2026: the guard is now the ban's own (banGuard, which opens a running session he has logged
+    // none of the exercise in; test:ban-running-session holds what it opens). Still loaded, never bypassed.
+    const loadsGuard = /const isProtected = \(await loadPlanEditContext\([^)]*\)\)\.banGuard\(/
+    const loadsAndPasses = (src: string) => loadsGuard.test(src)
       // The LOADED guard, by shorthand: "isProtected: null" would also name
       // the key and switch the guard off (caught by mutation).
       && /banExerciseFromMesocycle\(\{[^}]*[\s,{]isProtected,?\s*\}\)/.test(src)
     check('the screen\'s ban', loadsAndPasses(screen))
     check('the coach\'s ban', loadsAndPasses(coachExec))
     check('the coach\'s card counts with the same guard',
-      /const \{ isProtected \} = await loadPlanEditContext\(/.test(coachCard) && /banBlastRadius\(mesocycle, name, isProtected\)/.test(coachCard))
+      loadsGuard.test(coachCard) && /banBlastRadius\(mesocycle, name, isProtected\)/.test(coachCard))
     check('the screen\'s confirm sheet counts with the guard it is handed',
-      /loadGuard\(\)\s*\n?\s*\.then\(guard => \{ if \(live\) setLines\(banConfirmLines\(banBlastRadius\(mesocycle, exerciseName, guard\)\)\) \}\)/.test(sheet))
+      /loadGuard\(exerciseName\)\s*\n?\s*\.then\(guard => \{ if \(live\) setLines\(banConfirmLines\(banBlastRadius\(mesocycle, exerciseName, guard\)\)\) \}\)/.test(sheet))
   }
 
   console.log('\n3. A rebuild keeps the bans in every block, not just the first (M40)')

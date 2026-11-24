@@ -18,7 +18,7 @@ import { getAppNow, getLocalDateString } from './dev-clock'
 import { getLocalSetsForDate } from './set-log-store'
 import { getActiveSessionRecord } from './active-session-store'
 import { getActiveAdaptations, type PlanAdaptationRow } from './plan-adaptations-store'
-import { buildDayGuard } from './plan-guard'
+import { buildDayGuard, buildBanGuard, type DayGuard } from './plan-guard'
 import { addDays, type SessionMove } from './session-move'
 import { effectiveConstraints, isAdaptationActive } from './effective-constraints'
 import type { PlanEditContext } from './plan-adaptations'
@@ -35,6 +35,15 @@ interface SessionFlags {
 export interface LoadedPlanEditContext extends PlanEditContext {
   /** The adaptations running now, as loaded — for the caller that also shows them. */
   adaptations: PlanAdaptationRow[]
+  /**
+   * THE GUARD A BAN WRITES THROUGH (24 Nov 2026, Ashley mid-session: "it told me that it was out for good but it
+   * stayed on my day"). `isProtected` treats a session that is RUNNING as trained, which is right for a rebuild (it
+   * would redraw the whole session under him) and wrong for a ban: he is looking at the exercise in that session and
+   * asking for it gone, the same edit a mid-session swap already makes. So today's running session is open to a ban
+   * of an exercise he has logged NOTHING of today; a finished, missed, rested or swapped day, a past day, and an
+   * exercise with even one logged set stay as they are, the record (plan-guard rule 1).
+   */
+  banGuard: (exerciseName: string) => DayGuard
 }
 
 export async function loadPlanEditContext(
@@ -48,16 +57,21 @@ export async function loadPlanEditContext(
   const closed = new Set<string>()
   let moves: SessionMove[] = []
   let adaptations: PlanAdaptationRow[] = []
+  /** Exercises with a set logged today, lower-cased. Null when it could not be read: then nothing is opened. */
+  let loggedTodayNames: Set<string> | null = new Set<string>()
+  let runningToday = false
 
   if (profile.id) {
     // What this phone already knows about today counts before the server
     // answers: a set logged ten seconds ago is a set logged.
     try {
-      if (getLocalSetsForDate(profile.id, today).rows.length > 0) logged.add(today)
+      const localRows = getLocalSetsForDate(profile.id, today).rows
+      if (localRows.length > 0) logged.add(today)
+      for (const r of localRows) loggedTodayNames?.add(r.exercise_name.toLowerCase())
       // A SESSION RUNNING TODAY IS TODAY BEING TRAINED, sets or not (run 5, H28, 11 Oct 2026): a rebuild applied
       // mid-session replaced the session on screen with a different one.
-      if (getActiveSessionRecord(profile.id, today)?.status === 'running') logged.add(today)
-    } catch { /* no local store outside the browser */ }
+      if (getActiveSessionRecord(profile.id, today)?.status === 'running') { logged.add(today); runningToday = true }
+    } catch { loggedTodayNames = null /* no local store outside the browser */ }
 
     try {
       const horizon = addDays(today, mesocycle.length * 7 + 8)
@@ -80,17 +94,19 @@ export async function loadPlanEditContext(
       }
       const ids = rows.map(s => s.id).filter(Boolean)
       if (ids.length > 0) {
-        const logs = await supabase.from('exercise_set_logs').select('session_id').in('session_id', ids)
+        const logs = await supabase.from('exercise_set_logs').select('session_id, exercise_name').in('session_id', ids)
         if (logs.error) throw logs.error
         const dateOf = new Map(rows.map(s => [s.id, s.date]))
-        for (const l of (logs.data ?? []) as { session_id: string }[]) {
+        for (const l of (logs.data ?? []) as { session_id: string; exercise_name?: string | null }[]) {
           const date = dateOf.get(l.session_id)
           if (date) logged.add(date)
+          if (date === today && l.exercise_name) loggedTodayNames?.add(l.exercise_name.toLowerCase())
         }
       }
     } catch (err) {
       console.error('Could not check what has been trained today, so today is being treated as trained:', err)
       closed.add(today)
+      loggedTodayNames = null
     }
   }
 
@@ -98,8 +114,13 @@ export async function loadPlanEditContext(
   const live = adaptations.filter(a => isAdaptationActive(a, now))
   // Every running temporary change, injury AND kit: a rebuild carries both through until they end (run 5, H28).
   const injuryEnds = live.map(a => getLocalDateString(new Date(a.expires_at))).sort()
+  const guardInput = { ...calendar, loggedDates: logged, closedDates: closed }
+  const isProtected = buildDayGuard(mesocycle, guardInput)
+  const banGuard = (exerciseName: string): DayGuard =>
+    buildBanGuard(mesocycle, { ...guardInput, runningToday, loggedTodayNames, exerciseName })
   return {
-    isProtected: buildDayGuard(mesocycle, { ...calendar, loggedDates: logged, closedDates: closed }),
+    isProtected,
+    banGuard,
     constraints: effectiveConstraints(profile, live, now),
     calendar,
     constrainedUntil: injuryEnds.length > 0 ? injuryEnds[injuryEnds.length - 1] : null,

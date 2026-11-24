@@ -36,6 +36,27 @@ Newest first. One line each.
   big it could not make a day land, so it was KEPT at his amounts. Real consequence, named: a very lean usual dinner is
   sized less often on the equal split. The fixture gained its cooking oil (10 g) and is sized as before (mutation:
   never size, caught).
+- [x] **A BAN TAPPED MID-SESSION LEFT THE EXERCISE ON THE SESSION (his report 24 Nov 2026, with screenshots)**. With
+  the session running and nothing logged, ⋮ → Ban Clamshell said "It isn't in any session still to come, so nothing
+  changes ahead of you … The session already behind you keeps it", the receipt said "out for good", and Clamshell
+  stayed on his day. CAUSE (traced): since run 5 (H28, 11 Oct) a RUNNING session counts as trained for the day guard,
+  so no rebuild redraws a session under him. The ban wrote through that same guard and skipped today. Right for a
+  rebuild, wrong for a ban: he is asking for that one exercise gone from the session in front of him, the edit a
+  mid-session swap already makes. FIX (mine, CSCS: the record is what was LOGGED, not what was on the card): a ban has
+  its own guard (`buildBanGuard`, loaded as `banGuard(name)`) that opens today's running session for an exercise with
+  nothing of it logged today; a set of it logged, a missed/rested/swapped day, a past day, or an unreadable day keep
+  today as it is. Every ban path uses it: the Exercise tab's sheet, Profile's, the screen ban, the coach's card and its
+  confirm, so the sheet's count and the write agree. Rebuilds are unchanged. Two lines I first wrote (a closed-day test
+  and a today-rows set) turned out to repeat what the underlying guard already does (MISSED mutations) and were
+  deleted. `test:ban-running-session` (23 checks, 8 mutations, 8 caught), `verify:ban-running-session` (11 checks;
+  with the fix removed it reproduces his report, Side Plank staying on the running session; 2 mutations, 2 caught);
+  `test:ban-scope` and `test:rebuild-honours` re-anchored (the guard's new shape; 4 mutations, 4 caught). All 91
+  gates that read the touched files pass. WORDING FIXED the same day (his "Fix the weird wording"): one
+  session to change now reads "It's in one session still to come, so that one gets rebuilt with the closest
+  alternative your kit and injuries allow." (it had read "This is every week of your plan, not just today — 1 session
+  gets rebuilt"); two or more keep the old sentence. Both sheets and the coach's card, one function
+  (`test:sheet-manners`, `test:ban-running-session`, 2 mutations, 2 caught). No Undo was needed beyond the
+  existing one, which puts the whole plan back. Frontend only: no edge function, no migration.
 - [x] **SIMPLE MEALS BY DEFAULT (his "Do whatever you think is best", 23 Nov 2026)**. His report: "Meal plans are the
   app's biggest weakness. The meals are too complicated. Users are required to become gourmet chefs", plus own meals
   and eating out being hard. I proposed four improvements (simple meals, fast logging, eating out from the menu,

@@ -384,7 +384,7 @@ export async function executeExerciseBan(
   const { banExerciseFromMesocycle } = await import('./mesocycle-edit')
   // Sessions already trained keep it (M35): the same guard the screen's ban loads.
   const { loadPlanEditContext } = await import('./plan-edit-context')
-  const { isProtected } = await loadPlanEditContext(profile, mesocycle, planCreatedAt ?? profile.created_at)
+  const isProtected = (await loadPlanEditContext(profile, mesocycle, planCreatedAt ?? profile.created_at)).banGuard(name)
   const next = await banExerciseFromMesocycle({ mesocycle, profile, bannedName: name, exclusions: updated, isProtected })
 
   try {

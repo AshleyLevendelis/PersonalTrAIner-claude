@@ -569,6 +569,8 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   history, an incoming lift in a plan with a calibration week starts at the calibration price in every week, as the
   plan's own unverified lifts do. Measured 62 of 200 swaps over 1.5x the plan's own figure before, 0 after.
   `test:replacement-prescription`, `docs/plans/swap-load-anchor.md`
+- **A ban tapped during today's running session takes it off that session** when none of it is logged yet (his report
+  24 Nov 2026; rebuilds still never redraw a running session). `test:ban-running-session`, `verify:ban-running-session`
 - Ban it from every future plan — **both**; `audit-fixes`, `silent-writes`,
   `coach-parity` §3. CORRECTED 15 Sep 2026, measured: this said `screen only`
   and quoted the decline "NOT WIRED UP YET… point the user at the ban button"
