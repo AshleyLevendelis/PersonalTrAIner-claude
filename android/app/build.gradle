@@ -11,10 +11,10 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "app.personaltrainer.coach"
+    namespace = "uk.co.personaltrainerapp"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "app.personaltrainer.coach"
+        applicationId "uk.co.personaltrainerapp"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

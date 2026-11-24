@@ -412,8 +412,11 @@ console.log('\n10. An attached email can actually sign you back in')
   const onboarding = stripComments(readFileSync(join(ROOT, 'src/components/onboarding/ConversationalOnboarding.tsx'), 'utf8'))
   check('it is reachable at the moment it is needed — before onboarding',
     /Already have an account\? Sign in/.test(onboarding))
+  // Since 24 Nov 2026 both the welcome page and setup's link open it (each also says where it came from).
   check('...and App.tsx still hands onboarding the way to open it',
-    /onSignIn=\{\(\) => setSignInOpen\(true\)\}/.test(app))
+    /<ConversationalOnboarding[\s\S]{0,200}onSignIn=\{\(\) => \{?[^}]{0,80}setSignInOpen\(true\)/.test(app))
+  check('...and the welcome page too',
+    /<WelcomeScreen[\s\S]{0,200}onSignIn=\{\(\) => \{?[^}]{0,80}setSignInOpen\(true\)/.test(app))
   check('...which onboarding actually wires to the button, not just accepts',
     /onClick=\{onSignIn\}/.test(onboarding))
   check('...and is NOT a wall in front of onboarding',
