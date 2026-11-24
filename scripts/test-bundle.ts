@@ -247,11 +247,16 @@ console.log('\n1. The libraries are cached separately from the app')
   // MOVED 22 Nov 2026: 461 -> 469. Crossed at 461 by the persona fixes (the age, pregnancy and low-recovery rules, the
   // "Lift fast, lower slow" cue and the rest-day line, all plan logic). MEASURED 461 through this gate on the change.
   // His 15 Sep ruling, "raise it with room to grow": 8 gz over today.
+  // MOVED 23 Nov 2026: 469 -> 477. Crossed by the next-set nudge (set-nudge.ts, his "1"): MEASURED 468 on a clean
+  // worktree of the branch head (1 left), 469 through this gate on the change. 8 gz over today, his 15 Sep ruling.
   // MOVED 23 Nov 2026: 469 -> 477. Crossed at 469 by the email-account fixes (sign out, sign in from Profile, forgot
   // password, the reset screen, plain error words). MEASURED 469 through this gate on the change. His 15 Sep ruling,
   // "raise it with room to grow": 8 gz over today.
-  headroom('a deploy re-downloads', appGzip, 477, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, under 477`, appGzip < 477, appGzip)
+  // MOVED 23 Nov 2026: 469 -> 480. Crossed by the persona audit at zero (the week-balance passes) and the planned
+  // interval session (its Start, effort tap and preview). MEASURED 472 through this gate on the change; 8 gz over today.
+  // 23 Nov 2026, main (email accounts, next-set nudge) merged on top: MEASURED 475, under the line, so it did not move.
+  headroom('a deploy re-downloads', appGzip, 480, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, under 480`, appGzip < 480, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -359,9 +364,10 @@ console.log('\n2b. The coach is not on the path to first paint')
   // MOVED 22 Nov 2026: 620 -> 628. Reached at 620 by the persona fixes (plan rules for older, pregnant and low-recovery
   // trainees, the block's exercises held, the week-balance passes), all in the first chunk because the plan is built
   // there. MEASURED 620 through this gate on the change. 628 is 8 kB over today, the margin every move here has used.
-  headroom('first paint fetches', firstLoadGzip, 628, 'kB gzipped')
+  // MOVED 23 Nov 2026: 628 -> 637, the same two changes, both in the first chunk. MEASURED 629; 8 kB over today.
+  headroom('first paint fetches', firstLoadGzip, 637, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 628, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 637, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -502,7 +508,9 @@ console.log('\n3. Nothing has crept back up')
   // days, the audit's six fixes); MEASURED 1592 through this gate on the change. His 15 Sep ruling: 25 kB over today.
   // MOVED 23 Nov 2026: 1617 -> 1644. Crossed by the persona audit's second round (main) meeting the email-account fixes
   // on the merge; MEASURED 1619 through this gate on it. His 15 Sep ruling: 25 kB over today.
-  const APP_CHUNK_BUDGET_KB = 1644
+  // MOVED 23 Nov 2026: 1617 -> 1651, the same two changes. MEASURED 1626 through this gate; 25 kB over today.
+  const APP_CHUNK_BUDGET_KB = 1651
+  // 23 Nov 2026, main merged on top: MEASURED 1635, under the line, so it did not move.
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -813,7 +821,9 @@ console.log('\n3. Nothing has crept back up')
   // change. His 15 Sep ruling: 25 kB raw over today's number (3262 + 25).
   // MOVED 23 Nov 2026: 3287 -> 3316, the email-account fixes. MEASURED 3291 through this gate on the change. His 15 Sep
   // ruling: 25 kB raw over today's number (3291 + 25).
-  const TOTAL_BUDGET_KB = 3316
+  // MOVED 23 Nov 2026: 3287 -> 3323, the same two changes. MEASURED 3298 through this gate; 25 kB over today.
+  const TOTAL_BUDGET_KB = 3323
+  // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')

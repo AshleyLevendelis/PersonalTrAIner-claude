@@ -43,6 +43,7 @@ import { substituteForInjury, substituteForEquipment, rebuildForInjury, dayChang
 import { planDaysInWindow, type PlanDayOnDate } from './plan-guard'
 import type { PendingActionReceipt } from './pending-actions-store'
 import { wontText } from './fact-display'
+import { blockShape } from './timer-engine'
 
 /**
  * THE PLAN TO DRAW AFTER A CONFIRM: the one that was SAVED, never the one that was attempted (27 Oct 2026).
@@ -1506,6 +1507,8 @@ export interface CardioSessionPayload {
   minutes: number
   targetRpe: number
   reason?: string
+  /** The rounds, when the session is intervals: started on the round timer from the day's card (planned-rounds.ts). */
+  rounds?: { rounds: number; workSeconds: number; restSeconds: number } | null
   /** 'today' writes the live week only; 'permanent' carries it to the rest of the block. */
   scope: 'today' | 'permanent'
 }
@@ -1587,6 +1590,7 @@ export async function executeCardioSession(
         duration: payload.minutes,
         targetRpe: payload.targetRpe,
         ...(payload.reason ? { reason: payload.reason } : {}),
+        ...(payload.rounds ? { rounds: { rounds: payload.rounds.rounds, workSeconds: payload.rounds.workSeconds, restSeconds: payload.rounds.restSeconds } } : {}),
       },
     }),
   })
@@ -1599,7 +1603,7 @@ export async function executeCardioSession(
   const touched = new Set(weeksTouchedByScope(mesocycle, payload.weekNumber, payload.scope).map(w => w.week_number))
   const next = mesocycle.map(w => (touched.has(w.week_number) ? withActivity(w) : w))
 
-  landed.push(`${payload.dayName}: ${payload.activity}, ${payload.minutes} min at RPE ${payload.targetRpe}`)
+  landed.push(`${payload.dayName}: ${payload.activity}, ${payload.minutes} min at RPE ${payload.targetRpe}${payload.rounds ? `, ${blockShape({ ...payload.rounds })}` : ''}`)
 
   if (!profile.id) {
     return { mesocycle: next, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }

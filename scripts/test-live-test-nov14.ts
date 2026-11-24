@@ -134,6 +134,10 @@ async function main() {
     check('...and a web address is not words ("com" is not a Compound Chest Press)', exerciseNamedIn('see www.example.com') === null)
     check('a plain question is not a how-to', !asksHowOrVideo('did I train well this week?'))
     check('naming an exercise without asking how or for a video gets no button', formVideoFor('I did deadlifts today and felt strong', 'Nice work.') === null)
+    // A GREETING IS NOT AN EXERCISE (his live test, 23 Nov 2026): "Good morning" found Good Mornings.
+    check('"Good morning. How can I improve my cardio conditioning for muay thai?" gets no video button', formVideoFor('Good morning. How can I improve my cardio conditioning for muay thai?', 'Try doing this on an assault bike: 3 to 4 rounds of 3 minutes.') === null)
+    check('...while "Good morning, how do I do good mornings?" still finds the exercise (the fixture binds)', formVideoFor('Good morning, how do I do good mornings?', 'Hinge at the hips.')?.exercise === 'Good Mornings')
+    check('...and "Hey, good morning! how do I do a deadlift?" names the deadlift, not the greeting', formVideoFor('Hey, good morning! how do I do a deadlift?', 'Brace first.')?.exercise === 'Deadlifts')
     const linked = linkifyBareUrls('Here: www.youtube.com/results?search_query=Box+Jumps and [ok](https://x.com).')
     check('a bare address the coach typed becomes a link the chat can open', linked.includes('[www.youtube.com/results?search_query=Box+Jumps](www.youtube.com/results?search_query=Box+Jumps)'), linked)
     check('...and a link already written as one is left alone', linked.includes('[ok](https://x.com)') && !linked.includes('[[ok]'), linked)

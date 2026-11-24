@@ -13,6 +13,7 @@ export function asksHowOrVideo(text: string): boolean {
   return ASKS_HOW_OR_VIDEO.test(text)
 }
 
+const GREETING = /^\s*(?:(?:hi|hey|hello|morning|evening)\b[\s,!.]*)?(?:good\s+(?:morning|afternoon|evening|night)\b)?/i
 const norm = (s: string) => ` ${s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `
 /** Each word with a trailing plural "s" dropped, so "box jumps" finds "Box Jump" and "lunges" finds "Lunge". */
 const singular = (s: string) => s.replace(/(\w{3,})s\b/g, '$1')
@@ -27,7 +28,11 @@ function catalogue(): { name: string; key: string }[] {
 export function exerciseNamedIn(text: string | null | undefined, opts: { wholeNameOnly?: boolean } = {}): string | null {
   if (!text) return null
   // A web address is not words ("com" found a Compound Chest Press by its prefix, in his live test's video reply).
-  const t = singular(norm(text.replace(/(?:https?:\/\/|www\.)\S+/gi, ' ')))
+  // A GREETING IS NOT AN EXERCISE (his live test, 23 Nov 2026: "Good morning. How can I improve my cardio conditioning
+  // for muay thai?" got "Watch a video: Good Mornings"). "Good morning" (or afternoon, evening) opening a message, and
+  // not followed by more of the exercise's name, is taken out before anything is matched; "how do I do good mornings?"
+  // still finds the hinge.
+  const t = singular(norm(text.replace(/(?:https?:\/\/|www\.)\S+/gi, ' ').replace(GREETING, ' ')))
   const whole = catalogue().find(n => t.includes(n.key))?.name
   if (whole || opts.wholeNameOnly) return whole ?? null
   // A shorter or reordered name ("lunges", "a barbell back squat"): the app's own exercise search over his words, the

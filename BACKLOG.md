@@ -61,6 +61,107 @@ Newest first. One line each.
   brought his plan back. The forgot-password reset is not yet tried. The confirmed line had been pinned over the top
   and covered the greeting; it now sits in the page above the tabs. Seen in the whole app booted from a confirm link at
   phone size (in flow, nothing under it); `test:account-auth` 6f (1 mutation, 1 caught). Frontend only.
+- [x] **AN INTERVAL SESSION ON THE PLAN RUNS ON THE ROUND TIMER (his ruling 23 Nov 2026, "A")**. His live test: the coach
+  suggested 4 × 3 min hard on the assault bike, 1 min rest, he said yes, put it on my rest days, and Wednesday read
+  "Wednesday: Assault Bike Rounds, 16 minutes." with nothing to start or log. Asked, from two options, he chose A (a
+  real workout card that starts the round timer and logs at the end) over B (a log line with a timer button). BUILT:
+  a planned session keeps its rounds, work and rest (the coach's tool takes rounds, work_seconds and rest_seconds; until
+  the `chat-gemini` deploy the card reads them from the coach's last reply when they fit the session's minutes, and
+  from a protocol written into the name); a session is never shorter than its rounds. The day's card: the session line,
+  its rounds, then "4 × 3 min, 1 min rest · Start · 10s countdown" (his countdown setting), which starts the round
+  timer at those numbers, tagged as this session on this date, and opens it on Tools; while it runs the card says
+  "Round timer running · Open it" and never restarts it; when the rounds end, "Done. How hard was it?" and one tap logs
+  it under the session's own name with the timer's minutes and the rounds as the note, so the day reads done and the
+  round is released only after the write. The round timer's own Log session asks the same one question (never "what
+  was this block?"). The minutes-and-effort row stays as the way to log it without the timer, and steps aside while the
+  round runs or asks, so there is one way to log at a time. Another day's preview is a card (name, effort, rounds,
+  reason), never one line. FOUND ON THE WAY, older than today: a logged walk or cardio session left the week strip on
+  "due" until he left the tab and came back (the week re-read on a saved set, never on a saved cardio log); it re-reads
+  now. Decided by me (presentation and wiring, no prescription changed): the logged minutes are the timer's (15 for
+  4 × 3/1), not the plan's 16, because that is what the app measured; effort is asked, never pre-chosen. CSCS review:
+  nothing about any prescription changes; the session is the coach's, now stored whole. `test:planned-rounds` (32
+  checks, 14 mutations caught), `verify:planned-rounds` (28 checks, 9 mutations caught, every state screenshotted and
+  read). Bundle limits raised by his "room to grow" rule (re-download 469 -> 480, first paint 628 -> 637, app chunk
+  1617 -> 1651, total 3287 -> 3323; measured 472, 629, 1626, 3298; the persona audit's passes and this build).
+  His third report ("after a refresh Wednesday went back to a rest day"): NOT reproduced; the session is saved and read
+  back; his screenshot showed last week (Mon 16-Sun 22), which the write leaves alone. Needs the `chat-gemini` deploy
+  for the coach to send the rounds itself.
+- [x] **THE PERSONA AUDIT AT ZERO (his "Yes fix all the problems", 23 Nov 2026)**. 6,000 plans, 31 rules: 126 plans broke a
+  coaching rule before this round, 0 after (every rule, every group, safety included). Before -> after: pushing over
+  1.5x pulling 42 -> 0, sessions past the time asked 32 -> 0, uneven weeks 32 -> 0, chest or back under four sets 14 -> 0,
+  thigh imbalance 13 -> 0. CSCS, mine, each traced before it was fixed. (1) A day holding two presses swaps its later
+  non-main one for pulling the day may take (rear delts on a chest day), else trunk work, while the week presses over 1.5x
+  what it pulls; a day holding two hinges or two squats swaps the spare one for the other side while the thigh is over
+  2.5x one way (both in the week the plan is built from, so every week carries it). (2) The press-heavy week's row also
+  goes on a chest or shoulders day of a split, not only a full-body day, and a row added in one week of a block is added
+  in every week of it (the block's "same exercises" pass had been taking it back). (3) The beginner's 18-set cap drops a
+  press before a pull the week needs, keeps the week's four chest sets, and never takes a day's last squat, hinge, press
+  or pull; the thigh is weighed again inside the cap. (4) The last time check holds a set the week needs (pulling, four
+  chest sets) until no spare exercise is left to drop, and a required second press of the same plane may go where the
+  week keeps four chest sets. (5) A day under 60% of the heaviest day's sets and 75% of its minutes takes sets (never a
+  press in a press-heavy week, never past the time or the cap, never tipping the thigh), or the heaviest day gives one.
+  (6) A day still seconds over its time after every set is at its floor: the bike or rower gives up to a minute (one
+  minute kept), then the first build-up keeps two rungs (50 and 70%), then a later lift's feeder set goes. Never a
+  working set, a rest, the balance hold or pelvic floor work. CSCS review: training effect, the swaps keep the movement
+  pattern of the day's session and trade a duplicate for the missing side; what it takes away, a duplicate press or
+  hinge, trunk or shoulder isolation sets, warm-up seconds; fundamentals, every pattern still covered (C1 0, and the
+  cap's new guard is the reason); no floor or ceiling redefined; inside scope. MEASURED AND DELETED, five mechanisms that
+  changed nothing on 6,000 plans (a balance-aware block trim, dropping the last stretch, a first short-ramp step, a
+  post-cap pull bump, searching every day for a spare press). The first version of this round CREATED three breaches
+  (the cap took a week's only hinge; the light day tipped a knee trainee's thigh, twice): found by the full audit, fixed,
+  pinned. `test:persona-audit-fixes` 71 -> 78 checks: 43 named plans judged by the audit's own detectors (`auditOne`,
+  exported), 18 mutations caught, 5 missed and deleted as above. `test:thin-day` re-anchored on its rule's own definition
+  of thin (ten sets OR under ten minutes short), since the press swap can end a day's thinness on minutes.
+  ALSO, his live test the same morning: "Good morning. How can I improve my cardio conditioning for muay thai?" got
+  "Watch a video: Good Mornings". A greeting opening a message is no longer read as an exercise name; "how do I do good
+  mornings?" still is (`test:live-test-nov14`, 3 checks, the mutation caught). NOT FIXED, reported to him: the coach's
+  added cardio session is a line of text, not a loggable round-timer session (it stores only a name and minutes), and
+  his "it went back to a rest day after a refresh" reads as the strip showing last week (Wed 18): the write is saved to
+  the database and re-read (traced, not run).
+- [x] **A PRESS ADDED TO BALANCE THE WEEK GOES IN WITH THE PRESSES, AND A SMITH LIFT CAN BE THE MAIN LIFT (23 Nov 2026,
+  CSCS, mine).** His report: his Push & Press day, rated by Gemini ("the Main Lift is sitting at the bottom"), ran Smith
+  bench 90 kg, push press, lateral raises, skull crushers, then Neutral-Grip Dumbbell Press labelled MAIN LIFT, held at
+  24 kg "short of 9 reps". Traced (engine-tracer), two causes, both generation: (1) the week's push:pull balance pass
+  runs AFTER the day's tier sort and appended its press to the end of the day (catalogue order makes it exactly
+  Neutral-Grip DB Press on a day already holding a bench); (2) with no tier-1 lift the label goes to the highest anchor
+  score, and Smith Machine Bench Press had no difficulty entry, so a 24 kg dumbbell press outranked the 90 kg Smith
+  bench that opened the day, while the block rotation (first compound) treated the Smith bench as main. Gemini was
+  right on both. FIXED: a compound the balance pass adds sits after the day's last compound and before its first
+  isolation, finisher, trunk or carry move (never inside a superset); the seven Smith compounds (squat, split squat,
+  bench, row, shoulder press, RDL, hip thrust) rank as main-lift candidates like their free-weight twins. MEASURED on
+  every 8th grid plan (1,152 plans, 4,608 days, `measure:compound-order`): a compound written after muscle isolation
+  735 days -> 88; the 88 are all knee-injury days whose rehab drills and leg curl open the day by design. CSCS review:
+  (1) the added press is now trained fresh instead of after the shoulders and triceps were tired, so it can reach its
+  reps and progress; (2) nothing removed, only reordered; (3) pattern coverage, push:pull and volume unchanged;
+  (4) no floor or ceiling moves, but the Smith bump also decides which lift gets the main-lift rest floor on a day
+  with no barbell lift: a Smith lift that opens its day now gets it; (5) in scope. NOT FIXED, named: on 826 of 4,499
+  labelled days the MAIN LIFT label sits on a harder lift that is not the day's first compound (e.g. a cable row
+  written after Iso-Lateral Pulldown, which has no difficulty entry either), so the label and the block rotation can
+  still disagree; the clean fix is one definition of "main lift" for both, which moves rest floors and needs its own
+  measured change. `test:compound-order` (5 checks; 5 mutations, 4 caught: counting trunk work as a compound changed
+  nothing because the pass never adds trunk work, an inert guard kept for clarity). Frontend only; existing plans keep
+  their order until rebuilt.
+
+- [x] **THE NEXT SET MOVES WITH THE REPS JUST DONE: his ruling 23 Nov 2026, "1"** (from three options: one question
+  per lift plus a tap-free nudge, over asking after every set every week, and over leaving it). His report: "The app
+  didnt ask me how the set felt", then "last week it was showing after each set". Both were by design: last week was
+  his testing week (his 15 Nov "Ask, then fill"), this week asks once per lift (his 11 Nov "One tap per lift"). Asked
+  which is best at CSCS level, I recommended neither alone. BUILT: when a logged working set lands 3+ reps over the top
+  of its range, the next set's blank box goes up ONE step (about 5%, at least one plate step); 2+ under the bottom, down
+  about 5%; a line under the row says why ("18 reps on set 1, so up to 37.5 kg"), and the Exercise tab's button and a
+  blank tick use the same number. The per-lift question is unchanged. CSCS basis (mine): reps fall about one a set at a
+  fixed load, so one either side is the plan working; three over is roughly three reps further from failure than asked,
+  about 7-10% of load, so the move takes the cautious half because fatigue builds through the session and the lift's
+  own question moves the next session; two under is a load the set cannot reach. Off where the effort question is off
+  (testing week, deload, a lift with no number), on the first session back from a break (its eased weights are the
+  point), on a stepped (pyramid) prescription, timed or distance sets, warm-ups, drops and bodyweight; never past a stated
+  kit limit. A typed weight always wins. CSCS review: (1) effect: keeps each set near its target effort instead of a
+  wasted easy set or a failed one; (2) takes away nothing (no set, rep or exercise); (3) fundamentals: overload is
+  kept, recovery protected by the one-step cap; (4) no floor or ceiling redefined, the progression engine still reads
+  what was logged; (5) in scope. NOT covered: a strength/power/consolidation block's compounds, which ramp across sets
+  (no nudge there), and a set over the range at a stated kit limit (no weight to add; nothing is said). `test:set-nudge`
+  (19 checks, 8 of 8 mutations caught), `verify:set-nudge` (11 checks, 2 of 2 caught). Frontend only.
+
 - [x] **EMAIL SIGN-UP, SIGN-IN AND SIGN-OUT: his report 23 Nov 2026, "I didn't receive a proper email to confirm my
   email address, and there's no way to sign out and sign back in with the email. Several times, it's asked me to change
   my password", then "Yes" to building the fix** (`docs/plans/account-signin.md`). Live testers in days.

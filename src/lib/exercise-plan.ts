@@ -12,7 +12,7 @@ import {
 } from './experience-config'
 import { PREGNANCY_LATE_EXCLUDED, PREGNANCY_LATE_REPLACEMENTS, lateReplacementKind, PELVIC_FLOOR_WARMUP_ITEM, pregnancyExclusion as pregnancyExclusionLate } from './pregnancy-rules'
 import { isOlderBeginner, needsBeginnerSafeguards, beginnerSafeguardExclusion, olderAdultExclusion, OLDER_BEGINNER_REASON_TEXT, OLDER_BEGINNER_FOUNDATIONS } from './older-beginner'
-import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields, withBalanceWork } from './warmup'
+import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields, shortenRampsToFit, withBalanceWork } from './warmup'
 import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, isPerSideLoad, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
@@ -4770,6 +4770,30 @@ function balanceWeeklyStructure(
       const added = list.pop()!
       list.splice(list.length - 1, 0, added)
     }
+    // A COMPOUND GOES IN WITH THE COMPOUNDS (23 Nov 2026, CSCS, mine; his Push & Press day). This pass runs after the
+    // day's tier sort, so a press added to even out push and pull was written after the lateral raises and skull
+    // crushers: a multi-joint lift done on shoulders and triceps that isolation had already tired, and labelled the
+    // main lift. A compound added here sits after the day's last compound and before its first isolation, finisher,
+    // trunk or carry move, never between a superset's two halves.
+    if (isPlacedWithCompounds(entry)) {
+      const at = list.findIndex(e => e.name === entry.name)
+      const firstLater = list.findIndex((e, i) => {
+        if (i === at) return false
+        const en = findEntry(e.name)
+        return !!en && en.mechanics_tier !== 'primer' && !isPlacedWithCompounds(en)
+      })
+      if (at !== -1 && firstLater !== -1 && firstLater < at) {
+        let to = firstLater
+        while (to > 0 && list[to - 1].superset_label && list[to - 1].superset_label === list[to].superset_label) to--
+        const [added] = list.splice(at, 1)
+        list.splice(to, 0, added)
+      }
+    }
+  }
+  /** A multi-joint lift of the session's main work: not isolation, a finisher, trunk work, a carry or cardio. */
+  function isPlacedWithCompounds(e: ExerciseEntry): boolean {
+    return (e.mechanics_tier === 'tier1_compound' || e.mechanics_tier === 'tier2_compound')
+      && e.movement_pattern !== 'core' && e.movement_pattern !== 'carry'
   }
 
   // Mirror of addExercise — removes the weakest excess-pattern accessory
@@ -5163,6 +5187,73 @@ function balanceWeeklyStructure(
   // little recovery and takes nothing from the next session's main lifts.
   const thinBudgetSeconds = getDurationBudgetSeconds(profile.session_duration_preference || '45-60')
   const weekAppearances = (name: string): number => days.reduce((n, d) => n + (d.exercises.some(ex => ex.name === name) ? 1 : 0), 0)
+
+  // A SPARE PRESS BECOMES PULLING, AND A SPARE HINGE OR SQUAT BECOMES THE OTHER (23 Nov 2026, the persona audit's C18
+  // and C13; CSCS, mine). The count balance above swaps, adds or removes; where a day holds two presses and only three
+  // exercises (a two-day bodyweight week's Chest & Triceps day: wide push-ups, push-ups, a side plank) nothing could
+  // move, and the week pushed twice what it pulled. And a two-day week's full-body day held a deadlift beside a
+  // kettlebell deadlift with one-leg leg press as its only knee work: hamstrings four times the quads. A coach keeps the
+  // session and changes the spare exercise. Read on SETS, as the audit and the weekly set balance read it: while pushing
+  // is over 1.5x pulling, a day holding two presses swaps its later non-main one for pulling it may take (its own
+  // pattern, or a group its track borrows, such as rear delts on a chest day), else for borrowed work neither count
+  // sees (trunk, traps). While one side of the thigh is over 2.5x the other (eight sets or more, one-leg work half to
+  // each), a day holding two of the heavy side swaps its later non-main one for the light side. Never the main lift,
+  // never required work, never a family the day already holds; sets carried over, and every later pass sees it.
+  {
+    const workSets = (pred: (e: ExerciseEntry) => boolean) => days.reduce((n, d) => n + d.exercises.reduce((a, ex) => { const x = findEntry(ex.name); return a + (x && x.mechanics_tier !== 'primer' && pred(x) ? ex.sets : 0) }, 0), 0)
+    const isPress = (e: ExerciseEntry) => classifyForBalance(e.movement_pattern) === 'push'
+    const isPullE = (e: ExerciseEntry) => classifyForBalance(e.movement_pattern) === 'pull'
+    const borrows = (dayIdx: number, e: ExerciseEntry) => (TRACKS[days[dayIdx].focus as TrackFocus]?.borrow ?? [])
+      .some(b => (b.groups?.includes(e.substitution_group) ?? false) || (b.patterns?.includes(e.movement_pattern) ?? false))
+    const fits = (dayIdx: number, e: ExerciseEntry) => e.mechanics_tier !== 'primer' && e.mechanics_tier !== 'cardio' && e.mechanics_tier !== 'tier1_compound'
+      && !dayFamilies(dayIdx).has(getMovementFamily(e)) && weekAppearances(e.name) < WEEKLY_APPEARANCE_CAP
+      && !days[dayIdx].exercises.some(ex => ex.name === e.name)
+    const spareOf = (dayIdx: number, pred: (e: ExerciseEntry) => boolean): number | null => {
+      const list = days[dayIdx].exercises
+      const hits = list.map((ex, i) => ({ i, x: findEntry(ex.name), ex })).filter(t => !!t.x && t.x.mechanics_tier !== 'primer' && pred(t.x))
+      if (hits.length < 2) return null
+      const spare = [...hits].reverse().find(t => t.x!.mechanics_tier !== 'tier1_compound' && getVolumeRole(t.x!) !== 'main' && !protectedNames.has(t.ex.name) && !t.ex.superset_label)
+      return spare?.i ?? null
+    }
+    for (let guard = 0; guard < 4 && workSets(isPullE) > 0 && workSets(isPress) > workSets(isPullE) * 1.5; guard++) {
+      const pressSets = (i: number) => days[i].exercises.reduce((n, ex) => { const x = findEntry(ex.name); return n + (x && x.mechanics_tier !== 'primer' && isPress(x) ? ex.sets : 0) }, 0)
+      let swapped = false
+      for (const dayIdx of days.map((_, i) => i).sort((a, b) => pressSets(b) - pressSets(a))) {
+        const exIdx = spareOf(dayIdx, isPress)
+        if (exIdx == null) continue
+        const forbidden = dayForbidden(dayIdx)
+        const twoPerPattern = (e: ExerciseEntry) => days[dayIdx].exercises.filter(ex => findEntry(ex.name)?.movement_pattern === e.movement_pattern).length < 2
+        const replacement = pool.find(e => fits(dayIdx, e) && isPullE(e) && (!forbidden.has(e.movement_pattern) || borrows(dayIdx, e)))
+          ?? pool.find(e => fits(dayIdx, e) && classifyForBalance(e.movement_pattern) === null && borrows(dayIdx, e) && twoPerPattern(e))
+        if (!replacement) continue
+        swap(dayIdx, exIdx, replacement, 'the week pushed over 1.5x what it pulled, and this press was the day\'s second')
+        swapped = true
+        break
+      }
+      if (!swapped) break
+    }
+    const QUAD = new Set<string>(['knee_dominant', 'isolation_quad']), HAM = new Set<string>(['hip_hinge', 'isolation_hamstring'])
+    const thigh = (side: Set<string>) => workSets(e => side.has(e.movement_pattern)) + workSets(e => e.movement_pattern === 'single_leg') / 2
+    for (let guard = 0; guard < 4; guard++) {
+      const q = thigh(QUAD), h = thigh(HAM)
+      if (q + h < 8 || (q <= h * 2.5 && h <= q * 2.5)) break
+      const [heavy, light] = q > h ? [QUAD, HAM] : [HAM, QUAD]
+      let swapped = false
+      for (let dayIdx = 0; dayIdx < days.length && !swapped; dayIdx++) {
+        const exIdx = spareOf(dayIdx, e => heavy.has(e.movement_pattern))
+        if (exIdx == null) continue
+        const old = findEntry(days[dayIdx].exercises[exIdx].name)!
+        const forbidden = dayForbidden(dayIdx)
+        const ok = (e: ExerciseEntry) => fits(dayIdx, e) && light.has(e.movement_pattern) && !forbidden.has(e.movement_pattern)
+        // Like for like: a compound for a compound, an isolation lift for an isolation lift.
+        const replacement = pool.find(e => ok(e) && (e.mechanics_tier === 'tier3_isolation') === (old.mechanics_tier === 'tier3_isolation')) ?? pool.find(ok)
+        if (!replacement) continue
+        swap(dayIdx, exIdx, replacement, 'one side of the thigh was over 2.5x the other, and this was the day\'s second of that side')
+        swapped = true
+      }
+      if (!swapped) break
+    }
+  }
 
   // Before the thin-day step, so a short day's top-up sees the trunk work already there.
   // TRUNK WORK TWICE A WEEK (his "yes fix all four", 21 Nov 2026; CSCS, mine). On a three-day full-body week the core
@@ -5827,7 +5918,7 @@ function enforceDayDurationBudget(
    */
   trunkElsewhere: number | null = null,
   /** The week's push and pull sets on the OTHER days: a pull set the week's balance needs is never trimmed (C18). */
-  balanceElsewhere: { push: number; pull: number } | null = null,
+  balanceElsewhere: { push: number; pull: number; chest?: number } | null = null,
 ): WorkoutDay {
   if (day.exercises.length === 0) return day
   // NO FILLER YIELD HERE, deliberately. One was written and measured: across
@@ -5837,6 +5928,10 @@ function enforceDayDurationBudget(
   // a gate that cannot fail — CLAUDE.md, "measure which one works".
   let exercises = day.exercises
   if (trunkElsewhere != null) { day = shortenWarmupToFit({ ...day, exercises }, budgetSeconds, flaggedJoints); exercises = day.exercises }
+  // A set the week needs (pulling for its balance, chest for its four) is held back while a whole spare exercise can
+  // still go in the final backstop below; only then is it trimmed (the persona audit's C17: the clock took a pregnant
+  // trainee's only chest press from four sets to three while a front raise stayed).
+  const trimSets = (holdNeeded: boolean) => {
   let guard = 0
   while (estimateDaySeconds({ ...day, exercises }) > budgetSeconds && guard < 30) {
     guard++
@@ -5874,13 +5969,21 @@ function enforceDayDurationBudget(
     const isPushT = (e: ExerciseEntry | null | undefined) => !!e && (e.movement_pattern === 'horizontal_push' || e.movement_pattern === 'vertical_push')
     const daySum = (f: (e: ExerciseEntry | undefined) => boolean) => exercises.filter(e => f(findEntry(e.name)) && findEntry(e.name)?.mechanics_tier !== 'primer').reduce((n, e) => n + (e.sets ?? 0), 0)
     const pullNeeded = balanceElsewhere != null && (balanceElsewhere.push + daySum(isPushT)) > (balanceElsewhere.pull + daySum(isPullT) - 1) * 1.5
+    // ...and so does a chest set the week's four need (the persona audit's C17: the clock took a pregnant trainee's
+    // incline push-ups from four sets to three, her only chest work beside three overhead presses).
+    const isChestT = (e: ExerciseEntry | null | undefined) => !!e && (e.movement_pattern === 'horizontal_push' || (e.movement_pattern as string) === 'isolation_chest')
+    const chestNeeded = balanceElsewhere?.chest != null && balanceElsewhere.chest + daySum(isChestT) - 1 < 4
     const accessories = trimmable.filter(t => !t.isRehab && (!t.role || !protectedRoles.has(t.role)))
     const rehabOnly = trimmable.filter(t => t.isRehab)
     const candidates = accessories.length > 0 ? accessories : rehabOnly.length > 0 ? rehabOnly : trimmable
-    candidates.sort((a, b) => ((pullNeeded && isPullT(a.entry) ? 1 : 0) - (pullNeeded && isPullT(b.entry) ? 1 : 0)) || b.sets - a.sets)
+    const lastRank = (e: ExerciseEntry | null | undefined) => (pullNeeded && isPullT(e)) || (chestNeeded && isChestT(e)) ? 1 : 0
+    candidates.sort((a, b) => (lastRank(a.entry) - lastRank(b.entry)) || b.sets - a.sets)
+    if (holdNeeded && lastRank(candidates[0].entry) === 1) break
     const target = candidates[0].i
     exercises = exercises.map((ex, i) => (i === target ? { ...ex, sets: ex.sets - 1 } : ex))
   }
+  }
+  trimSets(trunkElsewhere != null)
   // Pushing is pushing and pulling is pulling here: a bench-type and an overhead press cover one need on a day short of time.
   const trimGroup = (p: string | undefined) => p === 'vertical_push' ? 'horizontal_push' : p === 'vertical_pull' ? 'horizontal_pull' : p
   // ...and a pull the week's balance needs is never the exercise that goes (C18: a Monday's second row went as "spare"
@@ -5925,6 +6028,40 @@ function enforceDayDurationBudget(
       continue
     }
     exercises = exercises.filter((_, i) => i !== drop)
+  }
+  // The sets the week needs, now that nothing spare is left to drop.
+  if (trunkElsewhere != null) trimSets(false)
+  // THE LAST MINUTE BEFORE THE CLOCK (23 Nov 2026, the persona audit's C8b; CSCS, mine): with every set at its floor and
+  // nothing left to spare, 32 plans ran seconds to a minute past the top of the range, a pregnant trainee's 20-30 session
+  // at 30.3 minutes beside her pelvic floor work and a deadlift build-up. The general warm-up and the build-up sets warm
+  // the same body, so they give the last seconds: never a working set, a rest, the balance hold or pelvic floor work;
+  // only in the final backstop, only on a day still over, and only as far as it is over.
+  if (trunkElsewhere != null && estimateDaySeconds({ ...day, exercises }) > budgetSeconds) {
+    // First the bike, rower or treadmill: down from two minutes towards one, only as far as the day is over (a
+    // pregnant trainee's 20-30 session, every set at its floor, pelvic floor work and a three-set deadlift build-up,
+    // ran 31 seconds past 30 minutes). The build-up sets go on raising her temperature; one minute is the least kept.
+    const over = estimateDaySeconds({ ...day, exercises }) - budgetSeconds
+    if (day.warmup && over > 0) {
+      let left = over
+      const general = day.warmup.general.map(g => {
+        const cut = Math.min(left, Math.max(0, g.duration_seconds - 60))
+        left -= cut
+        return cut > 0 ? { ...g, duration_seconds: g.duration_seconds - cut, prescription: g.prescription.replace(/^\d+(-\d+)?\s*min/, `${Math.ceil((g.duration_seconds - cut) / 30) / 2} min`) } : g
+      })
+      const saved = over - left
+      if (saved > 0) day = { ...day, warmup: { ...day.warmup, general, total_seconds: day.warmup.total_seconds - saved } }
+    }
+    // ...then the build-up takes the short session's shape, the first lift in two sets (half and 70% of its working
+    // weight), and at the very last a later lift's feeder set goes (warmup.ts shortenRampsToFit says why).
+    if (day.warmup && estimateDaySeconds({ ...day, exercises }) > budgetSeconds) {
+      for (const laterFeeders of [true, false]) {
+        if (estimateDaySeconds({ ...day, exercises }) <= budgetSeconds) break
+        const warmup = shortenRampsToFit(day.warmup!, 2, laterFeeders)
+        const byName = new Map(warmup.ramp_ups.map(r => [r.exercise, r]))
+        exercises = exercises.map(ex => (!ex.ramp_up ? ex : byName.has(ex.name) ? { ...ex, ramp_up: byName.get(ex.name) } : { ...ex, ramp_up: undefined }))
+        day = { ...day, warmup, exercises }
+      }
+    }
   }
   let trimmedDay: WorkoutDay = { ...day, exercises }
 
@@ -7945,8 +8082,25 @@ export function beginnerWorkingSets(day: WorkoutDay): number {
   }, 0)
 }
 
-export function capBeginnerSets(day: WorkoutDay, protectedNames: ReadonlySet<string> = new Set(), maxSets: number = BEGINNER_MAX_WORKING_SETS, setsOnly = false): WorkoutDay {
+export function capBeginnerSets(day: WorkoutDay, protectedNames: ReadonlySet<string> = new Set(), maxSets: number = BEGINNER_MAX_WORKING_SETS, setsOnly = false,
+  /** The week's push and pull sets on the OTHER days: a pull the week's balance needs goes last, a press first (C18). */
+  balanceElsewhere: { push: number; pull: number; chest?: number } | null = null): WorkoutDay {
   let exercises = day.exercises
+  const PUSH = ['horizontal_push', 'vertical_push'], PULL = ['horizontal_pull', 'vertical_pull']
+  const onDay = (ps: string[]) => exercises.reduce((n, ex) => { const x = findEntry(ex.name); return n + (x && x.mechanics_tier !== 'primer' && ps.includes(x.movement_pattern) ? ex.sets : 0) }, 0)
+  // 0 = goes first, 2 = goes last: a press while the week pushes more than it pulls; a pull whose loss would leave the
+  // week pushing more than it pulls (the band is pull at least equal to push, up to 1.5x).
+  const balanceRank = (e: ExerciseEntry, sets: number) => {
+    if (!balanceElsewhere) return 1
+    const push = balanceElsewhere.push + onDay(PUSH), pull = balanceElsewhere.pull + onDay(PULL)
+    if (PUSH.includes(e.movement_pattern) && push > pull) return 0
+    if (PULL.includes(e.movement_pattern) && push > pull - sets) return 2
+    // ...and the week's four chest sets (the persona audit's C17: a beginner's only press, a floor press for a sore
+    // shoulder, raised to four and capped back to three).
+    const CHEST = ['horizontal_push', 'isolation_chest']
+    if (balanceElsewhere.chest != null && CHEST.includes(e.movement_pattern) && balanceElsewhere.chest + onDay(CHEST) - sets < 4) return 2
+    return 1
+  }
   let guard = 0
   while (beginnerWorkingSets({ ...day, exercises }) > maxSets && guard++ < 60) {
     const rows = exercises.map((ex, i) => {
@@ -7956,7 +8110,8 @@ export function capBeginnerSets(day: WorkoutDay, protectedNames: ReadonlySet<str
     }).filter(r => r.entry && r.entry.mechanics_tier !== 'primer' && r.role !== 'main' && r.role !== 'conditioning')
     // Isolation before accessory, then the most sets first: the same order enforceDayDurationBudget trims in.
     const trimmable = rows.filter(r => (r.ex.sets ?? 0) > getRoleSetFloor(r.role!))
-      .sort((a, b) => (a.role === 'isolation' ? 0 : 1) - (b.role === 'isolation' ? 0 : 1) || (b.ex.sets ?? 0) - (a.ex.sets ?? 0) || b.i - a.i)
+      .sort((a, b) => balanceRank(a.entry!, 1) - balanceRank(b.entry!, 1)
+        || (a.role === 'isolation' ? 0 : 1) - (b.role === 'isolation' ? 0 : 1) || (b.ex.sets ?? 0) - (a.ex.sets ?? 0) || b.i - a.i)
     if (trimmable.length > 0) {
       const t = trimmable[0].i
       exercises = exercises.map((ex, i) => (i === t ? { ...ex, sets: ex.sets - 1 } : ex))
@@ -7965,9 +8120,15 @@ export function capBeginnerSets(day: WorkoutDay, protectedNames: ReadonlySet<str
     // A deload trims sets only: it never drops an exercise (the same exercises all block).
     if (setsOnly || trainingSlotCount(exercises.map(ex => findEntry(ex.name))) <= 3) break
     const isCore = (e: ExerciseEntry) => e.movement_pattern === 'core'
+    // Never the day's last squat, hinge, press or pull (23 Nov 2026, the persona audit's C1): once pulls the week needed
+    // went last, the cap took a two-day week's only kettlebell deadlift instead.
+    const GROUP: Record<string, string> = { knee_dominant: 'squat', single_leg: 'squat', hip_hinge: 'hinge', horizontal_push: 'push', vertical_push: 'push', horizontal_pull: 'pull', vertical_pull: 'pull' }
+    const lastOfGroup = (r: { i: number; entry?: ExerciseEntry }) => { const g = GROUP[r.entry!.movement_pattern]
+      return !!g && !exercises.some((ex, j) => j !== r.i && findEntry(ex.name)?.mechanics_tier !== 'primer' && GROUP[findEntry(ex.name)?.movement_pattern ?? ''] === g) }
     const droppable = rows
       .filter(r => !r.ex.superset_label && !protectedNames.has(r.ex.name) && r.entry!.mechanics_tier !== 'tier1_compound')
-      .sort((a, b) => (a.role === 'isolation' || isCore(a.entry!) ? 0 : 1) - (b.role === 'isolation' || isCore(b.entry!) ? 0 : 1) || b.i - a.i)
+      .sort((a, b) => (lastOfGroup(a) ? 1 : 0) - (lastOfGroup(b) ? 1 : 0) || balanceRank(a.entry!, a.ex.sets ?? 0) - balanceRank(b.entry!, b.ex.sets ?? 0)
+        || (a.role === 'isolation' || isCore(a.entry!) ? 0 : 1) - (b.role === 'isolation' || isCore(b.entry!) ? 0 : 1) || b.i - a.i)
     if (droppable.length === 0) break
     const drop = droppable[0].i
     exercises = exercises.filter((_, i) => i !== drop)
@@ -8476,6 +8637,9 @@ export function generateMesocycle(
 
   sequence.forEach((phase, blockIndex) => {
     const blockStartIndex = weeks.length
+    // Pulling the press-heavy rule below put on a day, by day name: kept in every loading week of the block (see the
+    // block's "same exercises" pass at its end).
+    const pullAddedOn = new Map<string, string>()
     // MID-BLOCK ONLY — Ashley's wording, and the audit insists on it. A block
     // changes the phase, and with it the rep targets and the intensity the
     // estimate is computed against, so a weight carried across the boundary is
@@ -9980,7 +10144,7 @@ export function generateMesocycle(
         // squat at 2. Neither side over 2.5x the other (single-leg work counts half to each, as both sides work): a set
         // moves from the heavy side's largest exercise to the light side's smallest, within role limits, or with no room
         // on the light side the heavy side just gives one (do less). Only with eight or more leg sets a week to weigh.
-        {
+        const balanceThigh = (setCap: number) => {
           const QUAD = ['knee_dominant', 'isolation_quad'], HAM = ['hip_hinge', 'isolation_hamstring']
           const rows = days.flatMap(d => d.exercises.filter(ex => { const x = findEntry(ex.name); return !!x && x.mechanics_tier !== 'primer' && [...QUAD, ...HAM, 'single_leg'].includes(x.movement_pattern) }))
           const side = (ps: string[]) => rows.filter(ex => ps.includes(findEntry(ex.name)!.movement_pattern))
@@ -9995,18 +10159,99 @@ export function generateMesocycle(
             const canGive = (ex: Exercise) => { const r = roleOf(ex); const d = dayOf(ex); return !!r && ex.sets > getRoleSetFloor(r) && !!d && beginnerWorkingSets(d) > 10 }
             const donor = side(heavy).filter(ex => canGive(ex) && !blockRequired.has(ex.name)).sort((a, b) => b.sets - a.sets)[0]
               ?? side(heavy).filter(canGive).sort((a, b) => b.sets - a.sets)[0]
-            const receiver = side(light).filter(ex => { const r = roleOf(ex); return !!r && ex.sets < getRoleSetCeiling(r, true) }).sort((a, b) => a.sets - b.sets)[0]
-            if (!donor && !receiver) break
+            const receiver = side(light).filter(ex => { const r = roleOf(ex); const d = dayOf(ex); return !!r && ex.sets < getRoleSetCeiling(r, true) && !!d && beginnerWorkingSets(d) + 1 <= setCap }).sort((a, b) => a.sets - b.sets)[0]
+            if (!donor && !receiver) {
+              // Every set at its floor and nothing to move (23 Nov 2026, the persona audit's C13): a pregnant beginner's
+              // week held two kettlebell deadlifts and a band leg curl against one box squat, every exercise at two sets.
+              // The heavy side's isolation lift goes (do less), on a day that keeps more than three exercises.
+              const iso = side(heavy).find(ex => { const x = findEntry(ex.name)!; const d = dayOf(ex)
+                return x.mechanics_tier === 'tier3_isolation' && !!d && trainingSlotCount(d.exercises.map(e => findEntry(e.name))) > 3 })
+              const d = iso ? dayOf(iso) : undefined
+              if (!iso || !d) break
+              const at = days.indexOf(d)
+              days[at] = { ...d, exercises: d.exercises.filter(e => e !== iso) }
+              rows.splice(rows.indexOf(iso), 1)
+              continue
+            }
             if (receiver) receiver.sets += 1
             if (donor && (!receiver || q + h >= 8)) donor.sets -= 1
           }
         }
+        balanceThigh(Infinity)
         // A BEGINNER'S CAP, after the balance pass (so nothing adds a set back) and before the filler (so the time it
         // frees goes to optional mobility). capBeginnerSets says why.
         {
           const cap = experience === 'beginner' ? BEGINNER_MAX_WORKING_SETS
             : (profile.injuries ?? []).includes('lower_back') ? LOWER_BACK_MAX_WORKING_SETS : null
-          if (cap != null) for (let i = 0; i < days.length; i++) if (days[i].exercises.length > 0) days[i] = capBeginnerSets(days[i], blockRequired, cap)
+          // ...and a pull the week's push:pull needs goes last (the persona audit's C18: a beginner's Monday lost the two
+          // pulldowns the balance pass had added, the last exercises on the day, and the week pressed 13 sets to 6).
+          const setsOn = (d: WorkoutDay, ps: string[]) => d.exercises.reduce((n, ex) => { const x = findEntry(ex.name); return n + (x && x.mechanics_tier !== 'primer' && ps.includes(x.movement_pattern) ? ex.sets : 0) }, 0)
+          if (cap != null) for (let i = 0; i < days.length; i++) if (days[i].exercises.length > 0) {
+            const others = days.filter((_, j) => j !== i)
+            days[i] = capBeginnerSets(days[i], blockRequired, cap, false, {
+              push: others.reduce((n, d) => n + setsOn(d, ['horizontal_push', 'vertical_push']), 0),
+              pull: others.reduce((n, d) => n + setsOn(d, ['horizontal_pull', 'vertical_pull']), 0),
+              chest: others.reduce((n, d) => n + setsOn(d, ['horizontal_push', 'isolation_chest']), 0) })
+          }
+          // The cap can take one side of the thigh's work (a pregnant beginner's reverse lunge went, and her week held
+          // two deadlifts and a leg curl against one box squat), so the thigh is weighed again, inside the cap.
+          if (cap != null) balanceThigh(cap)
+        }
+        // THE LIGHT DAY TAKES SETS (23 Nov 2026, the persona audit's C15; CSCS, mine): a two-day bodyweight week held a
+        // 14-set, 30-minute full-body day beside a 6-set, 21-minute squat-and-carry day; a five-day week a 10-set day
+        // beside 18. The heaviest day already gives where the week has three days or more (above); a two-day week, or a
+        // light day still well under, takes. A day under 60% of the heaviest day's working sets AND under 75% of its
+        // minutes takes one set at a time on its smallest exercise with room (role ceilings), while the session stays
+        // inside the top of the range and a beginner's 18: never a press while the week pushes as much as it pulls, never
+        // a conditioning day (its circuit is its work).
+        {
+          const sessionMax = getSessionMaximumSeconds(profile.session_duration_preference || '45-60')
+          const cap = experience === 'beginner' ? BEGINNER_MAX_WORKING_SETS : (profile.injuries ?? []).includes('lower_back') ? LOWER_BACK_MAX_WORKING_SETS : Infinity
+          const lifting = (d: WorkoutDay) => d.exercises.length > 0 && d.focus !== 'Conditioning & Core'
+            && !d.exercises.some(e => { const x = findEntry(e.name); return x?.mechanics_tier === 'cardio' || x?.movement_pattern === 'cardio' })
+          const PUSH = ['horizontal_push', 'vertical_push'], PULL = ['horizontal_pull', 'vertical_pull']
+          const weekSets = (ps: string[]) => days.reduce((n, d) => n + d.exercises.reduce((a, e) => { const x = findEntry(e.name); return a + (x && x.mechanics_tier !== 'primer' && ps.includes(x.movement_pattern) ? e.sets : 0) }, 0), 0)
+          for (let guard = 0; guard < 24; guard++) {
+            const ds = days.filter(lifting)
+            if (ds.length < 2) break
+            const maxSets = Math.max(...ds.map(d => beginnerWorkingSets(d))), maxMin = Math.max(...ds.map(d => estimateDaySeconds(d)))
+            const light = ds.find(d => beginnerWorkingSets(d) < maxSets * 0.6 && estimateDaySeconds(d) < maxMin * 0.75)
+            if (!light) break
+            const pushHeavy = weekSets(PUSH) >= weekSets(PULL)
+            const room = light.exercises
+              .map(ex => ({ ex, x: findEntry(ex.name) }))
+              .filter(t => { const role = t.x ? getVolumeRole(t.x) : null
+                return !!t.x && !!role && role !== 'conditioning' && t.x.mechanics_tier !== 'primer' && t.ex.sets < getRoleSetCeiling(role, true)
+                  && !(pushHeavy && PUSH.includes(t.x.movement_pattern)) })
+              .sort((a, b) => a.ex.sets - b.ex.sets)
+            // ...and never a set that tips the thigh past 2.5x one way (a knee trainee's light day took its knee drill and
+            // Spanish squat to three sets each: quads 9, hamstrings 3).
+            const thighOk = (t: { ex: Exercise; x?: ExerciseEntry }, delta = 1) => {
+              const side = (ps: string[]) => days.reduce((n, d) => n + d.exercises.reduce((a, e) => { const x = findEntry(e.name); return a + (x && x.mechanics_tier !== 'primer' && ps.includes(x.movement_pattern) ? e.sets + (e === t.ex ? delta : 0) : 0) }, 0), 0)
+              const sl = side(['single_leg']) / 2, q = side(['knee_dominant', 'isolation_quad']) + sl, h = side(['hip_hinge', 'isolation_hamstring']) + sl
+              return q + h < 8 || (q <= h * 2.5 && h <= q * 2.5)
+            }
+            const pick = room.find(t => {
+              const trial = { ...light, exercises: light.exercises.map(e => (e === t.ex ? { ...e, sets: e.sets + 1 } : e)) }
+              return beginnerWorkingSets(trial) <= cap && estimateDaySeconds(trial) <= sessionMax && thighOk(t)
+            })
+            if (pick) { pick.ex.sets += 1; continue }
+            // ...and where the light day has no room (a Push & Press day of three presses in a week already pressing as
+            // much as it pulls; an Upper Pull day at every ceiling), the heaviest day gives a set: never its main lift,
+            // never below a floor, never pulling the week needs or chest under its four.
+            const heavy = [...ds].sort((a, b) => beginnerWorkingSets(b) - beginnerWorkingSets(a))[0]
+            const chestWeek = weekSets(['horizontal_push', 'isolation_chest'])
+            const give = heavy.exercises
+              .map(ex => ({ ex, x: findEntry(ex.name) }))
+              .filter(t => { const role = t.x ? getVolumeRole(t.x) : null
+                return !!t.x && !!role && role !== 'main' && role !== 'conditioning' && t.x.mechanics_tier !== 'primer' && t.ex.sets > getRoleSetFloor(role)
+                  && !(PULL.includes(t.x.movement_pattern) && weekSets(PUSH) > weekSets(PULL) - 1)
+                  && !((t.x.movement_pattern === 'horizontal_push' || (t.x.movement_pattern as string) === 'isolation_chest') && chestWeek - 1 < 4)
+                  && thighOk(t, -1) })
+              .sort((a, b) => b.ex.sets - a.ex.sets)[0]
+            if (!give) break
+            give.ex.sets -= 1
+          }
         }
         // THE FILLER SIZES ITSELF ON THE DAY AS IT WILL SHIP (18 Nov 2026).
         // It used to run just BEFORE the balance pass, which then took a set
@@ -10124,13 +10369,17 @@ export function generateMesocycle(
           for (let i = 0; i < days.length; i++) {
             const d = days[i]
             if (!d.exercises.some(e => isPush(e.name) && working(e)) || d.exercises.some(e => isPull(e.name) && working(e))) continue
-            // A full-body day only: a Shoulders or Push day is built to press, and a row there is borrowed work (test:day-purpose).
-            if (!/Full Body/.test(d.focus)) continue
+            // A full-body day, or a chest or shoulders day of a split (23 Nov 2026, the persona audit's C18 and C17; CSCS,
+            // mine): a 75-year-old's three-day week pressed on two days and rowed three sets on one, and her chest day had an
+            // hour with nothing to pull. A row beside a press is the antagonist pairing a coach writes on a pressing day. A
+            // Push & Press day stays a pressing day: its week has a pull day of its own.
+            if (!/Full Body/.test(d.focus) && d.focus !== 'Chest & Triceps' && d.focus !== 'Shoulders & Abs') continue
             // Never past a session's set cap (the beginner's 18, a bad back's 22): the persona audit's S9 caught this adding
             // two sets to an 18-set beginner day.
             const setCap = experience === 'beginner' ? BEGINNER_MAX_WORKING_SETS : (profile.injuries ?? []).includes('lower_back') ? LOWER_BACK_MAX_WORKING_SETS : Infinity
             if (beginnerWorkingSets(d) + 2 > setCap) continue
             days[i] = { ...d, exercises: [...d.exercises, { ...weekPull, sets: 2, superset_label: undefined, rest: weekPull.rest === 'alternate' ? '60s' : weekPull.rest }] }
+            pullAddedOn.set(d.day, weekPull.name)
             if (sum(isPush) <= sum(isPull) * 1.5) break
           }
         }
@@ -10156,7 +10405,8 @@ export function generateMesocycle(
           const setsOn = (d: WorkoutDay, ps: string[]) => d.exercises.filter(e => { const x = findEntry(e.name); return !!x && x.mechanics_tier !== 'primer' && ps.includes(x.movement_pattern) }).reduce((n, e) => n + (e.sets ?? 0), 0)
           const others = days.filter((_, j) => j !== i)
           days[i] = enforceDayDurationBudget(days[i], sessionMaxSeconds, flagged, days.reduce((n, d, j) => n + (j === i ? 0 : trunkOn(d)), 0),
-            { push: others.reduce((n, d) => n + setsOn(d, ['horizontal_push', 'vertical_push']), 0), pull: others.reduce((n, d) => n + setsOn(d, ['horizontal_pull', 'vertical_pull']), 0) })
+            { push: others.reduce((n, d) => n + setsOn(d, ['horizontal_push', 'vertical_push']), 0), pull: others.reduce((n, d) => n + setsOn(d, ['horizontal_pull', 'vertical_pull']), 0),
+              chest: others.reduce((n, d) => n + setsOn(d, ['horizontal_push', 'isolation_chest']), 0) })
         }
       }
 
@@ -10170,10 +10420,18 @@ export function generateMesocycle(
         const isPull = (n: string) => ['horizontal_pull', 'vertical_pull'].includes(findEntry(n)?.movement_pattern ?? '')
         const sum = (f: (n: string) => boolean) => days.reduce((n, d) => n + d.exercises.filter(e => f(e.name) && findEntry(e.name)?.mechanics_tier !== 'primer').reduce((a, e) => a + (e.sets ?? 0), 0), 0)
         for (let guard = 0; guard < 6 && sum(isPull) > 0 && sum(isPush) > sum(isPull) * 1.5; guard++) {
+          const spareOn = (d: WorkoutDay) => d.exercises.filter(e => isPush(e.name) && findEntry(e.name)?.mechanics_tier !== 'primer').length >= 2 && trainingSlotCount(d.exercises.map(e => findEntry(e.name))) > 3
+            ? [...d.exercises.keys()].reverse().find(i => { const x = findEntry(d.exercises[i].name); return !!x && isPush(d.exercises[i].name) && x.mechanics_tier !== 'primer' && getVolumeRole(x) !== 'main'
+              // Required work may go where the day keeps another press of its own plane and the week keeps four chest
+              // sets (a beginner's Push & Press day held a bench press, a landmine press and a neutral-grip press, all
+              // required, and the week pressed 12 sets to 7).
+              && (!blockRequired.has(d.exercises[i].name) || (d.exercises.some((o, j) => j !== i && findEntry(o.name)?.mechanics_tier !== 'primer' && findEntry(o.name)?.movement_pattern === x.movement_pattern)
+                && (x.movement_pattern !== 'horizontal_push' || sum(n => ['horizontal_push', 'isolation_chest'].includes(findEntry(n)?.movement_pattern ?? '')) - d.exercises[i].sets >= 4))) })
+            : undefined
           const di = days.findIndex(d => d.exercises.filter(e => isPush(e.name) && findEntry(e.name)?.mechanics_tier !== 'primer').length >= 2 && trainingSlotCount(d.exercises.map(e => findEntry(e.name))) > 3)
           if (di < 0) break
           const d = days[di]
-          const idx = [...d.exercises.keys()].reverse().find(i => { const x = findEntry(d.exercises[i].name); return !!x && isPush(d.exercises[i].name) && x.mechanics_tier !== 'primer' && getVolumeRole(x) !== 'main' && !blockRequired.has(d.exercises[i].name) })
+          const idx = spareOn(d)
           if (idx == null) break
           days[di] = { ...d, exercises: d.exercises.filter((_, i) => i !== idx) }
         }
@@ -10312,6 +10570,30 @@ export function generateMesocycle(
       const dayNames = new Set(loadingWeeks.flatMap(w => w.days.filter(d => d.exercises.length > 0).map(d => d.day)))
       for (const dn of dayNames) {
         // Only weeks where the day lifts (a run or a moved day is not a dropped exercise).
+        // A PULL ADDED IN ONE WEEK IS ADDED IN ALL (23 Nov 2026, the persona audit's C18): the press-heavy rule adds the
+        // week's own row to a pressing day only in the weeks that need it (the rep ramp makes week 3 the one), and this
+        // pass then took it out of that week too, because the other weeks lacked it. It goes into every loading week of
+        // the block where the day lifts and the week rows somewhere, two sets, as that week's own row.
+        const added = pullAddedOn.get(dn)
+        if (added) for (const w of loadingWeeks) {
+          const i = w.days.findIndex(d => d.day === dn)
+          const d = w.days[i]
+          if (!d || d.exercises.length === 0 || d.exercises.some(e => e.name === added)) continue
+          const own = w.days.flatMap(x => x.exercises).find(e => e.name === added)
+          if (!own) continue
+          // Inside the time asked: the day's other accessory sets give first (never a press or a pull, never below a
+          // floor), and a week that still cannot hold it goes without.
+          const maxSeconds = getSessionMaximumSeconds(profile.session_duration_preference || '45-60')
+          let list = [...d.exercises, { ...own, sets: 2, superset_label: undefined, rest: own.rest === 'alternate' ? '60s' : own.rest }]
+          for (let g = 0; g < 8 && estimateDaySeconds({ ...d, exercises: list }) > maxSeconds; g++) {
+            const t = list.map((e, k) => ({ e, k, x: findEntry(e.name) })).filter(q => { const role = q.x ? getVolumeRole(q.x) : null
+              return !!q.x && !!role && role !== 'main' && q.x.mechanics_tier !== 'primer' && q.e.sets > getRoleSetFloor(role) && classifyForBalance(q.x.movement_pattern) === null })
+              .sort((a, b) => b.e.sets - a.e.sets)[0]
+            if (!t) break
+            list = list.map((e, k) => (k === t.k ? { ...e, sets: e.sets - 1 } : e))
+          }
+          if (estimateDaySeconds({ ...d, exercises: list }) <= maxSeconds) w.days[i] = { ...d, exercises: list }
+        }
         const lists = loadingWeeks.map(w => w.days.find(d => d.day === dn)?.exercises.map(e => e.name) ?? []).filter(l => l.length > 0)
         if (lists.length < 2) continue
         const everywhere = (n: string) => lists.every(l => l.includes(n))

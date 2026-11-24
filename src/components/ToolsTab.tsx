@@ -24,8 +24,11 @@ import { RoundField } from '@/components/timers/RoundField'
 import { RoundCard } from '@/components/timers/RoundCard'
 import { useTimers } from '@/hooks/useTimers'
 import { useActiveSession } from '@/hooks/useActiveSession'
+import { PlannedRoundEffort } from '@/components/exercise/PlannedRoundsStart'
+import { roundIsPlannedSession } from '@/lib/planned-rounds'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
-import { parseConditioningInterval, ROUND_PRESETS } from '@/lib/timer-engine'
+import { blockShape, parseConditioningInterval, ROUND_PRESETS } from '@/lib/timer-engine'
+import { splitActivity } from '@/lib/cardio-lines'
 import type { WorkoutDay, MesocycleWeek, EquipmentAccess } from '@/lib/types'
 import type { RoundLogSummary } from '@/lib/timer-engine'
 import { AddUnplannedWork } from '@/components/exercise/AddUnplannedWork'
@@ -254,7 +257,27 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
   // THE SHEET WHERE THE FINISHED ROUND IS WRITTEN DOWN. Rendered once, beside
   // both branches, because the full-screen branch returns early and a sheet
   // mounted only in the normal layout could never open from the field.
-  const logSheet = (
+  // A ROUND STARTED FROM TODAY'S PLANNED SESSION (23 Nov 2026) is logged AS that session: one effort tap, its own
+  // name so the day reads done, never "what was this block?".
+  const todaysPlanned = (todayCell?.movedTo ? null : todayCell?.session)?.plannedActivity ?? null
+  const plannedRound = todaysPlanned && roundIsPlannedSession(timers.roundConfig, todaysPlanned.activity, todayDate) && timers.roundConfig
+    ? { planned: todaysPlanned, config: timers.roundConfig }
+    : null
+  const logSheet = plannedRound ? (
+    <Dialog open={!!roundToLog} onOpenChange={o => { if (!o) setRoundToLog(null) }}>
+      <DialogContent data-testid="planned-round-log">
+        <DialogHeader><DialogTitle>{`${splitActivity(plannedRound.planned.activity).name} · ${blockShape(plannedRound.config)}`}</DialogTitle></DialogHeader>
+        <PlannedRoundEffort
+          planned={plannedRound.planned}
+          config={plannedRound.config}
+          onLogged={() => {
+            setLoggedNote(`Logged · ${splitActivity(plannedRound.planned.activity).name} · ${blockShape(plannedRound.config)}`)
+            setRoundToLog(null)
+          }}
+        />
+      </DialogContent>
+    </Dialog>
+  ) : (
     <AddUnplannedWork
       open={!!roundToLog}
       onOpenChange={o => { if (!o) setRoundToLog(null) }}
