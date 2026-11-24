@@ -743,6 +743,10 @@
     "verify:planned-rounds": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/planned-rounds.mjs",
     "test:account-auth": "tsx scripts/test-account-auth.ts",
     "verify:welcome": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/welcome.mjs",
+    "test:testing-week-both-ways": "tsx scripts/test-testing-week-both-ways.ts",
+    "test:move-logged-sets": "tsx scripts/test-move-logged-sets.ts",
+    "test:primer-dose": "tsx scripts/test-primer-dose.ts",
+    "verify:wrong-exercise": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/wrong-exercise.mjs",
     "measure:meal-protein-spread": "tsx scripts/measure-meal-protein-spread.ts",
     "test:meal-protein-spread": "tsx scripts/test-meal-protein-spread.ts"
   },

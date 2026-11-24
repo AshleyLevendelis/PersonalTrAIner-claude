@@ -30,7 +30,7 @@ import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateC
 import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG, repsLookImpossible, prescribedRepsHigh } from '@/lib/set-plausibility'
 import { blankWeightFor, carriedWeightFor, type BlankWeight } from '@/lib/set-row'
 import type { UserProfile } from '@/lib/types'
-import { EFFORT_RPE, effortFromRpe, type LiftEffort } from '@/lib/lift-effort'
+import { EFFORT_RPE, PROBE_RPE, effortFromRpe, type LiftEffort } from '@/lib/lift-effort'
 import { restAfterWarmupSeconds } from '@/lib/warmup-rest'
 import { parseRestSeconds } from '@/lib/session-duration'
 
@@ -1173,7 +1173,18 @@ export function SetGrid({
                         data-next-kg={kg}
                         aria-pressed={chosen === a.feel}
                         className={`min-h-[44px] rounded-full border px-3 text-xs ${chosen === a.feel ? 'border-primary bg-primary/20 text-primary-text' : 'border-primary/50 text-foreground'}`}
-                        onClick={() => { setProbeFeel(prev => ({ ...prev, [k]: a.feel })); updateInput(ref, 'weight', String(kg)) }}
+                        onClick={() => {
+                          setProbeFeel(p => ({ ...p, [k]: a.feel }))
+                          updateInput(ref, 'weight', String(kg))
+                          // THE ANSWER IS KEPT ON THE SET IT IS ABOUT (24 Nov 2026): the testing week reads it to set
+                          // next week's weight in both directions (calibration-anchor.ts). It had lived on screen only.
+                          if (profileId) logSet({
+                            userId: profileId, date: today, weekNumber: liveWeek, day: dayName, exerciseId, exerciseName,
+                            setNumber: prev.set_number, weightKg: prev.weight_kg, repsCompleted: prev.reps_completed,
+                            unit: prev.unit, isBodyweight: prev.is_bodyweight, addedLoadKg: prev.added_load_kg ?? null,
+                            isWarmup: false, dropIndex: 0, rpe: PROBE_RPE[a.feel],
+                          })
+                        }}
                         aria-label={`${a.label}, ${a.hint}: set ${setNumber} at ${kg} kg`}
                       >
                         {a.label}

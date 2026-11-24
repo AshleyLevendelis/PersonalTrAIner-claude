@@ -150,6 +150,11 @@ const b2after = await box(2)
 const said = await ev(`(() => { const sec = ${SECTION}; const r = sec && sec.querySelector('[data-testid="probe-feel-result"]'); return r ? r.textContent.trim() : null })()`)
 check('10b. ...fills set 2\u2019s box with that weight, says so, and only fills it', !!b2after && parseFloat(b2after.value) === kgOf('easy') && said === `Set 2: go up to ${kgOf('easy')} kg.` && (await savedState(2)) === 'Save set 2', { b2after, said })
 await scrollTo('/How was set 1/'); await wait(400); await shoot('calibration-search-cascade')
+// THE ANSWER IS KEPT ON SET 1 (24 Nov 2026, docs/plans/testing-week-both-ways.md): read off the stored row, the figure
+// next week's weight is worked from, not the words on screen. Easy is stored as 5, and set 1 is still one row. Rows
+// logged today carry the session (the seeded history from an earlier week does not).
+const set1Rows = await ev(`(window.__fakeDb?.exercise_set_logs ?? []).filter(r => r.exercise_name === ${MAIN} && r.set_number === 1 && !r.is_warmup && r.session_id).map(r => ({ rpe: r.rpe, kg: r.weight_kg }))`)
+check('10c. ...and keeps the answer on set 1 (one row, effort 5)', Array.isArray(set1Rows) && set1Rows.length === 1 && set1Rows[0].rpe === 5, set1Rows)
 
 check('11a. ticking set 3 with nothing typed', await tapSave(3))
 await wait(600)

@@ -148,6 +148,8 @@ import { offerStillHolds, fingerprintWeeks, undoStillFits, weeksUndoWrites, dayS
 import { dayHasSession } from '@/lib/day-verbs'
 import { addDays, daysBetween, dayNameOf, sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause } from '@/lib/session-move'
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
+import { planMoveLoggedSets, applyMoveLoggedSets, moveLine } from '@/lib/move-logged-sets'
+import { decideChatMove } from '@/lib/move-logged-sets-chat'
 import { normalizeExternalUrl } from '@/lib/chat-links'
 import { buildFirstRunIntro, isFirstChat, planShapeFromMesocycle, type FirstRunSessionBrief } from '@/lib/first-run-intro'
 import { buildCoachExerciseSummary, buildCoachPhaseBrief, nextSessionAfter, partOfDay, stampTurnTime, stampTurnOutcome, outcomeOfCard, summariseTodayWork, type TurnOutcome } from '@/lib/chat-plan-context'
@@ -2677,6 +2679,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // declared) — mapped to WorkoutEntryInput's camelCase at the one
     // boundary that consumes it (resolveAndMaybeLog), not here.
     logWorkout?: { date: string | null; corrects_previous?: boolean; entries: { raw_text: string; exercise_phrase: string; sets_phrase: string }[] }
+    moveLoggedSets?: { from_phrase: string; to_phrase: string }
     // Memory & goals (VISION-ARCHITECTURE.md §1 Part 2) — I1 holds: the
     // server never writes user_facts/user_goals/user_context_facts, it
     // forwards the validated tool args. resolveAndSaveMemory resolves
@@ -6077,6 +6080,45 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    *   produced 6 logged sets against 3 prescribed, and every future weight
    *   would have built on three sets that never happened.
    */
+  /**
+   * "I LOGGED LEG CURL, I ACTUALLY DID LEG EXTENSIONS" (24 Nov 2026, move-logged-sets.ts): every set as logged moves to
+   * the exercise he names and leaves the wrong one, with the correction receipt's Undo (the new rows deleted, the old
+   * written back). No number comes from the model.
+   */
+  const moveLoggedSetsFromChat = (fromPhrase: string, toPhrase: string, userSaid: string): { text: string; receipt?: ChatReceiptView } => {
+    const decision = decideChatMove({ fromPhrase, toPhrase, userSaid, loggedNames: loggedExerciseNamesToday() })
+    if (decision.kind === 'ask') return { text: decision.say }
+    const userId = activeSession.profileId ?? ''
+    const fromRows = activeSession.logs.filter(l => l.exercise_name === decision.fromName)
+    const plan = planMoveLoggedSets(fromRows, activeSession.setsFor(decision.toId, decision.toName), { exerciseId: decision.toId, exerciseName: decision.toName },
+      { userId, date: activeSession.date, weekNumber: activeSession.liveWeek, day: activeSession.dayName })
+    if (!plan) return { text: `There's nothing logged under ${decision.fromName} today to move.` }
+    const inPlan = (todayRef?.session?.exercises ?? []).some(e => e.name === decision.toName)
+    const { moved, logged } = applyMoveLoggedSets(plan, {
+      logSet: input => activeSession.logSet(input),
+      deleteSet: key => activeSession.deleteSet(key),
+    }, { userId, date: activeSession.date })
+    if (!moved) return { text: `I couldn't move those sets just now, so ${decision.fromName} is still as you logged it. Try again in a moment.` }
+    if (!inPlan) activeSession.declareOffPlan(decision.toName)
+    activeSession.refresh()
+    onLogsUpdated?.()
+    const title = `Moved · ${activeSession.dayName}`
+    return {
+      text: `Done — those sets are under ${decision.toName} now, and ${decision.fromName} is clear.`,
+      receipt: {
+        kind: 'log_workout',
+        title,
+        rows: [{ label: decision.toName, detail: moveLine(decision.fromName, decision.toName, plan) }],
+        summary: '',
+        status: 'done',
+        resolvedAt: new Date().toISOString(),
+        // The correction receipt's own Undo: delete what this wrote (with its kind, so a build-up row or a drop is the
+        // one deleted), then write the old rows back.
+        undoToken: JSON.stringify({ logged, replaced: plan.before, cardio: [] }),
+      },
+    }
+  }
+
   const resolveAndMaybeLog = (entries: WorkoutEntryInput[], correctsPrevious = false, userSaid = '', pastDay: PastLogDay | null = null): { text: string; receipt?: ChatReceiptView; clarification?: ChatClarificationView; past?: { groups: ParsedSetGroup[]; day: PastLogDay } } => {
     // THE SESSION RUN TODAY, moves taken into account — the plan's own row
     // for this weekday is empty on a day a session moved onto, and every
@@ -7089,6 +7131,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (result.receipt) {
       return { text: result.receipt.title, receipt: result.receipt }
     }
+    if (result.moveLoggedSets) return moveLoggedSetsFromChat(result.moveLoggedSets.from_phrase, result.moveLoggedSets.to_phrase, userSaid ?? '')
     if (result.logWorkout) {
       const entries: WorkoutEntryInput[] = result.logWorkout.entries.map(e => ({
         rawText: e.raw_text,
@@ -8676,13 +8719,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // undo that throws leaves the sets in place while the button reports
       // nothing at all. Read both, and treat an unparseable token as "no undo
       // available" rather than as an exception on a tap.
-      let keys: { exerciseId: string; setNumber: number }[] = []
+      let keys: { exerciseId: string; setNumber: number; isWarmup?: boolean; dropIndex?: number }[] = []
       let replaced: ReplacedSetPreImage[] = []
       let cardio: string[] = []
       try {
         const token = JSON.parse(receipt.undoToken) as
           | { exerciseId: string; setNumber: number }[]
-          | { logged?: { exerciseId: string; setNumber: number }[]; replaced?: ReplacedSetPreImage[]; cardio?: string[] }
+          | { logged?: { exerciseId: string; setNumber: number; isWarmup?: boolean; dropIndex?: number }[]; replaced?: ReplacedSetPreImage[]; cardio?: string[] }
         if (Array.isArray(token)) keys = token
         else { keys = token.logged ?? []; replaced = token.replaced ?? []; cardio = token.cardio ?? [] }
       } catch (err) {
@@ -8699,7 +8742,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // writer hard-codes is_warmup false (chat-gemini/index.ts). If it ever
         // gains a way to log a build-up, the token has to carry the kind and
         // this line has to read it — the type now forces that conversation.
-        activeSession.deleteSet({ userId: profile.id, date: activeSession.date, exerciseId: key.exerciseId, setNumber: key.setNumber, isWarmup: false, dropIndex: 0 })
+        // A MOVE'S KEYS CARRY THEIR KIND (24 Nov 2026, move-logged-sets.ts): a moved build-up row or drop is deleted as
+        // itself. Every other token's keys are working sets and read as before.
+        activeSession.deleteSet({ userId: profile.id, date: activeSession.date, exerciseId: key.exerciseId, setNumber: key.setNumber, isWarmup: key.isWarmup ?? false, dropIndex: key.dropIndex ?? 0 })
       }
       for (const pre of replaced) activeSession.logSet(pre)
       // The walk goes too. The store's own undo window is the receipt's ten

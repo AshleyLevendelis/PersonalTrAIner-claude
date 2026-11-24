@@ -134,7 +134,12 @@ const testingThursday = isoOf(new Date(new Date(created).getTime() + 3 * 8640000
 const testingLift = (() => {
   const d = weeks[0]?.days.find(x => x.day === 'Thursday')
   const i = d ? d.exercises.findIndex(e => e.suggested_load_kg != null && !!getExerciseEntry(e.name) && isExternallyLoaded(getExerciseEntry(e.name)!)) : -1
-  return d && i >= 0 ? { index: i, name: d.exercises[i].name, printedKg: d.exercises[i].suggested_load_kg! } : null
+  // REPS FOR NEXT WEEK'S RANGE (24 Nov 2026): the testing week reads a set against the reps of the week it sets, so a
+  // set that is to carry its weight across is done for the top of week 2's range (8 reps into a 10-12 week is worked
+  // down through the reps, test:testing-week-both-ways). An INPUT: how many reps he did.
+  const nextReps = weeks[1]?.days.find(x => x.day === 'Thursday')?.exercises[i]?.reps ?? d?.exercises[i]?.reps ?? ''
+  const reps = Math.max(8, ...(String(nextReps).match(/\d+/g)?.map(Number) ?? []))
+  return d && i >= 0 ? { index: i, name: d.exercises[i].name, printedKg: d.exercises[i].suggested_load_kg!, reps } : null
 })()
 ;(window as unknown as Record<string, unknown>).__testingLift = testingLift
 if (new URLSearchParams(location.search).has('testing-day-used') && testingLift) {
@@ -143,7 +148,7 @@ if (new URLSearchParams(location.search).has('testing-day-used') && testingLift)
 }
 const testingSets = UNFINISHED_TESTING && testingLift ? [1, 2, 3].map(n => ({
   id: `tw${n}`, user_id: PROFILE_ID, session_id: 'ws-testing', exercise_id: getExerciseId(testingLift.name), exercise_name: testingLift.name,
-  set_number: n, weight_kg: testingLift.printedKg + 20, reps_completed: 8, is_bodyweight: false, is_warmup: false, drop_index: 0, unit: 'kg', rpe: null,
+  set_number: n, weight_kg: testingLift.printedKg + 20, reps_completed: testingLift.reps, is_bodyweight: false, is_warmup: false, drop_index: 0, unit: 'kg', rpe: null,
   completed_at: new Date(new Date(created).getTime() + 3 * 86400000 + 10 * 3600000 + n * 180000).toISOString(), date: testingThursday,
 })) : []
 
