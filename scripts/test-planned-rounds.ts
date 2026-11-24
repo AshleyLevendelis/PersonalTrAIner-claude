@@ -12,7 +12,7 @@
 
 import { readFileSync } from 'fs'
 import { setSupabaseClient } from '../src/lib/supabase'
-import { cardioSessionRounds, plannedRoundsOf, roundIsPlannedSession, roundsMinutes, sessionMinutesFor } from '../src/lib/planned-rounds'
+import { cardioSessionRounds, plannedRoundsOf, plannedSessionRow, roundIsPlannedSession, roundsMinutes, sessionMinutesFor } from '../src/lib/planned-rounds'
 import { isSensibleRoundConfig } from '../src/lib/timer-engine'
 import { executeCardioSession } from '../src/lib/pending-action-executor'
 import type { MesocycleWeek, UserProfile } from '../src/lib/types'
@@ -56,6 +56,22 @@ async function main() {
   check('...and with no minutes to check against, none is read', plannedRoundsOf({ activity: HIS.activity, reason: HIS.reason }) === null)
   check('a reason with no rounds in it is no timer', plannedRoundsOf({ activity: 'Easy Spin', duration: 30, reason: 'Keeps the legs moving between hard days.' }) === null)
   check('the stored rounds still win over the reason', same(plannedRoundsOf({ ...HIS, rounds: BIKE }), BIKE))
+
+  console.log('\n1c. Another day\'s session drawn as a weight day\'s row (his request 24 Nov 2026)')
+  {
+    const r = plannedSessionRow({ ...HIS, targetRpe: 8 })
+    check('his Wednesday: the Intervals tag, Hard effort, four segments', r.label === 'Intervals' && r.effort === 'Hard' && r.segments === 4, r)
+    check('...the legend "4 × 3 min hard" and "1 min rest"', r.dose === '4 × 3 min' && r.doseWord === 'hard' && r.rest === '1 min', r)
+    check('...and the meta line "4 rounds · 16 min"', r.meta === '4 rounds · 16 min', r.meta)
+    const short = plannedSessionRow({ activity: 'Assault Bike Rounds', duration: 10, targetRpe: 8, rounds: BIKE })
+    check('the meta line never says fewer minutes than the rounds take', short.meta === `4 rounds · ${roundsMinutes(BIKE)} min`, short.meta)
+    const walk = plannedSessionRow({ activity: 'Walk', duration: 20, targetRpe: 3 })
+    check('a steady session: the Cardio tag, one segment, "20 min easy", no rest', walk.label === 'Cardio' && walk.segments === 1 && walk.dose === '20 min' && walk.doseWord === 'easy' && walk.rest === null && walk.meta === '20 min', walk)
+    const noEffort = plannedSessionRow({ activity: 'Walk', duration: 20 })
+    check('no effort on the plan: none drawn, never guessed', noEffort.effort === null && noEffort.doseWord === 'session', noEffort)
+    const peek = readFileSync('src/components/exercise/TodayPanel.tsx', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    check('the Exercise screen draws another day\'s session with this card', /<PlannedActivityPeek /.test(peek))
+  }
 
   console.log('\n2. The coach\'s card carries the rounds')
   const said = 'For Muay Thai conditioning, try 4 × 3 min hard on the assault bike, 1 min rest between, like a fight. Would you like me to add this to your plan?'
@@ -115,7 +131,7 @@ async function main() {
   const tools = strip(readFileSync('src/components/ToolsTab.tsx', 'utf8'))
   check('the round timer logs a planned round as the session (one effort tap)', /roundIsPlannedSession\(timers\.roundConfig, todaysPlanned\.activity, todayDate\)/.test(tools) && /<PlannedRoundEffort/.test(tools))
   const peek = strip(readFileSync('src/components/exercise/TodayPanel.tsx', 'utf8'))
-  check('another day\'s planned session is a preview, not one sentence', /peekWorkout\?\.plannedActivity \? \(\s*<PlannedActivityPreview /.test(peek) && !/plannedActivity\.duration\} minutes\./.test(peek))
+  check('another day\'s planned session is a preview, not one sentence', /peekWorkout\?\.plannedActivity \? \(\s*<PlannedActivityPeek /.test(peek) && !/plannedActivity\.duration\} minutes\./.test(peek))
 
   console.log(`\n${ran} checks ran`)
   if (failures > 0) { console.error(`${failures} failure(s)`); process.exit(1) }

@@ -14,6 +14,7 @@
 import type { PlannedActivity } from './types'
 import { isSensibleRoundConfig, parseConditioningInterval, parseIntervalSuggestion, type RoundConfig } from './timer-engine'
 import { splitActivity } from './cardio-lines'
+import { effortForRpe, effortLabel } from './cardio-effort'
 
 /** THE WORDS, one place, so the card, the day and the coach's offer say the same thing. */
 export const PLANNED_ROUNDS_WORDS = {
@@ -105,4 +106,49 @@ export function roundIsPlannedSession(
   date: string,
 ): boolean {
   return !!config?.planned && config.planned.activity === activity && config.planned.date === date
+}
+
+/**
+ * A PLANNED CARDIO SESSION AS A ROW, the way a weight day's exercise is drawn (his request 24 Nov 2026, with a
+ * screenshot of Thursday's "Squat & Carry": "I want the cardio day to look similar to this before the day"). The tag
+ * over the name, the effort where a lift's weight sits, one bar segment per round (one for a steady session), and the
+ * legend under it: "4 × 3 min hard · 1 min rest", or "20 min easy". Read off the plan; nothing here is new.
+ */
+export interface PlannedSessionRow {
+  /** The small tag over the name: "Intervals" for rounds, "Cardio" for a steady session. */
+  label: string
+  name: string
+  /** "Hard", "Steady", "Easy", or null when the plan named no effort. */
+  effort: string | null
+  /** One segment per round; a steady session is one. */
+  segments: number
+  /** "4 × 3 min", or "20 min". */
+  dose: string
+  /** The word after the dose: the effort in lower case, else "work" for rounds and "session" for a steady one. */
+  doseWord: string
+  /** "1 min" between rounds, or null (one round, no rest, or a steady session). */
+  rest: string | null
+  /** The meta line under the title: "4 rounds · 16 min", or "16 min". */
+  meta: string
+}
+
+export function plannedSessionRow(planned: Pick<PlannedActivity, 'activity' | 'duration' | 'targetRpe' | 'rounds'> & { reason?: string }): PlannedSessionRow {
+  const { name } = splitActivity(planned.activity)
+  const key = effortForRpe(planned.targetRpe)
+  const effort = key ? effortLabel(key) : null
+  const rounds = plannedRoundsOf(planned)
+  const unit = (s: number) => (s >= 60 && s % 60 === 0 ? `${s / 60} min` : `${s}s`)
+  const minutes = rounds ? sessionMinutesFor(planned.duration, rounds) : planned.duration
+  if (rounds) {
+    return {
+      label: 'Intervals', name, effort, segments: rounds.rounds,
+      dose: `${rounds.rounds} × ${unit(rounds.workSeconds)}`, doseWord: effort ? effort.toLowerCase() : 'work',
+      rest: rounds.rounds > 1 && rounds.restSeconds > 0 ? unit(rounds.restSeconds) : null,
+      meta: `${rounds.rounds} rounds · ${minutes} min`,
+    }
+  }
+  return {
+    label: 'Cardio', name, effort, segments: 1,
+    dose: `${minutes} min`, doseWord: effort ? effort.toLowerCase() : 'session', rest: null, meta: `${minutes} min`,
+  }
 }

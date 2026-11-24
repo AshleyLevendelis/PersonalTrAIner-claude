@@ -173,7 +173,24 @@ await load(`&today=${dayBefore}`, 'exercise')
 await until(q(`[data-strip-date="${target?.date}"]`))
 await tap(`[data-strip-date="${target?.date}"]`)
 const peek = await until(`${q('[data-testid="peek-planned-activity"]')}?.innerText?.replace(/\\s+/g, ' ').trim() ?? null`, 5000)
-check('F1. tomorrow\'s session is a preview with its name, effort, rounds and reason', /Assault Bike Rounds/.test(peek ?? '') && /Hard/.test(peek ?? '') && /4 × 3 min, 1 min rest/.test(peek ?? '') && /Muay Thai/.test(peek ?? ''), peek)
+check('F1. tomorrow\'s session is a preview with its name, effort, rounds and reason', /Assault Bike Rounds/.test(peek ?? '') && /Hard/.test(peek ?? '') && /4 × 3 min hard/.test(peek ?? '') && /1 min rest/.test(peek ?? '') && /Muay Thai/.test(peek ?? ''), peek)
+// DRAWN AS A WEIGHT DAY IS (his request 24 Nov 2026): the day, the title, the meta line and an X; a row with its tag,
+// the effort where a lift's weight sits, and one bar segment per round.
+const card = await ev(`(() => { const c = document.querySelector('[data-testid="peek-planned-activity"]'); if (!c) return null; return {
+  meta: c.querySelector('[data-testid="hero-meta"]')?.textContent?.trim() ?? null,
+  close: !!c.querySelector('button[aria-label="Close"]'),
+  tag: c.querySelector('[data-testid="peek-planned-label-tag"]')?.textContent?.trim() ?? null,
+  badge: c.querySelector('[data-load-badge]')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
+  segments: c.querySelectorAll('[data-set-bar] [data-seg]').length,
+  start: !!c.querySelector('[data-testid="planned-rounds-start"]'),
+} })()`)
+check('F3. the card is drawn like a weight day: "4 rounds · 16 min", a Close, the Intervals tag, Hard effort on the right', card?.meta === '4 rounds · 16 min' && card?.close === true && card?.tag === 'Intervals' && /Hard/.test(card?.badge ?? '') && /effort/i.test(card?.badge ?? ''), card)
+check('F4. ...one bar segment per round, and no Start a day early (his "Keep it as is")', card?.segments === 4 && card?.start === false, card)
+await tap('[data-testid="peek-planned-close"]')
+const closed = await until(`!document.querySelector('[data-testid="peek-planned-activity"]')`, 3000)
+check('F5. its X closes it', closed === true, closed)
+await tap(`[data-strip-date="${target?.date}"]`)
+await until(q('[data-testid="peek-planned-activity"]'), 3000)
 check('F2. ...not the old one sentence', !/Assault Bike Rounds, 16 minutes\./.test(await ev('document.body.innerText')))
 await shoot('planned-rounds-peek')
 
@@ -189,8 +206,8 @@ await shoot('planned-rounds-reason-day')
 await load(`&roundsInReason=1&today=${dayBefore}`, 'exercise')
 await until(q(`[data-strip-date="${target?.date}"]`))
 await tap(`[data-strip-date="${target?.date}"]`)
-const gPeek = await until(`${q('[data-testid="peek-planned-shape"]')}?.innerText?.trim() ?? null`, 5000)
-check('G3. the day before, its preview shows the rounds', /4 × 3 min, 1 min rest/.test(gPeek ?? ''), gPeek)
+const gPeek = await until(`${q('[data-testid="peek-planned-shape"]')}?.innerText?.replace(/\\s+/g, ' ').trim() ?? null`, 5000)
+check('G3. the day before, its preview shows the rounds', /4 × 3 min hard/.test(gPeek ?? '') && /1 min rest/.test(gPeek ?? ''), gPeek)
 await shoot('planned-rounds-reason-peek')
 
 const txt = await ev('document.body.innerText')
