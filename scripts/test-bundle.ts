@@ -826,7 +826,10 @@ console.log('\n3. Nothing has crept back up')
   // meal library's own chunk, which is fetched when meals are made and never on first paint. MEASURED 3311 on the branch
   // head before it, 3327 through this gate on the change (OVER by 4). His 15 Sep ruling, "raise it with room to grow":
   // 25 kB raw over today.
-  const TOTAL_BUDGET_KB = 3352
+  // MOVED 24 Nov 2026: 3352 -> 3378. Crossed by 1 kB by heart rate from a watch (health-heart.ts, its own lazy chunk,
+  // loaded only in the phone app with the switch on) on top of cardio days and the Android notifications. MEASURED 3353
+  // through this gate on the change. His 15 Sep ruling: 25 kB raw over today.
+  const TOTAL_BUDGET_KB = 3378
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)
