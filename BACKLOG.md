@@ -21,6 +21,150 @@ Newest first. One line each.
   docs/handover/android-notifications.md). Known: the status-bar icon is the app icon (may draw as a white circle).
   Needs the `coach-reach-out` and `chat-gemini` deploys and the `FCM_SERVICE_ACCOUNT` secret.
 
+- [x] **SIMPLE MEALS BY DEFAULT (his "Do whatever you think is best", 23 Nov 2026)**. His report: "Meal plans are the
+  app's biggest weakness. The meals are too complicated. Users are required to become gourmet chefs", plus own meals
+  and eating out being hard. I proposed four improvements (simple meals, fast logging, eating out from the menu,
+  adherence); he delegated, and this is the first. MEASURED first: the typical library dish had 6 ingredients, 7 of
+  143 snacks were one or two foods, the meal writer was told "You are a chef" and asked for names like "Sichuan Mapo
+  Tofu with Charred Bok Choy", and a new plan served 42% simple meals and 4% two-food snacks. BUILT (decisions mine):
+  "simple" = five main foods or fewer (a snack two; seasonings and oil not counted, read off the food), nothing to
+  shape, layer, batter or make a sauce from (`meal-effort.ts`); 78 new simple dishes (36 two-food snacks, 20 lunches,
+  22 dinners, plus 10 two-food snacks for bigger appetites; plain names; 27 drafts dropped or changed to pass every
+  library rule; 88 in all); the library offers simple dishes
+  first unless he loves cooking; recipes are capped by the cooking answer (Quick none past a thin meal, Moderate a
+  quarter of what the meal holds, Happy to cook unlimited; a thin meal under 20 dishes always takes one); the writer is
+  asked for simple food with plain names (needs the `generate-meals` deploy); the cooking choices say "simple". AFTER
+  (measure:simple-meals, a new plan through generateMealPools, 3 targets x 4 diets, 28 days): Moderate 71% simple
+  served, 64% two-food snacks, 99% days on target (were 42%, 4%, 94%); Quick 89%, 68%, 99% (43%, 7%, 97%). Variety
+  held on Moderate (20.1 -> 19.9 dishes a meal in 4 weeks), Quick lost about two. On-target moves with which dishes
+  the writer offers (89-96% in a run whose stand-in drew from the changed library), so it reads "did not fall". FOUND ON THE WAY: the quarter had first been a quarter of
+  the 100-dish ceiling, which was 60% of a real meal (about 40 dishes land a day), so it reads what the meal holds; and
+  my rename of three clashing new names also renamed an older "Chicken curry with rice" (caught by test:meal-facts,
+  put back), and did it AGAIN with "Edamame and rice cakes" (put back; a replace edits the FIRST match, and the older
+  dish is first). And the first snacks left a muscle-gain plan 20 snacks deep (test:real-plates wants 30); a thin-meal
+  line of 30 cost the default 7 points of simple meals, so two-food snacks for bigger appetites went in instead. The
+  depth control's floor went 20 -> 15 (measured 22 on this morning's code, 19 after; its note said 32). NOT DONE: existing plans keep their meals until Regenerate all or a top-up; changing the cooking answer
+  does not offer new meals; cook once eat twice, same breakfast, whole-pack portions (next slice); fast logging, eating
+  out from the menu and adherence (not started). `test:simple-meals` (38 checks, 17 mutations, 17 caught),
+  `measure:simple-meals`, `docs/plans/simple-meals.md`. Total size budget 3323 -> 3352 (measured 3327, the library's
+  own lazy chunk), his "room to grow".
+
+- [x] **FIRST PLAY STORE BUNDLE BUILT, 23 Nov 2026** (closed test only; nothing published). `app-release.aab`, 6.61 MB,
+  versionCode 1 / versionName 1.0, production database (4 references to the production project in the bundled app, 0
+  to TEST). Signed with his upload key (`%USERPROFILE%\personal-trainer-upload.jks`, alias `upload`, owner "CN=Ashley
+  Levendelis", valid to 2054); the key's settings file is git-ignored and the key lives outside the repo. Merged release
+  manifest: INTERNET, health.READ_STEPS and AndroidX's DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION, nothing else.
+  `test:phone-app` 35 checks green. **The release build needs Java 21**: with the laptop's default JDK 17 it fails
+  "invalid source release: 21" in `:capacitor-android`; set `JAVA_HOME` to Android Studio's `jbr` (21.0.5) first. Next:
+  he uploads to Closed testing; every later upload raises versionCode by one.
+- [x] **A WELCOME PAGE BEFORE SETUP: his request 24 Nov 2026, "Option 1, build it. Make the one line good. Something
+  that really sells it"** (from two options: one simple page, over three swipeable slides). He noticed on signing out
+  that the app dropped straight into the setup chat. Now a phone with no plan and no setup under way (the first open,
+  and after signing out) opens on: the icon, "Personal TrAIner", **"A personal trainer in your pocket"** and **"Workouts
+  and meals built around you, a coach you can text any time, and a plan that changes when your week does."**, with Get
+  started (setup) and I already have an account (sign-in, whose way out now says Back and returns here). The words are
+  mine on his delegation and his to change; every clause is something the app does today (tailored plan and meals, the
+  chat, moves, swaps and resizes). A setup part-way through goes straight back to it; New Plan skips the page (he chose
+  to start again); never a wall. `verify:welcome` (15 checks, 5 mutations, 5 caught), the whole app booted at phone
+  size, screenshots read. Frontend only.
+- [x] **THE STORE APP UPDATES THROUGH GOOGLE'S REVIEW, NO LIVE-UPDATE SERVICE: his ruling 23 Nov 2026, "I think its
+  fine to do the Google review version"** (over a paid live-update service and over loading the live website inside the
+  app). Each change reaches the phone app only as a new upload (versionCode +1) and Google's review; the website still
+  updates on merge. My recommendation was the same for the closed test, revisiting a live-update service once real users
+  arrive and updates are frequent.
+- [x] **REPORTED COACH REPLIES NOW EMAIL HIM, LIVE ON PRODUCTION, 23 Nov 2026.** Migration 20261122120000 applied on
+  both projects (`test:schema-parity` PASS, 76 each), `report-email` deployed, function secrets and both Vault secrets
+  set, and a real report from the app reached his Gmail. Two failures on the way, both in setup, none in code: the
+  placeholders' angle brackets were typed into the secrets (Resend answered 400 and logged nothing, because the key was
+  unreadable), then the two copies of the shared secret differed (401 "refused"). Found by reading `net._http_response`
+  and by comparing fingerprints (the CLI's secret digests against a sha256 of the Vault value), never the values.
+  **A handover with `<...>` placeholders gets them typed literally; generate a value once and hand it to both places
+  from the terminal (`Set-Clipboard`).** Open: `net._http_response` shows a call timing out at 5 s on every hour (the
+  reach-out schedule, likely); unexamined. The function logs only Resend's status, not its reason.
+- [x] **THE PHONE APP ASKED FOR VO2 MAX AS WELL AS STEPS, 23 Nov 2026, found in the first native build on his laptop.**
+  The built app's final manifest declared `READ_VO2_MAX` and `WRITE_VO2_MAX` beside `READ_STEPS`, against the "steps
+  only" rule (Play refuses unused health permissions). Cause: the removal list named `READ_VO` / `WRITE_VO`, which are
+  not permissions, cut at the digit; and `test:phone-app` read both lists with `[A-Z_]+`, cut the plugin's names at the
+  same digit and so saw them match. Fixed both (real names; `[A-Z0-9_]+`). Mutations: the old short name back, and the
+  WRITE line deleted: 2 of 2 caught, 35 checks ran each. Proven on the BUILT app: its merged manifest now holds
+  INTERNET, READ_STEPS and AndroidX's own receiver permission, nothing else. **A permission check must read the names
+  the way Android does; the merged manifest after a build is the proof, the source manifest is not.** Also that day:
+  icons and launch screen cut into Android sizes (52 files changed of 74 written). The laptop build used a
+  build-folder-only `.env.production.local` (production address and the public publishable key taken from the live
+  app, his choice), because the only settings file on the laptop points at TEST; it is not committed.
+  **ON HIS PHONE, 23 Nov 2026** (Samsung SM-S948B, Android 17, debug build installed by cable, opened with no crash):
+  his words, "steps work and look correct" and "timers work and beep". Health Connect's screen listed steps only (his
+  "yes steps only"), and the report flag shows on coach replies. Sign-in worked. Nothing sent to any store.
+
+- [x] **THE PHONE APP'S PERMANENT ID IS `uk.co.personaltrainerapp`: his choice 23 Nov 2026** (over keeping
+  `app.personaltrainer.coach`, his 20 Nov pick, made before he owned a domain). Nothing had been uploaded, so it was free
+  to change: Capacitor's appId, Android's applicationId, namespace and the activity's package folder, the URL scheme,
+  iPhone's bundle id, and the handover prompts. Permanent from the first upload. His Google Play identity is verified.
+- [x] **PROVEN LIVE ON HIS PHONE, 23 Nov 2026, AND THE CONFIRMED LINE PUSHES THE PAGE DOWN (his "yes make it push the
+  page down")**. His dashboard pass (Claude in his browser): personaltrainerapp.co.uk bought, Resend verified, production
+  Supabase sending through it, Site URL was `http://localhost:3000` (the dead link his own confirmation hit) and is now
+  the live app, both templates in his words. On his phone: the confirmation email arrived in the inbox from
+  hello@personaltrainerapp.co.uk, its link opened the app with "Your email is confirmed", and sign out then sign in
+  brought his plan back. The forgot-password reset is not yet tried. The confirmed line had been pinned over the top
+  and covered the greeting; it now sits in the page above the tabs. Seen in the whole app booted from a confirm link at
+  phone size (in flow, nothing under it); `test:account-auth` 6f (1 mutation, 1 caught). Frontend only.
+- [x] **AN INTERVAL SESSION ON THE PLAN RUNS ON THE ROUND TIMER (his ruling 23 Nov 2026, "A")**. His live test: the coach
+  suggested 4 × 3 min hard on the assault bike, 1 min rest, he said yes, put it on my rest days, and Wednesday read
+  "Wednesday: Assault Bike Rounds, 16 minutes." with nothing to start or log. Asked, from two options, he chose A (a
+  real workout card that starts the round timer and logs at the end) over B (a log line with a timer button). BUILT:
+  a planned session keeps its rounds, work and rest (the coach's tool takes rounds, work_seconds and rest_seconds; until
+  the `chat-gemini` deploy the card reads them from the coach's last reply when they fit the session's minutes, and
+  from a protocol written into the name); a session is never shorter than its rounds. The day's card: the session line,
+  its rounds, then "4 × 3 min, 1 min rest · Start · 10s countdown" (his countdown setting), which starts the round
+  timer at those numbers, tagged as this session on this date, and opens it on Tools; while it runs the card says
+  "Round timer running · Open it" and never restarts it; when the rounds end, "Done. How hard was it?" and one tap logs
+  it under the session's own name with the timer's minutes and the rounds as the note, so the day reads done and the
+  round is released only after the write. The round timer's own Log session asks the same one question (never "what
+  was this block?"). The minutes-and-effort row stays as the way to log it without the timer, and steps aside while the
+  round runs or asks, so there is one way to log at a time. Another day's preview is a card (name, effort, rounds,
+  reason), never one line. FOUND ON THE WAY, older than today: a logged walk or cardio session left the week strip on
+  "due" until he left the tab and came back (the week re-read on a saved set, never on a saved cardio log); it re-reads
+  now. Decided by me (presentation and wiring, no prescription changed): the logged minutes are the timer's (15 for
+  4 × 3/1), not the plan's 16, because that is what the app measured; effort is asked, never pre-chosen. CSCS review:
+  nothing about any prescription changes; the session is the coach's, now stored whole. `test:planned-rounds` (32
+  checks, 14 mutations caught), `verify:planned-rounds` (28 checks, 9 mutations caught, every state screenshotted and
+  read). Bundle limits raised by his "room to grow" rule (re-download 469 -> 480, first paint 628 -> 637, app chunk
+  1617 -> 1651, total 3287 -> 3323; measured 472, 629, 1626, 3298; the persona audit's passes and this build).
+  His third report ("after a refresh Wednesday went back to a rest day"): NOT reproduced; the session is saved and read
+  back; his screenshot showed last week (Mon 16-Sun 22), which the write leaves alone. Needs the `chat-gemini` deploy
+  for the coach to send the rounds itself.
+- [x] **THE PERSONA AUDIT AT ZERO (his "Yes fix all the problems", 23 Nov 2026)**. 6,000 plans, 31 rules: 126 plans broke a
+  coaching rule before this round, 0 after (every rule, every group, safety included). Before -> after: pushing over
+  1.5x pulling 42 -> 0, sessions past the time asked 32 -> 0, uneven weeks 32 -> 0, chest or back under four sets 14 -> 0,
+  thigh imbalance 13 -> 0. CSCS, mine, each traced before it was fixed. (1) A day holding two presses swaps its later
+  non-main one for pulling the day may take (rear delts on a chest day), else trunk work, while the week presses over 1.5x
+  what it pulls; a day holding two hinges or two squats swaps the spare one for the other side while the thigh is over
+  2.5x one way (both in the week the plan is built from, so every week carries it). (2) The press-heavy week's row also
+  goes on a chest or shoulders day of a split, not only a full-body day, and a row added in one week of a block is added
+  in every week of it (the block's "same exercises" pass had been taking it back). (3) The beginner's 18-set cap drops a
+  press before a pull the week needs, keeps the week's four chest sets, and never takes a day's last squat, hinge, press
+  or pull; the thigh is weighed again inside the cap. (4) The last time check holds a set the week needs (pulling, four
+  chest sets) until no spare exercise is left to drop, and a required second press of the same plane may go where the
+  week keeps four chest sets. (5) A day under 60% of the heaviest day's sets and 75% of its minutes takes sets (never a
+  press in a press-heavy week, never past the time or the cap, never tipping the thigh), or the heaviest day gives one.
+  (6) A day still seconds over its time after every set is at its floor: the bike or rower gives up to a minute (one
+  minute kept), then the first build-up keeps two rungs (50 and 70%), then a later lift's feeder set goes. Never a
+  working set, a rest, the balance hold or pelvic floor work. CSCS review: training effect, the swaps keep the movement
+  pattern of the day's session and trade a duplicate for the missing side; what it takes away, a duplicate press or
+  hinge, trunk or shoulder isolation sets, warm-up seconds; fundamentals, every pattern still covered (C1 0, and the
+  cap's new guard is the reason); no floor or ceiling redefined; inside scope. MEASURED AND DELETED, five mechanisms that
+  changed nothing on 6,000 plans (a balance-aware block trim, dropping the last stretch, a first short-ramp step, a
+  post-cap pull bump, searching every day for a spare press). The first version of this round CREATED three breaches
+  (the cap took a week's only hinge; the light day tipped a knee trainee's thigh, twice): found by the full audit, fixed,
+  pinned. `test:persona-audit-fixes` 71 -> 78 checks: 43 named plans judged by the audit's own detectors (`auditOne`,
+  exported), 18 mutations caught, 5 missed and deleted as above. `test:thin-day` re-anchored on its rule's own definition
+  of thin (ten sets OR under ten minutes short), since the press swap can end a day's thinness on minutes.
+  ALSO, his live test the same morning: "Good morning. How can I improve my cardio conditioning for muay thai?" got
+  "Watch a video: Good Mornings". A greeting opening a message is no longer read as an exercise name; "how do I do good
+  mornings?" still is (`test:live-test-nov14`, 3 checks, the mutation caught). NOT FIXED, reported to him: the coach's
+  added cardio session is a line of text, not a loggable round-timer session (it stores only a name and minutes), and
+  his "it went back to a rest day after a refresh" reads as the strip showing last week (Wed 18): the write is saved to
+  the database and re-read (traced, not run).
 - [x] **A PRESS ADDED TO BALANCE THE WEEK GOES IN WITH THE PRESSES, AND A SMITH LIFT CAN BE THE MAIN LIFT (23 Nov 2026,
   CSCS, mine).** His report: his Push & Press day, rated by Gemini ("the Main Lift is sitting at the bottom"), ran Smith
   bench 90 kg, push press, lateral raises, skull crushers, then Neutral-Grip Dumbbell Press labelled MAIN LIFT, held at

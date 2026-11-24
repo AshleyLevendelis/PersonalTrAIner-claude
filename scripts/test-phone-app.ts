@@ -28,10 +28,10 @@ const check = (label: string, ok: boolean, detail?: unknown) => {
 console.log('\n1. Android declares READ_STEPS and removes every other health permission the plugin brings')
 {
   const plugin = read('node_modules/@capgo/capacitor-health/android/src/main/AndroidManifest.xml')
-  const pluginPerms = [...plugin.matchAll(/android\.permission\.health\.([A-Z_]+)/g)].map(m => m[1])
+  const pluginPerms = [...plugin.matchAll(/android\.permission\.health.([A-Z0-9_]+)/g)].map(m => m[1])
   const app = strip(read('android/app/src/main/AndroidManifest.xml'))
-  const declared = [...app.matchAll(/<uses-permission android:name="android\.permission\.health\.([A-Z_]+)"\s*\/>/g)].map(m => m[1])
-  const removed = new Set([...app.matchAll(/<uses-permission android:name="android\.permission\.health\.([A-Z_]+)" tools:node="remove"\s*\/>/g)].map(m => m[1]))
+  const declared = [...app.matchAll(/<uses-permission android:name="android\.permission\.health.([A-Z0-9_]+)"\s*\/>/g)].map(m => m[1])
+  const removed = new Set([...app.matchAll(/<uses-permission android:name="android\.permission\.health.([A-Z0-9_]+)" tools:node="remove"\s*\/>/g)].map(m => m[1]))
   check('the plugin was read (sanity check on this check: it brings more than one health permission)', pluginPerms.length > 10, pluginPerms.length)
   check('READ_STEPS is declared, and it is the only health permission declared', JSON.stringify(declared) === JSON.stringify(['READ_STEPS']), declared)
   const kept = pluginPerms.filter(p => p !== 'READ_STEPS' && !removed.has(p))

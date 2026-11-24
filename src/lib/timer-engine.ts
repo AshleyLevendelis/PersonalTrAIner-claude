@@ -84,6 +84,13 @@ export interface RoundConfig {
    * record has none and must keep behaving exactly as it started.
    */
   carried?: CarriedRounds
+  /**
+   * THE PLANNED SESSION THIS ROUND IS (Ashley, 23 Nov 2026): set only when the round was started from a planned
+   * cardio session's own Start button, so a finished round is logged as that session and the day reads done. Read
+   * through roundIsPlannedSession (planned-rounds.ts). Optional, like the fields above: a round from anywhere else has
+   * none and is logged the way it always was.
+   */
+  planned?: { activity: string; date: string }
 }
 
 export type RoundPhase = 'lead_in' | 'work' | 'rest'
@@ -587,8 +594,14 @@ export function parseIntervalSuggestion(text: string | null | undefined): RoundC
   const rounds = /(\d+)\s*(?:rounds?|sets?|times|intervals|reps of)\b/i.exec(t)?.[1] ?? /\b(\d+)\s*x\s*\d/i.exec(t)?.[1] ?? /\bx\s*(\d+)\b/i.exec(t)?.[1]
   if (!work || !rest || !rounds) return null
   const config = { rounds: parseInt(rounds, 10), workSeconds: work.seconds, restSeconds: rest.seconds }
-  if (config.rounds < 2 || config.rounds > 50 || config.workSeconds < 5 || config.workSeconds > 900 || config.restSeconds < 5 || config.restSeconds > 900) return null
-  return config
+  return isSensibleRoundConfig(config) ? config : null
+}
+
+/** A round timer the app would start from words it read: 2-50 rounds, work and rest each 5 seconds to 15 minutes. */
+export function isSensibleRoundConfig(c: { rounds: number; workSeconds: number; restSeconds: number }): boolean {
+  return [c.rounds, c.workSeconds, c.restSeconds].every(Number.isFinite)
+    && Number.isInteger(c.rounds) && c.rounds >= 2 && c.rounds <= 50
+    && c.workSeconds >= 5 && c.workSeconds <= 900 && c.restSeconds >= 5 && c.restSeconds <= 900
 }
 
 /**

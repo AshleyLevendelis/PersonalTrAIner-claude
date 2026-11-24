@@ -4,6 +4,7 @@ import { healthConditionsOf, healthConditionsInWords, mealRestrictionsOf, noteFo
 import { plainTyped } from '@/lib/typed-text'
 import { isRunningGoal, runningGoalLabel, raceDateWords, weeksBetween, reachableByRace, chooseRunningDays, raceDateMissing, RACE_DATE_QUESTION } from '@/lib/running'
 import { blockShape } from '@/lib/timer-engine'
+import { cardioSessionRounds, sessionMinutesFor, PLANNED_ROUNDS_WORDS } from '@/lib/planned-rounds'
 import { circuitName } from '@/lib/circuit'
 import { textBesideSave, contextNoteText } from '@/lib/save-reply'
 import { goalAsk, goalAmount, goalLabel } from '@/lib/goal-ask'
@@ -4291,6 +4292,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
     const reason = typeof rawArgs.reason === 'string' && rawArgs.reason.trim() ? rawArgs.reason.trim() : undefined
     const wasRest = !day.plannedActivity
+    // THE ROUNDS HE SAID YES TO (23 Nov 2026): the coach's own three numbers, else the intervals its last reply
+    // prescribed when they fit the session, so the day gets a round timer and not a line of words.
+    const lastCoachReply = [...messages].reverse().find(m => m.role === 'assistant' && m.content.trim())?.content ?? null
+    const rounds = cardioSessionRounds(rawArgs, minutes, lastCoachReply)
+    const sessionMinutes = sessionMinutesFor(minutes, rounds)
+    const line = `${prescriptionLine({ activity, duration: sessionMinutes, targetRpe })}${rounds ? `, ${blockShape(rounds)}` : ''}`
 
     return {
       scopeKey: `${profile.id}:propose_cardio_session:${day.day}:${activeSession.liveWeek}`,
@@ -4299,9 +4306,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         weekNumber: activeSession.liveWeek,
         dayName: day.day,
         activity,
-        minutes,
+        minutes: sessionMinutes,
         targetRpe,
         reason,
+        rounds,
         // EVERY WEEK OF THE BLOCK, because "Wednesday is my cardio day" is a
         // standing statement, not a one-off. A single session is what
         // propose_session_activity_swap already does to one day.
@@ -4309,13 +4317,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       },
       preImage: mesocycle,
       diff: {
-        lead: ask(`put ${prescriptionLine({ activity, duration: minutes, targetRpe })} on ${day.day}`),
+        lead: ask(`put ${line} on ${day.day}`),
         rows: [
-          { field: day.day, before: wasRest ? 'Rest' : day.focus, after: prescriptionLine({ activity, duration: minutes, targetRpe }) },
+          { field: day.day, before: wasRest ? 'Rest' : day.focus, after: line },
         ],
         unchanged: ['Every other day of your week'],
         implications: [
           { severity: 'info', text: SCOPE.restOfBlock },
+          ...(rounds ? [{ severity: 'info' as const, text: PLANNED_ROUNDS_WORDS.onTheCard }] : []),
           ...(wasRest ? [] : [{ severity: 'warn' as const, text: `This replaces the ${day.focus.toLowerCase()} that was on ${day.day}.` }]),
         ],
         rationale: reason,

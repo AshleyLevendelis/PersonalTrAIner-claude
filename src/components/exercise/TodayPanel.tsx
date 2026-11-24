@@ -114,7 +114,9 @@ import { InsightBanner } from '@/components/ui/insight-banner'
 import { FirstSessionLiftsCard } from './FirstSessionLiftsCard'
 import { CircuitOffer } from './CircuitOffer'
 import { describeDayGap, dayGapCanAddPress } from '@/lib/day-gap-note'
-import type { Exercise, WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
+import type { Exercise, WorkoutDay, MesocycleWeek, UserProfile, PlannedActivity } from '@/lib/types'
+import { plannedRoundsOf } from '@/lib/planned-rounds'
+import { blockShape } from '@/lib/timer-engine'
 import type { LoadSource } from './LoadChip'
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -1663,6 +1665,11 @@ export function TodayPanel({
         ) : !peekWorkout || peekWorkout.exercises.length === 0 ? (
           <div className="space-y-3">
             {peekDidLogs.length > 0 && <PeekWhatYouDid logs={peekDidLogs} />}
+            {/* A PLANNED SESSION ON ANOTHER DAY IS SHOWN AS A SESSION (23 Nov 2026): "Wednesday: Assault Bike Rounds,
+                16 minutes." was his whole view of it. What it is, its rounds and why, read off the plan. */}
+            {!peekBeforePlan && peekWorkout?.plannedActivity ? (
+              <PlannedActivityPreview dayName={peekDay} focus={peekWorkout.focus} planned={peekWorkout.plannedActivity} onBack={() => setPeekDate(null)} />
+            ) : (
             <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 text-center text-sm text-muted-foreground" data-testid="peek-rest-day">
               {/* A peeked day with a prescribed activity is NOT a rest day, and
                   saying so was the same defect as the empty card — it just said
@@ -1672,8 +1679,6 @@ export function TodayPanel({
                   her less than the plan knew. */}
               {peekBeforePlan
                 ? `${peekDay} was before your plan began, so there is no session on it.`
-                : peekWorkout?.plannedActivity
-                ? `${peekDay}: ${peekWorkout.plannedActivity.activity}, ${peekWorkout.plannedActivity.duration} minutes.`
                 : peekWorkout?.recommendedCardio
                 ? `${peekDay} is a rest day. Optional: ${prescriptionLine(peekWorkout.recommendedCardio)}.`
                 : peekWorkout?.conditioning_note
@@ -1681,6 +1686,7 @@ export function TodayPanel({
                 : `${peekDay} is a rest or recovery day.`}
               <div className="mt-3 flex justify-center"><PeekBackToToday onClick={() => setPeekDate(null)} /></div>
             </div>
+            )}
           </div>
         ) : (
           <>
@@ -2458,5 +2464,24 @@ function PeekBackToToday({ onClick }: { onClick: () => void }) {
     <Button size="sm" variant="ghost" className="min-h-11 text-muted-foreground" data-testid="peek-back-today" onClick={onClick}>
       Back to today
     </Button>
+  )
+}
+
+/**
+ * ANOTHER DAY'S PLANNED SESSION, READ-ONLY (23 Nov 2026): its name, the prescription in the words a log reads back
+ * in, the rounds when it is intervals, and the coach's reason. Started and logged on its own day.
+ */
+function PlannedActivityPreview({ dayName, focus, planned, onBack }: { dayName: string; focus: string; planned: PlannedActivity; onBack: () => void }) {
+  const { name, protocol } = splitActivity(planned.activity)
+  const rounds = plannedRoundsOf(planned)
+  const shape = protocol ?? (rounds ? blockShape(rounds) : null)
+  return (
+    <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 space-y-1.5" data-testid="peek-planned-activity">
+      <p className="text-[1.0625rem] font-semibold text-foreground leading-tight">{`${focus || name} · ${dayName}`}</p>
+      <p className="text-sm font-medium text-foreground" data-testid="peek-planned-line">{prescriptionLine({ activity: name, duration: planned.duration, targetRpe: planned.targetRpe })}</p>
+      {shape && <p className="text-xs text-muted-foreground" data-testid="peek-planned-shape">{shape}</p>}
+      {planned.reason && <p className="text-xs leading-[1.5] text-muted-foreground">{planned.reason}</p>}
+      <div className="pt-1.5 flex justify-center"><PeekBackToToday onClick={onBack} /></div>
+    </div>
   )
 }

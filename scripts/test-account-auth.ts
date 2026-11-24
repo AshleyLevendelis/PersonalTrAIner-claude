@@ -101,6 +101,11 @@ async function main() {
   const gate = app.indexOf('if (recoveryOpen) {'), restoring = app.indexOf('if (isRestoring) {')
   check('6c. the screen is drawn before the loading screen', gate > 0 && restoring > 0 && gate < restoring && /<SetNewPasswordScreen /.test(app.slice(gate, restoring)))
   check('6d. a confirmed or spent link is said once on the app', /AUTH_LINK_AT_LOAD\?\.kind === 'email-confirmed'/.test(app) && /AUTH_LINK_AT_LOAD\?\.kind === 'link-failed'/.test(app) && /data-testid="account-notice"/.test(app))
+  // His ask, 23 Nov 2026: pinned over the top it covered the greeting; it now pushes the page down.
+  const notice = app.match(/<div[^>]*data-testid="account-notice"[^>]*>/)?.[0] ?? ''
+  const mainAt = app.indexOf('<DockPaddedMain'), noticeAt = app.indexOf('data-testid="account-notice"'), tabsAt = app.indexOf('<Tabs value={activeTab}')
+  check('6f. the confirmed line sits in the page above the tabs, never pinned over it',
+    !!notice && !/\b(fixed|absolute|sticky)\b/.test(notice) && mainAt > 0 && mainAt < noticeAt && noticeAt < tabsAt, notice)
   const profile = readFileSync('src/components/ProfileScreen.tsx', 'utf-8')
   check('6e. Profile reads the account again every time it opens', /if \(!open\) return\s*let live = true\s*void readAccountStatus\(\)[\s\S]{0,120}\}, \[open\]\)/.test(profile))
 
