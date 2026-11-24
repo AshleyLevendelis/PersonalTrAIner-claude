@@ -70,7 +70,7 @@ async function main() {
 
   console.log('\n5. Wired')
   const dash = readFileSync('src/components/Dashboard.tsx', 'utf8').replace(/\/\/.*$/gm, '')
-  check('Home links the phone for the profile it shows', /keepPhoneLinked\(profile\.id\)/.test(dash))
+  check('Home links the phone for the profile it shows', (/keepPhoneLinked\(profile\.id\)/.test(dash) || /const id = profile\.id[\s\S]{0,500}?[^.]keepPhoneLinked\(id\)/.test(dash)))
   const src = readFileSync('src/lib/push-link.ts', 'utf8').replace(/\/\/.*$/gm, '')
   check('the real write is the turn-on tap\'s upsert, keyed by the phone', /from\('push_subscriptions'\)\.upsert\(row, \{ onConflict: 'endpoint' \}\)/.test(src))
   check('never asks for permission (only reads it)', !/requestPermission|pushManager\.subscribe\(/.test(src) && /Notification\.permission !== 'granted'/.test(src))

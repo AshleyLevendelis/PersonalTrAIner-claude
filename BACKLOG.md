@@ -57,6 +57,39 @@ Newest first. One line each.
   gets rebuilt"); two or more keep the old sentence. Both sheets and the coach's card, one function
   (`test:sheet-manners`, `test:ban-running-session`, 2 mutations, 2 caught). No Undo was needed beyond the
   existing one, which puts the whole plan back. Frontend only: no edge function, no migration.
+
+- [x] **NOTIFICATIONS IN THE ANDROID APP (23 Nov 2026, his report "Now the app is on my phone as a proper app ...
+  Notifications dont seem to be working", then "yes build it for Android").** Cause: the phone app (Capacitor) has no
+  browser push service or service worker, so Profile > Reminders said "This browser can't show notifications from the
+  app". It was named as "native push is a separate job" in docs/plans/phone-app.md on 20 Nov and not flagged to him
+  when he installed the app. BUILT: the phone uses @capacitor/push-notifications (Firebase on Android), loaded by a
+  dynamic import only; asked only from his tap on "On this phone"; "on" only over a row the server saved; off removes
+  the row; Home re-links the phone daily and follows a rotated token; a tap opens only a tab of this app; a message
+  while the app is open makes the chat re-read. The server sends an `fcm:` row through Firebase's HTTP v1 API (signed
+  with a service account, `FCM_SERVICE_ACCOUNT`), with the same tags, high priority and 6-hour life as the browser
+  route; "gone" only on Firebase's UNREGISTERED/404, a missing secret is "failed" (row kept). Both senders
+  (coach-reach-out and chat-gemini's reply ping) go through `_shared/push.ts`, so both reach the app. NO MIGRATION: a
+  phone-app device is an ordinary push_subscriptions row, endpoint `fcm:<token>`, empty browser keys. The iPhone app
+  says "Notifications in the iPhone app aren't built yet." (Apple push key needed). `test:native-push` (50 checks;
+  17 mutations, 17 caught, one only after a check was added for a phone whose notifications were switched off in
+  Android settings), `verify:reminders` §6 (7 checks; 3 mutations, 3 caught), screenshot read. NOT PROVEN: a real
+  phone receiving one (needs his Firebase project, the secret, the two deploys and a native build:
+  docs/handover/android-notifications.md). Known: the status-bar icon is the app icon (may draw as a white circle).
+  Needs the `coach-reach-out` and `chat-gemini` deploys and the `FCM_SERVICE_ACCOUNT` secret.
+  **PROVEN LIVE 24 Nov 2026** on his Samsung (SM-S948B), production: Firebase app `uk.co.personaltrainerapp` added to
+  project personal-trainer-43bee (the earlier google-services.json named only the placeholder id); secret set on TEST
+  and production (his yes); `coach-reach-out` and `chat-gemini` deployed by him from this branch; device row `fcm:`
+  saved 16:29; the test send reached the phone with the app shut, and the tap opened the chat. Three snags on the way,
+  worth knowing: (1) the first secret was stored with an extra layer of JSON quoting (I set it through an env file
+  with a double-stringified value), `parseServiceAccount` returned null and the log said "FCM_SERVICE_ACCOUNT is not
+  set" — a set-but-unreadable secret logs as unset, so read that line as "missing OR unparseable". Fixed by a
+  single-quoted literal env value; the CLI's digest then matched sha256 of the compact JSON on both projects. (2) In a
+  OneDrive worktree the deploy refused with "stale" shared copies that differed only in CRLF line endings
+  (`core.autocrlf=true`); `npm run sync:shared` rewrote them, nothing to commit. (3) OneDrive left node_modules files as
+  cloud placeholders ("not a regular file" in Gradle) and locked app\build; replaced the placeholders with real copies
+  and deleted app\build. The app now asks POST_NOTIFICATIONS, WAKE_LOCK, ACCESS_NETWORK_STATE and c2dm RECEIVE, so the
+  next Play bundle's permission list grows by those. Key file moved out of Downloads to C:\Users\Ashley\app-keys.
+
 - [x] **SIMPLE MEALS BY DEFAULT (his "Do whatever you think is best", 23 Nov 2026)**. His report: "Meal plans are the
   app's biggest weakness. The meals are too complicated. Users are required to become gourmet chefs", plus own meals
   and eating out being hard. I proposed four improvements (simple meals, fast logging, eating out from the menu,
