@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **FIRST PLAY STORE BUNDLE BUILT, 23 Nov 2026** (closed test only; nothing published). `app-release.aab`, 6.61 MB,
+  versionCode 1 / versionName 1.0, production database (4 references to the production project in the bundled app, 0
+  to TEST). Signed with his upload key (`%USERPROFILE%\personal-trainer-upload.jks`, alias `upload`, owner "CN=Ashley
+  Levendelis", valid to 2054); the key's settings file is git-ignored and the key lives outside the repo. Merged release
+  manifest: INTERNET, health.READ_STEPS and AndroidX's DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION, nothing else.
+  `test:phone-app` 35 checks green. **The release build needs Java 21**: with the laptop's default JDK 17 it fails
+  "invalid source release: 21" in `:capacitor-android`; set `JAVA_HOME` to Android Studio's `jbr` (21.0.5) first. Next:
+  he uploads to Closed testing; every later upload raises versionCode by one.
 - [x] **A WELCOME PAGE BEFORE SETUP: his request 24 Nov 2026, "Option 1, build it. Make the one line good. Something
   that really sells it"** (from two options: one simple page, over three swipeable slides). He noticed on signing out
   that the app dropped straight into the setup chat. Now a phone with no plan and no setup under way (the first open,
