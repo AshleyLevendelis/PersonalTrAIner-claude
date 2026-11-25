@@ -133,3 +133,13 @@ export function effortFromWords(text: string | null | undefined): { key: EffortK
   const key = [...found][0]
   return { key, rpe: EFFORTS.find(e => e.key === key)!.rpe }
 }
+
+/**
+ * WHAT A SESSION'S HEART RATE READS AS, under its log (health-heart.ts, his 24 Nov 2026 "1 + 2"): "♥ 142 avg · 171 max".
+ * A figure to look at, never a target. Null without an average. Here, beside the read-back, so the row needs no import
+ * of the phone's health code.
+ */
+export function heartLine(avg: number | null | undefined, max: number | null | undefined): string | null {
+  if (avg == null || !(avg > 0)) return null
+  return max != null && max > 0 ? `♥ ${avg} avg · ${max} max` : `♥ ${avg} avg`
+}

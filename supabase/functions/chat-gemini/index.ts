@@ -3321,7 +3321,13 @@ PERFORMANCE COACHING DIRECTIVES — about WORKING SETS ONLY (see WHAT THE LABELS
 - Celebrate personal records (new max weight or rep count for an exercise).
 - Use the data to validate or adjust volume recommendations — if a user logs fewer reps than prescribed, their fatigue may be accumulating.` : ''}
 
-${context.cardio_log_history ? `CARDIO & CONDITIONING HISTORY (last 14 days):
+${typeof context.heart_rate_context === "string" && context.heart_rate_context.trim() ? `HEART RATE (from their watch or chest strap, read by the app; facts, never targets):
+${context.heart_rate_context}
+- Use these when they ask how a session went, how their fitness is going, or how recovered they are: say the number and what it plainly shows ("your easy jog now runs about 10 beats lower at the same effort, which is your aerobic fitness improving").
+- NEVER give a heart rate target, zone or "train at X bpm": effort is always in words (easy, steady, hard). Never say what a reading means medically and never name a cause for a raised resting heart rate; if they are worried by a reading or feel unwell, suggest they speak to their GP.
+- A raised resting heart rate is a reason to OFFER a lighter day (propose_session_shorten with minutes 0 is the shortest version), never to change their plan unasked.
+
+` : ""}${context.cardio_log_history ? `CARDIO & CONDITIONING HISTORY (last 14 days):
 The following shows the user's cardio/conditioning activities with activity name, duration, and RPE intensity.
 ${context.cardio_log_history}
 

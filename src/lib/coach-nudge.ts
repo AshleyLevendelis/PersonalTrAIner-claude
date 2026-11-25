@@ -49,6 +49,7 @@ export type NudgeKind =
   | 'personal_best'
   | 'consistency_milestone'
   | 'session_due'
+  | 'recovery_flag'
 
 /**
  * WEEKS ON PLAN WORTH A WORD (his 13 Nov 2026 ruling: weekly consistency in place of the streak). Counted over the last
@@ -90,6 +91,11 @@ export interface NudgeInput {
   todayLogged: boolean
   /** Today is their birthday, from the date of birth they picked (body-units.ts isBirthday). Absent: not known. */
   birthdayToday?: boolean
+  /**
+   * RESTING HEART RATE RAISED (his "2", 25 Nov 2026; heart-trends.ts recoveryFlag): the app's sentence and the run's
+   * first morning, which keys it, so one run of raised mornings is raised once. Absent: no watch, or nothing raised.
+   */
+  recovery?: { line: string; since: string } | null
 }
 
 export interface CoachNudge {
@@ -117,6 +123,7 @@ export function nudgeKeys(input: NudgeInput): {
   pr: string | null
   consistency: string | null
   due: string | null
+  recovery: string | null
 } {
   const milestone = CONSISTENCY_MILESTONES.includes(input.weeksOnPlan) ? input.weeksOnPlan : null
   return {
@@ -134,6 +141,10 @@ export function nudgeKeys(input: NudgeInput): {
     // day). Both are better sentences than this one, so this one stays quiet.
     due: input.planKnown && input.todaySession && !input.todayLogged && input.hour < input.cutoffHour
       ? `due:${input.today}`
+      : null,
+    // The same window as `due` (before the session, nothing logged): afterwards there is nothing left to lighten.
+    recovery: input.recovery && input.planKnown && input.todaySession && !input.todayLogged && input.hour < input.cutoffHour
+      ? `recovery:${input.recovery.since}`
       : null,
   }
 }
@@ -157,6 +168,7 @@ export function keysCoveredByOpener(
   if (openerKind === 'session_feel') covered.push(keys.feel)
   if (openerKind === 'missed_yesterday') covered.push(keys.missed)
   if (openerKind === 'training_today' || openerKind === 'training_done_today') covered.push(keys.due)
+  if (openerKind === 'recovery_flag') covered.push(keys.recovery, keys.due)
   return covered.filter((k): k is string => k != null)
 }
 
@@ -219,6 +231,19 @@ export function pickNudge(input: NudgeInput, said: string[]): CoachNudge | null 
       keys: [keys.missed],
       text: `Yesterday's ${input.missedYesterday.focus} didn't happen — no drama. Run it today, mark it missed, or was it a rest day?`,
       chips: ["I'll do it today", 'Mark it missed', 'Call it a rest day'],
+    }
+  }
+
+  // 2b. A RAISED RESTING HEART RATE BEFORE TODAY'S SESSION (his "2", 25 Nov 2026). Above a best and the session
+  //     reminder because it changes what he does today; below the two above because those are about something that
+  //     happened. An OFFER: the chip is his request to the coach, whose card he still applies. It speaks for today's
+  //     session too, so "feeling good for it?" does not follow it. The words name no cause (CSCS, mine).
+  if (unsaid(keys.recovery) && input.recovery && input.todaySession) {
+    return {
+      kind: 'recovery_flag',
+      keys: [keys.recovery, ...(keys.due ? [keys.due] : [])],
+      text: recoveryOfferText(input.recovery.line, input.todaySession.focus),
+      chips: RECOVERY_CHIPS,
     }
   }
 
@@ -368,6 +393,7 @@ const NUDGE_MOMENT: Record<NudgeKind, string> = {
   personal_best: 'personal_best',
   consistency_milestone: 'consistency_milestone',
   session_due: 'workout_today',
+  recovery_flag: 'recovery_flag',
 }
 
 /** The marker the day's hello carries in the chat. */
@@ -494,9 +520,16 @@ export function keysSaidByMarkers(keys: ReturnType<typeof nudgeKeys>, momentsSai
  * unanswered, and Tuesday's hello, built by the opener, asked about the same session again. A question she has
  * chosen not to answer is not asked a second time; the hello finds something else to say.
  */
-export function openerSkips(keys: ReturnType<typeof nudgeKeys>, said: string[]): { feel: boolean; missed: boolean } {
+export function openerSkips(keys: ReturnType<typeof nudgeKeys>, said: string[]): { feel: boolean; missed: boolean; recovery: boolean } {
   return {
+    recovery: keys.recovery != null && said.includes(keys.recovery),
     feel: keys.feel != null && said.includes(keys.feel),
     missed: keys.missed != null && said.includes(keys.missed),
   }
+}
+
+/** The recovery offer's words and replies, one place for the event above and the opener (coach-opener.ts). */
+export const RECOVERY_CHIPS = ['Give me the shortest version today', "I feel fine, keep it as it is"]
+export function recoveryOfferText(line: string, focus: string): string {
+  return `${line} That can mean you're still carrying some fatigue. Want today's ${focus} lighter?`
 }

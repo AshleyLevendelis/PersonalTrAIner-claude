@@ -8,7 +8,7 @@ import {
   MAX_PLAUSIBLE_CARDIO_MINUTES, isPlausibleDistanceKm, MAX_PLAUSIBLE_DISTANCE_KM, getCardioLogsForDateMerged, subscribeCardioLogStore,
   type CardioLogView,
 } from '@/lib/cardio-log-store'
-import { EFFORTS, effortForRpe, rpeToStore, cardioReadback, roundShapeOf, type EffortKey } from '@/lib/cardio-effort'
+import { EFFORTS, effortForRpe, rpeToStore, cardioReadback, roundShapeOf, heartLine, type EffortKey } from '@/lib/cardio-effort'
 import { splitActivity, unclaimedCardio } from '@/lib/cardio-lines'
 import { prescriptionLine } from '@/lib/activity-day'
 import { easeOffQuestion, type EaseOffQuestion } from '@/lib/cardio-ease-off'
@@ -147,6 +147,7 @@ export function CardioReadback({
     distanceKm: log.distance_km == null ? null : Number(log.distance_km),
     shape: roundShapeOf(log.notes),
   })
+  const heart = heartLine(log.avg_heart_rate, log.max_heart_rate)
 
   const handleUndo = async () => {
     if (!log.clientId) return
@@ -192,6 +193,7 @@ export function CardioReadback({
           </button>
         )}
       </div>
+      {heart && <p className="pl-2.5 pt-1 text-[0.75rem] text-muted-foreground tabular-mono" data-testid="cardio-heart">{heart}</p>}
       {error && <p className="text-[0.625rem] text-destructive px-1 mt-0.5">{error}</p>}
     </div>
   )

@@ -749,7 +749,7 @@ export function formatCardioLogsForAI(logs: CardioLog[]): string {
     const parts = entries.map(e => {
       let s = `${e.activity_name} for ${e.duration_minutes}min at RPE ${e.intensity_rpe}`
       if (e.distance_km != null && Number(e.distance_km) > 0) s += `, ${Math.round(Number(e.distance_km) * 100) / 100} km`
-      if (e.avg_heart_rate) s += ` (HR: ${e.avg_heart_rate}bpm)`
+      if (e.avg_heart_rate) s += ` (heart rate: average ${e.avg_heart_rate}${e.max_heart_rate ? `, highest ${e.max_heart_rate}` : ''})`
       return s
     })
     lines.push(`${date}: ${parts.join(' | ')}`)

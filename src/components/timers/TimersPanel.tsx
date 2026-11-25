@@ -19,6 +19,7 @@
 // ---------------------------------------------------------------------------
 
 import { useState } from 'react'
+import { LiveHeart } from '@/components/LiveHeart'
 import { Button } from '@/components/ui/button'
 import { useTimers } from '@/hooks/useTimers'
 
@@ -152,6 +153,7 @@ export function CountdownPanel() {
         <p className="m-0 text-sm font-semibold" style={{ color: done ? 'var(--primary-text)' : 'var(--muted-foreground)' }}>
           {done ? "Time's up" : timers.running ? `of ${countdownClock(length!)}` : `Paused · of ${countdownClock(length!)}`}
         </p>
+        {!done && <LiveHeart className="text-sm text-muted-foreground" />}
         <div className="h-2 w-full overflow-hidden rounded-full" style={{ background: 'var(--hairline)' }} aria-hidden>
           <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%`, background: 'var(--primary)' }} />
         </div>

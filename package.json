@@ -12,6 +12,10 @@
     "test:added-load": "tsx scripts/test-added-load.ts",
     "test:audit": "NODE_ENV=production tsx scripts/run-constraint-audit.ts",
     "test:kit-list": "tsx scripts/test-kit-list.ts",
+    "test:health-heart": "tsx scripts/test-health-heart.ts",
+    "test:heart-strap": "tsx scripts/test-heart-strap.ts",
+    "test:strap-live": "tsx scripts/test-strap-live.ts",
+    "test:heart-trends": "tsx scripts/test-heart-trends.ts",
     "test:health-conditions": "tsx scripts/test-health-conditions.ts",
     "test:first-session-lifts": "tsx scripts/test-first-session-lifts.ts",
     "test:band-slots": "tsx scripts/test-band-slots.ts",
@@ -729,6 +733,8 @@
     "test:coach-actions": "tsx scripts/test-coach-actions.ts",
     "verify:chat-real-day": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-real-day.mjs",
     "verify:account-row": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/account-row.mjs",
+    "verify:heart-uses": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/heart-uses.mjs",
+    "verify:heart-strap": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/heart-strap.mjs && node .tour-harness/heart-strap-app.mjs && node .tour-harness/heart-strap-workout.mjs",
     "verify:health-steps": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/health-steps.mjs",
     "test:phone-app": "tsx scripts/test-phone-app.ts",
     "test:native-push": "tsx scripts/test-native-push.ts",
@@ -755,6 +761,7 @@
     "test:peek-recovery": "tsx scripts/test-peek-recovery.ts"
   },
   "dependencies": {
+    "@capacitor-community/bluetooth-le": "8.3.0",
     "@capacitor/android": "8.6.2",
     "@capacitor/core": "8.6.2",
     "@capacitor/ios": "8.6.2",

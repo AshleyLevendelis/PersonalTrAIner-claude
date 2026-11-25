@@ -1840,6 +1840,21 @@ menu" stays true when a copy is also left outside it.
   must stay removed unless the app starts reading that data. Phone-only code loads only in the phone app.
   `test:phone-app`, `verify:health-steps`, `docs/plans/phone-app.md`. NOT BUILT natively yet: his machine
 
+- **Heart rate from a watch: his "1 + 2, build it", 24 Nov 2026**: after each session its average and highest heart rate
+  (from Health Connect, which the watch writes to) show under it, and Progress shows resting heart rate against last
+  week. Read only, its own switch, phone app only; never a target or zone. `test:health-heart`, `verify:health-steps`
+  §6-7. Needs migration 20261124180000 and a phone app rebuild
+- **A heart rate strap, live: his "then start working on 3", 24 Nov 2026** (option 3; options 1 and 2, the watch after each
+  session and resting on Home, built the day before): Profile pairs a strap with the phone's picker; the round timer,
+  countdown and today's workout show "♥ N" while it sends (nothing after 5s, out of range or without skin contact); each
+  session's figure comes from the strap first. Shown, never judged (CSCS, mine). `test:strap-live`, `verify:heart-strap`.
+  NOT on a real strap yet (his phone)
+- **What the heart rate does for his training: his "Build 1, 2 and 3 now", 25 Nov 2026** (CSCS mine, basis in BACKLOG):
+  Home shows the same steady session at a lower heart rate ("Easy jog: average heart rate 152 → 141 over 6 weeks"),
+  only like for like and only a fall; a resting heart rate 5+ above his usual three mornings running makes the coach
+  OFFER a lighter session before a training day's session, once per run, naming no cause; the coach is told the
+  figures and never gives a target or zone. A "♥ N" beside the gear while a strap sends. `test:heart-trends`,
+  `verify:heart-uses`. Needs the `chat-gemini` deploy for the coach's half
 - **Coach notifications reach the Android app: his request 23 Nov 2026, "yes build it for Android"**: the phone app
   uses Firebase (an `fcm:` row in the same phones table, no migration); the same switch, tags and limits as the
   website; the iPhone app says it is not built yet. `test:native-push`, `verify:reminders` §6. Needs the

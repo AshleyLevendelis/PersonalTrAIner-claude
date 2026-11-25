@@ -924,6 +924,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   /** The same 14 days of sets, as rows, for the patterns the app looks for (coach-patterns.ts). */
   const recentLogsRef = useRef<ExerciseSetLog[]>([])
   const [cardioLogHistory, setCardioLogHistory] = useState('')
+  // HEART RATE (his "Build 1, 2 and 3 now", 25 Nov 2026; health-heart.ts readHeartPicture): what the coach is told, and
+  // a raised resting heart rate for the opener. Empty with no watch or strap.
+  const [heartContext, setHeartContext] = useState('')
+  const [heartRecovery, setHeartRecovery] = useState<{ line: string; since: string } | null>(null)
+  // The daily hello waits for this read (a raised resting heart rate is its first-ranked offer on a training day).
+  const [heartLoaded, setHeartLoaded] = useState(false)
   const [quickRepliesDismissed, setQuickRepliesDismissed] = useState(false)
 
   // ---------------------------------------------------------------------
@@ -1445,14 +1451,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const nextSessionAfterToday = () =>
     nextSessionAfter({ date: activeSession.date, plan: liveWeekDays, moves: trainingWeek.moves })
 
-  const composeOpener = (skip: { feel: boolean; missed: boolean } = { feel: false, missed: false }): Opener => {
+  const composeOpener = (skip: { feel: boolean; missed: boolean; recovery?: boolean } = { feel: false, missed: false }): Opener => {
     // Named "tomorrow" when it is, otherwise by its day — the opener's own
     // wording rule, applied to the shared walk above.
     const upcoming = nextSessionAfterToday()
     const tomorrowSession = upcoming
       ? { dayName: upcoming.isTomorrow ? 'tomorrow' : upcoming.dayName, focus: upcoming.focus, lead: upcoming.lead }
       : null
-    return pickOpener({
+    const opener = pickOpener({
       hour: getAppNow(profile.id).getHours(),
       cutoffHour: sessionCutoffHour(profile.preferred_time),
       awaitingFeel: feelContext?.awaiting && !skip.feel
@@ -1472,7 +1478,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // does not have.
       noticed: noticedFact(),
       lastOrdinaryKind: readLastOrdinaryKind(profile.id ?? ''),
+      // RAISED ONCE PER RUN through the coach's said-once memory: the run's key, once spoken, is skipped (openerSkips).
+      recovery: heartRecovery && !skip.recovery ? { line: heartRecovery.line } : null,
     })
+    return opener
   }
 
   /**
@@ -1535,6 +1544,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     todayLogged: activeSession.logs.some(l => !l.is_warmup) || trainedTodayFacts(activeSession.date).trainedToday,
     // The birthday wish (his 9 Nov request), from the date of birth he picked; none for an age typed instead.
     birthdayToday: isBirthday(profile.date_of_birth, activeSession.date),
+    recovery: heartRecovery,
   }
   // A ref as well as the value, because the opener finalises from inside a
   // setTimeout: the closure it captured could be several data arrivals old by
@@ -1705,7 +1715,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   useEffect(() => {
     if (!profile.id || nudgeInFlightRef.current) return
     if (!historyLoaded || isFirstEverChat !== false || isLoading) return
-    if (!proactiveData || !feelContext || trainingWeek.loading || !planKnown) return
+    if (!proactiveData || !feelContext || trainingWeek.loading || !planKnown || !heartLoaded) return
     if (messages.length === 0) return
     if (messages.length === 1 && !messages[0].id) return
     if (hasUnreadCoachMessage(messages, seenAttention)) return
@@ -1802,7 +1812,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile.id, historyLoaded, isFirstEverChat, isLoading, proactiveData, feelContext, trainingWeek.loading, planKnown, messages, seenAttention, clockTick, reminderSettings, logsMeals])
+  }, [profile.id, historyLoaded, isFirstEverChat, isLoading, proactiveData, feelContext, trainingWeek.loading, planKnown, messages, seenAttention, clockTick, reminderSettings, logsMeals, heartLoaded])
 
   // One-shot finalization of the synchronous fallback greeting once we know
   // (a) whether this is a genuinely first-ever conversation (no prior
@@ -2100,6 +2110,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // the cardio store's own broadcast (ownWriteVersion, above), so a walk
     // logged on the Exercise tab is in the next message's context.
     void cardioHistoryForCoach(profile.id, getLocalDateString(getAppNow(profile.id)), 14).then(setCardioLogHistory)
+    void import('@/lib/health-heart').then(async m => {
+      const picture = await m.readHeartPicture(profile.id!, getLocalDateString(getAppNow(profile.id)))
+      setHeartContext(m.heartContextForCoach(picture))
+      setHeartRecovery(picture.recovery ? { line: picture.recovery.line, since: picture.recovery.since } : null)
+    }).catch(() => { /* the coach is told nothing about heart rate */ }).finally(() => setHeartLoaded(true))
     try {
       const recent = await getRecentLogsWithWarmups(profile.id, 14, activeSession.date)
       recentLogsRef.current = recent
@@ -2453,6 +2468,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       favorites_summary: favoritesSummary,
       workout_log_history: workoutLogHistory,
       cardio_log_history: cardioLogHistory,
+      heart_rate_context: heartContext,
       // Proactive material (same Dashboard aggregator, see the
       // `proactiveData` effect above) — specific-or-silent by construction:
       // each field is only ever set when there's something real to report,

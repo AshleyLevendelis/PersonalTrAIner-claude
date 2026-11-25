@@ -31,6 +31,12 @@ export interface HealthAdapter {
   requestStepsAccess(): Promise<boolean>
   /** Total steps between two instants, summed by the phone (it removes the double count of phone + watch). */
   stepsBetween(start: Date, end: Date): Promise<number>
+  /** HEART RATE (health-heart.ts, his 24 Nov 2026 "1 + 2"): the phone's sheet for heart rate and resting heart rate. */
+  requestHeartAccess?(): Promise<boolean>
+  /** Heart rate readings (beats a minute) between two instants, as the watch or strap wrote them. */
+  heartRateSamples?(start: Date, end: Date): Promise<{ bpm: number; at: string }[]>
+  /** Resting heart rate, one or more a day, between two instants. */
+  restingHeartRateSamples?(start: Date, end: Date): Promise<{ bpm: number; at: string }[]>
 }
 
 /** Tests and the browser test pages hand in a pretend health store on this global; `null` means "no phone app". */
@@ -43,7 +49,7 @@ type CapacitorGlobal = { isNativePlatform?: () => boolean; getPlatform?: () => s
 let realAdapter: Promise<HealthAdapter | null> | null = null
 
 /** The phone's health store, or null in a browser. */
-function healthAdapter(): Promise<HealthAdapter | null> {
+export function healthAdapter(): Promise<HealthAdapter | null> {
   const fake = testAdapter()
   if (fake !== undefined) return Promise.resolve(fake)
   if (!isPhoneApp()) return Promise.resolve(null)
@@ -65,6 +71,18 @@ function healthAdapter(): Promise<HealthAdapter | null> {
               dataType: 'steps', startDate: start.toISOString(), endDate: end.toISOString(), bucket: 'day', aggregation: 'sum',
             })
             return res.samples.reduce((sum, s) => sum + (Number.isFinite(s.value) ? s.value : 0), 0)
+          },
+          requestHeartAccess: async () => {
+            const status = await Health.requestAuthorization({ read: ['heartRate', 'restingHeartRate'] })
+            return status.readAuthorized.includes('heartRate')
+          },
+          heartRateSamples: async (start, end) => {
+            const res = await Health.readSamples({ dataType: 'heartRate', startDate: start.toISOString(), endDate: end.toISOString(), limit: 5000, ascending: true })
+            return res.samples.map(s => ({ bpm: s.value, at: s.startDate }))
+          },
+          restingHeartRateSamples: async (start, end) => {
+            const res = await Health.readSamples({ dataType: 'restingHeartRate', startDate: start.toISOString(), endDate: end.toISOString(), limit: 200, ascending: true })
+            return res.samples.map(s => ({ bpm: s.value, at: s.startDate }))
           },
         }
       } catch {

@@ -74,6 +74,99 @@ Newest first. One line each.
   its shortcut and easy out under the message box; the chat now follows it as its buttons land, only when he was at
   the bottom. Two checks re-anchored on the deliberate changes (`test:reminder-writer`'s greeting, `verify:reminders`'
   switch count 12 -> 14).
+- [x] **A NEW PLAN AND THE HEART RATE SETTINGS (25 Nov 2026, found by the pre-merge sweep)**. `test:reset-clears-draft`
+  failed: three new phone-storage keys (the watch switch, the paired strap, the strap's raw readings) were not
+  classified. Decided (mine, mechanical): all three KEPT by a New Plan. The switch and the strap are the phone's, as the
+  steps switch is; the readings are matched to a session only by its own start and end, so none from before a New Plan
+  can land in the new plan's sessions, and they go after four hours. Gate green; its failure on the unfixed code is the
+  detector proven.
+  **The same sweep found two more, both fixed.** (1) `test:local-dates`: the recovery flag's "since" date was worked
+  out the UTC way (`toISOString().slice`). Harmless from a midday anchor, but the house rule is local calendar dates; it
+  now steps the date as `addDays` does (inlined, the file takes no imports). (2) `test:meal-favourite`: the browser
+  stand-in database did not know the new heart columns (`cardio_logs.max_heart_rate`, `workout_sessions.avg/max_heart_rate`,
+  `daily_resting_heart_rate.bpm`) hold whole numbers, so a decimal would have passed there and failed live. Added; every
+  heart writer already rounds, and `verify:heart-uses`, `verify:heart-strap`, `verify:health-steps` pass against the
+  stricter fake. Both gates failed on the old code, so both detectors are seen to fire.
+- [x] **WHAT THE HEART RATE DOES FOR HIS TRAINING: FITNESS, RECOVERY, THE COACH, AND A CORNER HEART (his "Build 1, 2
+  and 3 now", 25 Nov 2026)**. His question: "How do we best use this data in the app to complement the training".
+  Offered (CSCS, mine): 1 a fitness trend, 2 a recovery offer from resting heart rate, 3 the coach told, 4 "that easy day
+  ran hard" (his, as it judges effort); advised against calories burned, heart-rate rest between lifts and zones. He
+  chose 1, 2 and 3, and asked "should we add a little symbol somewhere in a corner maybe when heart rate is being picked
+  up?": built as "♥ 148" beside the settings gear while the strap sends, a tap opening the strap's row (mine, told him).
+  BUILT: `heart-trends.ts` (pure rules), `readHeartPicture` (one read for Home, the coach's events and its context).
+  (1) Home's Progress: "Easy jog: average heart rate 152 → 141 over 6 weeks" with "Same steady effort, a lower heart
+  rate: your fitness is improving"; a strap alone is enough. (2) On a training day before the session, the coach's
+  first message: "your resting heart rate has been about 6 above your usual (58) for 3 mornings. That can mean you're
+  still carrying some fatigue. Want today's Legs lighter?" with "Give me the shortest version today" / "I feel fine,
+  keep it as it is"; an event ranked under an unreviewed session and a missed day and above a best; said once per run
+  of raised mornings (the coach's said-once memory, keyed by the run's first morning); it speaks for "feeling good for
+  it?" too. The daily hello now waits for the heart read. (3) The coach is sent the resting line, the flag, the fitness
+  lines and the last week's session figures (cardio history now carries the highest too), with instructions: say the
+  number and what it plainly shows, never a target or zone, never a cause, the GP if worried, a lighter day OFFERED.
+  CSCS BASIS, mine: fitness is compared like for like only (one activity; Easy or Steady, RPE 6 or under, because an
+  interval session's average says nothing about aerobic fitness; within a quarter of the usual length; four sessions
+  over three weeks; the first two against the last two so one hot day cannot make the line) and shown only on a fall of
+  3+: the same submaximal effort at a lower heart rate is the standard field marker of improved aerobic fitness, while a
+  rise has too many causes (heat, sleep, illness, accumulated fatigue) to be said truthfully. Recovery: a morning resting
+  heart rate about 5+ above the individual's own baseline over consecutive days is a common practical marker of
+  incomplete recovery; baseline is the median of days 4-17 (at least five), so the judged days never set it and one odd
+  morning cannot move it; three mornings, not one or two, so a single bad night never triggers it. It is an offer,
+  never a change, and names no cause: interpreting it medically is outside CSCS scope.
+  Found by the gate: the flag's first morning was a day late (a rounded day number turned back into a date). Found by
+  the browser: on a training day the session reminder took the first-message slot, so the offer as first written (in
+  the opener only) would never have been said; it became one of the coach's events.
+  VERIFIED: `test:heart-trends` (46 checks), `verify:heart-uses` (13: the coach's offer and its buttons with the plan
+  untouched, Home's line, the corner heart, its tap, its going), screenshots read; neighbours re-run (coach-nudge
+  re-anchored for the new event and the hello's new wait). MUTATIONS 19, 19 caught (every rule's number, the event's
+  place and keys, the opener's window, the coach's context and instructions, Home's line, the corner heart and its tap,
+  the hello's wait). NOT PROVEN: real resting data
+  from a watch, and whether the coach (Gemini) follows the new lines (exam, after the `chat-gemini` deploy).
+
+- [x] **A HEART RATE STRAP, LIVE WHILE HE TRAINS (option 3, stage 2; his "then start working on 3", 24 Nov 2026)**.
+  BUILT 25 Nov 2026 (`docs/plans/live-heart-rate.md`): Profile → "Steps from your phone" → "Heart rate strap" → Find my
+  strap opens the phone's own Bluetooth picker, filtered to things sending heart rate; the strap is remembered on this
+  phone and connected whenever the app opens or comes back to the front. While it sends, the round timer (running), the
+  countdown and today's workout (beside the sets done) show "♥ N"; a reading over 5 seconds old, a strap out of range,
+  and a reading the strap took without skin contact are never shown. One store for all three (`strap-live.ts`). Readings
+  stay on the phone (the last four hours, written down when the app goes to the back); each session's average and
+  highest come from them FIRST, then the watch route fills what is left, so the strap's figure is kept where both exist.
+  Readings no session still needs are dropped; the last two hours always stay (a cardio log typed in later). The
+  session-figure rule moved into `heart-strap.ts` (no imports) so the live number does not pull the watch sync into the
+  first download; health-heart re-exports it, one rule for both sources.
+  Mine (measurement, CSCS): stale after 5s; nothing judges the number (no zone, target, colour); the strap prescribes
+  nothing and safety stays the red-flag rule. Android: BLUETOOTH_SCAN declared neverForLocation, BLUETOOTH_CONNECT, and
+  the location permissions the plugin declares for every version capped at Android 11 (where a scan still needs them).
+  iPhone: the Bluetooth sentence added to Info.plist (no iPhone app built yet). Plugin `@capacitor-community/bluetooth-le`
+  8.3.0, loaded by a dynamic import inside the phone app only. Bundle: app chunk 1665 -> 1672 (measured 1663), total
+  3374 -> 3401 (measured 3392, the plugin's own chunk).
+  VERIFIED: `test:strap-live` (33 checks), `verify:heart-strap` (Profile 12, timers 8, today's workout 4), with a pretend
+  strap sending the real notification bytes; screenshots read. MUTATIONS 15, 14 caught: the one MISSED first (a session
+  still running past two hours losing its readings) exposed a gate whose running session was inside the two hours that
+  always stay; a three-hour session was added and catches it. The other miss is equivalent (the strap row showing a
+  number only while 'connected': the number is already gone the moment the link drops), recorded, not given a check. NOT PROVEN: a real strap on a
+  real phone (stage 3, his machine): pairing, the phone's permission sheets, reconnecting after the screen locks, and
+  whether Android keeps the link while the app is in the back. OPEN, HIS: the Play store's nearby-devices form; whether
+  the coach is told a session's heart rate.
+
+- [x] **HEART RATE FROM A WATCH OR STRAP, AFTER EACH SESSION AND AT REST (his "1 + 2, build it", 24 Nov 2026)**.
+  His question: pair heart sensors from a watch or monitor and feed the data in. Options put to him: 1 heart rate after
+  each session, 2 resting heart rate on Home, 3 live heart rate from a Bluetooth strap during a session. He chose 1 and
+  2 to build, then 3. BUILT (phone app only, read only, its own switch on Profile → "Steps from your phone" → "Heart
+  rate from your watch"): after a session the average and highest heart rate over that session's own time show under
+  the cardio log ("♥ 147 avg · 171 max") and in session history; Progress on Home shows "Resting heart rate 58 · 2
+  lower than last week". Read from Health Connect / Apple Health, which the watch or strap already writes to; nothing
+  is written back. Mine (measurement): a reading is believed at 30-230 bpm, a session's figure needs 3 readings inside
+  its time, a resting figure is the lowest reading of the day (25-140), the week's line needs 3 days this week (and 3
+  last week to compare). A cardio log typed in later has a guessed time, so its figure is kept only if the heart clearly
+  worked (highest 100+): measured in the gate, a desk's 70 bpm is never put on a typed-in run. CSCS: NOTHING is
+  prescribed by heart rate; effort stays in words (his health-conditions and cardio-days rulings), and a gate fails on
+  any shown sentence setting a zone or target. Android declares READ_HEART_RATE and READ_RESTING_HEART_RATE (and keeps
+  every write permission removed), so the Play listing's health declaration needs heart rate added; the privacy page
+  now names heart rate (his to approve). Needs migration 20261124180000 (two heart columns, one resting table with
+  owner-only access) and a phone app rebuild. `test:health-heart` (21 checks, 10 mutations), `verify:health-steps` §6-7
+  (6 checks, 3 mutations: 2 caught on screen, the third, the sync's own switch check, is behind the screen's own check
+  and caught by `test:health-heart`), `test:phone-app`. NOT proven: a real watch on his phone; iPhone (not built);
+  the coach is not told these figures yet. NEXT: 3, live heart rate from a Bluetooth strap during a session.
 - [x] **THE PLANK ANSWER (his "fix the plank answer", 25 Nov 2026)**. Asked on his phone after the why-sheet deploy, "why is my plank time going up each week" got "We increase your hold time by 5 to 10 seconds each week ... before moving to a harder exercise!". Neither half is the app: holds go up 5 seconds a week (week 1 the base, week 2 +5, week 3 +10, the deload back to the base; `stepHoldSeconds`), and nothing in the code ever changes the exercise. CAUSE, both halves in the sheet, not the model: the entry read "add 5 seconds in week 2 and 10 in week 3" (two numbers that read as two different steps), and its reason said "then the exercise itself gets harder", copied from a coaching note in the code's comment that no code carries out. FIXED: the entry now states one 5-second step a week with the worked example 30-45s, 35-50s, 40-55s and the deload back to week 1's time; the reason no longer claims a harder exercise; and the block tells the coach to keep an entry's numbers and weeks exactly as written and add no step it does not state. `test:app-decisions` §7 (6 checks; the example is CALLED against `stepHoldSeconds`, not read): 8 mutations, 8 caught (the old wording, a wrong example, "5 to 10 seconds each week", the harder-exercise claim, a deload that is not week 1, the instruction removed, the code's step at 10 seconds, the code's deload not the base). `test:coach-promises` fails identically on unchanged main in this Windows checkout (CRLF in a pinned slice), not this change. Needs the `chat-gemini` deploy. Whether the coach now SAYS it right is model behaviour: ask him the same question after the deploy. ALSO: the coach exam against TEST was stopped at 87 turns, 15 of them HTTP 429 after the runner's full retry ladder (about 45 s), the last several in a row, so TEST's Gemini key looks out of today's quota; partial transcripts discarded, nothing graded or committed.
 
 - [x] **TODAY'S CARDIO SESSION CAN BE CHANGED FOR TODAY (his request 25 Nov 2026, on the new session card: "make sure it's easy to change, say for example the user had less time and can't do 8x3 they should easily be able to change it to 6x3 ... Let them be able to edit it")**. "Change for today" under the figures opens steppers: Rounds, Work and Rest for a rounds session (the round timer's own steps; never under 2 rounds, 10s work or 5s rest, so the Start can never be lost), Minutes for a steady one (5 a tap, 5 to 240). The figures, the bar, the length, the Start (round timer or countdown) and the one-tap log all follow; closed, a line names the plan ("Plan: 4 × 3 min, 1 min rest"), and "Back to the plan" undoes it. TODAY ONLY, mine on CSCS grounds: it is the session done on a day with less time, so the plan, progression and the next session are untouched and the log records what was done; kept on the phone for that date so a tab change keeps it. Not offered a day early (the preview stays his "Keep it as is"), nor once logged or while its timer runs. Effort is not a stepper: the log's own Easy/Steady/Hard already changes it. `withTodayChange`, `stepTodayRounds`, `stepTodayMinutes`; `test:planned-rounds` §1d (64 checks; 7 mutations, 7 caught), `verify:planned-rounds` J1-J10 (2 mutations, both caught); screenshots read. Not built: changing it from the chat ("only 20 minutes today" for a cardio day already exists as the shorten tool for lifting days, not this). Frontend only.

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Maximize2, ArrowRight, ChevronRight } from 'lucide-react'
+import { LiveHeart } from '@/components/LiveHeart'
 import { Button } from '@/components/ui/button'
 import { useTimers, ROUND_LEAD_IN_SECONDS } from '@/hooks/useTimers'
 import { FIELD, roundPhaseOf, formatRemaining } from '@/components/timers/RoundField'
@@ -174,6 +175,8 @@ export function RoundCard({ live, idleConfig, onLogSession, hero = false, onOpen
         >
           {eyebrow}
         </span>
+        {/* THE LIVE HEART RATE (option 3): only while a paired strap is sending, never during the idle card. */}
+        {phase !== 'idle' && <LiveHeart className="ml-auto mr-2 text-[0.75rem] text-muted-foreground" />}
         {onOpenSetup ? (
           // THE WAY BACK INTO THE ROUND'S SETTINGS while it runs (switch
           // protocol at the next round, the sound) — the Round tile is not on
