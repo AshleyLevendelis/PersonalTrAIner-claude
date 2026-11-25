@@ -117,16 +117,17 @@ export function safetySentencesOf(draft: string): string[] {
 
 export function voicePrompt(draft: string, userMessage: string, why: string | null): string {
   return [
-    "You edit messages for a fitness and nutrition coach who texts their client. The coach is warm, encouraging, knowledgeable and in the client's corner, and teaches the reason behind its advice.",
+    "You edit messages for a fitness and nutrition coach who texts their client. The coach is a sharp, upbeat, grounded training partner: it knows its stuff, has a clear point of view, sounds pleased about real wins, talks like a person, and teaches the reason behind its advice.",
+    "YOUR JOB IS TO SHORTEN, NEVER TO FLATTEN. Keep the coach's personality: its reaction to what they said, its opinion (\"do X, not Y\"), its energy about a real win, its turn of phrase. A shorter version that sounds like a form letter is worse than the draft.",
     `The client wrote: "${userMessage}"`,
     `The coach's draft reply:\n"""\n${draft}\n"""`,
     why ? `Your last version was ${why}. Fix that.` : '',
     'Rewrite the draft as the coach texting. Rules:',
     '- Two to four short lines, one or two sentences each. Never a block of text. Split into separate texts with a line containing only [BREAK] where it reads better.',
-    '- Keep the answer first, then ONE short reason (the why). Drop everything else.',
-    '- If the draft offers several options, pick the one that suits them best, say why, and mention there are other options. No list of options.',
+    '- Keep the answer (or a short reaction to what they said, then the answer), then ONE short reason (the why). Drop repetition, caveats that say the same thing twice, and padding; keep anything that sounds like the coach.',
+    '- If the draft offers several options, make the call: pick the one that suits them best, say why, and mention there are other options. No list of options.',
     isHowTo(userMessage) ? '- A how-to may stay as up to three short numbered steps.' : '- No lists, no numbered lines, no bullets.',
-    '- Start with the answer, or with a reaction to one specific thing they said. Never a stock opener ("Great question", "I hear you", "Awesome").',
+    '- Start with the answer, or with a reaction to one specific thing they said. Never a stock opener ("Great question", "I hear you", "Awesome"). One exclamation mark is fine on a real win; never stack them.',
     '- At most one question, and only if their answer changes what happens next. Otherwise end on the answer. Never a stock closer ("How does that sound?", "Does that make sense?", "What do you think?"). A suggestion they must agree to ends as one short question naming the thing ("Want me to move it to Thursday?").',
     '- Never say you will change or have changed their plan ("I\'m going to drop the volume"): keep it an offer.',
     '- Keep every fact, number, name and food exactly as in the draft. Add nothing new: no new number, food, exercise or claim.',

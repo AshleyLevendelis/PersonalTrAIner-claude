@@ -197,15 +197,15 @@ const t11at = await ev(`(() => {
 })()`)
 if (t11at) { await pointAt(t11at); await wait(900) }
 const t11 = await ev(`(() => {
-  const card = document.querySelector('[data-testid="peek-rest-day"]')
+  const card = document.querySelector('[data-testid="peek-rest-day"], [data-testid="peek-recovery-day"]')
   const back = card ? [...card.querySelectorAll('button')].find(b => b.textContent.trim() === 'Back to today') : null
   const r = back?.getBoundingClientRect()
   return { card: !!card, back: !!back, h: r ? Math.round(r.height) : 0, w: r ? Math.round(r.width) : 0 }
 })()`)
 check('T11a. tapping a rest day on the strip shows its short card with a way back', !!t11at && t11.card && t11.back, { t11at, t11 })
 check('T11b. ...and the way back is at least 44px tall and wide', t11.h >= 44 && t11.w >= 44, t11)
-await tapSelector('[data-testid="peek-rest-day"] [data-testid="peek-back-today"]')
-const t11back = await ev(`!document.querySelector('[data-testid="peek-rest-day"]')`)
+await tapSelector('[data-testid="peek-rest-day"] [data-testid="peek-back-today"], [data-testid="peek-recovery-day"] [data-testid="peek-back-today"]')
+const t11back = await ev(`!document.querySelector('[data-testid="peek-rest-day"], [data-testid="peek-recovery-day"]')`)
 check('T11c. ...and one tap on it returns to today', t11back === true, t11back)
 
 const err = await ev('window.__err ?? null')

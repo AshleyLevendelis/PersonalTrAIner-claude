@@ -57,8 +57,9 @@ const RAIL = { borderLeft: '2px solid color-mix(in srgb, var(--primary) 55%, tra
  * several store notifications, and an older fetch landing after a newer one
  * would put an undone walk straight back on screen.
  */
-export function useCardioLogsToday(): CardioLogView[] {
-  const { profileId, date } = useActiveSession()
+export function useCardioLogsToday(onDate?: string): CardioLogView[] {
+  const { profileId, date: today } = useActiveSession()
+  const date = onDate ?? today
   const [logs, setLogs] = useState<CardioLogView[]>([])
   useEffect(() => {
     if (!profileId) return
@@ -341,6 +342,8 @@ export function PlannedCardioRow({
   testid,
   timer,
   hideEntry,
+  onDate,
+  previewNote,
   hideTitle = false,
   entryLabel,
 }: {
@@ -353,13 +356,21 @@ export function PlannedCardioRow({
   label?: string
   onLogged?: () => void
   testid?: string
+  /**
+   * ANOTHER DAY'S OPTIONAL CARDIO (his report 25 Nov 2026: "The optional rest day exercises should be loggable like
+   * other exercises"). A past date: the row reads and logs THAT day, as a set logged after the fact is that day's.
+   */
+  onDate?: string
+  /** A day still to come: the row is the prescription and this line, never boxes (nothing is logged ahead of its day). */
+  previewNote?: string
   /** The session hero already says what the plan asks (PlannedSessionHero): the row is only the way to log it. */
   hideTitle?: boolean
   /** A quiet label over the boxes, the hero's "Or log it yourself". */
   entryLabel?: string
 }) {
-  const { profileId, date } = useActiveSession()
-  const logs = useCardioLogsToday()
+  const { profileId, date: today } = useActiveSession()
+  const date = onDate ?? today
+  const logs = useCardioLogsToday(onDate)
   const split = splitActivity(prescription.activity)
   const { name } = split
   // A session's rounds stored beside its name (or read off the coach's reason) read as its protocol line, the way one
@@ -423,6 +434,8 @@ export function PlannedCardioRow({
           displayName={name}
           onUndone={() => { undone.current = [...undone.current, saved]; setJustSaved(null); setMinutes('') }}
         />
+      ) : previewNote ? (
+        <p className="text-xs text-muted-foreground pl-2.5 pr-1" data-testid="cardio-preview-note">{previewNote}</p>
       ) : hideEntry ? null : (
         <EntryBoxes
           minutes={minutes}

@@ -34,6 +34,8 @@ function inPhoneApp(): boolean {
 export const MOMENT_LABELS: Record<MomentKey, string> = {
   session_feel: 'Ask how a session felt',
   workout_today: 'Remind me on the morning of a training day',
+  load_clash: 'Warn me when a hard class lands next to leg day',
+  pattern_spotted: 'Point out a pattern, like a stuck lift',
   session_not_logged: "Remind me if I haven't logged a session",
   missed_yesterday: 'Check in when I miss a day',
   comeback: 'A small step back after a few quiet days',
