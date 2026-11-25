@@ -17,6 +17,7 @@ import { supabase } from './supabase'
 import { isMalformedZeroWeight, getSetsForSession } from './set-log-store'
 import { readCardioLogs } from './cardio-log-store'
 import { cardioLine } from './cardio-lines'
+import { heartLine } from './cardio-effort'
 import { dayNameOf } from './session-move'
 import { setVolumeKg, honestSessionMinutes } from './session-derive'
 import { prMetricFor, calculateE1RM, type PRMetric } from './pr-engine'
@@ -320,6 +321,8 @@ export interface SessionHistoryEntry {
   day: string | null
   durationMinutes: number | null
   isCompleted: boolean
+  /** The workout's average and highest heart rate, read from the phone (health-heart.ts), else absent. */
+  heart?: string | null
   totalVolumeKg: number
   totalSets: number
   /** True when the sets query for this session failed — totalVolumeKg/totalSets are 0 as a placeholder, NOT a real "nothing logged" result. Callers must render this distinctly (e.g. "Couldn't load"), never as a genuine zero. */
@@ -374,11 +377,13 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
   const oldest = rows.length >= limit ? rows[rows.length - 1].date : '0000-01-01'
   const cardioByDate = new Map<string, string[]>()
   for (const log of (await readCardioLogs(userId, { from: oldest })).rows) {
-    cardioByDate.set(log.date, [...(cardioByDate.get(log.date) ?? []), cardioLine(log)])
+    // Its heart rate beside it when the phone found one (health-heart.ts, 24 Nov 2026).
+    const heart = heartLine(log.avg_heart_rate, log.max_heart_rate)
+    cardioByDate.set(log.date, [...(cardioByDate.get(log.date) ?? []), heart ? `${cardioLine(log)} · ${heart}` : cardioLine(log)])
   }
 
   const allRows: SessionHistoryEntry[] = await Promise.all(
-    rows.map(async (row: { id: string; date: string; split_type: string; day: string | null; duration_minutes: number | null; is_completed: boolean; started_at?: string | null; finished_at?: string | null }) => {
+    rows.map(async (row: { id: string; date: string; split_type: string; day: string | null; duration_minutes: number | null; is_completed: boolean; started_at?: string | null; finished_at?: string | null; avg_heart_rate?: number | null; max_heart_rate?: number | null }) => {
       const base = {
         sessionId: row.id,
         date: row.date,
@@ -386,6 +391,7 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
         day: row.day,
         durationMinutes: honestSessionMinutes(row.duration_minutes, row.started_at, row.finished_at, []),
         isCompleted: row.is_completed,
+        heart: heartLine(row.avg_heart_rate, row.max_heart_rate),
         cardio: cardioByDate.get(row.date) ?? [],
       }
       // A failed sets query must render as "couldn't load", never as a

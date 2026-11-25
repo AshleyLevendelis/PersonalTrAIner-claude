@@ -409,6 +409,36 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     return () => { live = false; document.removeEventListener('visibilitychange', onVisible) }
   }, [profile.id, activeSession.date])
 
+  // HEART RATE FROM THE PHONE (his 24 Nov 2026 "1 + 2"; health-heart.ts): the same moments as steps. Today's and
+  // yesterday's finished sessions get their heart rate, and Progress shows the resting figure's week. Loaded only in the
+  // phone app with the switch on; nothing in a browser.
+  const [restingLine, setRestingLine] = useState<string | null>(null)
+  // FITNESS FROM HEART RATE (his "1", 25 Nov 2026; heart-trends.ts): the same steady session at a lower heart rate.
+  const [fitnessLine, setFitnessLine] = useState<string | null>(null)
+  useEffect(() => {
+    if (!profile.id || !activeSession.date || !isPhoneApp()) return
+    const id = profile.id, date = activeSession.date
+    let live = true
+    const pull = () => {
+      void import('@/lib/health-heart')
+        .then(async m => {
+          // A PAIRED STRAP (option 3, strap-live.ts) fills first, so its figure is the one kept where both exist.
+          await m.fillHeartFromStrap(id, date)
+          const watch = m.isHealthHeartConnected()
+          if (watch) await m.syncHeartFromHealth(id, date)
+          // A strap alone gives session figures (so the fitness line) but no resting figure.
+          if (!watch && !(await import('@/lib/strap-live')).pairedStrap()) { if (live) { setRestingLine(null); setFitnessLine(null) } return }
+          const picture = await m.readHeartPicture(id, date)
+          if (live) { setRestingLine(watch ? picture.resting?.line ?? null : null); setFitnessLine(picture.fitness[0]?.line ?? null) }
+        })
+        .catch(() => { /* Progress keeps what it had */ })
+    }
+    pull()
+    const onVisible = () => { if (document.visibilityState === 'visible') pull() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { live = false; document.removeEventListener('visibilitychange', onVisible) }
+  }, [profile.id, activeSession.date])
+
 
   if (!loading && loadError && !data) {
     return (
@@ -795,6 +825,17 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             </div>
           )}
         </div>
+        {restingLine && (
+          <p className="border-b border-[color:var(--hairline)] py-3 text-[0.8125rem]" data-home-resting-hr>
+            <span className="text-[color:var(--role-warn-text)]" aria-hidden>♥ </span>{restingLine}
+          </p>
+        )}
+        {fitnessLine && (
+          <p className="border-b border-[color:var(--hairline)] py-3 text-[0.8125rem]" data-home-fitness-hr>
+            <span className="text-[color:var(--role-warn-text)]" aria-hidden>♥ </span>{fitnessLine}
+            <span className="block text-[0.75rem] text-muted-foreground">Same steady effort, a lower heart rate: your fitness is improving.</span>
+          </p>
+        )}
         <div data-home-volume>
           <PageRow
             className="border-t-0 border-b-0"

@@ -241,6 +241,12 @@ export const APP_DECISIONS: AppDecision[] = [
   { area: 'Training', anchor: { file: 'src/lib/running.ts', token: 'startState' }, also: ['running', 'older', '65'],
     rule: 'From 65 the last four walk-run steps are always done, even for someone who can already run 20 minutes.',
     why: 'Age only adds safeguards.' },
+  { area: 'Training', anchor: { file: 'src/lib/heart-trends.ts', token: 'fitnessTrends' }, numbersFrom: [{ file: 'src/lib/heart-trends.ts', token: 'MIN_FALL' }], also: ['heart rate', 'fitness', 'aerobic', 'getting fitter'],
+    rule: 'Your fitness line compares the same steady session (easy or steady effort, a similar length) over at least four sessions and three weeks, the first two against the last two, and shows only a fall of 3 beats or more.',
+    why: 'The same effort at a lower heart rate is aerobic fitness improving; a rise has too many causes, like heat or a poor night, to say anything true.' },
+  { area: 'Recovery', anchor: { file: 'src/lib/heart-trends.ts', token: 'recoveryFlag' }, numbersFrom: [{ file: 'src/lib/heart-trends.ts', token: 'RAISED_BY' }], also: ['resting heart rate', 'recovery', 'tired', 'fatigue', 'lighter day'],
+    rule: 'When your resting heart rate is 5 or more above your usual on each of the last 3 mornings, the coach offers a lighter session, once, and changes nothing unless you say yes.',
+    why: 'A raised resting heart rate is a common sign of carrying fatigue; your usual is the middle of the 4 to 17 days before, so the raised days never set their own baseline.' },
   { area: 'Training', anchor: { file: 'src/lib/cardio-presets.ts', token: 'cardioPresetsFor' }, also: ['cardio options', 'presets'],
     rule: 'Quick cardio picks follow your kit: a full gym gets incline walk, heavy bag, HIIT bike and Zone 2; everyone else brisk walk, run, bodyweight circuit and Zone 2.',
     why: 'A suggestion you cannot do is not a suggestion.' },
@@ -438,6 +444,10 @@ export const APP_DECISIONS: AppDecision[] = [
 export const APP_DECISIONS_EXEMPT: Record<string, string> = {
   'src/lib/set-parse.ts': 'parses typed workouts; its one CSCS note points at the alias table, which has its own entry',
   'src/lib/types.ts': 'type definitions; the macro default it mentions is decided in macro-calculator.ts',
+  'src/lib/coach-nudge.ts': 'when the coach speaks unprompted; the one coaching rule it carries, the raised resting heart rate, is on the sheet under heart-trends.ts',
+  'src/lib/coach-opener.ts': 'what the coach says first; the one coaching rule it carries, the raised resting heart rate, is on the sheet under heart-trends.ts',
+  'src/lib/strap-live.ts': 'pairs and connects the strap and keeps its readings on the phone; it shows the number and prescribes nothing',
+  'src/lib/heart-strap.ts': 'reads a chest strap over Bluetooth; it only drops readings outside 30-230 bpm, a sensor check, and prescribes nothing',
 }
 
 const MAX_PICKED = 8

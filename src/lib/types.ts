@@ -1128,6 +1128,8 @@ export interface CardioLog {
   duration_minutes: number
   intensity_rpe: number
   avg_heart_rate?: number | null
+  /** The highest heart rate over the session (health-heart.ts, 24 Nov 2026). Absent before its migration. */
+  max_heart_rate?: number | null
   notes?: string | null
   /** How far, in km, only when she gave it (Sam, 20 Oct 2026). Absent on a database without the column yet. */
   distance_km?: number | null

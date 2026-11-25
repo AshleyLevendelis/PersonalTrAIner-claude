@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { connectHealthHeart, disconnectHealthHeart, isHealthHeartConnected } from '@/lib/health-heart'
+import { connectPairedStrap, forgetStrap, pairStrap, pairedStrap, useLiveHeartRate, useStrapState, type PairedStrap } from '@/lib/strap-live'
 import {
   connectHealthSteps, disconnectHealthSteps, healthStoreName, isHealthStepsConnected,
   type HealthPlatform,
@@ -60,6 +62,103 @@ export function HealthStepsSection({ platform, onChanged }: { platform: HealthPl
         </Button>
       )}
       {note && <p role="alert" className="text-[0.75rem] text-[color:var(--role-warn-text)]" data-health-note>{note}</p>}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Profile, "Heart rate from your watch" (his ruling 24 Nov 2026, "1 + 2"). Beside steps, the same shape: drawn only in
+// the phone app, nothing asked until he taps, read only. The words promise only what is built: after a session, and
+// resting heart rate on Home; nothing is prescribed by it.
+// ---------------------------------------------------------------------------
+export function HealthHeartSection({ platform }: { platform: HealthPlatform }) {
+  const store = healthStoreName(platform)
+  const [connected, setConnected] = useState(isHealthHeartConnected())
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+  const connect = async () => {
+    setBusy(true)
+    setNote(null)
+    const r = await connectHealthHeart()
+    setBusy(false)
+    if (r.ok) { setConnected(true); return }
+    setNote(r.reason === 'denied'
+      ? `Heart rate wasn’t allowed. You can allow it in ${store}, then tap again.`
+      : r.reason === 'unavailable'
+      ? `${store} isn’t available on this phone.`
+      : `Couldn’t reach ${store}. Nothing was changed. Try again in a moment.`)
+  }
+  return (
+    <div className="space-y-3 text-sm pt-4 border-t border-[color:var(--hairline)]" data-health-heart={connected ? 'on' : 'off'}>
+      <p className="font-medium text-foreground">Heart rate from your watch</p>
+      <p className="text-muted-foreground">
+        {connected
+          ? `After each session your average and highest heart rate show under it, and Home shows your resting heart rate. It comes from ${store}, which your watch or strap writes to.`
+          : `If a watch or chest strap writes your heart rate to ${store}, the app can show your average and highest heart rate after each session, and your resting heart rate on Home. It reads heart rate only, and writes nothing.`}
+      </p>
+      {connected ? (
+        <Button variant="outline" className="min-h-[44px]" onClick={() => { disconnectHealthHeart(); setConnected(false) }} data-heart-off>Stop reading heart rate</Button>
+      ) : (
+        <Button className="min-h-[44px]" onClick={() => void connect()} disabled={busy} data-heart-connect>
+          {busy ? 'Asking your phone…' : 'Read heart rate'}
+        </Button>
+      )}
+      {note && <p role="alert" className="text-[0.75rem] text-[color:var(--role-warn-text)]" data-heart-note>{note}</p>}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Profile, "Heart rate strap" (option 3, his "then start working on 3", 24 Nov 2026; strap-live.ts). Read straight from
+// the strap while he trains, so the number on the timer and the workout is live. Drawn only in the phone app; nothing
+// is asked of Bluetooth until he taps. The words promise only what is built: a live number, and the session's figure.
+// ---------------------------------------------------------------------------
+export function HeartStrapSection() {
+  const [strap, setStrap] = useState<PairedStrap | null>(pairedStrap())
+  const state = useStrapState()
+  const bpm = useLiveHeartRate()
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+  const find = async () => {
+    setBusy(true)
+    setNote(null)
+    const r = await pairStrap()
+    setBusy(false)
+    if (r.ok) { setStrap(r.strap); return }
+    setNote(r.reason === 'unavailable'
+      ? 'Bluetooth isn’t available on this phone.'
+      : r.reason === 'cancelled'
+      ? null
+      : 'Found it, but couldn’t connect. Check the strap is on and damp, then tap again.')
+    if (r.reason === 'failed') setStrap(pairedStrap())
+  }
+  const status = !strap ? null
+    : bpm != null ? `Connected · ♥ ${bpm}`
+    : state === 'connecting' ? 'Connecting…'
+    : state === 'connected' ? 'Connected · waiting for a reading'
+    : 'Not in range'
+  return (
+    <div className="space-y-3 text-sm pt-4 border-t border-[color:var(--hairline)]" data-heart-strap={strap ? 'paired' : 'none'}>
+      <p className="font-medium text-foreground">Heart rate strap</p>
+      <p className="text-muted-foreground">
+        {strap
+          ? `${strap.name}. While it’s on, the timer and today’s workout show your heart rate live, and each session keeps its average and highest. Readings stay on this phone.`
+          : 'Pair a chest strap or a watch that broadcasts heart rate, and the timer and today’s workout show it live while you train. Each session keeps its average and highest. Readings stay on this phone.'}
+      </p>
+      {status && <p className="text-[0.8125rem] text-foreground" data-heart-strap-status>{status}</p>}
+      {strap ? (
+        <div className="flex flex-wrap gap-2">
+          {state !== 'connected' && state !== 'connecting' && (
+            <Button className="min-h-[44px]" onClick={() => void connectPairedStrap()} data-heart-strap-reconnect>Connect</Button>
+          )}
+          <Button variant="outline" className="min-h-[44px]" onClick={() => { void forgetStrap(); setStrap(null) }} data-heart-strap-forget>Forget this strap</Button>
+        </div>
+      ) : (
+        <Button className="min-h-[44px]" onClick={() => void find()} disabled={busy} data-heart-strap-find>
+          {busy ? 'Looking…' : 'Find my strap'}
+        </Button>
+      )}
+      {note && <p role="alert" className="text-[0.75rem] text-[color:var(--role-warn-text)]" data-heart-strap-note>{note}</p>}
     </div>
   )
 }

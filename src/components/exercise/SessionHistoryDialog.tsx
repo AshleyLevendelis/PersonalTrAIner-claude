@@ -104,6 +104,7 @@ export function SessionHistoryDialog({
                     </p>
                     {/* THE DAY'S CARDIO, AS ITS OWN LINES under the lifting's
                         figures, never added into them (H21). */}
+                    {entry.heart && <p className="text-xs text-muted-foreground tabular-mono" data-testid="history-heart">{entry.heart}</p>}
                     {entry.cardio.map((line, i) => <p key={i} className="text-xs text-muted-foreground" data-testid="history-cardio-line">{line}</p>)}
                   </div>
                   <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${expandedSessionId === entry.sessionId ? 'rotate-180' : ''}`} />
