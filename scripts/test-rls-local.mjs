@@ -340,7 +340,8 @@ try {
     // A RECORD, NOT A DRAFT (22 Nov 2026): a reported coach reply is kept for Ashley to review, so its sender can read
     // and delete it but never rewrite it after sending. Named here, so a table cannot become append-only by forgetting
     // its update policy: everything else must carry all four, and these exactly the three and no update.
-    const APPEND_ONLY = ['coach_reply_reports']
+    // The tester toolkit's two tables (25 Nov 2026) are records of the same kind: what happened, and what a tester said.
+    const APPEND_ONLY = ['coach_reply_reports', 'tester_events', 'tester_reports']
     const wrong = expectScoped
       .map(t => ({ table: t, policies: Number(counts.get(t) ?? 0) }))
       .filter(r => r.policies !== (APPEND_ONLY.includes(r.table) ? 3 : 4))

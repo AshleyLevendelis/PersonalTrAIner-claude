@@ -1211,6 +1211,9 @@ function App() {
       running_base_minutes: typeof profileRow.running_base_minutes === 'number' ? profileRow.running_base_minutes : null,
       // Cardio days a week (cardio-days.ts), absent before its migration: read as none asked.
       cardio_days_per_week: typeof profileRow.cardio_days_per_week === 'number' ? profileRow.cardio_days_per_week : null,
+      // Helping test the app (tester toolkit, 25 Nov 2026): the date they agreed, null when not a tester, and ABSENT
+      // (undefined) before its migration, so the tester log is never switched off by a read that did not say.
+      tester_since: 'tester_since' in profileRow ? (typeof profileRow.tester_since === 'string' ? profileRow.tester_since : null) : undefined,
       // Slice 4's two settings, absent before their migration: read as the defaults.
       meal_variety: profileRow.meal_variety === 'some' || profileRow.meal_variety === 'same' ? profileRow.meal_variety : 'variety',
       show_numbers: profileRow.show_numbers !== false,
