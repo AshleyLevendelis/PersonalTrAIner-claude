@@ -286,6 +286,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             exercisePlan, mesocycle: mesocycle ?? [], planCreatedAt,
             now: getAppNow(profile.id), weekSessions: fresh.weekSessions, today: activeSession.date,
             proteinTarget: fresh.hasNutritionTargets ? fresh.proteinTarget : null,
+            daysAhead: fresh.ahead ?? null,
           }))
         }
       })

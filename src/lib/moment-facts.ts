@@ -23,6 +23,7 @@ import { addDays } from './session-move'
 import { getLocalDateString } from './dev-clock'
 import { supabase } from './supabase'
 import { isMissingColumnError } from './missing-column'
+import type { DaysAhead } from './days-ahead'
 
 export interface FactsAhead {
   trainingWeekdays?: string[]
@@ -41,11 +42,16 @@ export interface FactsAhead {
    * she is behind on a number the app itself would not print.
    */
   proteinTargetG?: number | null
+  /**
+   * WHAT IS COMING UP (25 Nov 2026, his "not proactive enough"): yesterday's, today's and tomorrow's session briefs and
+   * one pattern, keyed by date (days-ahead.ts), so a reminder can name the session, the lift and a clash.
+   */
+  daysAhead?: DaysAhead | null
 }
 
 const SENT_KEY = 'fitplan_moment_facts_sent_v1'
 /** Columns added after the table, each dropped from a write the database does not know yet. */
-const LATER_COLUMNS = ['protein_target_g', 'week_sessions_done', 'week_sessions_planned', 'week_as_of'] as const
+const LATER_COLUMNS = ['protein_target_g', 'week_sessions_done', 'week_sessions_planned', 'week_as_of', 'days_ahead'] as const
 
 /**
  * ONLY WHEN SOMETHING CHANGED. This runs from App and from Home as their data
@@ -65,6 +71,7 @@ export async function sendFactsAhead(profileId: string, facts: FactsAhead): Prom
   if (facts.weekSessionsPlanned !== undefined) row.week_sessions_planned = facts.weekSessionsPlanned
   if (facts.weekAsOf !== undefined) row.week_as_of = facts.weekAsOf
   if (facts.proteinTargetG !== undefined) row.protein_target_g = facts.proteinTargetG
+  if (facts.daysAhead !== undefined) row.days_ahead = facts.daysAhead
 
   let remembered: Record<string, string> = {}
   try { remembered = JSON.parse(localStorage.getItem(SENT_KEY) ?? '{}') } catch { /* private window: send anyway */ }
@@ -105,6 +112,8 @@ export function momentFactsFrom(input: {
   today: string
   /** Today's protein target; null or absent when Home has none to show. */
   proteinTarget?: number | null
+  /** What is coming up (days-ahead.ts), as Home worked it out; absent sends nothing. */
+  daysAhead?: DaysAhead | null
 }): FactsAhead {
   // The LIVE week's pattern, not the week-1 snapshot: after a schedule change from a later week the
   // snapshot still holds the old weekdays, and the phone would be reminding her on days she no longer trains.
@@ -134,5 +143,6 @@ export function momentFactsFrom(input: {
   return {
     trainingWeekdays, planEndsOn, blockEndsOn, proteinTargetG,
     ...(input.weekSessions ? { weekSessionsDone: input.weekSessions.done, weekSessionsPlanned: input.weekSessions.planned, weekAsOf: input.today } : {}),
+    ...(input.daysAhead ? { daysAhead: input.daysAhead } : {}),
   }
 }

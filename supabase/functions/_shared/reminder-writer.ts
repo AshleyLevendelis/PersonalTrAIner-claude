@@ -22,7 +22,9 @@
 //     or the wrong part of the day (today-claim.ts, the chat's own check);
 //   - talk about being an AI;
 //   - more than one emoji;
-//   - not opening "Hey", her WhatsApp shape ("Hey Ashley, are you ready...").
+//   - not opening with a greeting: her WhatsApp shape ("Hey Ashley, are you ready..."), widened 25 Nov 2026 to
+//     the time of day ("Morning Ashley, ...") so every reminder does not start with the same word;
+//   - a message carrying one-tap answers that does not end on a question.
 // Any refusal, a slow or failed call, or no key: the fixed sentence goes.
 //
 // Everything that touches the world is handed in (`call`), so
@@ -33,6 +35,15 @@ import { detectTodayClaim } from './today-claim.ts'
 
 export const MAX_REMINDER_CHARS = 240
 
+/**
+ * WHO IS WRITING (Ashley's brief, 25 Nov 2026: "still robotic, still no personality, still not enthusiastic"): the same
+ * coach as the chat (chat-gemini §0), so a reminder and a reply sound like one person.
+ */
+export const COACH_PERSONA = "You are this person's coach and training partner: sharp, upbeat, grounded and genuinely invested in them. You know your stuff, you have been watching their week, you know what is coming next, and you talk like a real person: contractions, everyday words, real energy about real progress, no fake hype, no corporate filler."
+
+/** A reminder opens with a greeting (her 6 Nov "Hey Ashley" shape, widened 25 Nov 2026 to fit the time of day). */
+export const GREETING = /^(?:hey|hi|morning|good morning|afternoon|good afternoon|evening|good evening)\b/i
+
 /** The part of the day on her clock, in the today-claim check's words. */
 export function partOfDayFor(hour: number): 'morning' | 'afternoon' | 'evening' {
   return hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
@@ -41,13 +52,37 @@ export function partOfDayFor(hour: number): 'morning' | 'afternoon' | 'evening' 
 /** What this moment is for, said to the coach. Only what the app knows. */
 function purpose(moment: CoachMoment, f: MomentFacts): string {
   switch (moment.key) {
-    case 'workout_today': return 'Today is a training day and nothing is logged yet. Get them ready and keen for it.'
+    case 'workout_today': {
+      const t = f.todaySession
+      return t
+        ? `Today's session is ${t.name}${t.lift && t.weight ? `, built around ${t.lift} at ${t.weight}` : ''}, and nothing is logged yet. Name the session, and get them keen for it.`
+        : 'Today is a training day and nothing is logged yet. Get them ready and keen for it.'
+    }
+    case 'load_clash': {
+      const c = f.clash
+      const t = f.todaySession
+      return `Today's session is ${t?.name ?? 'a training session'}${c?.lift ? `, built around ${c.lift}` : ''}, a heavy leg day, and they have ${c?.activity ?? 'a hard class'} ${c?.when === 'yesterday' ? 'yesterday, so their legs may be tired' : 'on the same day'}. Say the clash in a line${c?.when === 'today' ? ', tell them to lift first' : ''}, and offer to trim the extra exercises today while keeping ${c?.lift ?? 'the main lift'} as planned. End on that offer as one short question.`
+    }
+    case 'pattern_spotted': {
+      const p = f.pattern
+      if (p?.kind === 'stuck_lift') return `${p.lift} has been at ${p.weight} for ${p.sessions} sessions with no rep gained. Say it is normal and fixable, and offer the fix. End on that offer as one short question.`
+      if (p?.kind === 'too_hard') return `They have answered "too hard" on ${p.times} lifts in the last week. Say tiredness is building, and offer a lighter next session so they recover. End on that offer as one short question.`
+      return `Their protein has been short on ${p?.days ?? 3} days running. Offer a hand closing the gap, never naming a food. End on that offer as one short question.`
+    }
     case 'session_feel': return `They finished a session ${f.finishedWhen ?? 'earlier'}. Ask how it felt; their answer helps you adjust the next one.`
     case 'session_not_logged': return "Today's planned session is still waiting and the day is getting on. Encourage a session, even a shorter one, without guilt."
     case 'missed_yesterday': return "Yesterday's planned session did not happen. Be kind, no guilt, and ask whether to move it or let it go."
     case 'comeback': return 'Nothing has been logged for three days. Do NOT mention what was missed. Offer one small, easy next step for today, warmly, with no guilt.'
     case 'door_open': return 'Nothing has been logged for two weeks. Say, warmly and with no pressure, that the door is open whenever they want to start again, and that it will start gently. Ask nothing of them.'
-    case 'week_review': return `It is Saturday. This week so far: ${f.weekSessionsDone ?? 0} of ${f.weekSessionsPlanned ?? 0} planned sessions done. Name one thing that went well, give that one number, and offer to adjust next week. No guilt.`
+    case 'week_review': {
+      // WHAT MOVED AND WHAT DRAGGED (25 Nov 2026): the week's bests by name and number, and the one thing to change.
+      const bests = (f.weekBests ?? []).map(b => `${b.lift} ${b.best}`).join(' and ')
+      const p = f.pattern
+      const drag = !p ? '' : p.kind === 'stuck_lift' ? ` What dragged: ${p.lift} has sat at ${p.weight}; offer a fix for next week.`
+        : p.kind === 'too_hard' ? ` What dragged: ${p.times} lifts marked too hard; offer to make their next session lighter.`
+          : ` What dragged: protein short ${p.days} days running; offer a hand with it next week.`
+      return `It is Saturday. This week so far: ${f.weekSessionsDone ?? 0} of ${f.weekSessionsPlanned ?? 0} planned sessions done.${bests ? ` What moved: a new best on ${bests}; name it with its number and sound pleased about it.` : ''}${drag}${drag ? '' : ' Offer to adjust next week.'} No guilt, and end on the one offer as a short question.`
+    }
     case 'plan_week': return 'It is Sunday. Offer to plan next week together: which days suit training, and any meals out. One short question.'
     case 'meal_not_logged': return (f.mealsAccountedToday ?? 0) >= 1
       ? 'Only one meal is logged on Nutrition today. Encourage adding the rest so the day adds up.'
@@ -63,15 +98,17 @@ function purpose(moment: CoachMoment, f: MomentFacts): string {
 export function reminderPrompt(moment: CoachMoment, f: MomentFacts): string {
   const name = (f.name ?? '').trim()
   return [
-    "You are this person's fitness and nutrition coach: warm, encouraging, knowledgeable, in their corner. Write ONE text message to them, the way a good coach texts.",
+    COACH_PERSONA,
+    'Write ONE text message to them, the way a coach who has been watching their week texts. It must give them something: a heads-up, the session, a fix or an offer. Never a message that only checks in.',
     `What it is for: ${purpose(moment, f)}`,
     `It is ${partOfDayFor(f.localHour)} for them.${f.loggedToday ? '' : ' Nothing has been trained or logged today.'}`,
-    `Start with "Hey${name ? ` ${name}` : ''}," and keep it to one or two short sentences, under 200 characters.`,
+    `Start with a greeting that fits the time of day ("Hey", ${f.localHour < 12 ? '"Morning"' : f.localHour >= 17 ? '"Evening"' : '"Afternoon"'})${name ? `, then "${name}"` : ''}, and keep it to one or two short sentences, under 200 characters. Lead with the thing that matters, not with small talk.`,
     'Where it fits, add one short why in plain words, so they learn something.',
+    (moment.chips ?? []).length > 0 ? `It offers something: end on ONE short question, and the app puts these answers under it: ${moment.chips.map(c => `"${c}"`).join(' / ')}. Make the question one those answer.` : '',
     'Rules: no number unless it is one given above; never name a food or a drink; never say they trained, ate or did anything the facts above do not say; no lists, no formatting; at most one emoji; never mention being an AI.',
     `For reference, a plain version: "${moment.text}" Write your own, warmer and more natural; do not copy it.`,
     'Reply with the message only.',
-  ].join('\n')
+  ].filter(Boolean).join('\n')
 }
 
 /** Words that name a food or a drink. A reminder never knows her allergies, so it never names one. */
@@ -95,6 +132,8 @@ export interface LineRules {
   mustOpenHey: boolean
   /** When buttons answer a question, the message must END on exactly that question. */
   mustEndWith?: string | null
+  /** The message carries one-tap answers (25 Nov 2026): it must end on a question. */
+  mustEndQuestion?: boolean
 }
 
 /** Is this coach-written line safe to show in place of the fixed sentence? */
@@ -104,7 +143,8 @@ export function checkCoachLine(raw: string | null | undefined, r: LineRules): Re
   if (text.length > MAX_REMINDER_CHARS) return { ok: false, why: 'too long' }
   if (sentenceCount(text) > 3) return { ok: false, why: 'too many sentences' }
   if (/[\n#*_`[\]]|^\s*[-•\d]+[.)]\s/m.test(text)) return { ok: false, why: 'formatting or a list' }
-  if (r.mustOpenHey && !/^hey\b/i.test(text)) return { ok: false, why: 'does not open "Hey"' }
+  if (r.mustOpenHey && !GREETING.test(text)) return { ok: false, why: 'does not open with a greeting' }
+  if (r.mustEndQuestion && !text.trimEnd().endsWith('?')) return { ok: false, why: 'offers something but does not end on the question its buttons answer' }
   if (r.mustEndWith && !text.toLowerCase().endsWith(r.mustEndWith.toLowerCase())) return { ok: false, why: 'does not end on the question its buttons answer' }
   const allowed = new Set(r.fixed.match(/\d+/g) ?? [])
   const stray = (text.match(/\d+/g) ?? []).filter(n => !allowed.has(n))
@@ -120,7 +160,7 @@ export function checkCoachLine(raw: string | null | undefined, r: LineRules): Re
 
 /** Is this written reminder safe to send in place of the fixed sentence? */
 export function checkReminder(raw: string | null | undefined, moment: CoachMoment, f: MomentFacts): ReminderCheck {
-  return checkCoachLine(raw, { fixed: moment.text, partOfDay: partOfDayFor(f.localHour), trainedToday: f.loggedToday, mustOpenHey: true })
+  return checkCoachLine(raw, { fixed: moment.text, partOfDay: partOfDayFor(f.localHour), trainedToday: f.loggedToday, mustOpenHey: true, mustEndQuestion: (moment.chips ?? []).length > 0 })
 }
 
 export interface WrittenReminder {
@@ -166,7 +206,8 @@ export interface OpenerAsk {
 
 export function openerPrompt(a: OpenerAsk): string {
   return [
-    "You are this person's fitness and nutrition coach: warm, encouraging, knowledgeable, in their corner. They have just opened the chat. Write the first message, the way a good coach texts.",
+    COACH_PERSONA,
+    'They have just opened the chat. Write the first message, the way a coach who has been watching their week texts.',
     `What the app wants said, plainly: "${a.fixed}"`,
     'Say the same thing in your own warm, natural words. Keep every fact exactly as given and add none: no new exercise, session, day, number or food.',
     a.question ? `End with exactly this question, word for word: "${a.question}"` : 'If it asks a question, end on a question.',

@@ -19,7 +19,10 @@ relinkTestOnExit()
 function pushTo(ref, label) {
   console.log(`== Pushing migrations to ${label} (${ref}) ==`)
   link(ref)
-  const status = supabase(['db', 'push', '--linked', '--yes'])
+  // --include-all (25 Nov 2026): two branches merged in either order give a migration dated BEFORE the newest one
+  // already applied (heart rate 20261124180000 behind days_ahead 20261125120000), and without the flag the push
+  // refuses it. test:schema-parity still proves both projects end with the identical set.
+  const status = supabase(['db', 'push', '--linked', '--include-all', '--yes'])
   if (status !== 0) {
     console.error(`\nThe push to ${label} failed. Stopping here.`)
     process.exit(status)

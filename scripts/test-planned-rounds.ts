@@ -162,10 +162,11 @@ async function main() {
   const hero = strip(readFileSync('src/components/exercise/PlannedSessionHero.tsx', 'utf8'))
   check('the day\'s card draws the session card, which hands the row its big Start and hides the boxes while its timer runs or asks',
     /<PlannedSessionHero dayName=\{workout\.day\} focus=\{workout\.focus\} planned=\{planned\} \/>/.test(card)
-      && /<PlannedCardioRow\s+prescription=\{planned\}\s+timer=\{<PlannedSessionStart planned=\{planned\} big \/>\}\s+hideEntry=\{timerBusy\}/.test(hero)
+      && /<PlannedCardioRow\s+prescription=\{planned\}\s+timer=\{notToday \? undefined : <PlannedSessionStart planned=\{planned\} big \/>\}\s+hideEntry=\{timerBusy\}/.test(hero)
       && /const timerBusy = usePlannedTimerBusy\(planned\)/.test(hero))
-  check('...and the rest day\'s optional cardio gets the same Start (24 Nov 2026)',
-    /<PlannedCardioRow prescription=\{cardio\} label="Optional" timer=\{<PlannedSessionStart planned=\{cardio\} \/>\} hideEntry=\{optionalBusy\}/.test(card))
+  // Since 25 Nov 2026 the optional cardio is the same session card under its banner, so the same big Start on its day.
+  check('...and the rest day\'s optional cardio gets the same Start (24 Nov 2026), through the same session card',
+    /<OptionalCardioHero dayName=\{workout\.day\} cardio=\{cardio\} \/>/.test(card) && /<PlannedSessionHero\s+optional\b/.test(card))
   check('the countdown on Tools asks the timed session\'s question', /<PlannedCountdownLog planned=\{countdownSession\} \/>/.test(strip(readFileSync('src/components/ToolsTab.tsx', 'utf8'))))
   const row = strip(readFileSync('src/components/exercise/CardioSetRow.tsx', 'utf8'))
   check('...and the row draws it under the session\'s name, over the boxes', row.indexOf('{!saved && timer}') > row.indexOf('data-testid="cardio-prescription"') && row.indexOf('{!saved && timer}') < row.indexOf('<EntryBoxes', row.indexOf('{!saved && timer}')) && /hideEntry \? null : \(/.test(row))

@@ -530,7 +530,8 @@ console.log('\n3. Nothing has crept back up')
   // the builder is its own chunk). MEASURED 1679 through this gate; 6 kB over it.
   // MOVED 25 Nov 2026, the merge of his own workout with main's live heart rate: 1692. MEASURED 1686 on the merged
   // tree; 6 kB over it.
-  const APP_CHUNK_BUDGET_KB = 1692
+  // MOVED 25 Nov 2026: 1692 -> 1701, that tree merged with the coach-voice branch. MEASURED 1692; 9 kB over it.
+  const APP_CHUNK_BUDGET_KB = 1701
   // 23 Nov 2026, main merged on top: MEASURED 1635, under the line, so it did not move.
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
@@ -855,11 +856,11 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 25 Nov 2026: 3374 -> 3401, the Bluetooth plugin's own chunk, loaded only inside the phone app, and the
   // live heart rate. MEASURED 3392; 9 kB over today.
   // MOVED 25 Nov 2026: 3401 -> 3415, the same merge. MEASURED 3406; 9 kB over today.
-  // MOVED 25 Nov 2026: 3370 -> 3396, his own workout: the workout screen's own chunk (fetched when he opens one) and
-  // the day's list. MEASURED 3390 through this gate; 6 kB over it.
-  // MOVED 25 Nov 2026 again: 3396 -> 3413, "My workouts" and its builder chunk. MEASURED 3407; 6 kB over it.
-  // MOVED 25 Nov 2026, the same merge: 3451. MEASURED 3445 on the merged tree; 6 kB over it.
-  const TOTAL_BUDGET_KB = 3451
+  // MOVED 25 Nov 2026: 3415 -> 3427, the coach-voice branch (deployed from its branch 24 Nov, never on main) merged
+  // into the heart-rate work. MEASURED 3418 on the merged tree; 9 kB over today.
+  // MOVED 25 Nov 2026: 3427 -> 3466, main's own workout (its own budget was 3451, measured 3445) merged on top.
+  // MEASURED 3457 on the merged tree; 9 kB over today.
+  const TOTAL_BUDGET_KB = 3466
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)

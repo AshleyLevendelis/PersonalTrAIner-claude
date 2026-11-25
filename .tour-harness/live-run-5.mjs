@@ -211,11 +211,10 @@ await load('', { tab: 'exercise' })
 await until(`document.querySelectorAll('[data-strip-day]').length > 0`, 12000)
 await wait(800)
 await tapExpr(q(`[data-strip-day="${sugg?.day ?? 'none'}"]`))
-const recov = await until(`(() => { const c = document.querySelector('[data-testid="peek-planned-activity"]'); return c ? { text: c.innerText.replace(/\\s+/g, ' ').trim(), tag: c.querySelector('[data-testid="peek-planned-label-tag"]')?.textContent ?? null, how: c.querySelector('[data-testid="peek-planned-how"]')?.textContent ?? null, dose: c.querySelector('[data-testid="peek-planned-shape"]')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null } : null })()`, 6000)
+// Since 25 Nov 2026 the recovery day is its own card with the cardio as a row (verify:rest-day §11), not a sentence.
+const recov = await until(`(() => { const c = document.querySelector('[data-testid="peek-recovery-day"]'); return c ? { title: c.querySelector('[data-testid="activity-day-title"]')?.textContent.trim() ?? '', figures: c.querySelector('[data-testid="cardio-prescription"]')?.innerText.replace(/\\s+/g, ' ').trim() ?? '' } : null })()`, 6000)
 const head = (sugg?.activity ?? '###').split(' — ')[0]
-// SINCE 25 NOV 2026 the suggested cardio is drawn as the session preview (his "Optional cardio days are blank"):
-// titled Rest day, tagged Optional, the activity on its row with its minutes and effort.
-check('E4. A RECOVERY DAY SHOWS ITS SUGGESTED CARDIO as the session preview: Rest day, Optional, the activity, "20 min easy"', !!recov && recov.text.includes('Rest day') && /^Optional · /.test(recov.tag ?? '') && recov.text.includes(head) && !!recov.how && /\d+ min\s*(easy|steady|hard)/.test(recov.dose ?? ''), { recov, sugg })
+check('E4. A RECOVERY DAY SAYS ITS SUGGESTED CARDIO: its name, its minutes and its effort', !!recov && recov.title === head.split(' (')[0] && /^\d+ min TIME (Easy|Steady|Hard) EFFORT$/i.test(recov.figures), { recov, sugg })
 await shoot('live-run-5-peek-recovery')
 
 const txt = await bodyText()

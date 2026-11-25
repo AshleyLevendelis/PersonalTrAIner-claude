@@ -721,6 +721,10 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   that costs nothing. Anything built on a model JUDGEMENT should be split this
   way and the two halves named separately.
   `cardio-session`, `verify:cardio-session`, `coach-parity`
+- **A rest day's optional cardio is drawn as a session, under an "Optional · rest day" banner: his request 25 Nov 2026**
+  ("so users dont think they are being forced into a workout in their rest day"): the session hero on the day (Start,
+  one-tap log), on a past day within two weeks it logs to THAT day, on a day ahead it is a preview ("You can log it on
+  Saturday."). Skipping it misses nothing. `verify:rest-day` §8b, §11, `test:peek-recovery`
 - **An interval session on the plan runs on the round timer: his ruling 23 Nov 2026, "A"** (over a log line with a
   timer button, from his "start the workout, it starts the round timer ... you log it completed at the end"): a planned
   session keeps its rounds, work and rest; its card has Start (the round timer at those numbers, his countdown), and when
@@ -1868,6 +1872,15 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   uses Firebase (an `fcm:` row in the same phones table, no migration); the same switch, tags and limits as the
   website; the iPhone app says it is not built yet. `test:native-push`, `verify:reminders` §6. Needs the
   `coach-reach-out` and `chat-gemini` deploys and the `FCM_SERVICE_ACCOUNT` secret
+
+- **The coach is a sharp, upbeat, grounded training partner who makes the call, and speaks first with a reason: his
+  brief 25 Nov 2026** ("still robotic, no personality, not enthusiastic, not proactive enough"): WHO YOU ARE first in
+  its instructions, two gears (gym floor on a part-done session), an editor that shortens and never flattens; reminders
+  name the session and lift; a CLASH (hard class next to heavy legs: trim the extras, keep the main lift) and a PATTERN
+  (afternoon, weekly) moment, each switchable inside his limit; one-tap answers under any offer. A reminder may greet by
+  the time of day, not only "Hey" (widens his 6 Nov example). **And the Saturday review says what moved** (his request
+  the same day): this week's bests by name and number, then the one thing that dragged, offered. `test:coach-proactive`, `docs/plans/coach-voice-and-
+  proactivity.md`. Needs the `days_ahead` migration and the `chat-gemini` and `coach-reach-out` deploys and an exam run
 
 ### His rulings of 17 Nov 2026
 - **The coach exam's judge is Fable 5.2: his ruling 17 Nov 2026, "Switch to Fable"** (over keeping Opus 5 and over

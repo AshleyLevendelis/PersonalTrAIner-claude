@@ -139,8 +139,9 @@ const replySwitch = (sw1 ?? []).find(s => s.id === 'reminder-coach_reply')
 check('2b2. a switch for the coach\'s replies, in her words, on to begin with', replySwitch?.label === 'Message me when the coach replies' && replySwitch?.on === true, replySwitch)
 // 13 NOV 2026 (his strategy, slice 2): twelve. The streak and the quiet-week check went; the comeback, the open door,
 // the Saturday review and Sunday's plan the week came in, each switchable.
-check('2b. twelve message switches, each named for what arrives', moments.length === 12 && moments.every(s => s.label && s.label.length > 10), moments.map(s => s.label))
-check('2c. ...all on to begin with (her ruling)', moments.length === 12 && moments.every(s => s.on), moments)
+// 25 Nov 2026: fourteen, with the clash warning and the pattern.
+check('2b. fourteen message switches, each named for what arrives', moments.length === 14 && moments.every(s => s.label && s.label.length > 10), moments.map(s => s.label))
+check('2c. ...all on to begin with (her ruling)', moments.length === 14 && moments.every(s => s.on), moments)
 const pushAsked0 = await ev('window.__push?.asked')
 check('2d. loading the screen never raised the permission prompt', pushAsked0 === 0, { asked: pushAsked0, stubError: await ev('window.__pushStubError ?? null') })
 const rows = await ev(`[...document.querySelectorAll('${SECTION} [role="switch"]')].map(s => Math.round(s.closest('div').getBoundingClientRect().height))`)
@@ -164,7 +165,7 @@ await until(() => ev(`!!document.querySelector('[data-slot="dialog-content"]')`)
 await ev(`(() => { document.querySelector('[data-profile-sheet]') && document.querySelector('[data-profile-back]')?.click(); setTimeout(() => document.querySelector('[data-profile-row="Reminders"]')?.click(), 200) })()`)
   await wait(300)
 const reread = await until(switches, v => Array.isArray(v) && v.length >= 8)
-check('2i. closing and reopening Profile reads it back off', reread?.find(s => s.id === 'reminder-missed_yesterday')?.on === false && reread.filter(s => s.id.startsWith('reminder-')).length === 13, reread)
+check('2i. closing and reopening Profile reads it back off', reread?.find(s => s.id === 'reminder-missed_yesterday')?.on === false && reread.filter(s => s.id.startsWith('reminder-')).length === 15, reread)
 
 // --- 2j. HOW OFTEN: her ruling of 6 Nov 2026, "Three levels" ----------------------------------------------
 const freq = () => ev(`[...document.querySelectorAll('${SECTION} [data-testid="reminders-frequency"] [role="radio"]')].map(b => { const r = b.getBoundingClientRect(); return { f: b.dataset.frequency, on: b.getAttribute('aria-checked') === 'true', text: b.textContent.replace(/\\s+/g, ' ').trim(), h: Math.round(r.height), inView: r.top >= 0 && r.bottom <= innerHeight } })`)

@@ -174,7 +174,9 @@ check('...with its title the rest day\'s size, and the testid kept',
 // suggestion deleted — found by mutation.
 check('...and its prescribed rows, drawn by the shared cardio row — the planned session and the suggestion',
   // The planned session through its own card since 25 Nov 2026 (PlannedSessionHero renders the shared row).
-  /<PlannedSessionHero [^>]*planned=\{planned\}/.test(recoveryBody) && /<PlannedCardioRow\s+prescription=\{planned\}/.test(readFileSync('src/components/exercise/PlannedSessionHero.tsx', 'utf8')) && /<PlannedCardioRow prescription=\{cardio\}/.test(recoveryBody))
+  /<PlannedSessionHero [^>]*planned=\{planned\}/.test(recoveryBody) && /<PlannedCardioRow\s+prescription=\{planned\}/.test(readFileSync('src/components/exercise/PlannedSessionHero.tsx', 'utf8')) 
+  // The suggestion as a session under its optional banner since 25 Nov 2026 (OptionalCardioHero -> PlannedSessionHero).
+  && /<OptionalCardioHero [^>]*cardio=\{cardio\}/.test(recoveryBody) && /<PlannedSessionHero\s+optional\b/.test(cardBare))
 // The violet is the recovery role, from the token rather than the mock's hex.
 check('the rest day wears the violet role from the token, not a literal',
   /var\(--role-ai-text\)/.test(restBody) && !/#B4A9FF/.test(card))

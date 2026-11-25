@@ -22,11 +22,11 @@ const REM3 = 'Hey Ashley, how was the workout this morning?'
 const shownCount = text => ev(`[...document.querySelectorAll('p, span, div')].filter(e => e.children.length === 0 && e.textContent.trim() === ${JSON.stringify(text)}).length`)
 const shortcuts = () => ev(`[...document.querySelectorAll('[data-testid="chat-reminder-shortcut"]')].map(b => { const r = b.getBoundingClientRect(); return { text: b.textContent.trim(), h: Math.round(r.height) } })`)
 /** A server row, written the way coach-reach-out writes one: after everything on screen. */
-const serverWrites = (id, content, moment, shortcut, minutesAfter) => ev(`(() => {
+const serverWrites = (id, content, moment, shortcut, minutesAfter, chips = null) => ev(`(() => {
   const rows = window.__fakeDb.chat_messages
   const newest = rows.map(r => r.created_at).sort().pop()
   rows.push({ id: ${JSON.stringify(id)}, profile_id: rows[0].profile_id, role: 'assistant', status: 'complete', content: ${JSON.stringify(content)},
-    created_at: new Date(Date.parse(newest) + ${minutesAfter} * 60000).toISOString(), action_data: { source: 'reminder', moment: ${JSON.stringify(moment)}, shortcut: ${JSON.stringify(shortcut)} } })
+    created_at: new Date(Date.parse(newest) + ${minutesAfter} * 60000).toISOString(), action_data: { source: 'reminder', moment: ${JSON.stringify(moment)}, shortcut: ${JSON.stringify(shortcut)}${chips ? `, chips: ${JSON.stringify(chips)}` : ''} } })
   return rows.length
 })()`)
 
@@ -68,6 +68,22 @@ await ev(`document.dispatchEvent(new Event('visibilitychange'))`)
 await wait(800)
 check('3c. reading again with nothing new draws nothing twice', (await shownCount(REM1)) === 1 && (await shownCount(REM2)) === 1 && (await shownCount(REM3)) === 1)
 await shoot('coach-texts-you-three')
+
+// --- 3d. A clash warning with its easy out (25 Nov 2026), drawn when the PHONE APP says a message arrived ------------
+const REM4 = "Morning Ashley, Muay Thai yesterday and Lower Body Strength today, so your legs may be tired. Want me to trim the extras and keep Barbell Squats as planned?"
+await serverWrites('rem-4', REM4, 'load_clash', 'exercise', 2, ["Trim today's session", 'Keep it as is'])
+await ev(`window.dispatchEvent(new CustomEvent('coach-message', { detail: { messageId: 'rem-4' } }))`)
+const four = await until(() => shownCount(REM4), v => v === 1, 30)
+check('3d. the phone app\'s own notification makes the chat draw the clash warning at once', four === 1, four)
+const replies = await until(() => ev(`[...document.querySelectorAll('[data-testid="chat-quick-replies"] button')].map(b => { const r = b.getBoundingClientRect(); return { text: b.textContent.trim(), h: Math.round(r.height), inView: r.top >= 0 && r.bottom <= innerHeight } })`), v => Array.isArray(v) && v.length === 2 && v.every(r => r.inView), 30)
+// The chat's one-tap answers are 40px pills with a 44px tap area (hit-slop-44, design 2b), the same as every other.
+check('3e. ...with its yes and its easy no as one-tap answers, on screen',
+  JSON.stringify((replies ?? []).map(r => r.text)) === JSON.stringify(["Trim today's session", 'Keep it as is']) && replies.every(r => r.h >= 40 && r.inView), replies)
+check('3f. ...and its "Open today\'s session" button too', (await shortcuts()).length === 3, await shortcuts())
+await wait(1500)
+const clear = await ev(`(() => { const c = document.querySelector('[data-testid="chat-composer"]')?.getBoundingClientRect(); const b = [...document.querySelectorAll('[data-testid="chat-quick-replies"] button')].map(x => x.getBoundingClientRect()); return { composerTop: c ? Math.round(c.top) : null, buttonsBottom: b.length ? Math.round(Math.max(...b.map(r => r.bottom))) : null } })()`)
+check('3g. ...and not hidden under the message box: the chat settles with them in sight', clear.composerTop != null && clear.buttonsBottom != null && clear.buttonsBottom <= clear.composerTop, clear)
+await shoot('coach-texts-you-clash')
 
 // --- 4. The shortcut ------------------------------------------------------------------------------------------
 await clickAt(`document.querySelector('[data-testid="chat-reminder-shortcut"]')`)
