@@ -28,7 +28,11 @@ Newest first. One line each.
   regex re-anchored); three exam cases (voice-make-the-call, reminder-tap-trim, reminder-tap-keep). NOT PROVEN: that the
   model sounds different (exam after the deploy); a real phone. NOT BUILT: a squeezed-weekday pattern, a weekly review
   that says what moved, iPhone push. Needs the `days_ahead` migration and the `chat-gemini` and `coach-reach-out`
-  deploys.
+  deploys. ALSO FIXED, found by the new screen check (`verify:coach-texts-you` 3d-3g, 3 mutations caught): a coach
+  message the server wrote while the chat was open stopped 53px short of the bottom (101px with its one-tap answers),
+  its shortcut and easy out under the message box; the chat now follows it as its buttons land, only when he was at
+  the bottom. Two checks re-anchored on the deliberate changes (`test:reminder-writer`'s greeting, `verify:reminders`'
+  switch count 12 -> 14).
 - [x] **NO LOPSIDED LUNCH: LUNCH AND DINNER ARE THE SAME SIZE (his "Build it", 24 Nov 2026; the split is mine, CSCS).**
   His report, with Gemini's review of his day: a 1,969 kcal day "on target" served lunch 67 g of protein (about 240 g raw
   tuna), breakfast 51 g, a 23 g snack. TRACED (engine-tracer): not the day search; every macro takes the meal's CALORIE

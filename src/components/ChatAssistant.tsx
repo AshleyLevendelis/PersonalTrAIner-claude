@@ -2004,7 +2004,25 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         .limit(PAGE_SIZE)
       if (!data || data.length === 0) return
       const loaded = data.reverse().map(rowToMessage)
+      // FOLLOW A MESSAGE THAT ARRIVES WHILE HE IS AT THE BOTTOM, buttons and all (25 Nov 2026, found by
+      // verify:coach-texts-you): a coach message written by the server and drawn while the chat was open stopped 53px
+      // short (101px with its one-tap answers), its shortcut and its easy out under the message box. Its buttons draw
+      // a beat after the bubble, so the follow is repeated as they land; only when he was at the bottom before.
+      const wasAtBottom = isNearBottomRef.current || checkIfNearBottom()
       setMessages(prev => addServerMessages(prev, loaded))
+      if (wasAtBottom) {
+        for (const ms of [60, 350, 900]) {
+          setTimeout(() => {
+            const el = scrollRef.current
+            if (!el || !isNearBottomRef.current && !checkIfNearBottom()) return
+            isNearBottomRef.current = true
+            el.scrollTo({ top: el.scrollHeight, behavior: 'instant' })
+            selfScrollTopRef.current = el.scrollTop
+            followedHeightRef.current = el.scrollHeight
+            setShowScrollPill(false)
+          }, ms)
+        }
+      }
     } catch (err) {
       console.error('Re-reading the chat failed:', err)
     }

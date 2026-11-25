@@ -96,7 +96,7 @@ export function reminderPrompt(moment: CoachMoment, f: MomentFacts): string {
     `It is ${partOfDayFor(f.localHour)} for them.${f.loggedToday ? '' : ' Nothing has been trained or logged today.'}`,
     `Start with a greeting that fits the time of day ("Hey", ${f.localHour < 12 ? '"Morning"' : f.localHour >= 17 ? '"Evening"' : '"Afternoon"'})${name ? `, then "${name}"` : ''}, and keep it to one or two short sentences, under 200 characters. Lead with the thing that matters, not with small talk.`,
     'Where it fits, add one short why in plain words, so they learn something.',
-    moment.chips.length > 0 ? `It offers something: end on ONE short question, and the app puts these answers under it: ${moment.chips.map(c => `"${c}"`).join(' / ')}. Make the question one those answer.` : '',
+    (moment.chips ?? []).length > 0 ? `It offers something: end on ONE short question, and the app puts these answers under it: ${moment.chips.map(c => `"${c}"`).join(' / ')}. Make the question one those answer.` : '',
     'Rules: no number unless it is one given above; never name a food or a drink; never say they trained, ate or did anything the facts above do not say; no lists, no formatting; at most one emoji; never mention being an AI.',
     `For reference, a plain version: "${moment.text}" Write your own, warmer and more natural; do not copy it.`,
     'Reply with the message only.',
@@ -152,7 +152,7 @@ export function checkCoachLine(raw: string | null | undefined, r: LineRules): Re
 
 /** Is this written reminder safe to send in place of the fixed sentence? */
 export function checkReminder(raw: string | null | undefined, moment: CoachMoment, f: MomentFacts): ReminderCheck {
-  return checkCoachLine(raw, { fixed: moment.text, partOfDay: partOfDayFor(f.localHour), trainedToday: f.loggedToday, mustOpenHey: true, mustEndQuestion: moment.chips.length > 0 })
+  return checkCoachLine(raw, { fixed: moment.text, partOfDay: partOfDayFor(f.localHour), trainedToday: f.loggedToday, mustOpenHey: true, mustEndQuestion: (moment.chips ?? []).length > 0 })
 }
 
 export interface WrittenReminder {
