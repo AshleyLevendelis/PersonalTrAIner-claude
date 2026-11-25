@@ -749,6 +749,8 @@
     "test:cardio-days": "tsx scripts/test-cardio-days.ts",
     "test:planned-rounds": "tsx scripts/test-planned-rounds.ts",
     "verify:cardio-days": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/cardio-days.mjs",
+    "test:own-workout": "tsx scripts/test-own-workout.ts",
+    "verify:own-workout": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/own-workout.mjs",
     "verify:planned-rounds": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/planned-rounds.mjs",
     "test:account-auth": "tsx scripts/test-account-auth.ts",
     "verify:welcome": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/welcome.mjs",

@@ -494,7 +494,12 @@ export function UnplannedCardioEntry({
   saveVerb = 'Log',
   defaultMinutes,
   onEaseOffQuestion,
+  date: forDate,
 }: {
+  /**
+   * THE DAY IT IS LOGGED ON, when it is not today: his own workout logged after the fact (25 Nov 2026). Omitted, today.
+   */
+  date?: string
   picks: readonly CardioPick[]
   /** Index into picks to start on, or null for nothing chosen. */
   initialPick?: number | null
@@ -513,7 +518,8 @@ export function UnplannedCardioEntry({
    */
   onEaseOffQuestion?: (question: EaseOffQuestion) => void
 }) {
-  const { profileId, date } = useActiveSession()
+  const { profileId, date: today } = useActiveSession()
+  const date = forDate ?? today
   const [pick, setPick] = useState<number | 'other' | null>(initialPick)
   const [otherName, setOtherName] = useState('')
   const [minutes, setMinutes] = useState('')

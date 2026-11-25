@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button'
 import { X } from 'lucide-react'
 import { ReadOnlyDayList } from './ReadOnlyDayList'
 import { whatYouDid } from '@/lib/session-derive'
+import { splitActivity } from '@/lib/cardio-lines'
 import { plannedSessionRow } from '@/lib/planned-rounds'
 import { LoadBadgeView, SetBar, Swatch } from './ExerciseBar'
 import type { ExerciseSetLog, PlannedActivity, WorkoutDay } from '@/lib/types'
@@ -151,14 +152,21 @@ export function PeekPanel({
  * lift's weight sits, one bar segment per round and the legend. Read-only, like the peek above it; Start is on the
  * day itself (his "Keep it as is", the same night).
  */
-export function PlannedActivityPeek({ dayName, focus, planned, onExit }: { dayName: string; focus: string; planned: PlannedActivity; onExit: () => void }) {
+export function PlannedActivityPeek({ dayName, focus, planned, onExit, optional }: {
+  dayName: string; focus: string; planned: PlannedActivity; onExit: () => void
+  /**
+   * A REST DAY'S OPTIONAL CARDIO, DRAWN THE SAME WAY (25 Nov 2026, his "Optional cardio days are blank"): Saturday's
+   * suggested ride was one grey sentence. It is the same preview, titled as the rest day it is and marked Optional.
+   */
+  optional?: boolean
+}) {
   const row = plannedSessionRow(planned)
   return (
     <div className="rounded-xl bg-card" data-testid="peek-planned-activity">
       <div className="flex items-start justify-between gap-2.5 px-4 pt-3.5 pb-3 border-b">
         <div className="min-w-0">
           <span className="text-[0.65625rem] uppercase tracking-[.2em] text-muted-foreground">{dayName}</span>
-          <p className="mt-1.5 text-[1.875rem] font-bold leading-[1.05] tracking-[-.03em]">{focus || row.name}</p>
+          <p className="mt-1.5 text-[1.875rem] font-bold leading-[1.05] tracking-[-.03em]">{optional ? 'Rest day' : focus || row.name}</p>
           <p className="mt-1.5 text-[0.75rem] text-muted-foreground" data-testid="hero-meta">{row.meta}</p>
         </div>
         <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={onExit} aria-label="Close" data-testid="peek-planned-close">
@@ -166,7 +174,7 @@ export function PlannedActivityPeek({ dayName, focus, planned, onExit }: { dayNa
         </Button>
       </div>
       <div className="flex flex-col gap-2.5 px-4 py-3">
-        <span className="ds-label-compact" data-testid="peek-planned-label-tag">{row.label}</span>
+        <span className="ds-label-compact" data-testid="peek-planned-label-tag">{optional ? `Optional · ${row.label}` : row.label}</span>
         <div className="flex flex-col py-3">
           <span className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
             <span className="min-w-[120px] flex-1 text-[0.96875rem] font-semibold leading-[1.3]" data-testid="peek-planned-line">{row.name}</span>
@@ -187,6 +195,11 @@ export function PlannedActivityPeek({ dayName, focus, planned, onExit }: { dayNa
               </span>
             )}
           </span>
+          {/* HOW TO DO IT, when the name carries it ("conversational pace, ~60-70% max HR"): a steady session's protocol
+              is the instruction, and the row above shows only the name. Intervals already show it as their shape. */}
+          {row.label === 'Cardio' && splitActivity(planned.activity).protocol && (
+            <p className="mt-2 text-[0.8125rem] leading-[1.45] text-foreground" data-testid="peek-planned-how">{splitActivity(planned.activity).protocol}</p>
+          )}
           {planned.reason && <p className="mt-2.5 text-[0.8125rem] leading-[1.5] text-muted-foreground" data-testid="peek-planned-reason">{planned.reason}</p>}
         </div>
       </div>

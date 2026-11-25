@@ -2,78 +2,24 @@
 
 Newest first. One line each.
 
-- [x] **REST-DAY CARDIO IS DRAWN AS A SESSION, UNDER AN "OPTIONAL · REST DAY" BANNER (25 Nov 2026, his follow-up with
-  his Wednesday Assault Bike card: "It should look more like this. This but with a banner to say its optional, so users
-  dont think they are being forced into a workout in their rest day").** Today's optional cardio and any other day's now
-  use the session hero main shipped the same day (`PlannedSessionHero`): the name as the title (the choices and pace
-  under it, `optionalCardioTitle`), the minutes and effort as figures, one big Start and "Or log it yourself" on the
-  day, and a banner FIRST, in the recovery colour: "Optional · rest day. Only if you feel like moving. Skip it and
-  nothing is missed: rest is the plan." (the wording is mine; his to change). A past day logs to that day with no Start
-  and no "Change for today"; a day ahead shows the figures and "You can log it on Saturday." with no Start and no boxes.
-  `verify:rest-day` §8b and §11 re-anchored on the banner and the figures (removing the banner: 3 caught), `test:rest-day-card`
-  and `test:planned-rounds` re-anchored (dropping `optional`: caught by each). Merged with main the same day; the size
-  budgets moved to the merged tree's measured 1670 and 3378 kB. Frontend only.
-  The pre-merge sweep found two more, both fixed: the two-week window was cut from a UTC date string (`test:local-dates`;
-  now built from the date's parts, 2 of 2 mutations caught), and the clash rule in `days-ahead.ts` had no line on the
-  why sheet (`test:app-decisions`; added under Recovery).
-- [x] **ANOTHER DAY'S REST-DAY CARDIO IS A ROW, LOGGABLE ON A PAST DAY (25 Nov 2026, his report with a screenshot of
-  Saturday: "Why do rest days look like this. The optional rest day exercises should be loggable like other
-  exercises").** Opened ON the day, a recovery day has been its card with a loggable Optional row since 24 Sep; opened
-  from the strip on any OTHER day it was one grey sentence ("Saturday is a rest day. Optional: ... · 39 min · Easy.").
-  Now the peek is the same card (`PeekRecoveryDay`): the same head, the same Optional row. Which days log it
-  (`optionalCardioMode`, mine): today and past days up to two weeks back log it TO THAT DAY (the chat's 19 Nov rule for
-  an earlier day); a day to come shows the row and "You can log it on Saturday." with no boxes, as a peeked training
-  day's exercises are read-only before their day; older is read-only. Decided unprompted: not logging ahead, because
-  nothing done yet can be counted (his "a missed day stays missed" and the week counts read logs by date). The row's
-  `onDate` reads and writes that date's logs. `test:peek-recovery` (12 checks, 7 of 7 mutations caught),
-  `verify:rest-day` §11 (7 checks; mutations below), `verify:live-run-5` E4 and `verify:qa-training` T11 re-anchored to
-  the card. NOT checked: the strip's mark for that day after a past-day log (it read "–" in the screenshot both before
-  and after; whether an optional cardio log should mark a rest day is unruled). Frontend only.
-- [x] **THE SATURDAY REVIEW SAYS WHAT MOVED (25 Nov 2026, his "build the weekly review that says what moved").** It only
-  counted sessions ("4 of 4 sessions done. Anything you'd change?"). Now: Home sends this week's bests ahead with the
-  days (`weekBestsOf`, from the records Home already lists, this Monday-to-Sunday week only, at most two, each said
-  through `personalBest` so a reps best is never a weight); the review names them ("all 4 sessions done, and a new best
-  on Barbell Squats: 85kg × 5"), then the ONE thing that dragged from the pattern finders, as an offer ("Barbell Squats
-  has sat at 80kg though. Want a fix for it next week?"), with its one-tap yes and no; with nothing dragged it is pleased
-  and offers "Look back at my week" / "All good"; with nothing moved and nothing dragged, the old sentence word for word.
-  On a review Saturday the pattern message waits (the review carries it). A week that did not go to plan is still said
-  with no guilt. The reminder writer is told what moved and what dragged. Mine: two bests at most, so the message stays a
-  text; "this week" is Monday to Sunday, his 15 Oct ruling. No migration (rides in `days_ahead`). `test:coach-proactive`
-  §9 (16 checks; 14 mutations, all caught, one only after the fixture put last week's record first so "this week only"
-  binds); `test:coach-moments` taught that the review carries the pattern. Needs the `days_ahead` migration and the
-  `chat-gemini` and `coach-reach-out` deploys, as the voice work does.
+- [x] **THE COACH-VOICE WORK WAS NEVER ON MAIN, AND THE HEART-RATE MIGRATION NEVER APPLIED (25 Nov 2026)**. The 24 Nov
+  coach-voice branch (`ccr-74a169c3-gto5y6`: training-partner voice, days ahead, the Saturday review, rest-day cardio)
+  was deployed to production FROM ITS BRANCH and never merged. Every chat-gemini deploy from main after it (the why
+  sheet v114, the plank fix v115, heart rate v116) put main's older coach back, so the live coach lost the voice work
+  from v114 on; coach-reach-out kept it. My error: I handed deploys from main without checking that branch was in main.
+  And `db:push-both` refused heart rate (20261124180000) and cardio days (20261124160000), because days_ahead
+  (20261125120000), applied from that branch, is dated after them and was absent from main; parity still read "77,
+  identical" because both projects lacked the same two. Fixed: the branch merged in; `db:push-both` passes
+  `--include-all` (dry run against TEST: exactly those two would apply); the why sheet gained the leg-sport clash
+  entry the merge's `days-ahead.ts` needed (`test:app-decisions` was the one merge-caused failure); the total bundle
+  budget 3415 -> 3427 (measured 3418). Sweep of the 453 checks reading the merged files: 400 pass, 50 fail, 49 of them
+  fail identically on a clean checkout of main on this Windows machine (line endings, spawn), the 50th fixed. Not run:
+  `test:quality`, `test:audit`. Needs: `db:push-both`, chat-gemini prod and TEST deploys, then the exam.
 
-- [x] **THE COACH'S VOICE AND PROACTIVITY (25 Nov 2026, his "still robotic, still no personality, still not
-  enthusiastic, and still not proactive enough", with a brief of his and Gemini's; "Review, build but also add in what
-  you think will make it better").** `docs/plans/coach-voice-and-proactivity.md`. FOUND FIRST: the coach's
-  instructions defined it by prohibitions; the second-pass editor's job ("drop everything else") cut exactly the
-  reaction, opinion and energy he is missing; the reminder writer was told only "today is a training day", so the best
-  it could say was "are you ready for your session today?"; and an offer had no one-tap answer. BUILT: a WHO YOU ARE
-  section first in the coach's instructions (sharp, upbeat, grounded; makes the call; real energy earned; two gears,
-  gym floor keyed to a part-done session; spots patterns; four say/don't-say pairs); the editor shortens and never
-  flattens; Home sends yesterday's, today's and tomorrow's session briefs and one pattern ahead (`days-ahead.ts`, the
-  `days_ahead` column); the morning reminder names the session and lift; two NEW switchable moments inside his daily
-  limit: a CLASH (heavy leg day with a hard class that day or the day before: trim the extras, keep the main lift; it
-  replaces that morning's plain reminder and is the chat's hello) and a PATTERN (stuck lift, too-hard piling up,
-  protein short; afternoon, once a week); one-tap answers under any offer, kept on the chat row, each mapped in the
-  coach's instructions to a tool that exists; the reminder writer gets the persona, the facts, a time-of-day greeting
-  and must end on the question its buttons answer. DECISIONS: upbeat-grounded over dry (his brief); a greeting that fits
-  the time over always "Hey" (widens his 6 Nov example, flagged to him); the clash rule and the trim are mine (CSCS):
-  hard leg-dominant conditioning, running or combat on the day of or the day before a lower-body main lift is where
-  fatigue and interference cost the lift most, and the standard answer (his 13 Sep shortening ruling too) keeps the
-  main lift and cuts accessory volume; gentle activity is never a clash. CSCS review: (1) no prescription changes
-  unless he taps the trim, which is the existing shortest version; (2) nothing taken away; (3) fundamentals untouched;
-  (4) no floor or ceiling moved; (5) in scope. The briefs and pattern finders load only when Home works them out, off
-  the first download; after merging main (whose own move took the first-paint budget to 637) it measures 634 of 637. `test:coach-proactive` (72 checks, 22
-  mutations, all caught); `test:coach-moments` and `test:coach-nudge` taught the two moments (one mechanism-pinned
-  regex re-anchored); three exam cases (voice-make-the-call, reminder-tap-trim, reminder-tap-keep). NOT PROVEN: that the
-  model sounds different (exam after the deploy); a real phone. NOT BUILT: a squeezed-weekday pattern, a weekly review
-  that says what moved, iPhone push. Needs the `days_ahead` migration and the `chat-gemini` and `coach-reach-out`
-  deploys. ALSO FIXED, found by the new screen check (`verify:coach-texts-you` 3d-3g, 3 mutations caught): a coach
-  message the server wrote while the chat was open stopped 53px short of the bottom (101px with its one-tap answers),
-  its shortcut and easy out under the message box; the chat now follows it as its buttons land, only when he was at
-  the bottom. Two checks re-anchored on the deliberate changes (`test:reminder-writer`'s greeting, `verify:reminders`'
-  switch count 12 -> 14).
+- [x] **YOUR OWN WORKOUT: FIVE THINGS THE PRE-MERGE SWEEP FOUND (25 Nov 2026), each a standing rule the build had missed, none a crash**. (1) A set must go through the one write path in the session hook: the workout screen saved sets itself, so it could not break the plan's "a logged set opens the session" behaviour but sat outside the rule `test:no-forked-state` holds. Now `logOwnSet` in the hook (the same write, never opening the plan's session) and the hook's own delete. (2) Cardio is logged by the one shared row on every screen (his 24 Sep ruling): the workout had its own copy of the boxes. Now it uses the shared row, which gained a `date` so a past day's cardio is logged to that day; a logged cardio reads back with an Undo while the store can take it back. (3) The rest's "−15" and "+15" were announced as bare "button": now "15 seconds less rest" / "more rest". (4) "Download my data" did not include the new saved workouts table: it does. (5) The why sheet had no lines for the four own-workout decisions (90 s starting rest, 3 x 8-10 for a new exercise, own sets counting as ordinary sets, a rest day marked trained but a plan day left the plan's): four entries, so the coach answers "why" from the app's reasons (needs the `chat-gemini` deploy). The gates that caught each are their own proof of catching it. `verify:own-workout` re-pointed at the shared row (48 checks): D6 (a past day's cardio lands on that day) caught its mutation, and the separate-session rule (a ticked own set never starts the plan's session) is caught by E3. The pre-merge sweep: 447 logic checks and the 77 Exercise-tab screen checks, 518 passed; the 6 failures were these 5 and the exam. Also seen, not this work's: `test:coach-exam-fresh` is red on main (the coach changed on 25 Nov without an exam run; his machine).
+- [x] **YOUR OWN WORKOUT, STEP 2: "MY WORKOUTS", BUILT AHEAD, SAVED, PUT ON A DAY (his request 25 Nov 2026, "Add squat, add bench press, add deadlift, rest ... Have it all ready, and you go to the gym and you just start"; his ruling the same day, "Both": a saved list started on any day AND optionally put on a day)**. Start now opens a choice: "Empty workout" or one of his saved workouts. "Build a new workout": a name, each exercise with sets (1-10), reps as he writes them, an optional weight and his rest, cardio with minutes, reorder and remove; the pencil edits or deletes. A day ahead offers "Plan a workout" (pick one, or build one there and it lands on that day; "Take off" removes it). On the day it reads "Planned · your workout" with Start (or "Log it" on a past day); started, it opens ready, his sets in the boxes numbered after the day's, nothing logged until a tick, and the planned card goes. STORED PHONE FIRST (a gym with no signal) and in a new `own_workouts` table where phones meet: the newer edit wins, a deletion is kept as removed so another phone cannot copy it back; before the migration everything works on the phone that made it and the choice says "Saved on this phone". CSCS, mine: a new exercise goes in at 3 sets of 8-10 with 90 s rest. `own-workout-plans.ts`, `OwnPlanEditor.tsx`, `OwnWorkoutDay.tsx`, migration `20261125130000_own_workouts.sql` (renamed from 20261125120000 on merge: that stamp was already days_ahead's, so the database would have counted it applied and skipped it); `test:own-workout` (50 checks; 10 more mutations, 10 caught, one only after a check was made null-safe so it failed rather than crashed), `verify:own-workout` (47 checks; 9 more mutations, 9 caught), `test:rls-local` §11 (5 checks against a real Postgres that ran every migration; 2 mutations of the new table's rules, both caught); screenshot read. NEEDS the migration on his machine for saved workouts to reach a second phone. Not built: a dot on the week strip for a planned workout of his own; step 1's finished-workout records stay on the phone; the coach (step 3). Frontend plus one migration.
+- [x] **YOUR OWN WORKOUT, STEP 1: START ONE ON ANY DAY, OR LOG ONE AFTER THE FACT (his request 25 Nov 2026: "on a blank day, on an empty day, you should just be able to start exercising ... add it ... put in the reps, put in the time ... start your own rest timer ... finish the rest time ... Likewise, you can log it after you've done it ... on a blank day, or even on a day that you've trained once"; and "The I also did button just adds sets to the existing workout though rather than a separate workout")**. WHAT WAS THERE (traced first): "I also did…" sat only under a training day's session and added a name to THAT session; a rest day could log cardio and borrow a session, never a lift; "I did it, not in the app" logged only the plan's own exercises; nothing could be saved ahead. BUILT: under every day's card, "Start your own workout" (a day with no session of the plan's), "Start a separate workout" (beside the plan's), "Log a workout you did" (a past day); nothing a day ahead yet. Full screen, its own chunk: add an exercise from the catalogue (or a name it does not know), sets of weight x reps ticked as you go and saved there and then (tap again to take one back), "Add set" filled from the last, YOUR OWN REST (90 s to start, 30 s to 5 min, kept per exercise, Start and Done by hand, never automatic: he asked to run it himself), cardio with minutes, km and Easy/Steady/Hard (asked, never chosen for him), a name, Finish. A past day has no ticks or timers and one Save, written at that day's noon. The day lists each workout of his own with what was saved in it; one opened and closed empty leaves nothing. DECIDED, MINE (CSCS and mechanics, basis in `docs/plans/own-workouts.md`): its sets are ordinary sets, so history, bests and the plan's next weight for that lift read them; their numbers run on after every set already on that date for that lift (the database keys a set by date, lift and number, so a second workout's "set 1" would have written over the plan's); finishing marks a day with no plan session trained, and leaves a plan day the plan's (his 22 Oct "count it as today's workout is the option, never the default"). HIS RULING THE SAME DAY, for step 2, from three options: **"Both"** (a saved "My workouts" list started on any day, AND optionally put on a day). `own-workout.ts`, `OwnWorkoutDay.tsx`, `OwnWorkoutSheet.tsx`; `test:own-workout` (32 checks; 8 mutations, 8 caught, one only after its fixture was made a list that is not a list), `verify:own-workout` (31 checks; 16 mutations: 15 caught, 1 did not apply on screen and is held by `test:own-workout` instead; one MISSED until a day-ahead check was added; two absence checks had been asking the browser for an element by value, which is always empty, and passed vacuously until rewritten); screenshots read (the boxes were invisible on the card and "km km" was doubled; both fixed). Bundle budgets moved with measurements recorded. NOT IN STEP 1, named: the workout's name and list live on the phone that made it (the sets are in the database); a lift in both the plan's session and his own on one day shows in both lists; no "count this as today's workout" yet; a saved past-day set is not edited here; the coach cannot build or start one yet (step 3). Frontend only.
+- [x] **A REST DAY'S OPTIONAL CARDIO, LOOKED AT AHEAD, IS DRAWN AS THE SESSION PREVIEW (his report 25 Nov 2026, screenshot of Saturday: "Optional cardio days are blank, with nothing to fill in")**. Saturday read as one grey sentence ("Saturday is a rest day. Optional: Zone 2 Aerobic Base ... · 39 min · Easy."). Now the same card as a planned cardio day a day early: the day, "Rest day", the minutes, an "Optional · Cardio" tag, the activity with its effort where a lift's weight sits, the bar and "39 min easy", how to do it ("conversational pace, ~60-70% max HR", the part of the name after the dash, which no preview drew before, planned sessions included) and the reason. No Start a day early (his "Keep it as is"); on the day the rest-day card already has a Start and a one-tap log (24 Nov). Layout only. `verify:live-run-5` E4 re-pointed (4 mutations: 3 caught, 1 equivalent on its fixture, whose plan already names the day "Rest day"); `verify:planned-rounds` 63 checks still pass; screenshot read. His wider ask in the same message (start, plan or log a workout of his own on any day) is planned separately: see the next entry when written. Frontend only.
 - [x] **A NEW PLAN AND THE HEART RATE SETTINGS (25 Nov 2026, found by the pre-merge sweep)**. `test:reset-clears-draft`
   failed: three new phone-storage keys (the watch switch, the paired strap, the strap's raw readings) were not
   classified. Decided (mine, mechanical): all three KEPT by a New Plan. The switch and the strap are the phone's, as the
@@ -167,6 +113,78 @@ Newest first. One line each.
   (6 checks, 3 mutations: 2 caught on screen, the third, the sync's own switch check, is behind the screen's own check
   and caught by `test:health-heart`), `test:phone-app`. NOT proven: a real watch on his phone; iPhone (not built);
   the coach is not told these figures yet. NEXT: 3, live heart rate from a Bluetooth strap during a session.
+- [x] **REST-DAY CARDIO IS DRAWN AS A SESSION, UNDER AN "OPTIONAL · REST DAY" BANNER (25 Nov 2026, his follow-up with
+  his Wednesday Assault Bike card: "It should look more like this. This but with a banner to say its optional, so users
+  dont think they are being forced into a workout in their rest day").** Today's optional cardio and any other day's now
+  use the session hero main shipped the same day (`PlannedSessionHero`): the name as the title (the choices and pace
+  under it, `optionalCardioTitle`), the minutes and effort as figures, one big Start and "Or log it yourself" on the
+  day, and a banner FIRST, in the recovery colour: "Optional · rest day. Only if you feel like moving. Skip it and
+  nothing is missed: rest is the plan." (the wording is mine; his to change). A past day logs to that day with no Start
+  and no "Change for today"; a day ahead shows the figures and "You can log it on Saturday." with no Start and no boxes.
+  `verify:rest-day` §8b and §11 re-anchored on the banner and the figures (removing the banner: 3 caught), `test:rest-day-card`
+  and `test:planned-rounds` re-anchored (dropping `optional`: caught by each). Merged with main the same day; the size
+  budgets moved to the merged tree's measured 1670 and 3378 kB. Frontend only.
+  The pre-merge sweep found one more, fixed after main took it in: the two-week window was cut from a UTC date string
+  (`test:local-dates`; now built from the date's parts, 2 of 2 mutations caught). The why-sheet line for the clash rule
+  that sweep also asked for was written on main too; the branch's copy was dropped as a duplicate.
+- [x] **ANOTHER DAY'S REST-DAY CARDIO IS A ROW, LOGGABLE ON A PAST DAY (25 Nov 2026, his report with a screenshot of
+  Saturday: "Why do rest days look like this. The optional rest day exercises should be loggable like other
+  exercises").** Opened ON the day, a recovery day has been its card with a loggable Optional row since 24 Sep; opened
+  from the strip on any OTHER day it was one grey sentence ("Saturday is a rest day. Optional: ... · 39 min · Easy.").
+  Now the peek is the same card (`PeekRecoveryDay`): the same head, the same Optional row. Which days log it
+  (`optionalCardioMode`, mine): today and past days up to two weeks back log it TO THAT DAY (the chat's 19 Nov rule for
+  an earlier day); a day to come shows the row and "You can log it on Saturday." with no boxes, as a peeked training
+  day's exercises are read-only before their day; older is read-only. Decided unprompted: not logging ahead, because
+  nothing done yet can be counted (his "a missed day stays missed" and the week counts read logs by date). The row's
+  `onDate` reads and writes that date's logs. `test:peek-recovery` (12 checks, 7 of 7 mutations caught),
+  `verify:rest-day` §11 (7 checks; mutations below), `verify:live-run-5` E4 and `verify:qa-training` T11 re-anchored to
+  the card. NOT checked: the strip's mark for that day after a past-day log (it read "–" in the screenshot both before
+  and after; whether an optional cardio log should mark a rest day is unruled). Frontend only.
+- [x] **THE SATURDAY REVIEW SAYS WHAT MOVED (25 Nov 2026, his "build the weekly review that says what moved").** It only
+  counted sessions ("4 of 4 sessions done. Anything you'd change?"). Now: Home sends this week's bests ahead with the
+  days (`weekBestsOf`, from the records Home already lists, this Monday-to-Sunday week only, at most two, each said
+  through `personalBest` so a reps best is never a weight); the review names them ("all 4 sessions done, and a new best
+  on Barbell Squats: 85kg × 5"), then the ONE thing that dragged from the pattern finders, as an offer ("Barbell Squats
+  has sat at 80kg though. Want a fix for it next week?"), with its one-tap yes and no; with nothing dragged it is pleased
+  and offers "Look back at my week" / "All good"; with nothing moved and nothing dragged, the old sentence word for word.
+  On a review Saturday the pattern message waits (the review carries it). A week that did not go to plan is still said
+  with no guilt. The reminder writer is told what moved and what dragged. Mine: two bests at most, so the message stays a
+  text; "this week" is Monday to Sunday, his 15 Oct ruling. No migration (rides in `days_ahead`). `test:coach-proactive`
+  §9 (16 checks; 14 mutations, all caught, one only after the fixture put last week's record first so "this week only"
+  binds); `test:coach-moments` taught that the review carries the pattern. Needs the `days_ahead` migration and the
+  `chat-gemini` and `coach-reach-out` deploys, as the voice work does.
+
+- [x] **THE COACH'S VOICE AND PROACTIVITY (25 Nov 2026, his "still robotic, still no personality, still not
+  enthusiastic, and still not proactive enough", with a brief of his and Gemini's; "Review, build but also add in what
+  you think will make it better").** `docs/plans/coach-voice-and-proactivity.md`. FOUND FIRST: the coach's
+  instructions defined it by prohibitions; the second-pass editor's job ("drop everything else") cut exactly the
+  reaction, opinion and energy he is missing; the reminder writer was told only "today is a training day", so the best
+  it could say was "are you ready for your session today?"; and an offer had no one-tap answer. BUILT: a WHO YOU ARE
+  section first in the coach's instructions (sharp, upbeat, grounded; makes the call; real energy earned; two gears,
+  gym floor keyed to a part-done session; spots patterns; four say/don't-say pairs); the editor shortens and never
+  flattens; Home sends yesterday's, today's and tomorrow's session briefs and one pattern ahead (`days-ahead.ts`, the
+  `days_ahead` column); the morning reminder names the session and lift; two NEW switchable moments inside his daily
+  limit: a CLASH (heavy leg day with a hard class that day or the day before: trim the extras, keep the main lift; it
+  replaces that morning's plain reminder and is the chat's hello) and a PATTERN (stuck lift, too-hard piling up,
+  protein short; afternoon, once a week); one-tap answers under any offer, kept on the chat row, each mapped in the
+  coach's instructions to a tool that exists; the reminder writer gets the persona, the facts, a time-of-day greeting
+  and must end on the question its buttons answer. DECISIONS: upbeat-grounded over dry (his brief); a greeting that fits
+  the time over always "Hey" (widens his 6 Nov example, flagged to him); the clash rule and the trim are mine (CSCS):
+  hard leg-dominant conditioning, running or combat on the day of or the day before a lower-body main lift is where
+  fatigue and interference cost the lift most, and the standard answer (his 13 Sep shortening ruling too) keeps the
+  main lift and cuts accessory volume; gentle activity is never a clash. CSCS review: (1) no prescription changes
+  unless he taps the trim, which is the existing shortest version; (2) nothing taken away; (3) fundamentals untouched;
+  (4) no floor or ceiling moved; (5) in scope. The briefs and pattern finders load only when Home works them out, off
+  the first download; after merging main (whose own move took the first-paint budget to 637) it measures 634 of 637. `test:coach-proactive` (72 checks, 22
+  mutations, all caught); `test:coach-moments` and `test:coach-nudge` taught the two moments (one mechanism-pinned
+  regex re-anchored); three exam cases (voice-make-the-call, reminder-tap-trim, reminder-tap-keep). NOT PROVEN: that the
+  model sounds different (exam after the deploy); a real phone. NOT BUILT: a squeezed-weekday pattern, a weekly review
+  that says what moved, iPhone push. Needs the `days_ahead` migration and the `chat-gemini` and `coach-reach-out`
+  deploys. ALSO FIXED, found by the new screen check (`verify:coach-texts-you` 3d-3g, 3 mutations caught): a coach
+  message the server wrote while the chat was open stopped 53px short of the bottom (101px with its one-tap answers),
+  its shortcut and easy out under the message box; the chat now follows it as its buttons land, only when he was at
+  the bottom. Two checks re-anchored on the deliberate changes (`test:reminder-writer`'s greeting, `verify:reminders`'
+  switch count 12 -> 14).
 - [x] **THE PLANK ANSWER (his "fix the plank answer", 25 Nov 2026)**. Asked on his phone after the why-sheet deploy, "why is my plank time going up each week" got "We increase your hold time by 5 to 10 seconds each week ... before moving to a harder exercise!". Neither half is the app: holds go up 5 seconds a week (week 1 the base, week 2 +5, week 3 +10, the deload back to the base; `stepHoldSeconds`), and nothing in the code ever changes the exercise. CAUSE, both halves in the sheet, not the model: the entry read "add 5 seconds in week 2 and 10 in week 3" (two numbers that read as two different steps), and its reason said "then the exercise itself gets harder", copied from a coaching note in the code's comment that no code carries out. FIXED: the entry now states one 5-second step a week with the worked example 30-45s, 35-50s, 40-55s and the deload back to week 1's time; the reason no longer claims a harder exercise; and the block tells the coach to keep an entry's numbers and weeks exactly as written and add no step it does not state. `test:app-decisions` §7 (6 checks; the example is CALLED against `stepHoldSeconds`, not read): 8 mutations, 8 caught (the old wording, a wrong example, "5 to 10 seconds each week", the harder-exercise claim, a deload that is not week 1, the instruction removed, the code's step at 10 seconds, the code's deload not the base). `test:coach-promises` fails identically on unchanged main in this Windows checkout (CRLF in a pinned slice), not this change. Needs the `chat-gemini` deploy. Whether the coach now SAYS it right is model behaviour: ask him the same question after the deploy. ALSO: the coach exam against TEST was stopped at 87 turns, 15 of them HTTP 429 after the runner's full retry ladder (about 45 s), the last several in a row, so TEST's Gemini key looks out of today's quota; partial transcripts discarded, nothing graded or committed.
 
 - [x] **TODAY'S CARDIO SESSION CAN BE CHANGED FOR TODAY (his request 25 Nov 2026, on the new session card: "make sure it's easy to change, say for example the user had less time and can't do 8x3 they should easily be able to change it to 6x3 ... Let them be able to edit it")**. "Change for today" under the figures opens steppers: Rounds, Work and Rest for a rounds session (the round timer's own steps; never under 2 rounds, 10s work or 5s rest, so the Start can never be lost), Minutes for a steady one (5 a tap, 5 to 240). The figures, the bar, the length, the Start (round timer or countdown) and the one-tap log all follow; closed, a line names the plan ("Plan: 4 × 3 min, 1 min rest"), and "Back to the plan" undoes it. TODAY ONLY, mine on CSCS grounds: it is the session done on a day with less time, so the plan, progression and the next session are untouched and the log records what was done; kept on the phone for that date so a tab change keeps it. Not offered a day early (the preview stays his "Keep it as is"), nor once logged or while its timer runs. Effort is not a stepper: the log's own Easy/Steady/Hard already changes it. `withTodayChange`, `stepTodayRounds`, `stepTodayMinutes`; `test:planned-rounds` §1d (64 checks; 7 mutations, 7 caught), `verify:planned-rounds` J1-J10 (2 mutations, both caught); screenshots read. Not built: changing it from the chat ("only 20 minutes today" for a cardio day already exists as the shorten tool for lifting days, not this). Frontend only.
