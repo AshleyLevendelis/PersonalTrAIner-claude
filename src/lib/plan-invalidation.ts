@@ -82,7 +82,7 @@ export const KNOWN_LIFT_FIELDS = ['known_squat_kg', 'known_bench_kg', 'known_dea
 // EXPERIENCE, RECOVERY AND CONDITIONING ADDED 8 Nov 2026, his ruling "Offer a rebuild" (QA round 2): all three are read
 // by the plan generator, and changing one on Profile saved it and left the plan as it was, with no word, the session-
 // length defect above again. They take the same road goal and style take: an offer, nothing changed until yes.
-export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal', 'start_preference', 'enjoyed_activities', 'health_conditions', 'running_goal', 'running_base_minutes', 'session_duration_preference', 'training_experience', 'recovery_capacity', 'conditioning_preference', ...KNOWN_LIFT_FIELDS] as const
+export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal', 'start_preference', 'enjoyed_activities', 'health_conditions', 'running_goal', 'running_base_minutes', 'cardio_days_per_week', 'session_duration_preference', 'training_experience', 'recovery_capacity', 'conditioning_preference', ...KNOWN_LIFT_FIELDS] as const
 export type PlanInvalidatingField = typeof PLAN_INVALIDATING_FIELDS[number] | 'concurrent_activities'
 
 /**
@@ -332,6 +332,19 @@ export function detectPlanInvalidation(
       detail: goal
         ? 'I can rebuild your plan from this week with runs on some of your training days, building up week by week in minutes and effort, and lifting on the rest (at least two days, one for a half marathon). Everything you have already logged stays exactly as it is.'
         : 'I can rebuild your plan from this week with every training day back to lifting. Everything you have already logged stays exactly as it is.',
+    }
+  }
+
+  // CARDIO DAYS A WEEK (cardio-days.ts, his 24 Nov 2026 "A"): sessions of their own on some training days, lifting
+  // keeping two. Offered like every other rebuild: nothing changes until yes.
+  if ('cardio_days_per_week' in patch && (patch.cardio_days_per_week ?? 0) !== (before.cardio_days_per_week ?? 0)) {
+    const n = Number(patch.cardio_days_per_week ?? 0)
+    return {
+      field: 'cardio_days_per_week',
+      title: n > 0 ? `Build ${n} cardio day${n === 1 ? '' : 's'} into your plan?` : 'Take the cardio days out of your plan?',
+      detail: n > 0
+        ? 'I can rebuild your plan from this week with cardio sessions on some of your training days (intervals on the round timer, steady sessions on a countdown) and lifting on the rest, at least two days. Everything you have already logged stays exactly as it is.'
+        : 'I can rebuild your plan from this week with those days back to lifting. Everything you have already logged stays exactly as it is.',
     }
   }
 
