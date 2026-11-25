@@ -25,6 +25,7 @@
 // ---------------------------------------------------------------------------
 
 import { welcomeBackOpener } from './coach-voice'
+import { RECOVERY_CHIPS, recoveryOfferText } from './coach-nudge'
 
 export type OpenerKind =
   | 'check_in'
@@ -37,6 +38,7 @@ export type OpenerKind =
   | 'session_moved'
   | 'plan_unknown'
   | 'welcome_back'
+  | 'recovery_flag'
 
 export interface OpenerSession {
   focus: string
@@ -113,6 +115,12 @@ export interface OpenerInput {
    * entry — a check-in, not the session.
    */
   lastOrdinaryKind?: OrdinaryKind | null
+  /**
+   * RESTING HEART RATE RAISED (his "2", 25 Nov 2026; heart-trends.ts): the app's own sentence, when his resting heart
+   * rate has sat 5 or more above his usual for three mornings and this run has not been raised before (the caller asks
+   * the coach's said-once memory, coach-nudge.ts openerSkips). Null otherwise.
+   */
+  recovery?: { line: string } | null
 }
 
 /**
@@ -291,6 +299,21 @@ export function pickOpener(input: OpenerInput): Opener {
     }
   }
 
+  // 3c. RAISED RESTING HEART RATE ON A TRAINING DAY (his "2", 25 Nov 2026). An OFFER of a lighter day, never a change:
+  //     the chip is his request to the coach, whose card he still has to apply. Only before the session (nothing logged,
+  //     before his usual hour), because afterwards there is nothing left to lighten. The words name no cause: a raised
+  //     resting heart rate is a sign of carrying fatigue, never a diagnosis (CSCS, mine).
+  if (input.recovery && todaySession && !todayLogged && hour < cutoffHour) {
+    const text = recoveryOfferText(input.recovery.line, todaySession.focus)
+    return {
+      kind: 'recovery_flag',
+      // The opener's sentence follows "Hey Sam — ", so it starts lower-case.
+      text: text.charAt(0).toLowerCase() + text.slice(1),
+      chips: RECOVERY_CHIPS,
+      attention: true,
+    }
+  }
+
   // 4. A SESSION ALREADY BEHIND THEM. Kept out of the rotation below and
   //    ranked above it, because this is not reciting a schedule — it is
   //    asking about something that happened, which is what a coach does. Past
@@ -455,3 +478,4 @@ export function rememberOrdinaryKind(profileId: string, kind: OpenerKind): void 
   if (!ordinary) return
   try { localStorage.setItem(`${LAST_OPENER_KEY}:${profileId}`, ordinary) } catch { /* best-effort */ }
 }
+

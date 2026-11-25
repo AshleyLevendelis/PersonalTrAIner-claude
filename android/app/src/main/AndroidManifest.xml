@@ -48,15 +48,23 @@
     <!-- Coach notifications (23 Nov 2026). Asked only when he turns "On this phone" on, never at start. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- STEPS ONLY (20 Nov 2026). The health plugin declares read AND write for every kind of health data it supports;
-         Google Play refuses an app that declares health permissions it does not use, so every one but READ_STEPS is
+         Google Play refuses an app that declares health permissions it does not use, so every one but READ_STEPS, READ_HEART_RATE and READ_RESTING_HEART_RATE (24 Nov 2026) is
          removed here. Add a line back only when the app starts reading that kind of data. -->
+    <!-- HEART RATE STRAP (option 3, 25 Nov 2026; src/lib/strap-live.ts). Android 12+: scan and connect, the scan
+         declared never to work out where he is. The Bluetooth plugin also declares location for every Android version;
+         only Android 11 and older need it for a scan, so it is capped there. Asked only when he taps Find my strap. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" tools:targetApi="s" tools:node="replace" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:targetApi="s" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" tools:node="replace" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="30" tools:node="replace" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />
     <uses-permission android:name="android.permission.health.WRITE_STEPS" tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_DISTANCE" tools:node="remove" />
     <uses-permission android:name="android.permission.health.WRITE_DISTANCE" tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" tools:node="remove" />
     <uses-permission android:name="android.permission.health.WRITE_ACTIVE_CALORIES_BURNED" tools:node="remove" />
-    <uses-permission android:name="android.permission.health.READ_HEART_RATE" tools:node="remove" />
+    <!-- HEART RATE, READ ONLY (his ruling 24 Nov 2026, "1 + 2"; src/lib/health-heart.ts): after a session and resting. -->
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
     <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_WEIGHT" tools:node="remove" />
     <uses-permission android:name="android.permission.health.WRITE_WEIGHT" tools:node="remove" />
@@ -66,7 +74,7 @@
     <uses-permission android:name="android.permission.health.WRITE_RESPIRATORY_RATE" tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" tools:node="remove" />
     <uses-permission android:name="android.permission.health.WRITE_OXYGEN_SATURATION" tools:node="remove" />
-    <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
     <uses-permission android:name="android.permission.health.WRITE_RESTING_HEART_RATE" tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" tools:node="remove" />
     <uses-permission android:name="android.permission.health.WRITE_HEART_RATE_VARIABILITY" tools:node="remove" />

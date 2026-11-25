@@ -1,5 +1,6 @@
 import { PAUSE_WORDS, isPausedOn, planPausedSince, pausedForDueDateOf } from '@/lib/plan-pause'
 import { noteForProfile, lateInPregnancy, PREGNANCY_HOLD_NOTE, isPregnant } from '@/lib/health-conditions'
+import { LiveHeart } from '@/components/LiveHeart'
 import { isStartingOut } from '@/lib/starting-out'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { takeRequestedExerciseDate } from '@/lib/app-route'
@@ -1425,8 +1426,10 @@ export function TodayPanel({
         {/* THE RIGHT OF THE KICKER (Exercise Week X1/X1b, his 12 Nov 2026 handoff): the day's length before it starts,
             the sets done while it runs (the one capped count, his 1 Nov "Sets done"), "Done" once finished. */}
         {status === 'running' && heroCount ? (
-          <span className="shrink-0 whitespace-nowrap text-[0.75rem] text-text-tertiary" data-testid="hero-sets">
-            <span className="tabular-mono">{heroCount.logged} of {heroCount.planned}</span> sets
+          <span className="flex shrink-0 items-center gap-3 whitespace-nowrap text-[0.75rem] text-text-tertiary">
+            {/* THE LIVE HEART RATE (option 3): while a paired strap is sending. */}
+            <LiveHeart />
+            <span data-testid="hero-sets"><span className="tabular-mono">{heroCount.logged} of {heroCount.planned}</span> sets</span>
           </span>
         ) : status === 'finished' ? (
           <span className="shrink-0 whitespace-nowrap text-[0.6875rem] text-text-tertiary" data-testid="hero-status">Done</span>

@@ -64,3 +64,14 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && !inPhoneApp) {
 // THE PHONE APP'S NOTIFICATIONS (23 Nov 2026): listen as early as possible, so a tap that started the app still opens
 // the tab it names. The plugin itself is loaded by a dynamic import inside native-push.ts.
 if (inPhoneApp) void import('./lib/native-push').then(m => m.listenForNativePush()).catch(() => {})
+// THE HEART RATE STRAP (option 3, strap-live.ts): a strap paired on this phone is connected when the app opens and when
+// it comes back to the front, so the timer and the workout have the live number without a trip to Profile.
+if (inPhoneApp) {
+  const strap = () => void import('./lib/strap-live').then(m => { if (m.pairedStrap()) void m.connectPairedStrap() }).catch(() => {})
+  strap()
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') strap()
+    // Going to the back is where the phone may close the app: the session's readings are written down first.
+    else void import('./lib/strap-live').then(m => m.flushStrapReadings()).catch(() => {})
+  })
+}

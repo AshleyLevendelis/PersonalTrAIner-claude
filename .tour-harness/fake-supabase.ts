@@ -100,9 +100,10 @@ const DEAD = () => ({ data: null, error: { message: 'TypeError: Failed to fetch'
  */
 export const INTEGER_COLUMNS: Record<string, readonly string[]> = {
   ai_usage_daily: ['requests'],
-  cardio_logs: ['avg_heart_rate', 'duration_minutes', 'intensity_rpe'],
+  cardio_logs: ['avg_heart_rate', 'duration_minutes', 'intensity_rpe', 'max_heart_rate'],
   coach_moment_facts: ['streak_days', 'protein_target_g', 'week_sessions_done', 'week_sessions_planned'],
   daily_nutrition_targets: ['calculated_bmr', 'calculated_tdee', 'estimated_eee', 'target_calories', 'target_carbs_g', 'target_fats_g', 'target_protein_g'],
+  daily_resting_heart_rate: ['bpm'],
   daily_steps: ['steps'],
   exercise_plans: ['sets', 'week_number'],
   exercise_set_logs: ['drop_index', 'reps_completed', 'set_number', 'week_number'],
@@ -119,7 +120,7 @@ export const INTEGER_COLUMNS: Record<string, readonly string[]> = {
   weight_basis_offers: ['applied_from_week'],
   workout_exercises: ['execution_order', 'rest_seconds', 'rpe_target', 'sets', 'tier'],
   workout_logs: ['reps_completed', 'set_number'],
-  workout_sessions: ['duration_minutes', 'week_number', 'effort'],
+  workout_sessions: ['avg_heart_rate', 'duration_minutes', 'effort', 'max_heart_rate', 'week_number'],
 }
 
 /**

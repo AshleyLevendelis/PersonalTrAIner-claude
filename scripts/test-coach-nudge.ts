@@ -146,9 +146,10 @@ console.log('\n3. Ashley\'s rulings, 7 Sep 2026')
   const unique = [...new Set(kinds)].sort()
   // RE-ANCHORED 9 Nov 2026: his request "the chat should also be able to proactively wish you happy birthday" adds a
   // sixth, and nothing else (no food, water or weigh-in still). 13 Nov 2026: the streak milestone became weeks on plan.
-  check('exactly the events he chose: the five, and the birthday he asked for',
+  // 25 Nov 2026: his "Build 1, 2 and 3" adds the recovery offer (a raised resting heart rate before a session).
+  check('exactly the events he chose: the five, the birthday he asked for, and the recovery offer',
     JSON.stringify(unique) === JSON.stringify(
-      ['birthday', 'consistency_milestone', 'missed_yesterday', 'personal_best', 'session_due', 'session_feel']),
+      ['birthday', 'consistency_milestone', 'missed_yesterday', 'personal_best', 'recovery_flag', 'session_due', 'session_feel']),
     unique)
   // Checked two ways, because one alone is weak. `weightKg` legitimately
   // appears (a PR is a weight), so this cannot be a bare search for "weight".
@@ -294,7 +295,7 @@ console.log('\n8. The wiring — what makes it a nudge rather than a nag')
   check('never on a brand-new account', /isFirstEverChat !== false/.test(chat))
   check('never while a reply is in flight', /\|\| isLoading\) return/.test(chat))
   check('never on half-loaded data',
-    /if \(!proactiveData \|\| !feelContext \|\| trainingWeek\.loading \|\| !planKnown\) return/.test(chat))
+    /if \(!proactiveData \|\| !feelContext \|\| trainingWeek\.loading \|\| !planKnown \|\| !heartLoaded\) return/.test(chat))
   check('never on top of the opener — one bubble with no id IS the opener',
     /if \(messages\.length === 1 && !messages\[0\]\.id\) return/.test(chat))
   // Re-anchored 13 Nov 2026: both now go through waitingOnAnswer (section 11 runs it), which counts an offer only while
@@ -435,7 +436,7 @@ console.log('\n9. Hello + more moments (her ruling 7 Nov 2026): one decision ove
   check('every unprompted row carries the reminder marker', /const marker = \{ source: 'reminder', moment: pick\.moment, shortcut: pick\.shortcut \}/.test(chat))
   check('the empty-chat opener counts as today\'s hello', /rememberWithoutSpeaking\([\s\S]{0,200}helloKey\(nudgeInputRef\.current\.today\)/.test(chat))
   check('a failed history read no longer silences the coach for the visit', /Failed to load chat history[\s\S]{0,400}setIsFirstEverChat\(prev => prev \?\? false\)/.test(chat))
-  check('the clock is checked again while the app sits open', /setInterval\(bump, 10 \* 60 \* 1000\)/.test(chat) && /clockTick, reminderSettings, logsMeals\]\)/.test(chat))
+  check('the clock is checked again while the app sits open', /setInterval\(bump, 10 \* 60 \* 1000\)/.test(chat) && /clockTick, reminderSettings, logsMeals, heartLoaded\]\)/.test(chat))
 }
 
 console.log('\n10. Happy birthday (his request, 9 Nov 2026): the coach wishes him, first, once, on the right day')
