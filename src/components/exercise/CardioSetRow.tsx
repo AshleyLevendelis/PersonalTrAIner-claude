@@ -339,6 +339,8 @@ export function PlannedCardioRow({
   testid,
   timer,
   hideEntry,
+  hideTitle = false,
+  entryLabel,
 }: {
   prescription: { activity: string; duration: number; targetRpe?: number; rounds?: { rounds: number; workSeconds: number; restSeconds: number }; reason?: string }
   /** A planned interval session's Start (PlannedRoundsStart), drawn under the prescription and over the boxes. */
@@ -349,6 +351,10 @@ export function PlannedCardioRow({
   label?: string
   onLogged?: () => void
   testid?: string
+  /** The session hero already says what the plan asks (PlannedSessionHero): the row is only the way to log it. */
+  hideTitle?: boolean
+  /** A quiet label over the boxes, the hero's "Or log it yourself". */
+  entryLabel?: string
 }) {
   const { profileId, date } = useActiveSession()
   const logs = useCardioLogsToday()
@@ -396,7 +402,7 @@ export function PlannedCardioRow({
 
   return (
     <div className="space-y-1.5" data-testid={testid ?? 'cardio-planned'}>
-      <div className="pl-2.5 pr-1">
+      {!hideTitle && <div className="pl-2.5 pr-1">
         {label && <p className={`${MICRO} text-primary-text`}>{label}</p>}
         {/* WHAT THE PLAN ASKS, in the exact words the saved row will use for
             what was DONE — "Walk · 20 min · Easy" over "✓ Walk · 20 min ·
@@ -406,8 +412,9 @@ export function PlannedCardioRow({
           {prescriptionLine({ activity: name, duration: prescription.duration, targetRpe: prescription.targetRpe })}
         </p>
         {protocol && <p className="text-[0.6875rem] leading-4 text-muted-foreground">{protocol}</p>}
-      </div>
+      </div>}
       {!saved && timer}
+      {!saved && !hideEntry && entryLabel && <p className={`${MICRO} pt-1.5 pl-2.5 text-muted-foreground`} data-testid="cardio-entry-label">{entryLabel}</p>}
       {saved ? (
         <CardioReadback
           log={saved}

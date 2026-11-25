@@ -51,7 +51,7 @@ import { ReadOnlyDayList } from './ReadOnlyDayList'
 import { weekPhaseLine } from '@/lib/exercise-week'
 import { weekRangeLabel } from '@/lib/nutrition-week'
 import { PRIMARY_CTA_CLASS, PRIMARY_CTA_STYLE } from '@/components/OnePage'
-import { PeekPanel, PeekWhatYouDid } from './PeekPanel'
+import { PeekPanel, PeekWhatYouDid, PlannedActivityPeek } from './PeekPanel'
 import { SectionLabel, sectionLabelFor } from './ExerciseLine'
 import { WarmupSection } from './WarmupSection'
 import { NextSetButton } from './NextSetButton'
@@ -115,8 +115,6 @@ import { FirstSessionLiftsCard } from './FirstSessionLiftsCard'
 import { CircuitOffer } from './CircuitOffer'
 import { describeDayGap, dayGapCanAddPress } from '@/lib/day-gap-note'
 import type { Exercise, WorkoutDay, MesocycleWeek, UserProfile, PlannedActivity } from '@/lib/types'
-import { plannedRoundsOf } from '@/lib/planned-rounds'
-import { blockShape } from '@/lib/timer-engine'
 import type { LoadSource } from './LoadChip'
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -1676,7 +1674,7 @@ export function TodayPanel({
             {/* A PLANNED SESSION ON ANOTHER DAY IS SHOWN AS A SESSION (23 Nov 2026): "Wednesday: Assault Bike Rounds,
                 16 minutes." was his whole view of it. What it is, its rounds and why, read off the plan. */}
             {!peekBeforePlan && peekWorkout?.plannedActivity ? (
-              <PlannedActivityPreview dayName={peekDay} focus={peekWorkout.focus} planned={peekWorkout.plannedActivity} onBack={() => setPeekDate(null)} />
+              <PlannedActivityPeek dayName={peekDay} focus={peekWorkout.focus} planned={peekWorkout.plannedActivity} onExit={() => setPeekDate(null)} />
             ) : (
             <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 text-center text-sm text-muted-foreground" data-testid="peek-rest-day">
               {/* A peeked day with a prescribed activity is NOT a rest day, and
@@ -2475,21 +2473,3 @@ function PeekBackToToday({ onClick }: { onClick: () => void }) {
   )
 }
 
-/**
- * ANOTHER DAY'S PLANNED SESSION, READ-ONLY (23 Nov 2026): its name, the prescription in the words a log reads back
- * in, the rounds when it is intervals, and the coach's reason. Started and logged on its own day.
- */
-function PlannedActivityPreview({ dayName, focus, planned, onBack }: { dayName: string; focus: string; planned: PlannedActivity; onBack: () => void }) {
-  const { name, protocol } = splitActivity(planned.activity)
-  const rounds = plannedRoundsOf(planned)
-  const shape = protocol ?? (rounds ? blockShape(rounds) : null)
-  return (
-    <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 space-y-1.5" data-testid="peek-planned-activity">
-      <p className="text-[1.0625rem] font-semibold text-foreground leading-tight">{`${focus || name} · ${dayName}`}</p>
-      <p className="text-sm font-medium text-foreground" data-testid="peek-planned-line">{prescriptionLine({ activity: name, duration: planned.duration, targetRpe: planned.targetRpe })}</p>
-      {shape && <p className="text-xs text-muted-foreground" data-testid="peek-planned-shape">{shape}</p>}
-      {planned.reason && <p className="text-xs leading-[1.5] text-muted-foreground">{planned.reason}</p>}
-      <div className="pt-1.5 flex justify-center"><PeekBackToToday onClick={onBack} /></div>
-    </div>
-  )
-}

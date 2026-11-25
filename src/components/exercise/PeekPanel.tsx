@@ -2,7 +2,9 @@ import { Button } from '@/components/ui/button'
 import { X } from 'lucide-react'
 import { ReadOnlyDayList } from './ReadOnlyDayList'
 import { whatYouDid } from '@/lib/session-derive'
-import type { ExerciseSetLog, WorkoutDay } from '@/lib/types'
+import { plannedSessionRow } from '@/lib/planned-rounds'
+import { LoadBadgeView, SetBar, Swatch } from './ExerciseBar'
+import type { ExerciseSetLog, PlannedActivity, WorkoutDay } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
 // LAYOUT-DESIGN.md §2.2 — one other day's content, in place, one tap, one
@@ -138,6 +140,56 @@ export function PeekPanel({
         banBusyName={banBusyName}
         className="px-4 pb-2"
       />
+    </div>
+  )
+}
+
+/**
+ * ANOTHER DAY'S PLANNED CARDIO SESSION, DRAWN AS A WEIGHT DAY IS (his request 24 Nov 2026, with Thursday's "Squat &
+ * Carry" beside it: "I want the cardio day to look similar to this before the day"). The same header (the day, the
+ * title, the meta line, the X) and one row in the exercise row's own parts: the tag, the name, the effort where a
+ * lift's weight sits, one bar segment per round and the legend. Read-only, like the peek above it; Start is on the
+ * day itself (his "Keep it as is", the same night).
+ */
+export function PlannedActivityPeek({ dayName, focus, planned, onExit }: { dayName: string; focus: string; planned: PlannedActivity; onExit: () => void }) {
+  const row = plannedSessionRow(planned)
+  return (
+    <div className="rounded-xl bg-card" data-testid="peek-planned-activity">
+      <div className="flex items-start justify-between gap-2.5 px-4 pt-3.5 pb-3 border-b">
+        <div className="min-w-0">
+          <span className="text-[0.65625rem] uppercase tracking-[.2em] text-muted-foreground">{dayName}</span>
+          <p className="mt-1.5 text-[1.875rem] font-bold leading-[1.05] tracking-[-.03em]">{focus || row.name}</p>
+          <p className="mt-1.5 text-[0.75rem] text-muted-foreground" data-testid="hero-meta">{row.meta}</p>
+        </div>
+        <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={onExit} aria-label="Close" data-testid="peek-planned-close">
+          <X className="size-3.5" />
+        </Button>
+      </div>
+      <div className="flex flex-col gap-2.5 px-4 py-3">
+        <span className="ds-label-compact" data-testid="peek-planned-label-tag">{row.label}</span>
+        <div className="flex flex-col py-3">
+          <span className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+            <span className="min-w-[120px] flex-1 text-[0.96875rem] font-semibold leading-[1.3]" data-testid="peek-planned-line">{row.name}</span>
+            {row.effort && <span className="ml-auto"><LoadBadgeView badge={{ value: row.effort, unit: '', qualifier: 'effort' }} /></span>}
+          </span>
+          <SetBar className="mt-2.5" rampTotal={0} rampDone={0} workingTotal={row.segments} workingDone={0} />
+          <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5" data-testid="peek-planned-shape">
+            <span className="flex items-center gap-1.5 whitespace-nowrap">
+              <Swatch color="var(--working-track-done)" />
+              <span className="tabular-mono text-[0.875rem] font-bold text-foreground">{row.dose}</span>
+              <span className="text-[0.8125rem] text-text-tertiary">{row.doseWord}</span>
+            </span>
+            {row.rest && (
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <Swatch color="var(--working-track-pending)" />
+                <span className="tabular-mono text-[0.875rem] font-bold text-foreground">{row.rest}</span>
+                <span className="text-[0.8125rem] text-text-tertiary">rest</span>
+              </span>
+            )}
+          </span>
+          {planned.reason && <p className="mt-2.5 text-[0.8125rem] leading-[1.5] text-muted-foreground" data-testid="peek-planned-reason">{planned.reason}</p>}
+        </div>
+      </div>
     </div>
   )
 }

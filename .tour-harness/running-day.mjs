@@ -58,7 +58,8 @@ await send('Page.navigate', { url: `${URL_RUN}&today=${target?.date}&load=1#/tab
 await wait(5000)
 const day = await text()
 await shot('running-day-held')
-check('1. the day is the run, by name', /Easy run · /.test(day || ''), (day || '').slice(0, 240))
+// The session card since 25 Nov 2026: the run's name is the card's title, its minutes a figure ("25 min TIME").
+check('1. the day is the run, by name', /Easy run/.test(await ev(`document.querySelector('[data-testid="activity-day-title"]')?.textContent ?? ''`) || '') && /\b25 min TIME\b/.test(day || ''), (day || '').slice(0, 240))
 check('2. its minutes are held to 25 with nothing logged', /Kept to 25 minutes today: log your runs/.test(day || ''), ((day || '').match(/.{0,40}Kept to.{0,90}/) || [''])[0])
 const boxMinutes = await ev(`(() => { const r = document.querySelector('[data-testid="planned-activity"]'); if (!r) return null; const i = r.querySelector('input'); return i ? (i.value || i.placeholder) : (r.textContent.match(/(\\d+) ?min/) || [])[1] ?? null })()`)
 check('3. ...and the row the tick logs says 25, not the plan\'s 35', String(boxMinutes) === '25', boxMinutes)
