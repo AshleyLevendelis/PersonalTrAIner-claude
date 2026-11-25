@@ -26,7 +26,7 @@ Newest first. One line each.
   beginner`'s bodyweight check now reads the label (it read the first compound, a second definition); 3 mutations
   caught across it and a new `test:session-derive` [23] (core day has no main lift, with a compound control).
   `test:persona-audit-fixes`, `test:exercise-consistency`, `test:block-swap-reach`, `test:compound-order`, rest
-  floors, session length, `test:audit` green; `test:quality` result in the commit. Frontend only; existing plans keep
+  floors, session length, `test:audit` green; `test:quality` 11.56 -> 11.59 of 12, 0 of 9,216 below the floor. Frontend only; existing plans keep
   their exercises until rebuilt.
 - [x] **THE TESTER TOOLKIT (25 Nov 2026): his four rulings, "Everything", "Both", "Yes, they can untick", "Email +
   daily summary"** (asked together on his "work through all of these without stopping", each from options; my
@@ -46,6 +46,10 @@ Newest first. One line each.
   and changed nothing, because App already starts it from the saved date, so that call was deleted as inert). NOT VERIFIED: a real email (needs the deploy), the summary's schedule (needs the
   migration on Supabase), a picture taken on a real phone. NEEDS: migration 20261125120000 and the `report-email`
   deploy. CSCS review: not applicable, nothing prescribed changes.
+  THE FULL SWEEP found two more, fixed the same day: `test:profile-restore` (tester_since read back, and left ABSENT
+  before its migration so a read that did not say never switches recording off) and `test:rls-local` (the two tester
+  tables named as records with no update policy, beside coach_reply_reports). `verify:correction-loop` failed once
+  under the sweep's load and passed alone.
 - [x] **A NEW PLAN AND THE HEART RATE SETTINGS (25 Nov 2026, found by the pre-merge sweep)**. `test:reset-clears-draft`
   failed: three new phone-storage keys (the watch switch, the paired strap, the strap's raw readings) were not
   classified. Decided (mine, mechanical): all three KEPT by a New Plan. The switch and the strap are the phone's, as the
