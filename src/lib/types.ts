@@ -142,6 +142,8 @@ export interface UserProfile {
   enjoyed_activities?: string[] | null
   /** What a doctor has said to watch (health-conditions.ts), ticked in setup's injuries card or on Profile (his ruling 14 Nov 2026, "Fold into injuries"). Not joints, so never in `injuries`. Column `health_conditions` (migration 20261114150000); missing before it runs. */
   health_conditions?: string[] | null
+  /** When they agreed to help test the app (tester toolkit, 25 Nov 2026); null when not a tester. */
+  tester_since?: string | null
   /** The due date, asked under the Pregnant tick (his ruling 15 Nov 2026, "Ask due date"). Column `due_date` (migration 20261115120000); missing before it runs. */
   due_date?: string | null
   /** The allergy card (allergies.ts; his ruling 15 Nov 2026, "Allergy card, peanuts split"). Column `allergies` (migration 20261118120000); missing before it runs, read as none. Always read through allergiesOf. */

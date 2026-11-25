@@ -54,6 +54,7 @@ import { supabase } from '@/lib/supabase'
 import { computeGoalProgress } from '@/lib/goal-progress'
 import { GoalWeightSetter } from '@/components/GoalWeightSetter'
 import { derivedStepsTargetFor } from '@/lib/steps-target'
+import { TesterSection } from '@/components/profile/TesterSection'
 import { updateProfileField, saveMealsElsewhere } from '@/lib/profile-store'
 import { useAppearance } from '@/hooks/useAppearance'
 import { AppearanceSection } from '@/components/AppearanceSection'
@@ -175,7 +176,7 @@ interface ProfileScreenProps {
   /** Fired after any memory (goal/fact/context) edit/delete — same contract MemoryScreen had. */
   onMemoryChanged: () => void | Promise<void>
   /** Chat receipt deep-links land here, scrolled to the relevant memory section. 'dietary' — surfacing round — is where the meal-plan "unrecognised restriction" banner's "Open Profile" button lands. */
-  initialSection?: 'goals' | 'facts' | 'context' | 'dietary' | 'myMeals' | 'health'
+  initialSection?: 'goals' | 'facts' | 'context' | 'dietary' | 'myMeals' | 'health' | 'testing'
   /** What the top bar's "‹" goes back to — the tab Profile was opened from (2d). */
   backLabel?: string
   /** Today's calorie target, for the stat strip — App's own macros, never worked out again here. */
@@ -261,13 +262,13 @@ type ProfileSheet =
   | 'body' | 'goal' | 'injuries'
   | 'schedule' | 'equipment' | 'lifts' | 'style' | 'exavoid'
   | 'allergies' | 'diet' | 'likes' | 'avoid' | 'meals'
-  | 'tone' | 'remembers' | 'appearance' | 'reminders' | 'account' | 'health'
+  | 'tone' | 'remembers' | 'appearance' | 'reminders' | 'account' | 'health' | 'testing'
 
 const SHEET_TITLE: Record<ProfileSheet, string> = {
   body: 'Height & weight', goal: 'Goal', injuries: 'Injuries',
   schedule: 'Schedule', equipment: 'Equipment', lifts: 'Known lifts', style: 'Style & recovery', exavoid: 'Exercises to avoid',
   allergies: 'Allergies', diet: 'Diet', likes: 'Foods you like', avoid: 'Foods to avoid', meals: 'Meals & shopping',
-  tone: 'Reply speed', remembers: 'What your Personal TrAIner remembers', appearance: 'Appearance', reminders: 'Reminders', account: 'Account', health: 'Steps from your phone',
+  tone: 'Reply speed', remembers: 'What your Personal TrAIner remembers', appearance: 'Appearance', reminders: 'Reminders', account: 'Account', health: 'Steps from your phone', testing: 'Help test the app',
 }
 
 /** A deep link names a section; this is the sheet that holds it, so its scroll still lands. */
@@ -277,6 +278,8 @@ const SHEET_FOR_SECTION: Record<NonNullable<ProfileScreenProps['initialSection']
   myMeals: 'likes',
   // The corner heart (25 Nov 2026) opens the strap's row, in the phone's health sheet.
   health: 'health',
+  // The tester invite link (?tester=1) and the bug button's way back (tester toolkit, 25 Nov 2026).
+  testing: 'testing',
 }
 
 /**
@@ -2111,6 +2114,9 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
       case 'health': return (
         <>{healthPlatform && <Suspense fallback={null}><HealthStepsSection platform={healthPlatform} onChanged={setHealthOn} /><HealthHeartSection platform={healthPlatform} /><HeartStrapSection /></Suspense>}</>
       )
+      case 'testing': return (
+        <>{profile.id && <TesterSection profileId={profile.id} since={profile.tester_since} onChanged={since => onProfileChanged({ tester_since: since })} />}</>
+      )
       case 'account': return (
         <AccountSection status={account} onChanged={setAccount} onClose={() => setSheet(null)} />
       )
@@ -2241,6 +2247,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               <SheetRow label="Remembers" value={loading ? '…' : `${rememberedCount} thing${rememberedCount === 1 ? '' : 's'}`} onOpen={() => setSheet('remembers')} />
               <SheetRow label="Appearance" value={THEME_PREVIEWS[appearance.theme]?.label ?? ''} onOpen={() => setSheet('appearance')} />
               {profile.id && <SheetRow label="Reminders" value={remindersValue ?? ''} onOpen={() => setSheet('reminders')} />}
+              {profile.id && <SheetRow label="Help test the app" value={profile.tester_since ? 'On' : 'Off'} onOpen={() => setSheet('testing')} />}
               {healthPlatform && <SheetRow label="Steps from your phone" value={healthOn ? `On · ${healthPlatform === 'ios' ? 'Apple Health' : 'Health Connect'}` : 'Off'} onOpen={() => setSheet('health')} />}
             </ProfileGroup>
 

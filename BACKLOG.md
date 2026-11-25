@@ -2,6 +2,24 @@
 
 Newest first. One line each.
 
+- [x] **THE TESTER TOOLKIT (25 Nov 2026): his four rulings, "Everything", "Both", "Yes, they can untick", "Email +
+  daily summary"** (asked together on his "work through all of these without stopping", each from options; my
+  recommendations were errors-plus-actions, both, yes, email-plus-summary, and he chose more recording than I
+  recommended). Plan and limits: `docs/plans/tester-toolkit.md`. A tester agrees on Profile ("Help test the app",
+  off by default, every kind of thing recorded said before the tap, never a password or an email address); the app
+  then records screens, taps, typing, crashes, console errors, failed requests and failure messages on screen
+  (`tester-log.ts`, `tester_events`), and gives a bug button beside the gear, "Report a problem" on every exercise ⋮
+  and a flag on each meal sheet; a report carries the area, his words, a picture of the screen (untickable) and the
+  last 30 things done (`tester_reports`). Each report is emailed with the picture attached, and a daily 07:17 UTC
+  summary groups the last 24 hours' problems, one line each with counts, most testers first, nothing sent when no
+  tester was active. Owner-only tables, deleted with the account, in the data download; New Plan turns it off. The
+  report sheet and screenshot library load only for a tester (total budget 3415 -> 3440, measured 3435).
+  VERIFIED: `test:tester-toolkit` (53 checks; 14 mutations, 14 caught, one rewritten after it crashed the gate rather
+  than breaking it and one re-anchored after it did not apply), `verify:tester-report` (35 checks on the whole app at
+  390px, screenshots read; 8 mutations, 7 caught: the eighth removed the Profile switch's own call to start recording
+  and changed nothing, because App already starts it from the saved date, so that call was deleted as inert). NOT VERIFIED: a real email (needs the deploy), the summary's schedule (needs the
+  migration on Supabase), a picture taken on a real phone. NEEDS: migration 20261125120000 and the `report-email`
+  deploy. CSCS review: not applicable, nothing prescribed changes.
 - [x] **A NEW PLAN AND THE HEART RATE SETTINGS (25 Nov 2026, found by the pre-merge sweep)**. `test:reset-clears-draft`
   failed: three new phone-storage keys (the watch switch, the paired strap, the strap's raw readings) were not
   classified. Decided (mine, mechanical): all three KEPT by a New Plan. The switch and the strap are the phone's, as the

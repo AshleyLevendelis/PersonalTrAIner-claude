@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { TesterReportMenuItem } from '@/components/TesterButtons'
 import { domingCue } from '@/lib/pregnancy-rules'
 import { TOUR_OPENS, setTourExercise, useTourStage } from '@/lib/tour-stage'
 import { isMovementPrepRow } from '@/lib/session-duration'
@@ -476,6 +477,8 @@ function ExerciseMenu({ ex, onOpenDetail, onOpenHistory, onSwap, onMove, canMove
             Logged the wrong exercise?
           </DropdownMenuItem>
         )}
+        {/* Testers only (tester toolkit, 25 Nov 2026): a report that names this exercise. */}
+        <TesterReportMenuItem area="exercise" itemLabel={ex.name} />
         <DropdownMenuItem variant="destructive" disabled={banBusy} onClick={onBan} data-testid="ban-exercise">
           <Ban className="size-3.5" />
           {banBusy ? 'Banning…' : 'Ban exercise'}

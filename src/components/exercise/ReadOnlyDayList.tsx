@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { TesterReportMenuItem } from '@/components/TesterButtons'
 import { ArrowRightLeft, BookOpen, Ban, History, Info, MoreVertical } from 'lucide-react'
 import { formatRampSets, groupExercises, isConditioningDay, mainLiftGroupIndex, type ExerciseGroup } from '@/lib/session-derive'
 import { getExerciseId } from '@/lib/exercise-db'
@@ -148,6 +149,8 @@ export function ReadOnlyDayList({
                   <ArrowRightLeft className="size-3.5" />
                   Swap exercise
                 </DropdownMenuItem>
+                {/* Testers only (tester toolkit, 25 Nov 2026): every exercise menu, the week view's too. */}
+                <TesterReportMenuItem area="exercise" itemLabel={ex.name} />
                 <DropdownMenuItem variant="destructive" disabled={banBusyName === ex.name} onClick={() => onBan(ex.name)}>
                   <Ban className="size-3.5" />
                   {banBusyName === ex.name ? 'Removing…' : 'Never show this again'}

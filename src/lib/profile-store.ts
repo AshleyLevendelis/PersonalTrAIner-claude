@@ -43,3 +43,16 @@ export async function savePlanPause(profileId: string, since: string | null): Pr
   if (isMissingColumnError(error, 'plan_paused_since')) return 'not-yet'
   throw error
 }
+
+/**
+ * HELPING TEST THE APP (tester toolkit, his rulings 25 Nov 2026): the date they agreed, or null when they stop. Said,
+ * never assumed: 'not-yet' is the database not having the column (migration 20261125120000 is run by hand), and the
+ * screen says testing is not switched on yet rather than recording someone the database cannot mark as agreeing.
+ */
+export async function saveTesterConsent(profileId: string, on: boolean): Promise<{ result: 'saved' | 'not-yet'; since: string | null }> {
+  const since = on ? new Date().toISOString() : null
+  const { error } = await supabase.from('fitness_profiles').update({ tester_since: since }).eq('id', profileId)
+  if (!error) return { result: 'saved', since }
+  if (isMissingColumnError(error, 'tester_since')) return { result: 'not-yet', since: null }
+  throw error
+}

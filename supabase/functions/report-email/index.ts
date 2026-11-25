@@ -2,7 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { handleReportEmail } from "../_shared/report-email.ts";
 
 // ---------------------------------------------------------------------------
-// report-email — a reported coach reply, emailed to Ashley (his request 22 Nov 2026).
+// report-email — a reported coach reply, emailed to Ashley (his request 22 Nov 2026); since 25 Nov 2026 also each tester
+// report as it arrives and a daily summary of tester errors (the tester toolkit).
 //
 // Called by the database (the coach_reply_reports insert trigger, through pg_net), never by the app, so it carries
 // no user's sign-in: the deploy turns the gateway's sign-in check off (scripts/deploy-functions.mjs NO_JWT) and this
@@ -27,6 +28,17 @@ Deno.serve(async (req) => {
     send: async ({ url, init }) => {
       const r = await fetch(url, init);
       return { ok: r.ok, status: r.status };
+    },
+    // The daily summary's read (tester toolkit, 25 Nov 2026). The service key is the function's own, set by Supabase;
+    // the read names the table and the time only, because the summary is about every tester at once.
+    readEvents: async (since) => {
+      const base = Deno.env.get("SUPABASE_URL") ?? "";
+      const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+      if (!base || !key) return null;
+      const r = await fetch(`${base}/rest/v1/tester_events?select=profile_id,session_id,at,kind,screen,detail&created_at=gte.${encodeURIComponent(since)}&order=at.asc&limit=20000`, {
+        headers: { apikey: key, Authorization: `Bearer ${key}` },
+      });
+      return r.ok ? await r.json() : null;
     },
   });
   console.log(`report-email: ${result}`);

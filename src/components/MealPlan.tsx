@@ -1,4 +1,5 @@
 import { useShowNumbers } from '@/lib/show-numbers'
+import { TesterReportFlag } from '@/components/TesterButtons'
 import { dayLineFor, isFreestyle, isFreestyleDay, FREESTYLE_WORDS, type FreestyleController } from '@/lib/freestyle'
 import { ELSEWHERE_WORDS, elsewhereState, isCookedElsewhere } from '@/lib/meals-elsewhere'
 import { useEffect, useRef, useState, Suspense, useMemo } from 'react'
@@ -1490,6 +1491,8 @@ function MealSlotRow({
                   </div>)}
                 </div>
                 <div className="flex shrink-0 items-center">
+                  {/* Testers only (tester toolkit, 25 Nov 2026): a report that names this meal. */}
+                  <TesterReportFlag area="meals" itemLabel={`${SLOT_LABEL[slot]}: ${displayName}`} />
                   {/* THE HEART — Ashley, 19 Sep 2026, from four options. The app never
                       asks whether a meal was any good; she says so when she wants to.
                       She rejected asking after every meal, asking once a day, and

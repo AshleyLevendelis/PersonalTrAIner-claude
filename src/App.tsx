@@ -188,6 +188,9 @@ import type { UserProfile, MacroTargets, WorkoutDay, PlanAction, MesocycleWeek }
 import type { ExerciseEntry } from '@/lib/exercise-db'
 import { ensureNearCopies } from '@/lib/near-copies-loader'
 import { LiveHeart } from '@/components/LiveHeart'
+import { setTester, useTesterOn } from '@/lib/tester-log'
+// Fetched only while somebody is testing (tester toolkit, 25 Nov 2026).
+const TesterReportHost = lazyWithReload(() => import('@/components/TesterReport'))
 
 const STORAGE_KEY = 'fitplan_profile_id'
 /** The start could not reach the server and had nothing kept on the phone to show. Nothing is lost: the row is untouched. */
@@ -730,7 +733,28 @@ function App() {
   const [profileInfoOpen, setProfileInfoOpen] = useState(false)
   // Where the app tour is: its gear and Profile stops open those (tour-stage.ts).
   const tourStage = useTourStage()
-  const [profileInfoSection, setProfileInfoSection] = useState<'goals' | 'facts' | 'context' | 'dietary' | 'myMeals' | 'health' | undefined>(undefined)
+  const [profileInfoSection, setProfileInfoSection] = useState<'goals' | 'facts' | 'context' | 'dietary' | 'myMeals' | 'health' | 'testing' | undefined>(undefined)
+  // THE TESTER LOG FOLLOWS THE PROFILE (tester toolkit, 25 Nov 2026): on while they have agreed, off when they have not.
+  // A profile read without the field (before its migration, or an old copy kept for a fast open) changes nothing, so
+  // a tester's waiting record is never dropped by a read that simply did not say.
+  const testerOn = useTesterOn()
+  const testerSince = storedProfile?.tester_since
+  const testerProfileId = storedProfile?.id
+  useEffect(() => {
+    if (!testerProfileId || testerSince === undefined) return
+    setTester(testerSince ? testerProfileId : null)
+  }, [testerProfileId, testerSince])
+  // THE TESTER INVITE LINK: ?tester=1 opens Profile at "Help test the app", once, and the address loses it.
+  useEffect(() => {
+    if (!testerProfileId) return
+    try {
+      const url = new URL(location.href)
+      if (url.searchParams.get('tester') !== '1') return
+      url.searchParams.delete('tester')
+      history.replaceState(history.state, '', url.toString())
+      setProfileInfoSection('testing'); setProfileInfoOpen(true)
+    } catch { /* an address the browser cannot read is left alone */ }
+  }, [testerProfileId])
   // "Open my profile" from the chat (his request 16 Nov 2026, "do everything from chat"): Profile is App's own sheet.
   useEffect(() => {
     const take = () => { if (takeOpenRequest(['profile'])) { setProfileInfoSection(undefined); setProfileInfoOpen(true) } }
@@ -3131,6 +3155,8 @@ function App() {
       // not plan data, and queued sets carry their own profile id so they can
       // still sync). `test:reset-clears-draft` holds the whole list.
       clearOnboardingDraft()
+      // The tester log belongs to the person being left (tester toolkit, 25 Nov 2026): off, and nothing of theirs waits.
+      setTester(null)
       // New Plan is a choice to start again, so it goes straight to setup, past the welcome page.
       setWelcomeOpen(false)
       // A question parked during the OLD plan's setup ("I'll answer that once
@@ -3900,6 +3926,8 @@ function App() {
         mealsPending={(isGeneratingMeals || initialMealBuild) && Object.keys(mealPools).length === 0}
         onRunningChange={setTourRunning}
       />
+      {/* THE TESTER'S REPORT SHEET (tester toolkit, 25 Nov 2026): one for the whole app, opened from anywhere. */}
+      {testerOn && <Suspense fallback={null}><TesterReportHost profileId={profile?.id} /></Suspense>}
       <Suspense fallback={null}>
       <ProfileScreen
         exercisePlan={exercisePlan}

@@ -846,7 +846,9 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 25 Nov 2026: 3374 -> 3401, the Bluetooth plugin's own chunk, loaded only inside the phone app, and the
   // live heart rate. MEASURED 3392; 9 kB over today.
   // MOVED 25 Nov 2026: 3401 -> 3415, the same merge. MEASURED 3406; 9 kB over today.
-  const TOTAL_BUDGET_KB = 3415
+  // MOVED 25 Nov 2026: 3415 -> 3440, the tester toolkit. MEASURED 3435: +20 kB is the report sheet and the screenshot
+  // library, both fetched only by a tester on the tap (TesterButtons.tsx), never by anyone else; the app chunk grew 3 kB.
+  const TOTAL_BUDGET_KB = 3440
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)

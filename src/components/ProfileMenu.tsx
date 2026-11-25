@@ -6,6 +6,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Settings, UserCircle, Compass } from 'lucide-react'
+import { TesterReportButton } from '@/components/TesterButtons'
 
 // ---------------------------------------------------------------------------
 // Houses the housekeeping actions ("Profile", "Replay the tour") the header used to
@@ -28,6 +29,9 @@ export function ProfileMenu({
   tourOpen?: boolean
 }) {
   return (
+    <>
+    {/* THE TESTER'S REPORT BUTTON (tester toolkit, 25 Nov 2026): beside the gear wherever the gear is, testers only. */}
+    <TesterReportButton />
     <DropdownMenu open={tourOpen ? true : undefined}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon-sm" aria-label="Profile and settings">
@@ -53,5 +57,6 @@ export function ProfileMenu({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    </>
   )
 }
