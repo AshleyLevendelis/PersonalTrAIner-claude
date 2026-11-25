@@ -409,6 +409,30 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     return () => { live = false; document.removeEventListener('visibilitychange', onVisible) }
   }, [profile.id, activeSession.date])
 
+  // HEART RATE FROM THE PHONE (his 24 Nov 2026 "1 + 2"; health-heart.ts): the same moments as steps. Today's and
+  // yesterday's finished sessions get their heart rate, and Progress shows the resting figure's week. Loaded only in the
+  // phone app with the switch on; nothing in a browser.
+  const [restingLine, setRestingLine] = useState<string | null>(null)
+  useEffect(() => {
+    if (!profile.id || !activeSession.date || !isPhoneApp()) return
+    const id = profile.id, date = activeSession.date
+    let live = true
+    const pull = () => {
+      void import('@/lib/health-heart')
+        .then(async m => {
+          if (!m.isHealthHeartConnected()) { if (live) setRestingLine(null); return }
+          await m.syncHeartFromHealth(id, date)
+          const trend = m.restingTrend(await m.readRestingHeartRate(id, date), date)
+          if (live) setRestingLine(trend?.line ?? null)
+        })
+        .catch(() => { /* Progress keeps what it had */ })
+    }
+    pull()
+    const onVisible = () => { if (document.visibilityState === 'visible') pull() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { live = false; document.removeEventListener('visibilitychange', onVisible) }
+  }, [profile.id, activeSession.date])
+
 
   if (!loading && loadError && !data) {
     return (
@@ -795,6 +819,11 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             </div>
           )}
         </div>
+        {restingLine && (
+          <p className="border-b border-[color:var(--hairline)] py-3 text-[0.8125rem]" data-home-resting-hr>
+            <span className="text-[color:var(--role-warn-text)]" aria-hidden>♥ </span>{restingLine}
+          </p>
+        )}
         <div data-home-volume>
           <PageRow
             className="border-t-0 border-b-0"

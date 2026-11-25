@@ -834,7 +834,9 @@ console.log('\n3. Nothing has crept back up')
   // 25 kB raw over today.
   // MOVED 25 Nov 2026: 3352 -> 3365. Crossed by the cardio-timer, cardio-days and Android-notification branch merged
   // with main's moved-sets, testing-week and warm-up work. MEASURED 3356 on the merged tree; 9 kB over today.
-  const TOTAL_BUDGET_KB = 3365
+  // MOVED 25 Nov 2026: 3365 -> 3374, the heart-rate reader (watch after each session and at rest) merged in, all
+  // in its own lazy chunk. MEASURED 3365; 9 kB over today.
+  const TOTAL_BUDGET_KB = 3374
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)

@@ -1831,6 +1831,10 @@ menu" stays true when a copy is also left outside it.
   must stay removed unless the app starts reading that data. Phone-only code loads only in the phone app.
   `test:phone-app`, `verify:health-steps`, `docs/plans/phone-app.md`. NOT BUILT natively yet: his machine
 
+- **Heart rate from a watch: his "1 + 2, build it", 24 Nov 2026**: after each session its average and highest heart rate
+  (from Health Connect, which the watch writes to) show under it, and Progress shows resting heart rate against last
+  week. Read only, its own switch, phone app only; never a target or zone. `test:health-heart`, `verify:health-steps`
+  §6-7. Needs migration 20261124180000 and a phone app rebuild
 - **Coach notifications reach the Android app: his request 23 Nov 2026, "yes build it for Android"**: the phone app
   uses Firebase (an `fcm:` row in the same phones table, no migration); the same switch, tags and limits as the
   website; the iPhone app says it is not built yet. `test:native-push`, `verify:reminders` §6. Needs the
