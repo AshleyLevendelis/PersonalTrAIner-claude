@@ -846,7 +846,9 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 25 Nov 2026: 3374 -> 3401, the Bluetooth plugin's own chunk, loaded only inside the phone app, and the
   // live heart rate. MEASURED 3392; 9 kB over today.
   // MOVED 25 Nov 2026: 3401 -> 3415, the same merge. MEASURED 3406; 9 kB over today.
-  const TOTAL_BUDGET_KB = 3415
+  // MOVED 25 Nov 2026: 3415 -> 3427, the coach-voice branch (deployed from its branch 24 Nov, never on main) merged
+  // into the heart-rate work. MEASURED 3418 on the merged tree; 9 kB over today.
+  const TOTAL_BUDGET_KB = 3427
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)
