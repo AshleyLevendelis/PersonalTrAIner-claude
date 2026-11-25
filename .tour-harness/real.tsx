@@ -441,10 +441,24 @@ const tilted = tilt !== 'lopsided' ? generated : generated.map(w => ({
   days: w.days.map(d => d.day === firstTrainingDay ? d
     : { ...d, exercises: d.exercises.map(e => ({ ...e, sets: e.sets * 3 })) }),
 }))
-const mesocycle = !THURSDAY ? tilted : tilted.map(w => w.week_number < 2 ? w : ({
+const thursdayed = !THURSDAY ? tilted : tilted.map(w => w.week_number < 2 ? w : ({
   ...w,
   days: w.days.map(d => d.day === 'Friday' ? { ...d, day: 'Saturday' } : d.day === 'Saturday' ? { ...d, day: 'Friday' } : d),
 }))
+// ?rounds=1 — AN INTERVAL SESSION THE COACH PUT ON A REST DAY (23 Nov 2026, verify:planned-rounds): the INPUT, the plan
+// as executeCardioSession leaves it (a plannedActivity with its rounds on a day with no lifting), on the first weekday
+// that lifts in no week. What the card draws from it is the app's.
+const ROUNDS = new URLSearchParams(location.search).get('rounds') === '1'
+const ROUNDS_DAY = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  .find(dn => thursdayed.every(w => !(w.days.find(d => d.day === dn)?.exercises.length)))
+const mesocycle = !ROUNDS || !ROUNDS_DAY ? thursdayed : thursdayed.map(w => ({
+  ...w,
+  days: [...w.days.filter(d => d.day !== ROUNDS_DAY), {
+    day: ROUNDS_DAY, focus: 'Assault Bike Rounds', exercises: [], is_scheduled: true,
+    plannedActivity: { activity: 'Assault Bike Rounds', duration: 16, targetRpe: 8, reason: 'Fight-length rounds build the engine Muay Thai asks for.', rounds: { rounds: 4, workSeconds: 180, restSeconds: 60 } },
+  } as typeof w.days[number]],
+}))
+;(window as unknown as { __roundsTarget: unknown }).__roundsTarget = ROUNDS && ROUNDS_DAY ? { day: ROUNDS_DAY, date: nearestAnchorDate(ROUNDS_DAY) } : null
 const exercisePlan = mesocycle[0].days
 
 // The date on which a given weekday falls inside PLAN WEEK 1 — the seven days

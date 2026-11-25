@@ -46,6 +46,9 @@ Table editor, `coach_reply_reports`.
 
 ## Worth knowing
 
+- **Updates go through the store: his ruling 23 Nov 2026.** No live-update service for now; every change to the
+  phone app is a new upload (versionCode +1) and a Google review.
+
 - **The phone app carries a copy of the website inside it.** A change to the website reaches the phone app only when
   a new version goes through the store (a day or two of review), unless a live-update service is added later. The
   website itself keeps updating as now.
@@ -94,7 +97,7 @@ WINDOWS: use PowerShell syntax, not bash (no "export", no "~/"). The ios/ folder
    "unauthorized"). If it is not listed at all, Windows may need the phone maker's USB driver (Samsung: "Samsung
    Android USB Driver"; Pixel: Android Studio > SDK Manager > SDK Tools > "Google USB Driver").
    npx cap run android     (pick his phone). If that fails, npx cap open android and press Run in Android Studio.
-7. Report any build error word for word. Do not change the app id (app.personaltrainer.coach) without asking.
+7. Report any build error word for word. Do not change the app id (uk.co.personaltrainerapp) without asking.
 
 What Ashley checks on the phone:
 - The app opens with the launch screen and the new coach-bubble icon, then his Home (sign in with his email on the

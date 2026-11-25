@@ -258,7 +258,7 @@ export function ExerciseTab({
       <BanExerciseSheet
         exerciseName={banTarget}
         mesocycle={mesocycle ?? []}
-        loadGuard={() => loadPlanEditContext(profile ?? { id: profileId, injuries: [] }, mesocycle ?? [], planCreatedAt).then(c => c.isProtected)}
+        loadGuard={name => loadPlanEditContext(profile ?? { id: profileId, injuries: [] }, mesocycle ?? [], planCreatedAt).then(c => c.banGuard(name))}
         onConfirm={onBanExercise}
         onClose={() => setBanTarget(null)}
       />

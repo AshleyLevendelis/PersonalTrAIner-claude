@@ -393,8 +393,8 @@ export const MEALS_PER_DAY_OPTIONS: { value: 2 | 3 | 4; icon: string; label: str
 ]
 
 export const COOKING_TIME_OPTIONS: { value: CookingTimePreference; icon: string; label: string; description: string }[] = [
-  { value: 'quick', icon: '⏱️', label: 'Quick', description: 'Under 15 minutes — keep it simple' },
-  { value: 'moderate', icon: '🍳', label: 'Moderate', description: 'Happy to spend up to ~30 minutes' },
+  { value: 'quick', icon: '⏱️', label: 'Quick', description: 'Simple meals, about 15 minutes' },
+  { value: 'moderate', icon: '🍳', label: 'Moderate', description: 'Mostly simple meals, the odd proper recipe' },
   { value: 'loves_cooking', icon: '👨‍🍳', label: 'Happy to cook', description: 'Real recipes, real prep — I enjoy it' },
 ]
 

@@ -155,9 +155,10 @@ console.log('\n4. Pinned meals are facts, and the honest residue says so')
 
 console.log('\n5. What it cannot fix, it says — rather than claiming success')
 {
-  // 2x is past what portions alone can reach for this day. The card must not
-  // pretend otherwise; this is the same honesty every edit path already owes.
-  const r = checkMealRefit(pools, scaleTargets(asBuilt, 2.0), OPTS)
+  // 3x is past what portions alone can reach (the scaler stops at 2.5x). It was 2x until 24 Nov 2026, when lunch and
+  // dinner became the same size and this fixture's 2x day became reachable. The card must not pretend otherwise;
+  // this is the same honesty every edit path already owes.
+  const r = checkMealRefit(pools, scaleTargets(asBuilt, 3.0), OPTS)
   // NOT OFFERED, and that is the corrected behaviour. A resize that cannot
   // land the day inside tolerance is not a fix, and putting a Confirm button
   // on it would be selling one.

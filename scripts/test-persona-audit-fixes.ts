@@ -251,5 +251,39 @@ console.log('\n9. Round two (his "yes fix the remaining ones too", 22 Nov 2026)'
   }
 }
 
+console.log('\n10. Round three (his "Yes fix all the problems", 23 Nov 2026): every plan each rule still caught, judged by the audit itself')
+{
+  const { auditOne } = await import('./audit-personas')
+  // The plans the audit named on 23 Nov 2026 before this round (and the three the first version of it broke), by rule.
+  // Each is judged by the audit's own detector, so a fix cannot pass here and fail there.
+  const PINNED: Record<string, number[]> = {
+    C18: [168, 457, 467, 1114, 1129, 1153, 1804, 1886, 2050, 2053, 5833],
+    C13: [1503, 1513, 2801, 2830, 4443, 2103, 4896],
+    C15: [35, 267, 526, 1489, 1804, 1880, 1932, 2059, 3401, 3808, 4809, 5622],
+    C17: [467, 1129, 1591, 1844, 2616, 2969, 3039, 5314],
+    C8b: [48, 78, 123, 323, 5613, 714, 815],
+    C1: [3192],
+  }
+  const cache = new Map<number, Record<string, string[]>>()
+  const breaches = (i: number) => { if (!cache.has(i)) cache.set(i, quiet(() => auditOne(i))); return cache.get(i)! }
+  const TEXT: Record<string, string> = {
+    C18: 'pushing never more than 1.5x pulling (a spare press becomes pulling; a pull the week needs goes last in every trim)',
+    C13: 'front and back of the thigh in balance (a spare hinge becomes a squat; weighed again inside the beginner cap)',
+    C15: 'an even week (the light day takes sets, or the heaviest gives)',
+    C17: 'four chest and back sets a week (a trim takes a spare exercise before a set the week needs)',
+    C8b: 'no session past the time asked for (the last stretch, the long build-up, then the bike, before the clock)',
+    C1: 'every loading week squats, hinges, pushes and pulls (the cap never takes a day\'s last of one)',
+  }
+  for (const [rule, ids] of Object.entries(PINNED)) {
+    const still = ids.filter(i => (breaches(i)[rule] ?? []).length > 0)
+    check(`${rule}: ${TEXT[rule]} — ${ids.length} named plans`, still.length === 0, still.map(i => `#${i} ${breaches(i)[rule]?.[0]}`))
+  }
+  // ...and none of those plans breaks ANY rule now (a fix for one rule must not buy a breach of another, the shape of the
+  // three this round's first version caused).
+  const all = [...new Set(Object.values(PINNED).flat())]
+  const any = all.filter(i => Object.values(breaches(i)).some(b => b.length > 0))
+  check(`none of the ${all.length} named plans breaks any of the audit's rules`, any.length === 0, any.map(i => `#${i} ${Object.keys(breaches(i)).join(',')}`))
+}
+
 console.log(`\n${passed + failed} checks ran: ${passed} passed, ${failed} failed`)
 process.exit(failed > 0 ? 1 : 0)

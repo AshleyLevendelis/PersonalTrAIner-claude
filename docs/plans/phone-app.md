@@ -42,7 +42,7 @@ app first, and the phone-only code is loaded only there (the website's first dow
   neither. `docs/handover/phone-app-first-build.md` is the prompt for his machine.
 - Real-phone proof: the browser tests use a pretend health store. Whether Apple's and Google's sheets appear and real
   counts arrive is proven only on a phone.
-- The app's id `app.personaltrainer.coach` is a placeholder until the first store upload, permanent after it.
+- The app's id `uk.co.personaltrainerapp` is a placeholder until the first store upload, permanent after it.
 - App icons and the launch screen are Capacitor's defaults.
 - Push notifications: Android BUILT 23 Nov 2026 (src/lib/native-push.ts, supabase/functions/_shared/fcm.ts,
   docs/handover/android-notifications.md); iPhone not built (needs an Apple push key).

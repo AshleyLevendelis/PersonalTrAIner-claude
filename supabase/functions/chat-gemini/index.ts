@@ -1329,6 +1329,18 @@ const toolDeclarations = [
           type: "number",
           description: "Effort on the 1-10 scale, REQUIRED. Zone 2 / conversational is 3-4; steady is 5-6; hard intervals are 7-8. Use what was discussed.",
         },
+        rounds: {
+          type: "number",
+          description: "ONLY when the session is intervals: how many rounds, as you prescribed them ('4 × 3 min, 1 min rest' is 4). Send rounds, work_seconds and rest_seconds together or none of them. With all three the app puts a Start button on the day that runs the round timer with these numbers and logs the session when it ends. A steady run, ride or swim has none.",
+        },
+        work_seconds: {
+          type: "number",
+          description: "ONLY with rounds: the work part of each round in SECONDS (3 min is 180).",
+        },
+        rest_seconds: {
+          type: "number",
+          description: "ONLY with rounds: the rest between rounds in SECONDS (1 min is 60).",
+        },
         reason: {
           type: "string",
           description: "One short sentence, in your own coaching voice, on why this session is what it is — shown on the day itself, so write it for them to read later, not as a label.",
@@ -2831,7 +2843,7 @@ WHEN TO ASK — say it out loud before you decide, because the app will not corr
 - HEDGED, so say nothing about adding it and just carry on the conversation: might, maybe, perhaps, possibly, probably, thinking about, thinking of, considering, I could, I may, we may, hoping to, hope to, not sure, if I, if I can, depends, we will see, we'll see, at some point, one of these days.
 - If they ask outright ("add a run on Friday"), that is not a mention, it is an instruction — you may go straight to the tool.
 
-CARRY WHAT YOU ALREADY TOLD THEM. If earlier in this conversation you recommended 30-40 minutes of zone 2 on a treadmill or bike, the card says a number in that range at that effort. "Wednesday: cardio" has thrown away your own coaching and is not acceptable. minutes and target_rpe are REQUIRED for that reason. If nothing has been discussed and you have no basis, ASK how long and how hard before calling — one more question is cheaper than a session they did not want.
+CARRY WHAT YOU ALREADY TOLD THEM. If earlier in this conversation you recommended 30-40 minutes of zone 2 on a treadmill or bike, the card says a number in that range at that effort. If you prescribed INTERVALS ("4 × 3 min, 1 min rest"), send rounds, work_seconds and rest_seconds as you said them, and minutes for the whole session including its warm-up: the day then gets a Start button that runs the round timer and logs it at the end. "Wednesday: cardio" has thrown away your own coaching and is not acceptable. minutes and target_rpe are REQUIRED for that reason. If nothing has been discussed and you have no basis, ASK how long and how hard before calling — one more question is cheaper than a session they did not want.
 
 NOT THIS TOOL: a sport they do OUTSIDE the plan on a standing schedule is §3g. One day's lift replaced by an activity is propose_session_activity_swap. Remembering a preference that changes no screen is record_fact.
 

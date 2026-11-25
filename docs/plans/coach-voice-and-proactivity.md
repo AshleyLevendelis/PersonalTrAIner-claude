@@ -72,7 +72,8 @@ add in our change what you think will make it better."
 
 ## Checks
 
-`test:coach-proactive` (72 checks, 22 mutations, all caught). `test:coach-moments` and `test:coach-nudge` updated for
+`test:coach-proactive` (72 checks, 22 mutations, all caught). The briefs and pattern finders load only when Home
+works them out, so the first download stays inside its budget. `test:coach-moments` and `test:coach-nudge` updated for
 the two new moments.
 
 ## Needs

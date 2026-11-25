@@ -152,7 +152,7 @@ interface ProfileScreenProps {
    * one wish, two outcomes depending on the door. With this, an add that names an exercise the plan holds opens the
    * ⋮ menu's own "Stop giving you X?" sheet and runs the same ban; one the plan does not hold is saved as before.
    */
-  planBan?: { mesocycle: MesocycleWeek[]; loadGuard: () => Promise<DayGuard>; ban: (exerciseName: string) => Promise<BanOutcome | void> }
+  planBan?: { mesocycle: MesocycleWeek[]; loadGuard: (exerciseName: string) => Promise<DayGuard>; ban: (exerciseName: string) => Promise<BanOutcome | void> }
   /** Temporary changes to the plan running now — listed under Injuries with "End now" (M25). */
   activeAdaptations?: PlanAdaptationRow[]
   endingAdaptationId?: string | null

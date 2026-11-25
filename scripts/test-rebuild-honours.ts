@@ -90,7 +90,7 @@ async function main() {
     check('with no start date, today is open until trained...', noStart([])(1, 'Sunday') === false)
     check('...and protected once it is', noStart([SUN])(1, 'Sunday') === true)
     const src = code('src/lib/plan-edit-context.ts')
-    check('a session running today counts as today trained, sets or not', /getActiveSessionRecord\(profile\.id, today\)\?\.status === 'running'\) logged\.add\(today\)/.test(src))
+    check('a session running today counts as today trained, sets or not', /getActiveSessionRecord\(profile\.id, today\)\?\.status === 'running'\) \{?\s*logged\.add\(today\)/.test(src))
   }
 
   console.log('\n2. When it starts')

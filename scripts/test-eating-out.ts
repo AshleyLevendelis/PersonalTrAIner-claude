@@ -133,7 +133,9 @@ function main() {
     check('the rest of Friday is still planned', SLOTS.filter(s => s !== 'dinner').every(s => !!friday(big).chosen[s]))
     check('the rest of Friday gets smaller around a big night out', others(big) < others(plain), [others(big), others(plain)])
     check('...and a light night leaves more of the day than a big one', others(light) >= others(big), [others(light), others(big)])
-    const poolOf = (slot: MealSlotName, name: string) => pools[slot]!.find(o => o.name === name)
+    // A leftover lunch is last night's DINNER dish (since 24 Nov 2026 lunch and dinner are the same size, so leftovers
+    // land far more often): its own dish is found in the dinner pool.
+    const poolOf = (slot: MealSlotName, name: string) => pools[slot]!.find(o => o.name === name) ?? (slot === 'lunch' ? pools.dinner!.find(o => o.name === name) : undefined)
     const shrunk = SLOTS.filter(s => s !== 'dinner').map(s => [s, friday(big).chosen[s]!, poolOf(s, friday(big).chosen[s]!.name)] as const)
     check('...each other meal is still its own dish, never less than three quarters of its size', shrunk.every(([, o, p]) => !!p && o.macros.calories >= p.macros.calories * 0.74), shrunk.map(([s, o, p]) => [s, o.macros.calories, p?.macros.calories]))
     check('...and at least one of them is smaller than its dish (the shrink happened)', shrunk.some(([, o, p]) => !!p && o.macros.calories < p.macros.calories * 0.95), shrunk.map(([s, o, p]) => [s, o.macros.calories, p?.macros.calories]))

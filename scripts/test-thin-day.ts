@@ -79,7 +79,11 @@ function main() {
     check('the plan has a Chest & Triceps day', !!chest, plan.map(d => d.focus))
     check('it took work (it had reached its count and was still short)', took.length >= 1, took)
     check('...and what it took is trunk work', took.length >= 1 && took.every(n => entryOf(n)?.movement_pattern === 'core'), took.map(n => `${n}:${entryOf(n)?.movement_pattern}`))
-    check('it is no longer thin: ten working sets or more (it was six in the plan every week is built from)', !!chest && workingSets(chest) >= 10, chest ? { sets: workingSets(chest), day: chest.exercises.map(e => `${e.name} ${e.sets}`) } : null)
+    // The rule's own definition of thin: nine working sets or fewer AND ten minutes or more short of the budget. Since
+    // 23 Nov 2026 the week's press-heavy swap can turn this day's second press into trunk work, so the day may stop being
+    // thin on minutes at nine sets; "ten sets" was a stricter claim than the rule makes.
+    const shortBy = chest ? getDurationBudgetSeconds('30-45') - estimateDaySeconds(chest) : Infinity
+    check('it is no longer thin: ten working sets or more, or under ten minutes short (it was six sets in the plan every week is built from)', !!chest && (workingSets(chest) >= 10 || shortBy < 600), chest ? { sets: workingSets(chest), shortBy, day: chest.exercises.map(e => `${e.name} ${e.sets}`) } : null)
     check('...and without what it took it WAS thin (the case binds)', !!chest && workingSets(chest, took) <= 9, chest ? workingSets(chest, took) : null)
     // In the plan he trains from: the same movement on that day in every loading week of the first block.
     const meso = quiet(() => { setRandomSource(seededRngFromKey(comboKey(c))); try { return generateMesocycle(buildProfile(c)) } finally { resetRandomSource() } })

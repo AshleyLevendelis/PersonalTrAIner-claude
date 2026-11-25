@@ -35,7 +35,7 @@ has ever been built. Browser tests used a pretend health store; this is the firs
      it, press "+ Capability" and add HealthKit (do not tick "Clinical Health Records").
    - Plug in his iPhone, choose it as the run destination, press Run. On the phone he may have to trust the developer
      in Settings > General > VPN & Device Management.
-4. Report any build error word for word. Do not change the app's id (app.personaltrainer.coach) without asking.
+4. Report any build error word for word. Do not change the app's id (uk.co.personaltrainerapp) without asking.
 
 == Android ==
 5. npx cap open android  -> Android Studio opens. Let Gradle finish syncing.

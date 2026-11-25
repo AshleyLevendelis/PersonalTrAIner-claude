@@ -524,6 +524,10 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   STILL TRUE AND NAMED: there is no ketogenic derivation, and the keto filter
   is the low-carb filter — fresh banana, grapes and mango pass it, which the
   sentence admits rather than hides
+- **Lunch and dinner are the same size on three meals, so no meal carries a lopsided share of the protein** (his
+  "Build it", 24 Nov 2026, after a 67 g lunch; the split is mine, CSCS): 0.30 / 0.35 / 0.35, every macro at the meal's
+  calorie share; a leftover lunch is the dinner portion. An exactly even protein split was measured and not kept (a
+  heavier breakfast, a fifth fewer breakfasts). `test:meal-protein-spread`, `measure:meal-protein-spread`
 - A measured floor for meals — `meal-quality` exists but needs a live
   database, so it NEVER runs in a cloud sweep: `UNGUARDED` in practice
 
@@ -565,6 +569,8 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   history, an incoming lift in a plan with a calibration week starts at the calibration price in every week, as the
   plan's own unverified lifts do. Measured 62 of 200 swaps over 1.5x the plan's own figure before, 0 after.
   `test:replacement-prescription`, `docs/plans/swap-load-anchor.md`
+- **A ban tapped during today's running session takes it off that session** when none of it is logged yet (his report
+  24 Nov 2026; rebuilds still never redraw a running session). `test:ban-running-session`, `verify:ban-running-session`
 - Ban it from every future plan — **both**; `audit-fixes`, `silent-writes`,
   `coach-parity` §3. CORRECTED 15 Sep 2026, measured: this said `screen only`
   and quoted the decline "NOT WIRED UP YET… point the user at the ban button"
@@ -696,6 +702,14 @@ menu" stays true when a copy is also left outside it.
   that costs nothing. Anything built on a model JUDGEMENT should be split this
   way and the two halves named separately.
   `cardio-session`, `verify:cardio-session`, `coach-parity`
+- **An interval session on the plan runs on the round timer: his ruling 23 Nov 2026, "A"** (over a log line with a
+  timer button, from his "start the workout, it starts the round timer ... you log it completed at the end"): a planned
+  session keeps its rounds, work and rest; its card has Start (the round timer at those numbers, his countdown), and when
+  the rounds end one effort tap logs it under the session's own name, so the day reads done; the round timer's own Log
+  session asks the same one question. The coach's card carries the coach's three numbers, else the intervals of the
+  reply he said yes to when they fit the session. Another day shows the session as a preview, never one line. A saved
+  cardio log now re-reads the week strip. `test:planned-rounds`, `verify:planned-rounds`. Needs the `chat-gemini` deploy
+  for the coach to send rounds itself
 - **Swap the session for a circuit of timer blocks, block by block** — both surfaces since
   8 Oct 2026. Ashley, from the gym: rope, push-ups, sit-ups and the bike off the round timer could
   only be logged as "Intervals". His ruling, from three options: **A, one workout made of blocks**.
@@ -1747,6 +1761,13 @@ menu" stays true when a copy is also left outside it.
 - **MEASURE A REMOVAL ON THE REAL REPLIES BEFORE SHIPPING THE LIST.** Same day: every candidate stock phrase was run
   over the 64 real exam replies first. One ("That's what we love to hear") was the reply's only answer to good news,
   and came off the list.
+
+### His request of 23 Nov 2026, meals ("Do whatever you think is best"; `docs/plans/simple-meals.md`)
+- **Meals are simple unless he loves cooking** (mine, on his delegation): five main foods or fewer, a snack two, nothing
+  to shape, layer or make a sauce from (`meal-effort.ts`); the library offers simple dishes first; recipes are at most a
+  quarter of a meal on Moderate (the default), none on Quick, unlimited on Happy to cook, and a thin meal always keeps
+  choices; the meal writer is asked for plain names. `test:simple-meals`, `measure:simple-meals`. Needs the
+  `generate-meals` deploy for the writer's half
 
 ### His requests of 20 Nov 2026
 - **Profile has an Account row, "Email & sign-in" (his request 20 Nov 2026, "Build the account row")**: an email can be

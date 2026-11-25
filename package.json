@@ -81,6 +81,7 @@
     "test:block-swap-reach": "tsx scripts/test-block-swap-reach.ts",
     "test:block-swap-until": "tsx scripts/test-block-swap-until.ts",
     "verify:finish-check": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/finish-check.mjs",
+    "verify:ban-running-session": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/ban-running-session.mjs",
     "test:cardio-effort": "tsx scripts/test-cardio-effort.ts",
     "test:chat-cardio": "tsx scripts/test-chat-cardio.ts",
     "test:reach-out": "tsx scripts/test-reach-out.ts",
@@ -493,6 +494,7 @@
     "test:coach-knows": "tsx scripts/test-coach-knows.ts",
     "test:day-as-shown": "tsx scripts/test-day-as-shown.ts",
     "test:ban-scope": "tsx scripts/test-ban-scope.ts",
+    "test:ban-running-session": "tsx scripts/test-ban-running-session.ts",
     "test:drop-sets": "tsx scripts/test-drop-sets.ts",
     "test:working-sets": "tsx scripts/test-working-sets.ts",
     "report:rest-floors": "tsx scripts/measure-rest-floors.ts",
@@ -674,6 +676,8 @@
     "test:setup-card-question": "tsx scripts/test-setup-card-question.ts",
     "test:meal-menu": "tsx scripts/test-meal-menu.ts",
     "measure:deep-pool": "tsx scripts/measure-deep-pool.ts",
+    "test:simple-meals": "tsx scripts/test-simple-meals.ts",
+    "measure:simple-meals": "tsx scripts/measure-simple-meals.ts",
     "measure:usual-meals": "tsx scripts/measure-usual-meals.ts",
     "test:greek-yoghurt-asked": "tsx scripts/test-greek-yoghurt-asked.ts",
     "test:mince-asked": "tsx scripts/test-mince-asked.ts",
@@ -733,7 +737,12 @@
     "test:report-email": "tsx scripts/test-report-email.ts",
     "test:chat-reply": "tsx scripts/test-chat-reply.ts",
     "verify:chat-reply": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-reply.mjs",
-    "test:account-auth": "tsx scripts/test-account-auth.ts"
+    "test:planned-rounds": "tsx scripts/test-planned-rounds.ts",
+    "verify:planned-rounds": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/planned-rounds.mjs",
+    "test:account-auth": "tsx scripts/test-account-auth.ts",
+    "verify:welcome": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/welcome.mjs",
+    "measure:meal-protein-spread": "tsx scripts/measure-meal-protein-spread.ts",
+    "test:meal-protein-spread": "tsx scripts/test-meal-protein-spread.ts"
   },
   "dependencies": {
     "@capacitor/android": "8.6.2",

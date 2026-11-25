@@ -586,6 +586,12 @@ export interface PlannedActivity {
   targetRpe?: number
   /** Coach-voice reason this session is what it is, same role as Exercise.selection_note. */
   reason?: string
+  /**
+   * THE ROUNDS, WHEN THE SESSION IS INTERVALS (Ashley, 23 Nov 2026): "4 × 3 min, 1 min rest" on the bike is started on
+   * the round timer from the day's card and logged when it ends. Read through plannedRoundsOf (planned-rounds.ts),
+   * which also reads a protocol written into `activity`; absent, the session is minutes and effort as before.
+   */
+  rounds?: { rounds: number; workSeconds: number; restSeconds: number }
 }
 
 export interface WorkoutDay {
