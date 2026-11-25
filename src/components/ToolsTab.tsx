@@ -8,6 +8,7 @@ import { History, BookOpen, Timer, ChevronRight, TimerReset, ArrowLeft, Flag, Ho
 // budget (test:bundle, 13 Sep 2026) for two panels most sessions never open.
 const RoundTimerSheet = lazyWithReload(() => import('@/components/timers/RoundTimerSheet').then(m => ({ default: m.RoundTimerSheet })))
 const StopwatchPanel = lazyWithReload(() => import('@/components/timers/TimersPanel').then(m => ({ default: m.StopwatchPanel })))
+const RecordActivityCard = lazyWithReload(() => import('@/components/RecordActivityCard').then(m => ({ default: m.RecordActivityCard })))
 const CountdownPanel = lazyWithReload(() => import('@/components/timers/TimersPanel').then(m => ({ default: m.CountdownPanel })))
 import { PlateCalculator } from '@/components/PlateCalculator'
 import { onOpenRequest, takeOpenRequest } from '@/lib/open-request'
@@ -22,6 +23,7 @@ import { getAllItems, subscribeGroceryStore } from '@/lib/grocery-store'
 import { programHash, groceryHash } from '@/lib/app-route'
 import { RoundField } from '@/components/timers/RoundField'
 import { RoundCard } from '@/components/timers/RoundCard'
+import type { BodyForEstimate } from '@/lib/activity-figures'
 import { useTimers } from '@/hooks/useTimers'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { PlannedRoundEffort, PlannedCountdownLog } from '@/components/exercise/PlannedRoundsStart'
@@ -103,6 +105,8 @@ const TIMER_CHOICES: { mode: 'round' | 'stopwatch' | 'lap' | 'countdown'; label:
 
 export interface ToolsTabProps {
   profileId?: string
+  /** Weight, age and sex, for a recorded walk's calorie ESTIMATE when only a strap gave a heart rate (activity-figures.ts). */
+  body?: BodyForEstimate
   /**
    * The training week, so the round timer can offer today's conditioning as a
    * one-tap prefill.
@@ -125,7 +129,7 @@ export interface ToolsTabProps {
 /** Stable identity, so a missing plan does not hand the week hook a fresh array each render. */
 const EMPTY_PLAN: WorkoutDay[] = []
 
-export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipmentAccess, planCreatedAt, logsVersion, onLogsUpdated }: ToolsTabProps) {
+export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipmentAccess, planCreatedAt, logsVersion, onLogsUpdated, body }: ToolsTabProps) {
   const timers = useTimers()
   // The session facade already owns "which day is it" (frozen at session
   // start, dev-clock aware). Deriving it again here from a fresh Date would
@@ -525,6 +529,19 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
           />
         )}
       </div>
+
+      {/* RECORD A WALK OR RUN (his 25 Nov 2026; RecordActivityCard). Start, End, and the phone's steps, distance and
+          calories for that window, logged with one effort tap. */}
+      {profileId && (
+        <Suspense fallback={null}>
+          <RecordActivityCard
+            profileId={profileId}
+            date={todayDate}
+            body={body ?? {}}
+            onLogged={line => { setLoggedNote(`Logged · ${line}`); week.refresh(); onLogsUpdated?.() }}
+          />
+        </Suspense>
+      )}
 
       <div data-tour="plates">
         <PlateCard

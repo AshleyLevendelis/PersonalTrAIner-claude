@@ -1,3 +1,4 @@
+import { activityFiguresLine } from '@/lib/activity-figures'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -148,6 +149,8 @@ export function CardioReadback({
     shape: roundShapeOf(log.notes),
   })
   const heart = heartLine(log.avg_heart_rate, log.max_heart_rate)
+  // A RECORDED WALK OR RUN's steps and calories (activity-figures.ts), an estimate marked as one.
+  const figures = activityFiguresLine(log)
 
   const handleUndo = async () => {
     if (!log.clientId) return
@@ -193,6 +196,7 @@ export function CardioReadback({
           </button>
         )}
       </div>
+      {figures && <p className="pl-2.5 pt-1 text-[0.75rem] text-muted-foreground tabular-mono" data-testid="cardio-figures">{figures}</p>}
       {heart && <p className="pl-2.5 pt-1 text-[0.75rem] text-muted-foreground tabular-mono" data-testid="cardio-heart">{heart}</p>}
       {error && <p className="text-[0.625rem] text-destructive px-1 mt-0.5">{error}</p>}
     </div>
