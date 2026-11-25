@@ -161,8 +161,9 @@ writeFileSync(new URL('./cardio-session.png', import.meta.url).pathname,
 // nothing on it; the card has to be a real one.
 check('6. the day is now a session, not an empty card', after.rendered === true, after.body?.slice(0, 260))
 check('7. ...naming the activity, the minutes and the effort',
-  // Effort in words since 24 Sep 2026: planned at RPE 3 is "Easy".
-  /Cycle · 35 min · Easy/.test(after.prescription || ''),
+  // Effort in words since 24 Sep 2026: planned at RPE 3 is "Easy". The session card since 25 Nov 2026 says it as
+  // the title and two figures: "35 min TIME", "Easy EFFORT".
+  /Cycle/.test(after.title || '') && /35 min TIME/.test(after.prescription || '') && /Easy EFFORT/.test(after.prescription || ''),
   after.prescription)
 check('8. ...and it introduces itself as the session, not as recovery',
   /Cycle/.test(after.title || '') && !/active recovery/i.test(after.card || ''), { title: after.title, card: after.card?.slice(0, 160) })
@@ -217,7 +218,7 @@ const after2 = await ev(`(() => {
 writeFileSync(new URL('./cardio-session-norow.png', import.meta.url).pathname,
   Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
 check('13. the Add button was there to tap', tapped2 === true)
-check('14. the day with no row is now a session', after2.rendered === true && /Swim · 30 min · Steady/.test(after2.prescription || ''), { p: after2.prescription, body: after2.body?.slice(0, 260) })
+check('14. the day with no row is now a session', after2.rendered === true && /Swim/.test(after2.title || '') && /30 min TIME/.test(after2.prescription || '') && /Steady EFFORT/.test(after2.prescription || ''), { p: after2.prescription, body: after2.body?.slice(0, 260) })
 check('15. ...and nothing on the page says the day could not be found', !/couldn.t find/i.test(after2.body || ''), (after2.body || '').match(/[^.]*couldn.t find[^.]*/i)?.[0])
 
 const err = await ev('window.__err ?? null')

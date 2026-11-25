@@ -24,7 +24,7 @@ import { RoundField } from '@/components/timers/RoundField'
 import { RoundCard } from '@/components/timers/RoundCard'
 import { useTimers } from '@/hooks/useTimers'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { PlannedRoundEffort } from '@/components/exercise/PlannedRoundsStart'
+import { PlannedRoundEffort, PlannedCountdownLog } from '@/components/exercise/PlannedRoundsStart'
 import { roundIsPlannedSession } from '@/lib/planned-rounds'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { blockShape, parseConditioningInterval, ROUND_PRESETS } from '@/lib/timer-engine'
@@ -260,9 +260,13 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
   // A ROUND STARTED FROM TODAY'S PLANNED SESSION (23 Nov 2026) is logged AS that session: one effort tap, its own
   // name so the day reads done, never "what was this block?".
   const todaysPlanned = (todayCell?.movedTo ? null : todayCell?.session)?.plannedActivity ?? null
-  const plannedRound = todaysPlanned && roundIsPlannedSession(timers.roundConfig, todaysPlanned.activity, todayDate) && timers.roundConfig
-    ? { planned: todaysPlanned, config: timers.roundConfig }
+  // ...and today's conditioning after lifting (24 Nov 2026): its Start tags the round the same way.
+  const roundSession = [todaysPlanned, todaysConditioning].find(p => !!p && roundIsPlannedSession(timers.roundConfig, p.activity, todayDate)) ?? null
+  const plannedRound = roundSession && timers.roundConfig
+    ? { planned: roundSession, config: timers.roundConfig }
     : null
+  const countdownSession = [todaysSession?.plannedActivity, todaysSession?.recommendedCardio]
+    .find(p => !!p && !!timers.countdownPlanned && timers.countdownPlanned.activity === p.activity && timers.countdownPlanned.date === todayDate) ?? null
   const logSheet = plannedRound ? (
     <Dialog open={!!roundToLog} onOpenChange={o => { if (!o) setRoundToLog(null) }}>
       <DialogContent data-testid="planned-round-log">
@@ -619,6 +623,10 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
             <Suspense fallback={null}>
               <CountdownPanel />
             </Suspense>
+          )}
+          {/* A COUNTDOWN STARTED FROM TODAY'S TIMED SESSION asks its one question here too when it ends (24 Nov 2026). */}
+          {timerPick === 'countdown' && (
+            <PlannedCountdownLog planned={countdownSession} />
           )}
         </DialogContent>
       </Dialog>

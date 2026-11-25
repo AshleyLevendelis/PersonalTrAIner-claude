@@ -8,7 +8,8 @@ import { getRecentActivityDurations, DEFAULT_ACTIVITY_MINUTES, readCardioLogs } 
 import { runForToday, RUN_ACTIVITY, type RunToday } from '@/lib/running'
 import { addDays } from '@/lib/session-move'
 import type { PlannedActivity } from '@/lib/types'
-import { PlannedRoundsStart, usePlannedRound } from './PlannedRoundsStart'
+import { PlannedSessionStart, usePlannedTimerBusy } from './PlannedRoundsStart'
+import { PlannedSessionHero } from './PlannedSessionHero'
 import { PlannedCardioRow, UnplannedCardioEntry, CardioReceipts, useCardioReceiptsToday, type CardioPick } from './CardioSetRow'
 // Its own chunk — see the file for the measurement that put it there.
 const AddCardioSession = lazyWithReload(() => import('./AddCardioSessionSheet').then(m => ({ default: m.AddCardioSession })))
@@ -477,54 +478,41 @@ export function ActiveRecoveryCard({
   // did. This is not an add-on like recommendedCardio: it IS the session, which
   // is why it leads the card and why the card stops calling itself recovery.
   const planned = useRunHeldToLog(workout.plannedActivity, raceDate ?? null)
-  const roundState = usePlannedRound(planned)
+  const optionalBusy = usePlannedTimerBusy(planned ? null : cardio)
   return (
     // THE RECOVERY COLOUR, as the rest day (Ashley's handoff, 4 Nov 2026, Exercise Screen option 4b): amber is for
     // warnings such as "That didn't save", and this card had kept it from before the 20 Sep rest-day rebuild.
     <Card className="bg-[color:var(--surface-deep)]">
       <CardContent className="py-4 space-y-3">
-        <div className="flex items-center gap-3">
-          <div
-            className="flex items-center justify-center size-10 rounded-full shrink-0"
-            style={{ background: 'color-mix(in srgb, var(--role-ai) 16%, transparent)' }}
-          >
-            <Heart className="size-[19px] text-[color:var(--role-ai-text)]" />
-          </div>
-          <div className="space-y-0.5">
-            <p className="text-[1.1875rem] font-semibold tracking-[-.01em] text-foreground leading-tight" data-testid="activity-day-title">
-              {planned ? `${workout.focus} · ${workout.day}` : `Active recovery · ${workout.day}`}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {planned ? "This is today's session." : workout.focus}
-            </p>
-          </div>
-        </div>
-        <WeekTrack done={weekTally.done} planned={weekTally.planned} left={weekTally.left} />
-        {/* LOGGED LIKE A SET since 24 Sep 2026 — the plan's minutes in the box
-            and its effort already chosen, so the ✓ alone logs the walk the plan
-            asked for. PlannedCardioRow reads itself back from today's logs, so
-            a walk logged this morning is still ticked this afternoon; the old
-            row forgot on every tab change and offered to log it again. */}
-        {planned && (
-          <div className="space-y-1.5" data-testid="planned-activity">
-            {/* ROUNDS RUN ON THE ROUND TIMER (23 Nov 2026): Start under the session's name, the effort tap when they
-                end, and the boxes step aside meanwhile so there is one way to log at a time. */}
-            <PlannedCardioRow prescription={planned} timer={<PlannedRoundsStart planned={planned} />} hideEntry={roundState === 'mine' || roundState === 'done'} />
-            {planned.heldBack && (
-              <p className="text-xs leading-[1.5] text-foreground px-0.5" data-testid="run-held-back">{planned.heldBack}</p>
-            )}
-            {planned.reason && (
-              <p className="text-xs leading-[1.5] text-muted-foreground px-0.5">{planned.reason}</p>
-            )}
+        {/* TODAY'S CARDIO SESSION, DRAWN AS A SESSION (his request 25 Nov 2026, PlannedSessionHero.tsx): the weight
+            day's hero, the session's numbers, one big Start, and the one-tap log under it. */}
+        {planned ? (
+          <PlannedSessionHero dayName={workout.day} focus={workout.focus} planned={planned} />
+        ) : (
+          <div className="flex items-center gap-3">
+            <div
+              className="flex items-center justify-center size-10 rounded-full shrink-0"
+              style={{ background: 'color-mix(in srgb, var(--role-ai) 16%, transparent)' }}
+            >
+              <Heart className="size-[19px] text-[color:var(--role-ai-text)]" />
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-[1.1875rem] font-semibold tracking-[-.01em] text-foreground leading-tight" data-testid="activity-day-title">
+                {`Active recovery · ${workout.day}`}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">{workout.focus}</p>
+            </div>
           </div>
         )}
+        <WeekTrack done={weekTally.done} planned={weekTally.planned} left={weekTally.left} />
         {/* NOT BOTH. recommendedCardio is a SUGGESTION for an otherwise-empty
             day; plannedActivity is what the plan prescribes for it. Showing
             both put "Cycle · 35m · RPE 3" directly above "Active Recovery Walk
             or Light Swim" and left the person to guess which was the session —
             the same unanswerable question the type comment warns about, on
             screen instead of in the data. Found by the driver, on a real card. */}
-        {!planned && cardio && <PlannedCardioRow prescription={cardio} label="Optional" />}
+        {/* THE OPTIONAL CARDIO STARTS A TIMER TOO (24 Nov 2026), and logs the same way. */}
+        {!planned && cardio && <PlannedCardioRow prescription={cardio} label="Optional" timer={<PlannedSessionStart planned={cardio} />} hideEntry={optionalBusy} />}
         {tomorrow && <TomorrowPreview tomorrow={tomorrow} onPeek={onPeek} />}
         <ActivityLogEntry alsoLabel={!!planned} claimed={planned ? [planned.activity] : cardio ? [cardio.activity] : []} />
         {/* AN EMPTY DAY IS THE ONE YOU WANT TO FILL, and this is the card an

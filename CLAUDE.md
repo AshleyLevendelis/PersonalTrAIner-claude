@@ -720,8 +720,22 @@ menu" stays true when a copy is also left outside it.
   session asks the same one question. The coach's card carries the coach's three numbers, else the intervals of the
   reply he said yes to when they fit the session. Another day shows the session as a preview, never one line. A saved
   cardio log now re-reads the week strip. A session with its numbers only in the coach's reason (his Wednesday, 24 Nov
-  2026) reads them from there, when they fit its minutes. `test:planned-rounds`, `verify:planned-rounds`. Needs the `chat-gemini` deploy
+  2026) reads them from there, when they fit its minutes. A day early it stays a preview with no Start: his ruling 24 Nov 2026, "Keep it as is". Drawn as a weight day is (his request the same night): the header, an Intervals row with the effort on the right,
+  a bar segment per round and "4 × 3 min hard · 1 min rest". **And on the day it is drawn as a session (his "improve the look of logging cardio, use your
+  best judgment", 25 Nov 2026)**: the weight day's hero, three figures (time, rounds, effort), the round bar that fills
+  when logged, one big Start, and "Or log it yourself" over the same one-tap row (`PlannedSessionHero.tsx`). **And it can be
+  changed for today (his request the same day, "can't do 8x3 ... change it to 6x3")**: rounds, work and rest (or minutes)
+  on steppers, everything on the card follows, "Back to the plan" undoes it; the plan is never written. `test:planned-rounds`, `verify:planned-rounds`. Needs the `chat-gemini` deploy
   for the coach to send rounds itself
+- **Every planned cardio session starts a timer and logs in one tap: his report 24 Nov 2026** ("add a 30min jog ... a
+  workout with timer built in", "even optional cardio on rest days"): rounds on the round timer (read from his own words,
+  the coach's reply, or the session's note when they fit), minutes on a countdown tagged with the session; the minutes it
+  ran are logged under the session's name. `test:planned-rounds`, `verify:planned-rounds` G-I
+- **Cardio days a week: his ruling 24 Nov 2026, "A, build it"** (over coach only and Profile only): setup asks someone who
+  loves cardio how many (0-3), Profile asks anyone; they take training days from lifting down to two (CSCS, mine), one
+  intervals / one steady / two intervals at three, low impact by feel, a health condition capped at RPE 7, and count as
+  the goal's conditioning; a running goal wins. The conditioning after lifting has the same Start. `test:cardio-days`,
+  `verify:cardio-days`, `verify:finisher` 5c. Needs the `cardio_days_per_week` migration
 - **Swap the session for a circuit of timer blocks, block by block** — both surfaces since
   8 Oct 2026. Ashley, from the gym: rope, push-ups, sit-ups and the bike off the round timer could
   only be logged as "Intervals". His ruling, from three options: **A, one workout made of blocks**.

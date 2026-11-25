@@ -255,8 +255,10 @@ console.log('\n1. The libraries are cached separately from the app')
   // MOVED 23 Nov 2026: 469 -> 480. Crossed by the persona audit at zero (the week-balance passes) and the planned
   // interval session (its Start, effort tap and preview). MEASURED 472 through this gate on the change; 8 gz over today.
   // 23 Nov 2026, main (email accounts, next-set nudge) merged on top: MEASURED 475, under the line, so it did not move.
-  headroom('a deploy re-downloads', appGzip, 480, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, under 480`, appGzip < 480, appGzip)
+  // MOVED 25 Nov 2026: 480 -> 490. Crossed by the cardio-timer, cardio-days and Android-notification branch merged
+  // with main's moved-sets, testing-week and warm-up work. MEASURED 481 on the merged tree; 9 kB over today.
+  headroom('a deploy re-downloads', appGzip, 490, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, under 490`, appGzip < 490, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -365,9 +367,11 @@ console.log('\n2b. The coach is not on the path to first paint')
   // trainees, the block's exercises held, the week-balance passes), all in the first chunk because the plan is built
   // there. MEASURED 620 through this gate on the change. 628 is 8 kB over today, the margin every move here has used.
   // MOVED 23 Nov 2026: 628 -> 637, the same two changes, both in the first chunk. MEASURED 629; 8 kB over today.
-  headroom('first paint fetches', firstLoadGzip, 637, 'kB gzipped')
+  // MOVED 25 Nov 2026: 637 -> 646. Crossed by the cardio-timer, cardio-days and Android-notification branch merged
+  // with main's moved-sets, testing-week and warm-up work. MEASURED 637 on the merged tree; 9 kB over today.
+  headroom('first paint fetches', firstLoadGzip, 646, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 637, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 646, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -509,7 +513,11 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 23 Nov 2026: 1617 -> 1644. Crossed by the persona audit's second round (main) meeting the email-account fixes
   // on the merge; MEASURED 1619 through this gate on it. His 15 Sep ruling: 25 kB over today.
   // MOVED 23 Nov 2026: 1617 -> 1651, the same two changes. MEASURED 1626 through this gate; 25 kB over today.
-  const APP_CHUNK_BUDGET_KB = 1651
+  // MOVED 25 Nov 2026: 1651 -> 1665. Crossed by the cardio-timer, cardio-days and Android-notification branch merged
+  // with main's moved-sets, testing-week and warm-up work. MEASURED 1656 on the merged tree; 9 kB over today.
+  // MOVED 25 Nov 2026 again: 1665 -> 1669. The cardio session card and its change-for-today steppers (his two requests
+  // that day) measured 1665 kB, on the line; 4 kB above the measured value, on a screen drawn every cardio day.
+  const APP_CHUNK_BUDGET_KB = 1669
   // 23 Nov 2026, main merged on top: MEASURED 1635, under the line, so it did not move.
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
@@ -826,7 +834,10 @@ console.log('\n3. Nothing has crept back up')
   // meal library's own chunk, which is fetched when meals are made and never on first paint. MEASURED 3311 on the branch
   // head before it, 3327 through this gate on the change (OVER by 4). His 15 Sep ruling, "raise it with room to grow":
   // 25 kB raw over today.
-  const TOTAL_BUDGET_KB = 3352
+  // MOVED 25 Nov 2026: 3352 -> 3365. Crossed by the cardio-timer, cardio-days and Android-notification branch merged
+  // with main's moved-sets, testing-week and warm-up work. MEASURED 3356 on the merged tree; 9 kB over today.
+  // MOVED 25 Nov 2026 again: 3365 -> 3370, the same card, measured 3366 kB.
+  const TOTAL_BUDGET_KB = 3370
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)
