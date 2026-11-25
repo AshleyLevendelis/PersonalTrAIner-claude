@@ -432,6 +432,19 @@ export const APP_DECISIONS: AppDecision[] = [
   { area: 'Coaching', anchor: { file: 'src/lib/coach-lessons.ts', token: 'lessonDue' }, also: ['lesson', 'tip'],
     rule: 'The coach teaches at most one short lesson a day, only when your own week makes it relevant, never repeated.',
     why: 'So you learn the reasons behind your plan as you go.' },
+  // ---- A workout of your own ----------------------------------------------------------------------------------------
+  { area: 'Rest', anchor: { file: 'src/lib/own-workout.ts', token: 'OWN_DEFAULT_REST' }, also: ['own workout', 'my workout', 'rest timer', 'extra workout', 'my workouts'],
+    rule: 'In a workout of your own, the rest is yours: it starts at 90 seconds, goes from 30 seconds to 5 minutes, is kept for each exercise, and runs only when you start it and stops when you tap Done.',
+    why: 'It is your workout, so the rest is your call; 90 seconds is a middle rest that suits most lifts as a start.' },
+  { area: 'Training', anchor: { file: 'src/lib/own-workout-plans.ts', token: 'newPlanLift' }, also: ['own workout', 'build a workout', 'my workouts', 'saved workout', 'plan a workout'],
+    rule: 'An exercise added to a workout you build ahead starts at 3 sets of 8 to 10 reps with 90 seconds of rest, and you can change any of it.',
+    why: 'A middle-of-the-road start for a lift nobody has given numbers to yet.' },
+  { area: 'Progression', anchor: { file: 'src/lib/own-workout.ts', token: 'nextOwnSetNumber' }, also: ['own workout', 'extra workout', 'my workout', 'second session', 'count'],
+    rule: 'Sets logged in a workout of your own are ordinary sets: they count in your history and personal bests, and the next weight the plan gives that lift reads them. They are numbered after any sets already logged that day, so they never replace the plan\'s.',
+    why: 'A set you lifted shows what the lift can do, whichever screen you logged it on.' },
+  { area: 'Weekly structure', anchor: { file: 'src/components/exercise/OwnWorkoutDay.tsx', token: 'markDayDone' }, also: ['own workout', 'rest day', 'extra workout', 'counts', 'trained'],
+    rule: 'Finishing a workout of your own on a day with no plan session marks that day trained; beside a plan session, the plan\'s session still counts as to do.',
+    why: 'Your own workout is extra; counting it as the day\'s session is your choice, never the default.' },
 ]
 
 /** Files that mention a coaching decision but make none of their own; each with the reason. */

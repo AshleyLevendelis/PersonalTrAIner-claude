@@ -6,16 +6,17 @@ import { PRIMARY_CTA_CLASS, PRIMARY_CTA_STYLE } from '@/components/OnePage'
 import { getExerciseId, searchExercisesToLog } from '@/lib/exercise-db'
 import { ensureNearCopies } from '@/lib/near-copies-loader'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
-import { saveSet, deleteSet, getSetsForDates, writeHistoricalSession, ensureSessionSynced } from '@/lib/set-log-store'
-import { saveCardioLog, deleteCardioLog, isCardioLogUndoable } from '@/lib/cardio-log-store'
+import { getSetsForDates, writeHistoricalSession, ensureSessionSynced } from '@/lib/set-log-store'
+import { deleteCardioLog, isCardioLogUndoable, type CardioLogView } from '@/lib/cardio-log-store'
 import { markSessionCompleted } from '@/lib/daily-tracking'
-import { EFFORTS, rpeToStore } from '@/lib/cardio-effort'
+import { effortForRpe, effortLabel } from '@/lib/cardio-effort'
 import { cardioPresetsFor } from '@/lib/cardio-presets'
 import { getAppNow } from '@/lib/dev-clock'
 import type { EquipmentAccess, UserProfile } from '@/lib/types'
+import { UnplannedCardioEntry, type CardioPick } from './CardioSetRow'
 import {
   type OwnWorkout, type OwnLift, type OwnCardio, type OwnItem,
-  saveOwnWorkout, removeOwnWorkout, newOwnLift, withAnotherSet, newOwnCardio, setIsSavable, cardioIsSavable,
+  saveOwnWorkout, removeOwnWorkout, newOwnLift, withAnotherSet, newOwnCardio, setIsSavable,
   readWeight, readReps, hasAnythingSaved, ownWorkoutSummary, stepOwnRest, restWords,
 } from '@/lib/own-workout'
 
@@ -43,7 +44,7 @@ export default function OwnWorkoutSheet({
   const session = useActiveSession()
   const live = initial.mode === 'live'
   const [w, setW] = useState<OwnWorkout>(initial)
-  const [picking, setPicking] = useState<null | 'lift' | 'cardio'>(initial.items.length === 0 ? 'lift' : null)
+  const [picking, setPicking] = useState<null | 'lift'>(initial.items.length === 0 ? 'lift' : null)
   const [note, setNote] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState<string | null>(null)
@@ -85,7 +86,7 @@ export default function OwnWorkoutSheet({
   const tickSet = (lift: OwnLift, i: number) => {
     const s = lift.sets[i]
     if (s.done) {
-      deleteSet({ userId: profileId, date: w.date, exerciseId: lift.exerciseId, setNumber: s.setNumber, isWarmup: false, dropIndex: 0 })
+      session.deleteSet({ userId: profileId, date: w.date, exerciseId: lift.exerciseId, setNumber: s.setNumber, isWarmup: false, dropIndex: 0 })
       session.refresh()
       updateItem(lift.key, it => ({ ...(it as OwnLift), sets: (it as OwnLift).sets.map((x, j) => (j === i ? { ...x, done: false } : x)) }))
       return
@@ -93,7 +94,7 @@ export default function OwnWorkoutSheet({
     const weight = readWeight(s.weight)
     const reps = readReps(s.reps)
     if (weight == null || reps == null) { setNote(reps == null ? 'Type the reps first.' : "That weight doesn't read as a number."); return }
-    const saved = saveSet({
+    const saved = session.logOwnSet({
       userId: profileId, date: w.date, weekNumber, day: dayName, exerciseId: lift.exerciseId, exerciseName: lift.name,
       setNumber: s.setNumber, weightKg: weight, repsCompleted: reps, isBodyweight: weight === 0,
     })
@@ -103,23 +104,19 @@ export default function OwnWorkoutSheet({
     updateItem(lift.key, it => ({ ...(it as OwnLift), sets: (it as OwnLift).sets.map((x, j) => (j === i ? { ...x, done: true } : x)) }))
   }
 
-  // ---- live: one cardio ----
-  const tickCardio = (c: OwnCardio) => {
-    if (c.done) {
-      if (c.clientId && isCardioLogUndoable(c.clientId)) {
-        void deleteCardioLog(c.clientId)
-        updateItem(c.key, it => ({ ...(it as OwnCardio), done: false, clientId: undefined }))
-      } else setNote('That cardio is saved, and too long ago to take back here.')
-      return
-    }
-    if (!cardioIsSavable(c)) { setNote('Pick the activity, the minutes and how hard it was.'); return }
-    const view = saveCardioLog({
-      userId: profileId, date: w.date, activityName: c.activity.trim(), durationMinutes: Math.round(Number(c.minutes)),
-      intensityRpe: rpeToStore(c.effort!), distanceKm: c.distanceKm.trim() ? Number(c.distanceKm.replace(',', '.')) : null,
-    })
-    if (!view) { setNote("Those minutes don't look right, so it wasn't saved."); return }
+  // ---- one cardio: logged by the app's one shared cardio row (his 24 Sep ruling), on this workout's day ----
+  const cardioLogged = (c: OwnCardio, view: CardioLogView) => {
     setNote(null)
-    updateItem(c.key, it => ({ ...(it as OwnCardio), done: true, clientId: view.clientId }))
+    updateItem(c.key, it => ({
+      ...(it as OwnCardio), done: true, clientId: view.clientId, activity: view.activity_name,
+      minutes: String(view.duration_minutes), effort: effortForRpe(view.intensity_rpe),
+      distanceKm: view.distance_km != null ? String(view.distance_km) : '',
+    }))
+  }
+  const undoCardio = (c: OwnCardio) => {
+    if (!c.clientId || !isCardioLogUndoable(c.clientId)) { setNote('That cardio is saved, and too long ago to take back here.'); return }
+    void deleteCardioLog(c.clientId)
+    updateItem(c.key, it => ({ ...(it as OwnCardio), done: false, clientId: undefined }))
   }
 
   const markDay = async (at: Date): Promise<boolean> => {
@@ -151,10 +148,8 @@ export default function OwnWorkoutSheet({
     const lifts = w.items.filter((i): i is OwnLift => i.kind === 'lift')
     const typed = lifts.flatMap(l => l.sets.filter(s => !s.done && (s.reps.trim() || s.weight.trim())).map(s => ({ l, s })))
     const unreadable = typed.filter(({ s }) => !setIsSavable(s))
-    const cardio = w.items.filter((i): i is OwnCardio => i.kind === 'cardio' && !i.done && (i.activity.trim() !== '' || i.minutes.trim() !== ''))
     if (unreadable.length > 0) { setNote(`${unreadable[0].l.name}: every set needs its reps, and a weight that reads (blank is bodyweight).`); return }
-    if (cardio.some(c => !cardioIsSavable(c))) { setNote('Each cardio needs the activity, the minutes and how hard it was.'); return }
-    if (typed.length === 0 && cardio.length === 0) { setNote('Add an exercise or a cardio first.'); return }
+    if (typed.length === 0 && !hasAnythingSaved(w)) { setNote('Add an exercise or log a cardio first.'); return }
     setSaving(true)
     const noon = `${w.date}T12:00:00`
     try {
@@ -172,21 +167,13 @@ export default function OwnWorkoutSheet({
       setNote("Couldn't save it. Check your signal and tap Save again; nothing was written.")
       return
     }
-    const cardioIds = new Map<string, string | undefined>()
-    for (const c of cardio) {
-      const view = saveCardioLog({
-        userId: profileId, date: w.date, activityName: c.activity.trim(), durationMinutes: Math.round(Number(c.minutes)),
-        intensityRpe: rpeToStore(c.effort!), distanceKm: c.distanceKm.trim() ? Number(c.distanceKm.replace(',', '.')) : null,
-      })
-      cardioIds.set(c.key, view?.clientId)
-    }
     const marked = await markDay(new Date(noon))
     const next: OwnWorkout = {
       ...w,
       finishedAtIso: w.finishedAtIso ?? new Date(noon).toISOString(),
       items: w.items.map(i => i.kind === 'lift'
         ? { ...i, sets: i.sets.filter(s => s.done || setIsSavable(s)).map(s => ({ ...s, done: true })) }
-        : cardioIds.has(i.key) ? { ...i, done: true, clientId: cardioIds.get(i.key) } : i),
+        : i),
     }
     update(next)
     session.refresh()
@@ -199,8 +186,8 @@ export default function OwnWorkoutSheet({
     update({ ...w, items: [...w.items, newOwnLift(name, id, taken(id))] })
     setPicking(null)
   }
-  const addCardio = (activity = '', minutes = '') => {
-    update({ ...w, items: [...w.items, newOwnCardio(activity, minutes)] })
+  const addCardio = () => {
+    update({ ...w, items: [...w.items, newOwnCardio()] })
     setPicking(null)
   }
 
@@ -239,25 +226,13 @@ export default function OwnWorkoutSheet({
               onStartRest={() => session.startRest(restKey(w, item), item.restSeconds)}
               onRestAdjust={d => session.adjustRest(d)}
               onRestDone={() => session.dismissRest()} />
-          : <CardioCard key={item.key} cardio={item} live={live} picks={cardioPresetsFor(equipmentAccess).map(p => ({ activity: p.activity, minutes: p.minutes, label: p.label }))}
-              onChange={next => updateItem(item.key, () => next)}
-              onTick={() => tickCardio(item)}
+          : <OwnCardioBlock key={item.key} cardio={item} live={live} date={w.date} presets={cardioPresetsFor(equipmentAccess)}
+              onLogged={view => cardioLogged(item, view)} onUndo={() => undoCardio(item)}
               onRemove={item.done ? undefined : () => removeItem(item.key)} />)}
       </div>
 
       {picking === 'lift' ? (
         <ExercisePicker profile={profile} exclusions={exclusions} onPick={addLift} onCancel={() => setPicking(null)} />
-      ) : picking === 'cardio' ? (
-        <div className="mt-3 rounded-2xl bg-[color:var(--surface-deep)] p-3" data-testid="own-cardio-picker">
-          <p className="ds-label-compact mb-2">Add cardio</p>
-          <div className="flex flex-wrap gap-2">
-            {cardioPresetsFor(equipmentAccess).map(p => (
-              <button key={p.label} type="button" data-testid="own-cardio-pick" className="min-h-11 rounded-full border px-3.5 text-[0.875rem]" onClick={() => addCardio(p.activity, String(p.minutes))}>{p.label}</button>
-            ))}
-            <button type="button" data-testid="own-cardio-other" className="min-h-11 rounded-full border px-3.5 text-[0.875rem]" onClick={() => addCardio()}>Something else</button>
-          </div>
-          <button type="button" className="mt-2 min-h-11 text-[0.8125rem] text-muted-foreground" onClick={() => setPicking(null)}>Cancel</button>
-        </div>
       ) : (
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button type="button" data-testid="own-add-exercise" onClick={() => setPicking('lift')}
@@ -265,7 +240,7 @@ export default function OwnWorkoutSheet({
             style={{ background: 'rgba(var(--glow-rgb), .12)', border: '1px solid rgba(var(--glow-rgb), .35)' }}>
             <Dumbbell className="size-4" aria-hidden /> Add exercise
           </button>
-          <button type="button" data-testid="own-add-cardio" onClick={() => setPicking('cardio')}
+          <button type="button" data-testid="own-add-cardio" onClick={addCardio}
             className="flex h-[52px] items-center justify-center gap-2 rounded-2xl border text-[0.875rem] font-semibold">
             <Activity className="size-4" aria-hidden /> Add cardio
           </button>
@@ -367,8 +342,8 @@ function LiftCard({ lift, live, restOn, restRemainingMs, onChange, onTick, onAdd
           <div className="mt-2.5 flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: 'rgba(var(--glow-rgb), .10)' }} data-testid="own-rest-running">
             <span className="text-[0.8125rem] text-muted-foreground">Rest</span>
             <span className="tabular-mono text-[1.125rem] font-bold" data-testid="own-rest-left">{clock(restRemainingMs)}</span>
-            <button type="button" className="ml-auto min-h-11 px-2 text-[0.8125rem]" onClick={() => onRestAdjust(-15)}>−15</button>
-            <button type="button" className="min-h-11 px-2 text-[0.8125rem]" onClick={() => onRestAdjust(15)}>+15</button>
+            <button type="button" aria-label="15 seconds less rest" className="ml-auto min-h-11 px-2 text-[0.8125rem]" onClick={() => onRestAdjust(-15)}>−15</button>
+            <button type="button" aria-label="15 seconds more rest" className="min-h-11 px-2 text-[0.8125rem]" onClick={() => onRestAdjust(15)}>+15</button>
             <button type="button" className="min-h-11 px-2 text-[0.8125rem] font-semibold text-primary-text" data-testid="own-rest-done" onClick={onRestDone}>Done</button>
           </div>
         ) : (
@@ -394,42 +369,39 @@ function clock(ms: number): string {
   return `${over ? '+' : ''}${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
-function CardioCard({ cardio, live, picks, onChange, onTick, onRemove }: {
-  cardio: OwnCardio; live: boolean; picks: { activity: string; minutes: number; label: string }[]
-  onChange: (c: OwnCardio) => void; onTick: () => void; onRemove?: () => void
+/**
+ * ONE CARDIO IN HIS OWN WORKOUT: the app's shared cardio row until it is logged (chips, minutes, km, Easy/Steady/Hard,
+ * the one-tap log), then a read-back. A cardio from a saved workout starts on its own activity and minutes.
+ */
+function OwnCardioBlock({ cardio, live, date, presets, onLogged, onUndo, onRemove }: {
+  cardio: OwnCardio; live: boolean; date: string; presets: readonly { label: string; activity: string; minutes: number; rpe: number }[]
+  onLogged: (view: CardioLogView) => void; onUndo: () => void; onRemove?: () => void
 }) {
-  const named = picks.some(p => p.activity === cardio.activity)
+  if (cardio.done) {
+    const effort = cardio.effort ? ` · ${effortLabel(cardio.effort)}` : ''
+    const km = cardio.distanceKm ? ` · ${cardio.distanceKm} km` : ''
+    return (
+      <div className="flex min-h-[52px] items-center gap-2 rounded-2xl bg-card px-3.5" data-testid="own-cardio" data-done="true">
+        <Check className="size-4 shrink-0 text-primary-text" aria-hidden />
+        <span className="flex-1 text-[0.9375rem]" data-testid="own-cardio-readback">{cardio.activity} · {cardio.minutes} min{km}{effort}</span>
+        {live && <button type="button" data-testid="own-cardio-undo" onClick={onUndo} className="min-h-11 px-2 text-[0.8125rem] font-semibold text-primary-text">Undo</button>}
+      </div>
+    )
+  }
+  const minutes = Number(cardio.minutes)
+  const matched = presets.findIndex(p => p.activity === cardio.activity)
+  const own: CardioPick[] = cardio.activity && matched < 0
+    ? [{ label: cardio.activity.length > 18 ? `${cardio.activity.slice(0, 16)}…` : cardio.activity, activity: cardio.activity, minutes: minutes > 0 ? minutes : 15 }]
+    : []
+  const picks: CardioPick[] = [...own, ...presets.map(p => ({ ...p, minutes: p.activity === cardio.activity && minutes > 0 ? minutes : p.minutes }))]
+  const initial = own.length > 0 ? 0 : matched >= 0 ? matched : null
   return (
-    <div className="rounded-2xl bg-card p-3.5" data-testid="own-cardio" data-done={cardio.done ? 'true' : 'false'}>
-      <div className="flex items-start justify-between gap-2">
-        {named || cardio.done
-          ? <p className="text-[1rem] font-semibold leading-tight">{cardio.activity}</p>
-          : <Input aria-label="Activity" placeholder="Run, skipping, rower…" value={cardio.activity} data-testid="own-cardio-activity" onChange={e => onChange({ ...cardio, activity: e.target.value })} className="h-11" />}
+    <div className="rounded-2xl bg-card p-3.5" data-testid="own-cardio" data-done="false">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[1rem] font-semibold leading-tight">Cardio</p>
         {onRemove && <button type="button" aria-label="Remove cardio" className="flex size-9 shrink-0 items-center justify-center text-muted-foreground" onClick={onRemove}><Trash2 className="size-4" aria-hidden /></button>}
       </div>
-      <div className="mt-2 flex items-center gap-2">
-        <Input inputMode="numeric" aria-label="Minutes" placeholder="0" value={cardio.minutes} disabled={cardio.done} data-testid="own-cardio-minutes" onChange={e => onChange({ ...cardio, minutes: e.target.value })} className="h-11 w-[72px] text-center tabular-mono border bg-[color:var(--surface-deep)]" />
-        <span className="text-[0.8125rem] text-muted-foreground">min</span>
-        <Input inputMode="decimal" aria-label="Distance" placeholder="–" value={cardio.distanceKm} disabled={cardio.done} data-testid="own-cardio-km" onChange={e => onChange({ ...cardio, distanceKm: e.target.value })} className="h-11 w-[72px] text-center tabular-mono border bg-[color:var(--surface-deep)]" />
-        <span className="text-[0.8125rem] text-muted-foreground">km</span>
-      </div>
-      <div className="mt-2 flex items-center gap-1.5">
-        {EFFORTS.map(e => (
-          <button key={e.key} type="button" disabled={cardio.done} aria-pressed={cardio.effort === e.key} data-testid="own-cardio-effort"
-            onClick={() => onChange({ ...cardio, effort: e.key })}
-            className="min-h-11 rounded-full border px-3 text-[0.8125rem]"
-            style={cardio.effort === e.key ? { background: 'rgba(var(--glow-rgb), .16)', borderColor: 'rgba(var(--glow-rgb), .5)' } : undefined}>
-            {e.label}
-          </button>
-        ))}
-        {live && (
-          <button type="button" aria-label={cardio.done ? 'Undo cardio' : 'Save cardio'} aria-pressed={cardio.done} data-testid="own-cardio-tick" onClick={onTick}
-            className="ml-auto flex size-11 items-center justify-center rounded-full border"
-            style={cardio.done ? { background: 'var(--primary)', color: 'var(--primary-foreground)', borderColor: 'transparent' } : undefined}>
-            <Check className="size-5" aria-hidden />
-          </button>
-        )}
-      </div>
+      <UnplannedCardioEntry picks={picks} initialPick={initial} date={date} onLogged={onLogged} />
     </div>
   )
 }
