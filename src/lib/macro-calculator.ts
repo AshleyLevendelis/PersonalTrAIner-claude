@@ -1,33 +1,12 @@
-import { sportKcalOn, sportKcalPerWeek, sportSessionKcal, SPORT_SESSION_MINUTES } from './setup-sports'
+import { sportKcalPerWeek, sportSessionKcal, SPORT_SESSION_MINUTES } from './setup-sports'
 import { nutritionGoalOf } from './health-conditions'
 import { activityDays } from './concurrent-activity'
 import type {
   UserProfile,
   MacroTargets,
-  MacroCalculationMode,
   ActivityLevel,
   FitnessGoal,
-  WorkoutDay,
 } from './types'
-
-export interface DailyMacroResult {
-  calories: number
-  protein: number
-  carbs: number
-  fat: number
-  dayType: 'training' | 'rest'
-  method: MacroCalculationMode
-}
-
-export interface WeeklyMacroSchedule {
-  monday: DailyMacroResult
-  tuesday: DailyMacroResult
-  wednesday: DailyMacroResult
-  thursday: DailyMacroResult
-  friday: DailyMacroResult
-  saturday: DailyMacroResult
-  sunday: DailyMacroResult
-}
 
 const STATIC_PAL: Record<ActivityLevel, number> = {
   sedentary: 1.2,
@@ -35,14 +14,6 @@ const STATIC_PAL: Record<ActivityLevel, number> = {
   moderate: 1.55,
   active: 1.725,
   very_active: 1.9,
-}
-
-const NEAT_MULTIPLIER: Record<ActivityLevel, number> = {
-  sedentary: 1.15,
-  light: 1.25,
-  moderate: 1.35,
-  active: 1.5,
-  very_active: 1.6,
 }
 
 /**
@@ -139,7 +110,7 @@ export function staticTDEEFor(profile: Pick<UserProfile, 'activity_level' | 'con
  * set" sheet, or null with no sport. Never a number without saying it assumed
  * a class length.
  */
-export function sportFuelNote(profile: Pick<UserProfile, 'concurrent_activities' | 'macro_calculation_mode'>, weightKg: number): string | null {
+export function sportFuelNote(profile: Pick<UserProfile, 'concurrent_activities'>, weightKg: number): string | null {
   const sports = (profile.concurrent_activities ?? []).filter(a => activityDays([a]).size > 0)
   if (sports.length === 0) return null
   const each = sports.map(a => {
@@ -148,37 +119,7 @@ export function sportFuelNote(profile: Pick<UserProfile, 'concurrent_activities'
     return { a, per, days }
   })
   const lead = each.map(({ a, per, days }) => `${a.name} adds about ${per} kcal a class (taken as ${SPORT_SESSION_MINUTES} minutes), ${days.length === 1 ? 'once' : days.length === 2 ? 'twice' : `${days.length} times`} a week`).join('; ')
-  if ((profile.macro_calculation_mode || 'STANDARD_STATIC') === 'DYNAMIC_CSCS') return `${lead}, on the day itself.`
   return `${lead}, spread across the week: +${Math.round(sportKcalPerWeek(sports, weightKg) / 7)} kcal a day.`
-}
-
-function getSessionDurationMinutes(profile: UserProfile): number {
-  switch (profile.session_duration_preference) {
-    case '20-30': return 25
-    case '30-45': return 37
-    case '45-60': return 52
-    case '60-90': return 75
-    case '90+': return 100
-    default: return 52
-  }
-}
-
-function getTrainingMET(focus: string): number {
-  const lower = focus.toLowerCase()
-  // 'full body strength' is a beginner's name for the Full Body Power day (21 Nov 2026): the same session, the same burn.
-  if (lower.includes('power') || lower.includes('full body strength') || lower.includes('conditioning')) return 7.0
-  if (lower.includes('squat') || lower.includes('leg')) return 6.0
-  if (lower.includes('pull') || lower.includes('hinge') || lower.includes('back')) return 6.0
-  if (lower.includes('push') || lower.includes('chest') || lower.includes('press')) return 5.0
-  if (lower.includes('shoulder') || lower.includes('core') || lower.includes('abs')) return 4.5
-  if (lower.includes('full body')) return 6.5
-  return 5.0
-}
-
-function classifyTrainingIntensity(focus: string): 'rest' | 'moderate' | 'high' {
-  const lower = focus.toLowerCase()
-  if (lower.includes('power') || lower.includes('full body') || lower.includes('conditioning')) return 'high'
-  return 'moderate'
 }
 
 /**
@@ -239,26 +180,6 @@ export function applyGoalAdjustment(tdee: number, goal: FitnessGoal, gender: 'ma
   }
 }
 
-function getCarbsPerKg(intensity: 'rest' | 'moderate' | 'high', goal: FitnessGoal): number {
-  switch (intensity) {
-    case 'rest':
-      if (goal === 'fat_loss') return 1.5
-      if (goal === 'hypertrophy') return 2.5
-      if (goal === 'conditioning') return 2.5
-      return 2.0
-    case 'moderate':
-      if (goal === 'fat_loss') return 3.0
-      if (goal === 'hypertrophy') return 5.0
-      if (goal === 'conditioning') return 5.0
-      return 4.0
-    case 'high':
-      if (goal === 'fat_loss') return 5.0
-      if (goal === 'hypertrophy') return 7.0
-      if (goal === 'conditioning') return 7.0
-      return 6.0
-  }
-}
-
 // ---------------------------------------------------------------------------
 // USER-ADJUSTABLE MACRO SPLIT (macro-accuracy round, Part 2)
 // ---------------------------------------------------------------------------
@@ -293,7 +214,7 @@ export const MACRO_SPLIT_PRESET_VALUES: Record<Exclude<MacroSplitPreset, 'custom
  * vegan beginner). Basis: muscle gain from resistance training levels off near 1.6 g/kg (Morton et al. 2018
  * meta-analysis, upper CI 2.2); the ISSN range for exercising people is 1.4-2.0 g/kg, with higher figures meant for
  * lean trained athletes in a deficit, not beginners, who gain readily even while losing fat. So a beginner's Balanced is
- * 1.6, Higher protein 2.0, and the periodised (dynamic) 2.2 becomes 1.8. Everyone else is unchanged.
+ * 1.6 and Higher protein 2.0. Everyone else is unchanged.
  */
 const BEGINNER_PROTEIN_OFFSET = 0.4
 const BEGINNER_PROTEIN_FLOOR = 1.6
@@ -379,8 +300,8 @@ function computeStaticMacros(profile: UserProfile, m: BodyMetrics): MacroTargets
   const tdee = staticTDEEFor(profile, m)
   const calorieTarget = applyGoalAdjustment(tdee, nutritionGoalOf(profile), m.gender)
 
-  // The calories field is always recomputed from the FINAL macros (M0),
-  // matching what dynamic mode already did — the old code returned the
+  // The calories field is always recomputed from the FINAL macros (M0) —
+  // the old code returned the
   // pre-allocation target, which silently disagreed with the macro sum by
   // a couple of kcal from rounding, and by 100+ kcal whenever the 50g carb
   // floor or the calorie rail engaged.
@@ -401,132 +322,7 @@ function computeStaticMacros(profile: UserProfile, m: BodyMetrics): MacroTargets
   return { calories: result.calories, protein: result.protein, carbs: result.carbs, fat: result.fat }
 }
 
-// Deliberately does NOT read the user-adjustable macro split (see
-// getProfileMacroSplit above) — this day-varying carb-cycling formula is its
-// own periodization scheme (protein fixed at 2.2g/kg, carbs swinging by
-// training intensity, fat as the remainder above a floor), not the flat
-// "protein g/kg + fat%, carbs remainder" shape the split control edits.
-// Retrofitting the split onto this chain would either do nothing useful
-// (fat% has no lever here — fat is already remainder-with-floor) or fight
-// the carb-cycling table. The Nutrition tab disables the split control while
-// Dynamic CSCS is selected and says why, rather than silently ignoring it.
-function computeDynamicDay(
-  profile: UserProfile,
-  m: BodyMetrics,
-  isTraining: boolean,
-  workoutFocus: string | null,
-  dayName: string,
-): DailyMacroResult {
-  const bmr = computeBMR(m)
-  const neatTDEE = bmr * NEAT_MULTIPLIER[profile.activity_level]
-  const weight = m.weightKg
-
-  let eee = 0
-  let intensity: 'rest' | 'moderate' | 'high' = 'rest'
-
-  if (isTraining && workoutFocus) {
-    const met = getTrainingMET(workoutFocus)
-    const durationHr = getSessionDurationMinutes(profile) / 60
-    eee = met * weight * durationHr
-    intensity = classifyTrainingIntensity(workoutFocus)
-  }
-
-  // ANOTHER SPORT ON THIS DAY (7 Nov 2026, her "add the extra calories on
-  // sport days"): its energy on the day itself, and the carbs of a hard day
-  // for a class worth 300 kcal or more (setup-sports.ts sportKcalOn).
-  const sportKcal = sportKcalOn(profile.concurrent_activities, dayName, weight)
-  if (sportKcal > 0) {
-    eee += sportKcal
-    intensity = sportKcal >= 300 ? 'high' : intensity === 'rest' ? 'moderate' : intensity
-  }
-
-  const dailyTDEE = Math.round(neatTDEE + eee)
-  const calories = applyGoalAdjustment(dailyTDEE, nutritionGoalOf(profile), m.gender)
-
-  // Per-kilo grams come off the reference weight (nutritionReferenceWeightKg); the energy above used the real one.
-  const refWeight = nutritionReferenceWeightKg(weight, m.heightCm)
-  const protein = Math.round((2.2 - beginnerProteinOffset(profile)) * refWeight)
-  const carbsPerKg = getCarbsPerKg(intensity, nutritionGoalOf(profile))
-  let carbs = Math.round(carbsPerKg * refWeight)
-
-  let fat = Math.round((calories - protein * 4 - carbs * 4) / 9)
-  const fatFloor = Math.round(FAT_FLOOR_PER_KG * refWeight)
-
-  if (fat < fatFloor) {
-    fat = fatFloor
-    const remainingCals = calories - protein * 4 - fat * 9
-    carbs = Math.max(50, Math.round(remainingCals / 4))
-  }
-
-  const actualCalories = protein * 4 + carbs * 4 + fat * 9
-
-  return {
-    calories: actualCalories,
-    protein,
-    carbs,
-    fat,
-    dayType: isTraining || sportKcal > 0 ? 'training' : 'rest',
-    method: 'DYNAMIC_CSCS',
-  }
-}
-
-/**
- * Null when any body metric is missing — the caller must render an absence,
- * not a number. Every public entry point in this file returns null the same
- * way, so there is no path that quietly computes from a guessed weight.
- */
-export function calculateDailyMacros(
-  profile: UserProfile,
-  dayName: string,
-  exercisePlan: WorkoutDay[],
-): DailyMacroResult | null {
-  const m = resolveBodyMetrics(profile)
-  if (!m) return null
-  const mode = profile.macro_calculation_mode || 'STANDARD_STATIC'
-
-  if (mode === 'STANDARD_STATIC') {
-    const macros = computeStaticMacros(profile, m)
-    // `|| []` backstop — see the note in exercise-plan.ts's availableDays.
-    const isTraining = (profile.training_days || []).some(
-      td => td.day === dayName && td.available
-    )
-    return {
-      ...macros,
-      dayType: isTraining ? 'training' : 'rest',
-      method: 'STANDARD_STATIC',
-    }
-  }
-
-  const isTraining = (profile.training_days || []).some(
-    td => td.day === dayName && td.available
-  )
-  const workoutDay = exercisePlan.find(wp => wp.day === dayName)
-  return computeDynamicDay(profile, m, isTraining, workoutDay?.focus ?? null, dayName)
-}
-
-/** Null when body metrics are missing — see calculateDailyMacros. All seven days share one resolution, so a week is never half-computed. */
-export function calculateWeeklySchedule(
-  profile: UserProfile,
-  exercisePlan: WorkoutDay[],
-): WeeklyMacroSchedule | null {
-  if (!resolveBodyMetrics(profile)) return null
-  // Non-null asserted deliberately: the guard above already proved the
-  // metrics resolve, and calculateDailyMacros returns null for exactly that
-  // one reason. Asserting here keeps a week all-or-nothing rather than
-  // letting individual days go null and half-populate the schedule.
-  const day = (name: string) => calculateDailyMacros(profile, name, exercisePlan)!
-  return {
-    monday: day('Monday'),
-    tuesday: day('Tuesday'),
-    wednesday: day('Wednesday'),
-    thursday: day('Thursday'),
-    friday: day('Friday'),
-    saturday: day('Saturday'),
-    sunday: day('Sunday'),
-  }
-}
-
-/** Null when body metrics are missing — see calculateDailyMacros. */
+/** Null when any body metric is missing: the caller renders an absence, never a number from a guessed weight. */
 export function getStaticDailyMacros(profile: UserProfile): MacroTargets | null {
   const m = resolveBodyMetrics(profile)
   return m ? computeStaticMacros(profile, m) : null

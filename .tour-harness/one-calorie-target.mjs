@@ -59,9 +59,8 @@ async function read() {
 async function sheet() {
   await ev(`document.querySelector('[data-targets-row]')?.click()`); await wait(900)
   const s = await ev(`(() => { const d = [...document.querySelectorAll('[role="dialog"]')].pop(); if (!d) return null
-    const cells = [...d.querySelectorAll('p')].map(p => p.innerText.trim())
-    const i = cells.findIndex(t => /^target$/i.test(t))
-    return { target: i > 0 ? cells[i - 1] : null, text: d.innerText } })()`)
+    // THE SHEET REDRAWN (25 Nov 2026): the target is its own labelled figure.
+    return { target: d.querySelector('[data-testid="targets-kcal"]')?.innerText ?? null, text: d.innerText } })()`)
   return s
 }
 
@@ -74,11 +73,10 @@ checkC("1c. ...and so does the sheet's Target cell", !!s && num(s.target) === nu
 checkC("2. the sheet says the weight the targets use (80 kg), not this morning's 81.7", !!s && /From 80 kg/.test(s.text) && !/From 81\.7 kg/.test(s.text), s?.text?.slice(0, 300))
 await shoot('one-calorie-target')
 
-// TARGETS THAT MOVE WITH THE TRAINING DAY: the top is today's target, and the row must print that one, not the
-// week's static baseline the sheet's chain explains.
+// ONE METHOD (his "Take it out", 25 Nov 2026): a profile saved on the old day-by-day mode gets the same target.
 await open('weighin=81.7&macromode=dynamic')
 const d = await read()
-checkC("3. with targets that move by training day, the row still prints today's target, the one at the top", num(d.top) > 0 && num(d.top) === num(d.row), d)
+checkC("3. a profile saved on the old day-by-day mode shows the same one target, top and row", num(d.top) > 0 && num(d.top) === num(r.top) && num(d.row) === num(r.row), { d, r })
 
 console.log(`\n${ran} checks ran.`)
 ws.close(); chrome.kill(); server.close()

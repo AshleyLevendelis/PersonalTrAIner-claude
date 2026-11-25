@@ -61,16 +61,6 @@ async function main() {
   const tl = mc.getStaticDailyMacros(lean)!
   check('a man at a BMI of 26 is untouched: 170 g of protein from his 85 kg', tl.protein === 170 && mc.getMacroDerivation(lean)!.referenceWeightKg === 85, tl)
 
-  console.log('\n3. The periodised day')
-  const dyn = mc.calculateDailyMacros(person({ weight_kg: 120, height_cm: 160, macro_calculation_mode: 'DYNAMIC_CSCS' }), 'Monday', [])!
-  check('a rest day\'s protein is 2.2 x 87.6 = 193 g, not 264', dyn.protein === 193, dyn)
-  // Carbs per kilo bind only where the fat floor does not take them back: a maintenance goal (2.0 g/kg on a rest day).
-  const dynMaint = mc.calculateDailyMacros(person({ weight_kg: 120, height_cm: 160, fitness_goal: 'functional', macro_calculation_mode: 'DYNAMIC_CSCS' }), 'Monday', [])!
-  check('...and a maintenance rest day\'s carbs are 2.0 x 87.6 = 175 g, not 240', dynMaint.carbs === 175, dynMaint)
-  check('...its fat floor is read off the reference weight too (never under 0.6 x 87.6 = 53)', dyn.fat === 53, dyn)
-  const dynLean = mc.calculateDailyMacros(person({ weight_kg: 85, height_cm: 180, gender: 'male', macro_calculation_mode: 'DYNAMIC_CSCS' }), 'Monday', [])!
-  check('a BMI-26 rest day is untouched (2.2 x 85 = 187 g)', dynLean.protein === 187, dynLean)
-
   console.log('\n4. Her plan can be served')
   const { MEAL_LIBRARY } = await import('../src/lib/meal-library-data')
   const { fitDishToBudget } = await import('../src/lib/meal-library')

@@ -62,18 +62,17 @@ check('...with the link that opens the sheet', /setHowItsSetOpen\(true\)/.test(s
 // RE-ANCHORED 30 Oct 2026 ("less is more"): a plain hairline row now, still at least 52px tall.
 check('...on a 44px target (the row is 52px tall)', /className="flex (min-)?h-\[52px\] w-full items-center[^"]*"[\s\S]{0,120}data-targets-row/.test(scroll))
 // THE OTHER HALF. Each of these left the scroll; none of them may have left
-// the app. A "cleaner tab" that dropped the method picker would be a feature
-// deletion wearing a design change's clothes.
+// the app. A "cleaner tab" that dropped one would be a feature deletion wearing a design change's clothes. The method
+// picker and the weekly table were taken out ON PURPOSE (his ruling 25 Nov 2026, "Take it out"), and are held absent below.
 for (const [what, needle] of [
   ['the BMR/TDEE derivation', 'derivation.bmr'],
   ['the macro-split control', '<MacroSplitCard'],
-  ['the dynamic week table', 'weeklySchedule[day]'],
-  ['the method picker', "onMacroModeChange?.('DYNAMIC_CSCS')"],
   ['the water target editor', 'handleSaveWaterTarget'],
 ] as const) {
   check(`${what} left the scroll`, !scroll.includes(needle))
   check(`...and is still reachable in the sheet`, sheet.includes(needle))
 }
+check('the day-by-day method is gone from the sheet: no picker, no weekly table', !/DYNAMIC_CSCS|weeklySchedule|onMacroModeChange/.test(sheet))
 // A dialog nothing can open is the same as a deleted card.
 check('the sheet is bound to the state the link sets', /open=\{howItsSetOpen\}/.test(sheet))
 

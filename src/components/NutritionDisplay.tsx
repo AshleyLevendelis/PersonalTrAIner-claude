@@ -3,9 +3,8 @@ import { mealRestrictionsOf, isPregnant, PREGNANCY_CALORIE_LINE } from '@/lib/he
 import { pregnancyFishLines } from '@/lib/pregnancy-food'
 import { useEffect, useRef, useState } from 'react'
 import type { HeldAround } from '@/lib/meal-generation'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Calculator, Layers, ShoppingCart, SlidersHorizontal, ChevronRight, ChevronDown, ChevronUp, Plus } from 'lucide-react'
+import { ShoppingCart, SlidersHorizontal, ChevronRight, ChevronDown, ChevronUp, Plus } from 'lucide-react'
 import { groceryHash, openGroceryForDays, tabHash } from '@/lib/app-route'
 import { setChatPrefill } from '@/lib/chat-prefill-store'
 import { MealPlan, SLOT_ORDER, SLOT_LABEL, type UpcomingMealDay } from '@/components/MealPlan'
@@ -21,13 +20,13 @@ import { getLogsForDate as getWaterLogsForDate, setWaterTargetMl, logWater, undo
 import { TODAY_RINGS, TODAY_RING_SIZE, ringShares, leftOrOverLabel, litres, weekRangeLabel, type RingKey } from '@/lib/nutrition-week'
 import { NestedRings, RING_COLOR, RING_LABEL } from '@/components/nutrition/NutritionRings'
 import { NutritionWeekView, PlannedDayCard, type WeekViewDay } from '@/components/nutrition/NutritionWeek'
-import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from '@/lib/types'
+import type { MacroTargets, UserProfile } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
 import { skipsBreakfast } from '@/lib/meal-generation'
 import type { MealDayMoveController } from '@/lib/meal-day-move'
 import type { EatingOutController } from '@/lib/eating-out'
-import { calculateWeeklySchedule, getMacroDerivation, sportFuelNote, nutritionReferenceWeightKg } from '@/lib/macro-calculator'
+import { getMacroDerivation, sportFuelNote, nutritionReferenceWeightKg } from '@/lib/macro-calculator'
 import { macroShortfallLine } from '@/lib/macro-shortfall'
 import { paceClock } from '@/lib/pace'
 import { getAppNow } from '@/lib/dev-clock'
@@ -68,7 +67,6 @@ export interface NutritionDisplayProps {
   profile: UserProfile
   /** Null when a body metric is missing — see MissingBodyMetricsNotice, which this component renders in that case instead of a ring meter reading 0/0. */
   macros: MacroTargets | null
-  exercisePlan?: WorkoutDay[]
   /** Latest daily_metrics weigh-in — overrides the immutable onboarding weight in every displayed number (living targets, M0). */
   latestWeightKg?: number | null
   /**
@@ -77,7 +75,6 @@ export interface NutritionDisplayProps {
    * top of the screen. The raw latest weigh-in stays a display fact; it never feeds a second target.
    */
   targetWeightKg?: number | null
-  onMacroModeChange?: (mode: MacroCalculationMode) => void
   /** Macro-accuracy round, Part 2 — fired on any macro-split edit (preset tap or a Custom-mode slider). */
   onMacroSplitChange?: (patch: Partial<UserProfile>) => void
   // Turn 12 ("one owner per fact") — meals moved here from the retired
@@ -180,7 +177,7 @@ export interface MealRefitOffer {
 }
 
 export function NutritionDisplay({
-  profile, macros, exercisePlan = [], latestWeightKg, targetWeightKg, onMacroModeChange, onMacroSplitChange,
+  profile, macros, latestWeightKg, targetWeightKg, onMacroSplitChange,
   profileId, date, planCreatedAt, pools, chosen, mealTotals, isGeneratingMeals, mealsRegeneratingAll = false, mealRegenerateError, onDismissRegenerateError, avoidFoods = [], onMealPickApplied,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions, onOpenMyMeals,
   onSwapMealSlot, onUndoMealSwap, onRegenerateMealSlot, onMakeOneNewMeal, onFindMoreOptions, onRegenerateAllMeals,
@@ -198,16 +195,11 @@ export function NutritionDisplay({
   const effectiveProfile = derivationWeightKg != null && derivationWeightKg > 0
     ? { ...profile, weight_kg: derivationWeightKg }
     : profile
-  const mode = profile.macro_calculation_mode || 'STANDARD_STATIC'
   // Turn 10: the derivation always explains the STATIC baseline (BMR → TDEE
   // → goal adjustment → target) regardless of which method is active below —
   // "where your numbers come from" is a fixed chain of math, not a
   // restatement of whichever schedule happens to be selected.
   const derivation = getMacroDerivation(effectiveProfile)
-
-  const weeklySchedule = mode === 'DYNAMIC_CSCS'
-    ? calculateWeeklySchedule(effectiveProfile, exercisePlan)
-    : null
 
   // Tab-restructure handoff — "one owner per fact": Nutrition now owns the
   // macro ring meter and water logging (moved off Dashboard.tsx). Both are
@@ -778,71 +770,44 @@ export function NutritionDisplay({
             <DialogTitle className="text-base">How your targets are set</DialogTitle>
           </DialogHeader>
 
+          {/* THE SHEET, REDRAWN (25 Nov 2026, his "doesn't fit the page ... doesn't fit the aesthetics"): the day's
+              target first, how it is worked out under it in plain words, then the split and the water target, each a
+              section under a label. The day-by-day "Dynamic CSCS" method and its weekly table are gone (his ruling the
+              same day, "Take it out"): one set of numbers, every day. */}
           {derivation && (
-            <div>
-              <div className="flex gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em]">{derivation.bmr}</p>
-                  <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">BMR</p>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em]">{derivation.tdee}</p>
-                  <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">TDEE</p>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em]">{derivation.surplusKcal > 0 ? '+' : ''}{derivation.surplusKcal}</p>
-                  <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">{derivation.surplusLabel.split(' ')[0]}</p>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="tabular-mono text-[1.0625rem] font-bold tracking-[-.03em] text-primary-text glow-mint">{derivation.target.calories}</p>
-                  <p className="mt-0.5 text-[0.53125rem] uppercase tracking-[.14em] text-muted-foreground">Target</p>
-                </div>
+            <section data-testid="targets-derivation">
+              <p className="ds-label">Your daily target</p>
+              <p className="mt-1.5 flex items-baseline gap-1.5">
+                <span className="tabular-mono text-[2rem] font-bold leading-none tracking-[-.03em] text-primary-text glow-mint" data-testid="targets-kcal">{derivation.target.calories.toLocaleString('en-GB')}</span>
+                <span className="text-[0.875rem] text-muted-foreground">kcal a day</span>
+              </p>
+              <div className="mt-3">
+                {[
+                  { label: 'Resting burn', value: derivation.bmr.toLocaleString('en-GB'), testid: 'targets-bmr' },
+                  { label: 'With your activity', value: derivation.tdee.toLocaleString('en-GB'), testid: 'targets-tdee' },
+                  { label: derivation.surplusLabel, value: `${derivation.surplusKcal > 0 ? '+' : derivation.surplusKcal < 0 ? '−' : ''}${Math.abs(derivation.surplusKcal).toLocaleString('en-GB')}`, testid: 'targets-adjust' },
+                ].map(r => (
+                  <div key={r.testid} className="flex min-h-[40px] items-center gap-2.5" style={{ borderTop: '1px solid var(--hairline)' }}>
+                    <span className="flex-1 text-[0.875rem]">{r.label}</span>
+                    <span className="tabular-mono text-[0.875rem] font-bold" data-testid={r.testid}>{r.value}</span>
+                    <span className="w-9 text-[0.75rem] text-muted-foreground">kcal</span>
+                  </div>
+                ))}
               </div>
-              <p className="mt-2.5 text-[0.6875rem] leading-normal text-muted-foreground">
+              <p className="mt-2 text-[0.75rem] leading-normal text-muted-foreground" data-testid="targets-from">
                 {derivation.splitApplies
-                  ? `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} y · protein ${derivation.split.proteinPerKg.toFixed(1)} g/kg · fat ${Math.round(derivation.split.fatPercent * 100)}% · carbs the remainder.`
-                  : `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} y · a fixed 20% protein / 25% fat / 55% carb split for conditioning goals.`}
+                  ? `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} years · protein ${derivation.split.proteinPerKg.toFixed(1)} g/kg · fat ${Math.round(derivation.split.fatPercent * 100)}% · carbs the rest.`
+                  : `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} years · a fixed 20% protein / 25% fat / 55% carb split for conditioning goals.`}
               </p>
               {derivation.splitApplies && effectiveProfile.weight_kg != null && derivation.referenceWeightKg < effectiveProfile.weight_kg && (
-                <p data-testid="reference-weight-note" className="mt-1.5 text-[0.6875rem] leading-normal text-muted-foreground">{referenceWeightLine(derivation.referenceWeightKg)}</p>
+                <p data-testid="reference-weight-note" className="mt-1.5 text-[0.75rem] leading-normal text-muted-foreground">{referenceWeightLine(derivation.referenceWeightKg)}</p>
               )}
               {/* ANOTHER SPORT'S FUEL, said where the number is explained (7 Nov 2026). */}
               {effectiveProfile.weight_kg && sportFuelNote(effectiveProfile, effectiveProfile.weight_kg) && (
-                <p data-testid="sport-fuel-note" className="mt-1.5 text-[0.6875rem] leading-normal text-muted-foreground">{sportFuelNote(effectiveProfile, effectiveProfile.weight_kg)}</p>
+                <p data-testid="sport-fuel-note" className="mt-1.5 text-[0.75rem] leading-normal text-muted-foreground">{sportFuelNote(effectiveProfile, effectiveProfile.weight_kg)}</p>
               )}
-            </div>
+            </section>
           )}
-
-          {/* THE WATER TARGET STAYS ON THIS TAB even though the quick-adds
-              left it: Home logs the day, Nutrition sets what the day is
-              measured against. Same editor, same optimistic-then-put-back
-              failure handling it had in the scroll. */}
-          <div className="border-t border-[color:var(--hairline)] pt-3">
-            <div className="flex items-center justify-between gap-3">
-              <p className="ds-label">Water target</p>
-              {editingWaterTarget ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={waterTargetInput}
-                    onChange={e => setWaterTargetInput(e.target.value)}
-                    className="h-9 w-24 rounded-md border border-border bg-transparent px-2 text-right tabular-mono text-[0.8125rem]"
-                    aria-label="Daily water target in millilitres"
-                  />
-                  <Button size="sm" className="hit-slop-44" onClick={() => void handleSaveWaterTarget()}>Save</Button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => { setWaterTargetInput(String(waterTarget)); setEditingWaterTarget(true) }}
-                  className="hit-slop-44 text-[0.8125rem]"
-                >
-                  <span className="tabular-mono">{waterTarget}</span> ml <span className="text-primary-text">Edit</span>
-                </button>
-              )}
-            </div>
-          </div>
 
           {/* The split control edits protein-per-KG and shows the resulting
               grams — both meaningless without a bodyweight, and a 0 here
@@ -854,104 +819,44 @@ export function NutritionDisplay({
               profile={profile}
               effectiveWeightKg={nutritionReferenceWeightKg(effectiveProfile.weight_kg!, effectiveProfile.height_cm)}
               calorieTarget={derivation.target.calories}
-              applies={mode === 'STANDARD_STATIC' && profile.fitness_goal !== 'conditioning'}
-              disabledReason={
-                profile.fitness_goal === 'conditioning'
-                  ? 'Not available for the conditioning goal, which uses its own fixed 20% protein / 25% fat / 55% carb split rather than a bodyweight-anchored one.'
-                  : 'Not available in Dynamic CSCS mode, which varies protein and carbs by training day using its own periodization — switch to Standard Static (below) to use this control.'
-              }
+              applies={profile.fitness_goal !== 'conditioning'}
+              disabledReason="Not used for the conditioning goal, which has its own fixed 20% protein / 25% fat / 55% carb split."
               onChange={patch => onMacroSplitChange?.(patch)}
               isGeneratingMeals={isGeneratingMeals}
               onRegenerateAllMeals={onRegenerateAllMeals}
             />
           )}
 
-          {mode === 'DYNAMIC_CSCS' && weeklySchedule && (
-            <div>
-              <p className="ds-label mb-2">Weekly dynamic targets</p>
-              <div className="space-y-2">
-                {(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).map((day) => {
-                  const d = weeklySchedule[day]
-                  return (
-                    <div
-                      key={day}
-                      className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
-                        d.dayType === 'training' ? 'bg-[color:var(--role-warn-bg)]' : 'bg-muted/50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium capitalize w-20">{day.slice(0, 3)}</span>
-                        <Badge variant={d.dayType === 'training' ? 'warning' : 'outline'} className="text-[0.625rem]">
-                          {d.dayType === 'training' ? 'Train' : 'Rest'}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-4 text-xs font-mono">
-                        <span>{d.calories} kcal</span>
-                        <span className="text-[color:var(--chart-2)]">P{d.protein}g</span>
-                        <span className="text-[color:var(--role-warn)]">C{d.carbs}g</span>
-                        <span className="text-text-tertiary">F{d.fat}g</span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* The method picker — the toggle that governs every number above
-              it in this sheet, so it sits with them rather than in Settings. */}
-          <div>
-            <div className="flex items-center justify-between">
-              <p className="ds-label">Method</p>
-              <Badge variant="secondary" className="text-xs">
-                {mode === 'STANDARD_STATIC' ? 'Standard' : 'Dynamic CSCS'}
-              </Badge>
-            </div>
-            <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => onMacroModeChange?.('STANDARD_STATIC')}
-                className={`w-full rounded-lg border p-3 text-left transition-all cursor-pointer ${
-                  mode === 'STANDARD_STATIC'
-                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                    : 'border-border hover:border-muted-foreground/30 hover:bg-muted/30'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
-                    mode === 'STANDARD_STATIC' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                  }`}>
-                    <Calculator className="size-3.5" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-xs text-foreground">Standard Static</p>
-                    <p className="text-[0.625rem] text-muted-foreground mt-0.5">Same macros every day</p>
-                  </div>
+          {/* THE WATER TARGET STAYS ON THIS TAB even though the quick-adds
+              left it: Home logs the day, Nutrition sets what the day is
+              measured against. Same editor, same optimistic-then-put-back
+              failure handling it had in the scroll. */}
+          <section className="border-t border-[color:var(--hairline)] pt-4">
+            <div className="flex min-h-11 items-center justify-between gap-3">
+              <p className="ds-label">Water target</p>
+              {editingWaterTarget ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={waterTargetInput}
+                    onChange={e => setWaterTargetInput(e.target.value)}
+                    className="h-11 w-24 rounded-xl border border-border bg-[color:var(--surface-deep)] px-2 text-right tabular-mono text-[0.875rem]"
+                    aria-label="Daily water target in millilitres"
+                  />
+                  <Button size="sm" className="min-h-11" onClick={() => void handleSaveWaterTarget()}>Save</Button>
                 </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => onMacroModeChange?.('DYNAMIC_CSCS')}
-                className={`w-full rounded-lg border p-3 text-left transition-all cursor-pointer ${
-                  mode === 'DYNAMIC_CSCS'
-                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                    : 'border-border hover:border-muted-foreground/30 hover:bg-muted/30'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
-                    mode === 'DYNAMIC_CSCS' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                  }`}>
-                    <Layers className="size-3.5" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-xs text-foreground">Dynamic CSCS</p>
-                    <p className="text-[0.625rem] text-muted-foreground mt-0.5">Carb-cycles by training day</p>
-                  </div>
-                </div>
-              </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setWaterTargetInput(String(waterTarget)); setEditingWaterTarget(true) }}
+                  className="hit-slop-44 text-[0.875rem]"
+                >
+                  <span className="tabular-mono font-bold">{waterTarget.toLocaleString('en-GB')}</span> ml <span className="ml-1 font-semibold text-primary-text">Edit</span>
+                </button>
+              )}
             </div>
-          </div>
+          </section>
         </DialogContent>
       </Dialog>
     </div>

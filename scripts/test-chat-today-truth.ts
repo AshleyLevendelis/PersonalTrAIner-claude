@@ -94,7 +94,9 @@ const eff = chat.slice(chat.indexOf('const chatMovesKey'), chat.indexOf('const c
 check('the chat\'s copy of Home reads the moves Home reads', /moves: trainingWeek\.moves/.test(eff))
 check('...and re-reads when the plan or the moves change', /exercisePlan, mesocycle, planCreatedAt, chatMovesKey\]/.test(eff))
 const nt = strip(read('../src/lib/nutrition-targets.ts'))
-check('the dynamic calorie day is the app\'s today, not the machine\'s', /getAppNow\(profileId\)\.toLocaleDateString/.test(nt) && !/new Date\(\)\.toLocaleDateString/.test(nt))
+// THE DAY-BY-DAY TARGET IS GONE (his ruling 25 Nov 2026, "Take it out"): the targets read no weekday at all now, so
+// no clock, the machine's or the app's, can pick the wrong day's numbers.
+check('the targets read no weekday (the day-by-day mode is gone), so no clock can pick the wrong day', !/toLocaleDateString\(['"]en-US['"], \{ weekday/.test(nt) && !/DYNAMIC_CSCS/.test(nt))
 check('the opener bubbles carry when they were said (seed, composed, reseed)',
   (chat.match(/status: 'complete',\s*created_at: new Date\(\)\.toISOString\(\)/g) ?? []).length >= 3
   && /content: greeting, status: 'complete', created_at: new Date\(\)\.toISOString\(\)/.test(chat), (chat.match(/status: 'complete',\s*created_at: new Date\(\)\.toISOString\(\)/g) ?? []).length)

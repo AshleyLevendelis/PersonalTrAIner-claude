@@ -950,7 +950,7 @@ function App() {
   // array, with no test able to see it. Naming the keys makes the position
   // derived rather than remembered.
   const MACRO_INPUT_KEYS = ['weight_kg', 'age', 'height_cm', 'gender',
-    'activity_level', 'fitness_goal', 'macro_calculation_mode'] as const
+    'activity_level', 'fitness_goal'] as const
   const macroInputs = profile
     ? MACRO_INPUT_KEYS.map(k => String(profile[k] ?? '')).join('|')
     : null
@@ -965,7 +965,6 @@ function App() {
     lastMacroInputsRef.current = macroInputs
     const targets = computeTargets(profile, {
       latestWeightKg: targetWeightAnchorKg ?? profile.weight_kg,
-      exercisePlan,
     })
     setMacros(targets)
     // AND SAY SO. Added 17 Sep 2026 with the goal change, because that is
@@ -979,9 +978,8 @@ function App() {
     // input change did not. Ashley's standing rule is that the app says what
     // changed in plain words, and it was being kept on one path out of four.
     //
-    // SAFE TO RUN AFTER A CALLER THAT ALREADY SNAPSHOTTED — handleMacroModeChange
-    // does, and its own write changes macro_calculation_mode, which is in the
-    // input string, so this effect fires straight after it. snapshotTargetsIfChanged
+    // SAFE TO RUN AFTER A CALLER THAT ALREADY SNAPSHOTTED (the split change does):
+    // snapshotTargetsIfChanged
     // compares against the last stored row and returns changedFromPrior: false
     // when the numbers match, so the notice is written once, not twice.
     // THE CAUSE IS DERIVED FROM WHICH INPUT MOVED, not assumed. This effect
@@ -1158,7 +1156,8 @@ function App() {
       dietary_preferences: profileRow.dietary_preferences || [],
       session_duration_preference: profileRow.session_duration_preference || '45-60',
       workout_split_preference: profileRow.workout_split_preference || 'ai_recommendation',
-      macro_calculation_mode: profileRow.macro_calculation_mode || 'STANDARD_STATIC',
+      // ONE METHOD (his ruling 25 Nov 2026, "Take it out"): a profile saved on the old day-by-day mode reads as Standard.
+      macro_calculation_mode: 'STANDARD_STATIC',
       equipment_access: profileRow.equipment_access || 'full_gym',
       training_style: profileRow.training_style || 'hybrid',
       training_experience: profileRow.training_experience || 'novice',
@@ -1388,7 +1387,6 @@ function App() {
     // screen; with that unreadable too, the sign-up weight, for display only (no save, no notice, no anchor).
     const liveTargets = computeTargets(restoredProfile, {
       latestWeightKg: effectiveTargetWeight.weightKg ?? (targetsUnread ? restoredProfile.weight_kg : undefined),
-      exercisePlan: restoredExercises,
     })
 
     // Both in one batch, so no render sees the saved profile without its kit.
@@ -3191,46 +3189,7 @@ function App() {
     }
   }
 
-  const handleMacroModeChange = async (mode: import('@/lib/types').MacroCalculationMode) => {
-    if (!profile) return
-    const updated = { ...profile, macro_calculation_mode: mode }
-    setProfile(updated)
-    // Living targets: mode is one of computeTargets' inputs, so the shared
-    // macros state must recompute the moment it changes — the chat and the
-    // Nutrition tab both read this state and must always agree. Reuses the
-    // CURRENT targetWeightAnchorKg rather than recomputing a fresh average —
-    // nothing about weight changed here, only the calculation method, so
-    // there's nothing to re-anchor and no "your target changed" notice to
-    // show (the user just deliberately changed it themselves).
-    const targets = computeTargets(updated, { latestWeightKg: targetWeightAnchorKg, exercisePlan })
-    setMacros(targets)
-    if (profile.id) {
-      // REVERT ON FAILURE, AND SNAPSHOT ONLY AFTER IT LANDS. This is the same
-      // optimistic-apply the split handler below does, and until 5 Sep 2026 it
-      // was the only one of the two missing its second half: the update's
-      // error was destructured by nobody, so a failed write left every macro
-      // on screen showing the new mode, the coach quoting those numbers, and
-      // the database still on the old one — and a reload would silently put
-      // it all back with no explanation.
-      const previousMode = profile.macro_calculation_mode
-      const { error } = await supabase
-        .from('fitness_profiles')
-        .update({ macro_calculation_mode: mode })
-        .eq('id', profile.id)
-      if (error) {
-        console.error('Macro mode save failed — reverting', error)
-        setProfile(prev => (prev ? { ...prev, macro_calculation_mode: previousMode } : prev))
-        setMacros(computeTargets({ ...updated, macro_calculation_mode: previousMode }, { latestWeightKg: targetWeightAnchorKg, exercisePlan }))
-        return
-      }
-      // After the write, never before: the snapshot is the historical record
-      // of what this person's targets WERE, and writing one for a mode change
-      // that failed puts a number in that history nothing ever showed them.
-      if (!anchorUnknownRef.current) snapshotTargetsIfChanged(profile.id, updated, targets, targetWeightAnchorKg)
-    }
-  }
-
-  /** Macro-accuracy round, Part 2 — same optimistic-apply + revert-on-failure shape as ProfileScreen's savePatch, plus the living-targets recompute handleMacroModeChange already does (the split is one of computeTargets' inputs too). */
+  /** Macro-accuracy round, Part 2 — same optimistic-apply + revert-on-failure shape as ProfileScreen's savePatch, plus the living-targets recompute (the split is one of computeTargets' inputs). */
   const handleMacroSplitChange = (patch: Partial<UserProfile>) => {
     if (!profile?.id) return
     const revertPatch = Object.fromEntries(
@@ -3238,20 +3197,18 @@ function App() {
     ) as Partial<UserProfile>
     const updated = { ...profile, ...patch }
     setProfile(updated)
-    // Same reasoning as handleMacroModeChange above — reuse the current
-    // anchor, no weight moved, no notice.
-    const targets = computeTargets(updated, { latestWeightKg: targetWeightAnchorKg, exercisePlan })
+    // Reuse the current anchor: no weight moved, so no notice.
+    const targets = computeTargets(updated, { latestWeightKg: targetWeightAnchorKg })
     setMacros(targets)
     supabase.from('fitness_profiles').update(patch).eq('id', profile.id).then(({ error }) => {
       if (error) {
         console.error('Macro split save failed — reverting', error)
         setProfile(prev => (prev ? { ...prev, ...revertPatch } : prev))
-        const revertedTargets = computeTargets({ ...updated, ...revertPatch }, { latestWeightKg: targetWeightAnchorKg, exercisePlan })
+        const revertedTargets = computeTargets({ ...updated, ...revertPatch }, { latestWeightKg: targetWeightAnchorKg })
         setMacros(revertedTargets)
         return
       }
-      // Moved below the write on 5 Sep 2026, same reason as the mode handler
-      // above: this snapshot is the target history, and a revert that leaves
+      // Moved below the write on 5 Sep 2026: this snapshot is the target history, and a revert that leaves
       // one behind records a target the user was shown for a second and never
       // actually had. Both handlers now snapshot only what survived.
       if (profile.id && !anchorUnknownRef.current) snapshotTargetsIfChanged(profile.id, updated, targets, targetWeightAnchorKg)
@@ -3711,10 +3668,8 @@ function App() {
             <NutritionDisplay
               profile={profile}
               macros={macros}
-              exercisePlan={exercisePlan}
               latestWeightKg={latestWeightKg}
               targetWeightKg={targetWeightAnchorKg ?? profile?.weight_kg ?? null}
-              onMacroModeChange={handleMacroModeChange}
               onMacroSplitChange={handleMacroSplitChange}
               profileId={profile.id}
               date={getSessionDateContext(profile.id).date}
