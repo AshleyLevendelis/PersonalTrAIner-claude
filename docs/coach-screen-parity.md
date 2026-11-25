@@ -88,8 +88,9 @@ it is wrong.
 
 ## Things the screen can do that the coach cannot
 
-**Eight screen-only, as of 11 Nov 2026** — the pre-session tightness check,
-macro mode, macro split, logging a build-up set, logging a drop set,
+**Seven screen-only, as of 25 Nov 2026** (the macro MODE was taken out that day, his "Take it out": one method,
+the split's choices kept) — the pre-session tightness check,
+macro split, logging a build-up set, logging a drop set,
 "Train anyway" on a rest day, saying how a lift felt on a set already
 logged, and which meals are cooked for him on which days (re-derived from the
 bullets that day, when the seventh and then the eighth were added). The calorie target below is a seventh entry but
@@ -176,9 +177,9 @@ the difference.
   screen can do this" was itself only half true, because changing it had never
   rebuilt the plan. Closing it meant fixing the screen as well as adding the
   tool.
-- **Macro mode** (Standard / Dynamic CSCS) and **macro split**. `screen only`.
-  Both bypass the Profile screen's own writer and are applied from `App.tsx`
-  with their own optimistic-apply and revert, so a coach path cannot simply
+- **Macro split**. `screen only`. (The macro MODE, Standard / Dynamic CSCS, was taken out 25 Nov 2026, his ruling
+  "Take it out".) It bypasses the Profile screen's own writer and is applied from `App.tsx`
+  with its own optimistic-apply and revert, so a coach path cannot simply
   reuse the profile-field executor.
 - **Logging a build-up set.** `screen only`, added 17 Sep 2026 the same day the
   rows were built — written here BY the person adding it, which is the thing

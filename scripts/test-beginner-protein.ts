@@ -1,7 +1,8 @@
 // A beginner's protein sits 0.4 g/kg lower, never below 1.6 (15 Nov 2026, CSCS: the coeliac nurse's 156 g as a vegan
 // beginner). Everyone else unchanged. One exit: the count of failures.
 import { readFileSync } from 'node:fs'
-import { presetSplitFor, getProfileMacroSplit, getStaticDailyMacros, calculateDailyMacros } from '../src/lib/macro-calculator'
+import { presetSplitFor, getProfileMacroSplit, getStaticDailyMacros } from '../src/lib/macro-calculator'
+import { computeTargets } from '../src/lib/nutrition-targets'
 
 let ran = 0, failed = 0
 const ok = (c: boolean, m: string, d?: unknown) => { ran++; if (c) console.log(`  ok: ${m}`); else { failed++; console.log(`  FAIL: ${m}${d !== undefined ? ` — ${JSON.stringify(d)}` : ''}`) } }
@@ -21,9 +22,10 @@ const b = getStaticDailyMacros(beg), m = getStaticDailyMacros(mid)
 ok(!!b && !!m && b.protein === 125 && m.protein === 156, 'the nurse\'s 78 kg: 125 g as a beginner, 156 g otherwise', { b: b?.protein, m: m?.protein })
 ok(!!b && !!m && b.calories === m.calories && b.carbs > m.carbs && b.fat === m.fat, 'calories and fat identical, carbs up', { b, m })
 
-console.log('§3 The periodised (dynamic) mode follows: 2.2 becomes 1.8')
-const dyn = (p: any) => calculateDailyMacros({ ...p, macro_calculation_mode: 'DYNAMIC_CSCS' }, 'Monday', [])
-ok(dyn(beg)?.protein === Math.round(1.8 * 78) && dyn(mid)?.protein === Math.round(2.2 * 78), 'dynamic: beginner 1.8 g/kg, others 2.2', { b: dyn(beg)?.protein, m: dyn(mid)?.protein })
+console.log('§3 One method (25 Nov 2026, his "Take it out"): a profile saved on the old day-by-day mode gets the same numbers')
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const old = (p: any) => computeTargets({ ...p, macro_calculation_mode: 'DYNAMIC_CSCS' })
+ok(JSON.stringify(old(beg)) === JSON.stringify(b) && JSON.stringify(old(mid)) === JSON.stringify(m), 'beginner and not: identical to Standard', { old: old(beg), b })
 
 console.log('§4 The Profile card reads the same default')
 const card = readFileSync('src/components/MacroSplitCard.tsx', 'utf8')

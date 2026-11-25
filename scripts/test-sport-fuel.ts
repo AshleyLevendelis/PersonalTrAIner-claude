@@ -10,16 +10,17 @@
  *   2. Standard (one number a day): the week's sport energy spread over seven
  *      days, so every day's number rises by the same amount, and the TDEE
  *      shown beside it agrees.
- *   3. Dynamic (a number per day): the energy on the sport day itself, with a
- *      hard day's carbs; the other days do not move.
+ *   3. One method (his "Take it out", 25 Nov 2026): a profile saved on the old day-by-day mode gets the same
+ *      Standard number, sport spread across the week, and the same sentence.
  *   4. What is said on the Nutrition sheet, and that every reader of the
  *      day's burn goes through the one sport-aware function.
  * Browser half: verify:sport-fuel.
  */
 import { readFileSync } from 'node:fs'
 import { sportSessionKcal, sportKcalPerWeek, sportKcalOn, sportMet } from '../src/lib/setup-sports'
-import { calculateDailyMacros, getMacroDerivation, getStaticDailyMacros, staticTDEEFor, resolveBodyMetrics, applyGoalAdjustment, sportFuelNote } from '../src/lib/macro-calculator'
+import { getMacroDerivation, getStaticDailyMacros, staticTDEEFor, resolveBodyMetrics, applyGoalAdjustment, sportFuelNote } from '../src/lib/macro-calculator'
 import type { ConcurrentActivity, UserProfile } from '../src/lib/types'
+import { computeTargets } from '../src/lib/nutrition-targets'
 
 let ran = 0, failures = 0
 const check = (label: string, ok: boolean, extra?: unknown) => {
@@ -54,30 +55,19 @@ check('the day\'s burn rises by the week\'s sport energy over seven days (952 / 
 const a = getStaticDailyMacros(base)!, b = getStaticDailyMacros(withSport)!
 const expected = applyGoalAdjustment(sportTdee, 'hypertrophy', 'female') - applyGoalAdjustment(plainTdee, 'hypertrophy', 'female')
 check('the calorie target rises by that, after the goal\'s own adjustment', Math.abs((b.calories - a.calories) - expected) <= 12 && b.calories > a.calories, [a.calories, b.calories, expected])
-check('...and stays the same number every day', DAYS.every(d => calculateDailyMacros(withSport, d, [])!.calories === b.calories))
+check('...and it is the number the app uses (one number, every day)', computeTargets(withSport)!.calories === b.calories)
 const der = getMacroDerivation(withSport)!
 check('the TDEE shown beside the target includes the sport', der.tdee === sportTdee && der.target.calories === b.calories, der)
 check('no sport, no change: the target is what it always was', getStaticDailyMacros({ ...base, concurrent_activities: undefined } as UserProfile)!.calories === a.calories)
 
-console.log('\n3. Dynamic: on the sport day itself')
+console.log('\n3. One method: a saved day-by-day mode reads as Standard')
 const dyn = { ...withSport, macro_calculation_mode: 'DYNAMIC_CSCS' } as UserProfile
-const dynNo = { ...base, macro_calculation_mode: 'DYNAMIC_CSCS' } as UserProfile
-const plan = [{ day: 'Tuesday', focus: 'Upper Pull & Core', exercises: [] }, { day: 'Thursday', focus: 'Push & Press', exercises: [] }] as never
-const tue = calculateDailyMacros(dyn, 'Tuesday', plan)!, tueNo = calculateDailyMacros(dynNo, 'Tuesday', plan)!
-check('a Muay Thai day gets more energy', tue.calories > tueNo.calories + 250, [tueNo.calories, tue.calories])
-check('...with more of it as carbs (a hard day\'s carbs)', tue.carbs > tueNo.carbs, [tueNo.carbs, tue.carbs])
-check('...and protein unchanged (it is set by body weight)', tue.protein === tueNo.protein)
-const wed = calculateDailyMacros(dyn, 'Wednesday', plan)!, wedNo = calculateDailyMacros(dynNo, 'Wednesday', plan)!
-check('a day with no sport does not move', wed.calories === wedNo.calories && wed.carbs === wedNo.carbs)
-const sunSport = { ...dyn, concurrent_activities: [{ ...MUAY, days: ['Sunday'] }] } as UserProfile
-const sun = calculateDailyMacros(sunSport, 'Sunday', plan)!
-check('a sport on a day with no gym session makes it a training day, not a rest day', sun.dayType === 'training' && sun.calories > calculateDailyMacros(dynNo, 'Sunday', plan)!.calories, sun)
+check('a profile saved on the old mode gets the Standard number, sport spread across the week', JSON.stringify(computeTargets(dyn)) === JSON.stringify(b), computeTargets(dyn))
 
 console.log('\n4. What she is told, and one function for the day\'s burn')
 check('standard says what each class adds, that it assumed an hour, and the daily rise',
   sportFuelNote(withSport, 68) === 'Muay Thai adds about 480 kcal a class (taken as 60 minutes), twice a week, spread across the week: +136 kcal a day.', sportFuelNote(withSport, 68))
-check('dynamic says it goes on the day itself',
-  sportFuelNote(dyn, 68) === 'Muay Thai adds about 480 kcal a class (taken as 60 minutes), twice a week, on the day itself.', sportFuelNote(dyn, 68))
+check('...and the old mode is told the same (no "on the day itself")', sportFuelNote(dyn, 68) === sportFuelNote(withSport, 68), sportFuelNote(dyn, 68))
 check('no sport, no sentence', sportFuelNote(base, 68) === null)
 for (const f of ['src/App.tsx', 'src/components/ChatAssistant.tsx', 'src/lib/nutrition-targets.ts']) {
   const src = strip(readFileSync(f, 'utf8'))

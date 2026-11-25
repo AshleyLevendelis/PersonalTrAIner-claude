@@ -22,7 +22,7 @@
 
 import { isPregnant } from './health-conditions'
 import type { UserProfile, MacroTargets, WorkoutDay } from './types'
-import { calculateDailyMacros, getStaticDailyMacros, computeBMR, staticTDEEFor, resolveBodyMetrics } from './macro-calculator'
+import { getStaticDailyMacros, computeBMR, staticTDEEFor, resolveBodyMetrics } from './macro-calculator'
 import { getDailyMetrics, upsertNutritionTarget, getNutritionTargets, upsertDailyMetric } from './daily-tracking'
 import { computeWeightTrend } from './weight-trend'
 import { supabase } from './supabase'
@@ -32,10 +32,6 @@ import { weighInStanding, heldWeighInOn, startingWeightCorrection, type WeighInS
 export interface ComputeTargetsOptions {
   /** Latest daily_metrics weigh-in, if any — overrides profile.weight_kg. */
   latestWeightKg?: number | null
-  /** For DYNAMIC_CSCS mode: which day's targets. Defaults to today's weekday. */
-  dayName?: string
-  /** For DYNAMIC_CSCS mode: the plan whose focus drives the day's EEE estimate. */
-  exercisePlan?: WorkoutDay[]
 }
 
 function effectiveProfile(profile: UserProfile, latestWeightKg?: number | null): UserProfile {
@@ -45,10 +41,6 @@ function effectiveProfile(profile: UserProfile, latestWeightKg?: number | null):
   return profile
 }
 
-/** The app's today (dev clock included), never the machine's: one notion of today, as everywhere else (1 Nov 2026). */
-function todayName(profileId: string | undefined): string {
-  return getAppNow(profileId).toLocaleDateString('en-US', { weekday: 'long' })
-}
 
 /**
  * The one way to get macro targets. Respects the profile's selected
@@ -62,16 +54,10 @@ function todayName(profileId: string | undefined): string {
  * missing value; none of them substitute a figure.
  */
 export function computeTargets(profile: UserProfile, opts: ComputeTargetsOptions = {}): MacroTargets | null {
-  const eff = effectiveProfile(profile, opts.latestWeightKg)
-
-  if ((profile.macro_calculation_mode || 'STANDARD_STATIC') === 'DYNAMIC_CSCS') {
-    const day = opts.dayName ?? todayName(profile.id)
-    const result = calculateDailyMacros(eff, day, opts.exercisePlan ?? [])
-    if (!result) return null
-    return { calories: result.calories, protein: result.protein, carbs: result.carbs, fat: result.fat }
-  }
-
-  return getStaticDailyMacros(eff)
+  // ONE SET OF NUMBERS FOR EVERY DAY (his ruling 25 Nov 2026, "Take it out"): the day-by-day "Dynamic CSCS" mode is
+  // gone. It cycled today's targets only while the meals, the week and the shopping list planned every day to them,
+  // and for lifting and fat loss the week's total and the protein are what count. A stored mode is read as Standard.
+  return getStaticDailyMacros(effectiveProfile(profile, opts.latestWeightKg))
 }
 
 /**
@@ -491,7 +477,7 @@ export async function retargetAfterWeighIn(
   const effective = await getEffectiveTargetWeightKg(profileId, latestWeightKg ?? profile.weight_kg, { frozen: isPregnant(profile) })
   if (effective.unread) return unread()
   const anchorKg = effective.weightKg ?? null
-  const targets = computeTargets(profile, { latestWeightKg: anchorKg, exercisePlan })
+  const targets = computeTargets(profile, { latestWeightKg: anchorKg })
   return { latestWeightKg, anchorKg, targets, recorded: snapshotTargetsIfChanged(profileId, profile, targets, anchorKg) }
 }
 
@@ -537,6 +523,6 @@ export async function correctStartingWeight(
   const effective = await getEffectiveTargetWeightKg(profileId, latestWeightKg ?? kg)
   if (effective.unread) return unread()
   const anchorKg = effective.weightKg ?? kg
-  const targets = computeTargets(profile, { latestWeightKg: anchorKg, exercisePlan })
+  const targets = computeTargets(profile, { latestWeightKg: anchorKg })
   return { latestWeightKg, anchorKg, targets, recorded: snapshotTargetsIfChanged(profileId, profile, targets, anchorKg) }
 }

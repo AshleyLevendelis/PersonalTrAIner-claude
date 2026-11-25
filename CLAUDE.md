@@ -954,7 +954,12 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   one word apart ("today" / "from now on") and the tools are not. Both sides of
   that pair are now the coach's too, and the prompt rule keys on the TIME SCOPE
   rather than the number, because both requests carry a minute figure
-- Targets and macro mode — `screen only`, and "targets" is not one thing:
+- **One calorie method: his ruling 25 Nov 2026, "Take it out"** (over fixing it and over leaving it): the day-by-day
+  "Dynamic CSCS" mode is gone. It cycled only today's targets while the meals, the week and the shopping list planned
+  every day to them; one set of numbers, the split's choices kept, the sport's energy spread across the week. A saved
+  Dynamic profile reads as Standard. "How your targets are set" is redrawn in the app's style. `test:sport-fuel` §3,
+  `verify:sport-fuel` 3, `verify:one-calorie-target` 3, `test:nutrition-layout`
+- Targets and macro split — `screen only`, and "targets" is not one thing:
   `calorie_target` has no control anywhere and never did. It is written once
   at onboarding and derived by `computeTargets` thereafter, so changing it
   means changing its INPUTS — macro split, activity level, or goal (which is
