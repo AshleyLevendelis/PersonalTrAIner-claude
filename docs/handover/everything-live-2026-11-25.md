@@ -1,9 +1,9 @@
 # Everything from main onto production and his phone (25 Nov 2026)
 
 Ashley lost track of which sessions' work reached the live database, the coach's server and his phone app. One prompt
-for Claude Code on his machine brings all three up to `main` (314c5c1, PR #59). The website is already live (Vercel
-deployed 314c5c1). NOT included: branch `ccr-700242dc-2er3y6` ("Record a walk or run"), which is not on `main` and
-whose migration shares the stamp 20261125120000 with `days_ahead`; it needs restamping before it can merge.
+for Claude Code on his machine brings all three up to `main` as of PR #60 ("Record a walk or run", merged on top of
+own workouts and the one calorie method). The website deploys itself from `main` and was confirmed live in the cloud
+session. Nothing is left on a side branch.
 
 ```
 Goal: bring EVERYTHING on main live: the production database, the coach's server functions, and Ashley's phone app.
@@ -11,16 +11,18 @@ He has lost track across several Claude Code sessions of which changes reached w
 earlier note: measure each place, bring it up to main, and prove it.
 
 WHY. The app has four places that update separately:
-  - Website: deploys itself from main through Vercel. Already done for main at 314c5c1 (nothing to do).
+  - Website: deploys itself from main through Vercel. Already done for main at PR #60 (nothing to do).
   - Database (Supabase, TEST vswuurrtbzbrgubddefv and PRODUCTION sdkhuczcfnqqimdgfiks): new tables and columns only
-    arrive when migrations are pushed. Main has migrations up to 20261125130000_own_workouts.sql. Features that need a
-    missing column quietly fall back ("not switched on yet"), so the website can look fine while a migration is missing.
+    arrive when migrations are pushed. Main has migrations up to 20261125140000_add_recorded_activity.sql. Features
+    that need a missing column quietly fall back ("not switched on yet"), so the website can look fine while a
+    migration is missing.
   - Coach server (six edge functions: chat-gemini, coach-reach-out, generate-meals, macro-calibration,
     onboarding-chat, report-email): each only changes when deployed. Many recent coach changes say "needs the
     chat-gemini deploy".
   - Phone app (Capacitor, android/ and ios/): the website is BUNDLED inside it, so the phone app only gets any change
-    (web or native) when it is rebuilt and reinstalled. Recent native changes: heart rate (Health Connect permissions),
-    coach notifications through Firebase.
+    (web or native) when it is rebuilt and reinstalled. Recent native changes: heart rate and walk/run recording
+    (Health Connect permissions: steps, heart rate, resting heart rate, distance, active calories), the heart rate
+    strap (Bluetooth), coach notifications through Firebase.
 Order matters: database first, then server functions (they read the new columns), then the phone app.
 
 You CANNOT run the two production commands (db:push-both, deploy:functions:prod): they refuse without a real terminal
@@ -29,9 +31,9 @@ Never write to the PRODUCTION database any other way. Never print a secret's val
 
 1. Get main.
      git fetch origin && git checkout main && git pull
-     git log --oneline -1          (must show 314c5c1 or later; report the line)
+     git log --oneline -3          (must include "Merge pull request #60"; report the lines)
      npm ci
-     ls supabase/migrations | tail -3   (must end with 20261125130000_own_workouts.sql)
+     ls supabase/migrations | tail -3   (must end with 20261125140000_add_recorded_activity.sql)
 
 2. Database. Measure first, then push.
      npx supabase migration list        (the CLI is linked to TEST by default; report which local migrations show
@@ -76,12 +78,14 @@ Never write to the PRODUCTION database any other way. Never print a secret's val
    iPhone (Mac with Xcode only): npx cap open ios -> pick his team under Signing -> his iPhone -> Run.
 
 6. Tell Ashley what to check on the phone:
-   - Exercise tab: under any day, "Start your own workout" / "Log a workout you did" / "Plan a workout" (newest feature).
+   - Tools tab: "Start walk" / "Start run", then End: steps, distance and calories fill in, one effort tap logs it.
+     The first time, the phone asks for distance and calories permission: say Allow.
+   - Exercise tab: under any day, "Start your own workout" / "Log a workout you did" / "Plan a workout".
    - Nutrition: the "How your targets are set" sheet has the new look and no "Dynamic CSCS" option.
    - Chat: the coach answers (proves GEMINI_KEY and chat-gemini).
    - Profile > Steps from your phone, and heart rate, ask permission again if new permissions were added.
 
 Done looks like: a short table with four rows (Website, Database TEST and PRODUCTION, Server functions, Phone app),
-each saying "up to date with main 314c5c1" with the proof from above, or exactly what is missing and why. Plus the list
-of missing secrets. Paste that table back to the cloud session.
+each saying "up to date with main (PR #60)" with the proof from above, or exactly what is missing and why. Plus the
+list of missing secrets. Paste that table back to the cloud session.
 ```
