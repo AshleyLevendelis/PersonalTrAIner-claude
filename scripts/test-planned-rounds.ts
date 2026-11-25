@@ -12,7 +12,7 @@
 
 import { readFileSync } from 'fs'
 import { setSupabaseClient } from '../src/lib/supabase'
-import { cardioSessionRounds, plannedRoundsOf, plannedSessionRow, roundIsPlannedSession, roundsMinutes, sessionMinutesFor } from '../src/lib/planned-rounds'
+import { cardioSessionRounds, plannedRoundsOf, plannedSessionRow, stepTodayMinutes, stepTodayRounds, withTodayChange, roundIsPlannedSession, roundsMinutes, sessionMinutesFor } from '../src/lib/planned-rounds'
 import { isSensibleRoundConfig } from '../src/lib/timer-engine'
 import { executeCardioSession } from '../src/lib/pending-action-executor'
 import type { MesocycleWeek, UserProfile } from '../src/lib/types'
@@ -72,6 +72,26 @@ async function main() {
     check('no effort on the plan: none drawn, never guessed', noEffort.effort === null && noEffort.doseWord === 'session', noEffort)
     const peek = readFileSync('src/components/exercise/TodayPanel.tsx', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
     check('the Exercise screen draws another day\'s session with this card', /<PlannedActivityPeek /.test(peek))
+  }
+
+  console.log('\n1d. Changed for today (his request 25 Nov 2026: "can\'t do 8x3 ... change it to 6x3")')
+  {
+    const EIGHT = { rounds: 8, workSeconds: 180, restSeconds: 60 }
+    let r = EIGHT
+    r = stepTodayRounds(r, 'rounds', -1); r = stepTodayRounds(r, 'rounds', -1)
+    check('8 × 3 min, two taps down, is 6 × 3 min', same(r, { rounds: 6, workSeconds: 180, restSeconds: 60 }), r)
+    const changed = withTodayChange({ activity: 'Assault Bike Rounds', duration: 31, targetRpe: 8, reason: 'x' }, { rounds: r })
+    check('...and the session takes its rounds and the minutes they take (6 × 3 + 5 × 1 = 23)', same(plannedRoundsOf(changed), r) && changed.duration === 23, changed)
+    check('...the effort and the reason are kept', changed.targetRpe === 8 && changed.reason === 'x')
+    let low = { rounds: 2, workSeconds: 10, restSeconds: 5 }
+    low = stepTodayRounds(stepTodayRounds(stepTodayRounds(low, 'rounds', -1), 'work', -1), 'rest', -1)
+    check('it never steps below a timer the app would start: 2 rounds, 10s work, 5s rest', same(low, { rounds: 2, workSeconds: 10, restSeconds: 5 }) && plannedRoundsOf({ activity: 'X', rounds: low }) !== null, low)
+    check('work steps through the round timer\'s own steps (3:00 down is 2:00)', stepTodayRounds(EIGHT, 'work', -1).workSeconds === 120)
+    check('a steady session: five minutes a tap, 30 to 25, never under 5 or over 240', stepTodayMinutes(30, -1) === 25 && stepTodayMinutes(5, -1) === 5 && stepTodayMinutes(240, 1) === 240 && stepTodayMinutes(22, 1) === 25 && stepTodayMinutes(22, -1) === 20)
+    check('...and the session takes the minutes', withTodayChange({ activity: 'Easy jog', duration: 30 }, { minutes: 25 }).duration === 25)
+    const plain = { activity: 'Easy jog', duration: 30 }
+    check('no change: the plan itself, the same object', withTodayChange(plain, null) === plain)
+    check('a stored change that is not a timer is ignored, never half-applied', withTodayChange(plain, { rounds: { rounds: 1, workSeconds: 2, restSeconds: 0 } }) === plain && withTodayChange(plain, { minutes: 999 }) === plain)
   }
 
   console.log('\n2. The coach\'s card carries the rounds')

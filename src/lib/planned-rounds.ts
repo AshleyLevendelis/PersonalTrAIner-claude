@@ -15,6 +15,7 @@ import type { PlannedActivity } from './types'
 import { isSensibleRoundConfig, parseConditioningInterval, parseIntervalSuggestion, type RoundConfig } from './timer-engine'
 import { splitActivity } from './cardio-lines'
 import { effortForRpe, effortLabel } from './cardio-effort'
+import { stepThrough, WORK_STEPS, REST_STEPS } from './round-setup'
 
 /** THE WORDS, one place, so the card, the day and the coach's offer say the same thing. */
 export const PLANNED_ROUNDS_WORDS = {
@@ -156,4 +157,37 @@ export function plannedSessionRow(planned: Pick<PlannedActivity, 'activity' | 'd
     label: 'Cardio', name, effort, segments: 1,
     dose: `${minutes} min`, doseWord: effort ? effort.toLowerCase() : 'session', rest: null, meta: `${minutes} min`,
   }
+}
+
+/**
+ * TODAY'S CHANGE TO A PLANNED CARDIO SESSION (his request 25 Nov 2026: "make sure it's easy to change, say for example
+ * the user had less time and can't do 8x3 they should easily be able to change it to 6x3 ... Let them be able to edit
+ * it"). Today only: the plan is not touched, the next session is as planned, and the log records what was done.
+ * Rounds sessions change their rounds, work and rest; a steady session its minutes. Every step stays a timer the app
+ * would start (two rounds or more, work and rest five seconds or more), so a change can never lose the Start.
+ */
+export interface TodayChange { rounds?: PlannedRounds; minutes?: number }
+
+const TODAY_REST_STEPS = REST_STEPS.filter(s => s >= 5)
+const TODAY_MINUTES_MIN = 5
+const TODAY_MINUTES_MAX = 240
+
+export function stepTodayRounds(r: PlannedRounds, field: 'rounds' | 'work' | 'rest', dir: 1 | -1): PlannedRounds {
+  if (field === 'rounds') return { ...r, rounds: Math.min(50, Math.max(2, r.rounds + dir)) }
+  if (field === 'work') return { ...r, workSeconds: stepThrough(WORK_STEPS, r.workSeconds, dir) }
+  return { ...r, restSeconds: stepThrough(TODAY_REST_STEPS, r.restSeconds, dir) }
+}
+
+/** Five minutes a tap, from 5 to 240. */
+export function stepTodayMinutes(minutes: number, dir: 1 | -1): number {
+  const next = dir > 0 ? Math.floor(minutes / 5) * 5 + 5 : Math.ceil(minutes / 5) * 5 - 5
+  return Math.min(TODAY_MINUTES_MAX, Math.max(TODAY_MINUTES_MIN, next))
+}
+
+/** The session as he will do it today: the changed rounds (and the minutes they take), or the changed minutes. */
+export function withTodayChange<P extends Pick<PlannedActivity, 'activity' | 'duration' | 'rounds'>>(planned: P, change: TodayChange | null | undefined): P {
+  if (!change) return planned
+  if (change.rounds && isSensibleRoundConfig(change.rounds)) return { ...planned, rounds: { ...change.rounds }, duration: roundsMinutes(change.rounds) }
+  if (change.minutes != null && Number.isFinite(change.minutes) && change.minutes >= TODAY_MINUTES_MIN && change.minutes <= TODAY_MINUTES_MAX) return { ...planned, duration: Math.round(change.minutes) }
+  return planned
 }
