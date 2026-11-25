@@ -69,7 +69,10 @@ function profileColumns(): Set<string> {
 
 /** Everything restoreSession puts on the profile, however it gets there. */
 function restoredKeys(app: string): Set<string> {
-  const block = /const restoredProfile: UserProfile = \{([\s\S]*?)\n    \}/.exec(app)?.[1] ?? ''
+  // The literal was renamed restoredProfile -> savedProfile (kit list, Oct 2026) and this parse quietly found nothing
+  // for weeks, leaving only the profileRow.<col> reads below to carry it. Anchored on what the literal IS (the one
+  // UserProfile object built from profileRow.id), never on its name; the check below fails when it finds nothing.
+  const block = /const \w+: UserProfile = \{\s*\n\s*id: profileRow\.id,([\s\S]*?)\n    \}/.exec(app)?.[1] ?? ''
   const keys = new Set([...block.matchAll(/^\s*([a-z_]+):/gm)].map(m => m[1]))
   // Some columns are read outside the object literal (exercise_exclusions
   // becomes its own state). Reading profileRow.<col> anywhere counts.
@@ -139,6 +142,7 @@ const READ_OFF_THE_ROW: Record<string, string> = {
 const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
 const cols = profileColumns()
 const restored = restoredKeys(app)
+const literalKeys = /const \w+: UserProfile = \{\s*\n\s*id: profileRow\.id,/.test(app)
 
 // ---------------------------------------------------------------------------
 console.log('\n1. Nothing the app reads is dropped on reload')
@@ -146,6 +150,7 @@ console.log('\n1. Nothing the app reads is dropped on reload')
 {
   check(`the migrations were parsed (${cols.size} columns on fitness_profiles)`, cols.size > 30, cols.size)
   check(`restoreSession was parsed (${restored.size} keys)`, restored.size > 30, restored.size)
+  check('the restored profile object literal was found (not only profileRow reads)', literalKeys)
 
   const dropped = [...cols].filter(c => !restored.has(c)).sort()
   for (const [col, file] of Object.entries(READ_OFF_THE_ROW)) {
@@ -180,7 +185,10 @@ console.log('\n2. Absent still means absent')
   // "that silently turned 'never given' back into a fabricated measurement
   // right at the restore boundary". A restore line that coerces a null to a
   // number or a zero reintroduces it.
-  const block = /const restoredProfile: UserProfile = \{([\s\S]*?)\n    \}/.exec(app)?.[1] ?? ''
+  // The literal was renamed restoredProfile -> savedProfile (kit list, Oct 2026) and this parse quietly found nothing
+  // for weeks, leaving only the profileRow.<col> reads below to carry it. Anchored on what the literal IS (the one
+  // UserProfile object built from profileRow.id), never on its name; the check below fails when it finds nothing.
+  const block = /const \w+: UserProfile = \{\s*\n\s*id: profileRow\.id,([\s\S]*?)\n    \}/.exec(app)?.[1] ?? ''
   const NULLABLE = [
     'max_dumbbell_kg', 'max_single_implement_kg', 'max_improvised_kg',
     'daily_step_target', 'water_target_ml', 'macro_protein_per_kg', 'macro_fat_percent',
