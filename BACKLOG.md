@@ -2,6 +2,20 @@
 
 Newest first. One line each.
 
+- [x] **"REBUILD TODAY" KEEPS THE MAIN LIFT ON A DAY WITH NO BARBELL LIFT (25 Nov 2026; found by the main-lift trace,
+  CSCS mine).** His 16 Sep ruling: rebuild today keeps the main lift and changes the rest. It read the main lift by slot
+  tier alone, so on a bodyweight or limited-kit day (no tier-1 slot) it kept NOTHING and rebuilt the very lift the day
+  is labelled with (measured: Close-Grip Push-Ups, labelled main, became Deficit Push-Ups). Now, with no tier-1 slot,
+  the day's labelled main lift (the hardest standalone compound, the one the plan keeps all block) is kept in its place
+  and everything else is rebuilt as before. CSCS review: (1) the progression thread on the day's main lift survives a
+  rebuild, which is the ruling's point; (2) takes nothing away (one fewer slot changes on those days); (3) coverage and
+  volume as before; (4) no floor or ceiling moves; (5) in scope. `test:session-rebuild` (+4 checks: the case binds,
+  kept in its place, never replaced, the rest still rebuilt; 1 mutation, caught, 2 failures). `test:kit-list`,
+  `test:qa-training-nov14`, `test:replacement-prescription` green. Frontend only.
+- [x] **CORRECTION: MEALS ALREADY LAND THEIR NUMBERS (25 Nov 2026).** I told Ashley only about half of planned days hit
+  every band, from the 18 Oct line in CLAUDE.md (52.5% after the bands tightened). The 9 Nov deep pool changed that and
+  I did not read the later line before quoting the older one. Measured today, `measure:deep-pool`: 99.8% of days on
+  target on the deep pool (97.1% on seven a meal), 20 different dishes a meal over four weeks. Off the list.
 - [x] **THE LIFT LABELLED "MAIN LIFT" IS THE ONE KEPT FOR THE WHOLE PLAN (25 Nov 2026, the 826 named under the
   compound-order entry; CSCS, mine).** Traced first (three definitions of a day's main lift, not two: the label and
   the rest floor rank by difficulty, the block rotation took the first tier-2 compound, and a dozen readers use the

@@ -3,6 +3,7 @@ import { getExerciseEntry } from './exercise-db'
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
 import { getReplacementCandidates, buildReplacementSlot, calibrates, isMainLiftSlot } from './mesocycle-edit'
 import { settleWeek, clearOrphanedSupersetLabels } from './settle-week'
+import { dayAnchorExercise } from './session-derive'
 
 // ---------------------------------------------------------------------------
 // A DIFFERENT SESSION TODAY — everything but the lift carrying your progression.
@@ -100,8 +101,14 @@ export async function rebuildDayAroundMainLift(params: RebuildSessionParams): Pr
   if (!week || !day) return NOTHING(mesocycle, "I couldn't find that day on your plan.")
   if (day.exercises.length === 0) return NOTHING(mesocycle, `${dayName} is a rest day — there's no session to rebuild.`)
 
-  const mainLift = day.exercises.find(isMainLiftSlot) ?? null
-  const rebuildable = day.exercises.filter(e => !isMainLiftSlot(e))
+  // THE MAIN LIFT ON A DAY WITH NO TIER-1 SLOT (25 Nov 2026, found by the main-lift trace): read by slot tier alone, a
+  // bodyweight or limited-kit day had no main lift, so "keep the main lift and rebuild around it" (his 16 Sep ruling)
+  // kept nothing and rebuilt the lift the day is labelled with. With no tier-1 slot, the day's labelled main lift
+  // (dayAnchorExercise, the hardest standalone compound, the one the plan keeps for the whole block) is kept.
+  const anchor = day.exercises.some(isMainLiftSlot) ? undefined : dayAnchorExercise(day.exercises)
+  const isKeptMain = (e: Exercise) => isMainLiftSlot(e) || e === anchor
+  const mainLift = day.exercises.find(isKeptMain) ?? null
+  const rebuildable = day.exercises.filter(e => !isKeptMain(e))
   if (rebuildable.length === 0) {
     return NOTHING(mesocycle, mainLift
       ? `${dayName} is just ${mainLift.name} — that's the lift I keep, so there's nothing else to change.`
@@ -117,7 +124,7 @@ export async function rebuildDayAroundMainLift(params: RebuildSessionParams): Pr
     // THE MAIN LIFT IS NOT CONSIDERED, not merely ranked last. Ashley's ruling
     // is about the progression thread, and the only version of "untouched"
     // that stays true is not looking at it.
-    if (isMainLiftSlot(slot)) { next.push(slot); continue }
+    if (isKeptMain(slot)) { next.push(slot); continue }
 
     const candidates = getReplacementCandidates(slot.name, profile, exclusions)
     // A LOADED LIFT IS NOT REBUILT INTO AN UNLOADED ONE (his 10 Sep ruling; QA, 14 Nov 2026: Leg Extensions became a band
