@@ -34,6 +34,9 @@ export interface AppDecision {
 
 export const APP_DECISIONS: AppDecision[] = [
   // ---- Warm-up and rest -------------------------------------------------------------------------------------------
+  { area: 'Recovery', anchor: { file: 'src/lib/days-ahead.ts', token: 'isLegTaxing' }, also: ['clash', 'class', 'muay thai', 'football', 'tired legs', 'heavy legs', 'trim'],
+    rule: 'When a hard class or sport that works the legs (running, conditioning, combat) falls on the same day as, or the day before, a session built around a heavy lower-body lift, the coach warns in the morning and offers to trim the extras while keeping the main lift as planned. Gentle activity such as yoga or an easy run is never treated as a clash.',
+    why: 'Fatigue and the interference between hard conditioning and heavy leg work cost the main lift the most quality; the standard answer is strength first and a trimmed accessory block, never a dropped main lift.' },
   { area: 'Rest', anchor: { file: 'src/lib/warmup-rest.ts', token: 'restAfterWarmupSeconds' }, also: ['timer', 'warmup', 'warm up', 'warm-up sets', 'ramp'],
     rule: 'There is no rest timer between warm-up sets; after the last warm-up before the first working set a short rest runs: 60 seconds before an ordinary lift, 90 before a main lift, 120 before a heavy main lift (6 reps or fewer at the top of its range), never longer than that lift\'s own working rest.',
     why: 'Each warm-up is just the next step up, so plates are changed and you go again; the last one sits near the working weight, and the first working set should not start short of breath from it.' },

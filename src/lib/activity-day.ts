@@ -90,8 +90,9 @@ export const LOG_BACK_DAYS = 14
 export function optionalCardioMode(date: string, today: string): 'log' | 'ahead' | 'closed' {
   if (date > today) return 'ahead'
   const [y, m, d] = today.split('-').map(Number)
+  // Calendar arithmetic on the date's own parts (Date.UTC only does the month and year carries), never a clock.
   const back = new Date(Date.UTC(y, m - 1, d - LOG_BACK_DAYS))
-  const earliest = back.toISOString().slice(0, 10)
+  const earliest = `${back.getUTCFullYear()}-${String(back.getUTCMonth() + 1).padStart(2, '0')}-${String(back.getUTCDate()).padStart(2, '0')}`
   return date >= earliest ? 'log' : 'closed'
 }
 
