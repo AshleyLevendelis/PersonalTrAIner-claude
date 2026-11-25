@@ -49,6 +49,11 @@ const PLAN_SUNDAY = new URLSearchParams(location.search).has('plan-sunday')
 const sundayBefore = (() => { const d = new Date(anchorNowMs()); d.setDate(d.getDate() - d.getDay()); d.setHours(20, 0, 0, 0); return d })()
 const created = PLAN_SUNDAY ? sundayBefore.toISOString() : new Date(anchorNowMs() - (PLAN_TODAY ? 0 : 9) * 86400000).toISOString()
 const TRAIN_TODAY = new URLSearchParams(location.search).has('session-day')
+// ?heart-history: six weeks of the same 30-minute easy jog at a falling heart rate, and resting heart rate at 58 for two
+// weeks then 64, 65, 63 on the last three mornings (INPUTS: rows as the strap's fill and the watch's sync write them).
+// verify:heart-uses reads Home's fitness line and the coach's recovery offer off them.
+const HEART_HISTORY = new URLSearchParams(location.search).has('heart-history')
+const heartDay = (ago: number) => isoOf(new Date(anchorNowMs() - ago * 86400000))
 // The anchor's Wednesday is "Rest day · optional cardio" on this profile, a planned day with no lifting. ?no-cardio:
 // she would rather avoid cardio (an INPUT), and the generator then leaves Wednesday a plain rest day with no plan
 // entry (verify:home-day-named). ?weigh=79.55: yesterday's weigh-in (an INPUT), so a reading with two decimals
@@ -180,7 +185,14 @@ const db: Db = {
   ],
   daily_steps: [], water_logs: [], exercise_set_logs: testingSets,
   workout_sessions: testingSets.length ? [{ id: 'ws-testing', profile_id: PROFILE_ID, date: testingThursday, is_completed: false, felt: null }] : [],
-  cardio_logs: [],
+  cardio_logs: HEART_HISTORY ? ([[42, 153], [35, 151], [21, 147], [14, 144], [7, 142], [1, 140]] as const).map(([ago, hr], i) => ({
+    id: `jog${i}`, user_id: PROFILE_ID, date: heartDay(ago), activity_name: 'Easy jog', duration_minutes: 30, intensity_rpe: 4,
+    avg_heart_rate: hr, max_heart_rate: hr + 18, completed_at: new Date(anchorNowMs() - ago * 86400000 - 3 * 3600000).toISOString(),
+  })) : [],
+  daily_resting_heart_rate: HEART_HISTORY ? [
+    ...Array.from({ length: 14 }, (_, i) => ({ id: `r${i}`, profile_id: PROFILE_ID, date: heartDay(i + 4), bpm: 58, source: 'health_connect' })),
+    ...([[2, 64], [1, 65], [0, 63]] as const).map(([ago, bpm]) => ({ id: `rr${ago}`, profile_id: PROFILE_ID, date: heartDay(ago), bpm, source: 'health_connect' })),
+  ] : [],
   meal_events: [], meal_plan_picks: [], favorite_meals: [],
   // ?list-stale: tomorrow is on the shopping list, built from a dinner the day no longer serves (an INPUT: a row as the
   // list writes it, his live test of 14 Nov 2026, a dinner since marked as eating out). verify:live-test-nov14.

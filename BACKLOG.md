@@ -2,6 +2,41 @@
 
 Newest first. One line each.
 
+- [x] **WHAT THE HEART RATE DOES FOR HIS TRAINING: FITNESS, RECOVERY, THE COACH, AND A CORNER HEART (his "Build 1, 2
+  and 3 now", 25 Nov 2026)**. His question: "How do we best use this data in the app to complement the training".
+  Offered (CSCS, mine): 1 a fitness trend, 2 a recovery offer from resting heart rate, 3 the coach told, 4 "that easy day
+  ran hard" (his, as it judges effort); advised against calories burned, heart-rate rest between lifts and zones. He
+  chose 1, 2 and 3, and asked "should we add a little symbol somewhere in a corner maybe when heart rate is being picked
+  up?": built as "♥ 148" beside the settings gear while the strap sends, a tap opening the strap's row (mine, told him).
+  BUILT: `heart-trends.ts` (pure rules), `readHeartPicture` (one read for Home, the coach's events and its context).
+  (1) Home's Progress: "Easy jog: average heart rate 152 → 141 over 6 weeks" with "Same steady effort, a lower heart
+  rate: your fitness is improving"; a strap alone is enough. (2) On a training day before the session, the coach's
+  first message: "your resting heart rate has been about 6 above your usual (58) for 3 mornings. That can mean you're
+  still carrying some fatigue. Want today's Legs lighter?" with "Give me the shortest version today" / "I feel fine,
+  keep it as it is"; an event ranked under an unreviewed session and a missed day and above a best; said once per run
+  of raised mornings (the coach's said-once memory, keyed by the run's first morning); it speaks for "feeling good for
+  it?" too. The daily hello now waits for the heart read. (3) The coach is sent the resting line, the flag, the fitness
+  lines and the last week's session figures (cardio history now carries the highest too), with instructions: say the
+  number and what it plainly shows, never a target or zone, never a cause, the GP if worried, a lighter day OFFERED.
+  CSCS BASIS, mine: fitness is compared like for like only (one activity; Easy or Steady, RPE 6 or under, because an
+  interval session's average says nothing about aerobic fitness; within a quarter of the usual length; four sessions
+  over three weeks; the first two against the last two so one hot day cannot make the line) and shown only on a fall of
+  3+: the same submaximal effort at a lower heart rate is the standard field marker of improved aerobic fitness, while a
+  rise has too many causes (heat, sleep, illness, accumulated fatigue) to be said truthfully. Recovery: a morning resting
+  heart rate about 5+ above the individual's own baseline over consecutive days is a common practical marker of
+  incomplete recovery; baseline is the median of days 4-17 (at least five), so the judged days never set it and one odd
+  morning cannot move it; three mornings, not one or two, so a single bad night never triggers it. It is an offer,
+  never a change, and names no cause: interpreting it medically is outside CSCS scope.
+  Found by the gate: the flag's first morning was a day late (a rounded day number turned back into a date). Found by
+  the browser: on a training day the session reminder took the first-message slot, so the offer as first written (in
+  the opener only) would never have been said; it became one of the coach's events.
+  VERIFIED: `test:heart-trends` (46 checks), `verify:heart-uses` (13: the coach's offer and its buttons with the plan
+  untouched, Home's line, the corner heart, its tap, its going), screenshots read; neighbours re-run (coach-nudge
+  re-anchored for the new event and the hello's new wait). MUTATIONS 19, 19 caught (every rule's number, the event's
+  place and keys, the opener's window, the coach's context and instructions, Home's line, the corner heart and its tap,
+  the hello's wait). NOT PROVEN: real resting data
+  from a watch, and whether the coach (Gemini) follows the new lines (exam, after the `chat-gemini` deploy).
+
 - [x] **A HEART RATE STRAP, LIVE WHILE HE TRAINS (option 3, stage 2; his "then start working on 3", 24 Nov 2026)**.
   BUILT 25 Nov 2026 (`docs/plans/live-heart-rate.md`): Profile → "Steps from your phone" → "Heart rate strap" → Find my
   strap opens the phone's own Bluetooth picker, filtered to things sending heart rate; the strap is remembered on this

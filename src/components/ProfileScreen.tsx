@@ -175,7 +175,7 @@ interface ProfileScreenProps {
   /** Fired after any memory (goal/fact/context) edit/delete — same contract MemoryScreen had. */
   onMemoryChanged: () => void | Promise<void>
   /** Chat receipt deep-links land here, scrolled to the relevant memory section. 'dietary' — surfacing round — is where the meal-plan "unrecognised restriction" banner's "Open Profile" button lands. */
-  initialSection?: 'goals' | 'facts' | 'context' | 'dietary' | 'myMeals'
+  initialSection?: 'goals' | 'facts' | 'context' | 'dietary' | 'myMeals' | 'health'
   /** What the top bar's "‹" goes back to — the tab Profile was opened from (2d). */
   backLabel?: string
   /** Today's calorie target, for the stat strip — App's own macros, never worked out again here. */
@@ -275,6 +275,8 @@ const SHEET_FOR_SECTION: Record<NonNullable<ProfileScreenProps['initialSection']
   goals: 'goal', facts: 'remembers', context: 'remembers', dietary: 'diet',
   // Nutrition's swap list links here: "Add a meal you already eat" (11 Nov 2026).
   myMeals: 'likes',
+  // The corner heart (25 Nov 2026) opens the strap's row, in the phone's health sheet.
+  health: 'health',
 }
 
 /**

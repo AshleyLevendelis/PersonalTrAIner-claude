@@ -413,6 +413,8 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   // yesterday's finished sessions get their heart rate, and Progress shows the resting figure's week. Loaded only in the
   // phone app with the switch on; nothing in a browser.
   const [restingLine, setRestingLine] = useState<string | null>(null)
+  // FITNESS FROM HEART RATE (his "1", 25 Nov 2026; heart-trends.ts): the same steady session at a lower heart rate.
+  const [fitnessLine, setFitnessLine] = useState<string | null>(null)
   useEffect(() => {
     if (!profile.id || !activeSession.date || !isPhoneApp()) return
     const id = profile.id, date = activeSession.date
@@ -422,10 +424,12 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         .then(async m => {
           // A PAIRED STRAP (option 3, strap-live.ts) fills first, so its figure is the one kept where both exist.
           await m.fillHeartFromStrap(id, date)
-          if (!m.isHealthHeartConnected()) { if (live) setRestingLine(null); return }
-          await m.syncHeartFromHealth(id, date)
-          const trend = m.restingTrend(await m.readRestingHeartRate(id, date), date)
-          if (live) setRestingLine(trend?.line ?? null)
+          const watch = m.isHealthHeartConnected()
+          if (watch) await m.syncHeartFromHealth(id, date)
+          // A strap alone gives session figures (so the fitness line) but no resting figure.
+          if (!watch && !(await import('@/lib/strap-live')).pairedStrap()) { if (live) { setRestingLine(null); setFitnessLine(null) } return }
+          const picture = await m.readHeartPicture(id, date)
+          if (live) { setRestingLine(watch ? picture.resting?.line ?? null : null); setFitnessLine(picture.fitness[0]?.line ?? null) }
         })
         .catch(() => { /* Progress keeps what it had */ })
     }
@@ -824,6 +828,12 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         {restingLine && (
           <p className="border-b border-[color:var(--hairline)] py-3 text-[0.8125rem]" data-home-resting-hr>
             <span className="text-[color:var(--role-warn-text)]" aria-hidden>♥ </span>{restingLine}
+          </p>
+        )}
+        {fitnessLine && (
+          <p className="border-b border-[color:var(--hairline)] py-3 text-[0.8125rem]" data-home-fitness-hr>
+            <span className="text-[color:var(--role-warn-text)]" aria-hidden>♥ </span>{fitnessLine}
+            <span className="block text-[0.75rem] text-muted-foreground">Same steady effort, a lower heart rate: your fitness is improving.</span>
           </p>
         )}
         <div data-home-volume>

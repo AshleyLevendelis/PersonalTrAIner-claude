@@ -187,6 +187,7 @@ import { flushPending as flushCardioPending } from '@/lib/cardio-log-store'
 import type { UserProfile, MacroTargets, WorkoutDay, PlanAction, MesocycleWeek } from '@/lib/types'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 import { ensureNearCopies } from '@/lib/near-copies-loader'
+import { LiveHeart } from '@/components/LiveHeart'
 
 const STORAGE_KEY = 'fitplan_profile_id'
 /** The start could not reach the server and had nothing kept on the phone to show. Nothing is lost: the row is untouched. */
@@ -729,7 +730,7 @@ function App() {
   const [profileInfoOpen, setProfileInfoOpen] = useState(false)
   // Where the app tour is: its gear and Profile stops open those (tour-stage.ts).
   const tourStage = useTourStage()
-  const [profileInfoSection, setProfileInfoSection] = useState<'goals' | 'facts' | 'context' | 'dietary' | 'myMeals' | undefined>(undefined)
+  const [profileInfoSection, setProfileInfoSection] = useState<'goals' | 'facts' | 'context' | 'dietary' | 'myMeals' | 'health' | undefined>(undefined)
   // "Open my profile" from the chat (his request 16 Nov 2026, "do everything from chat"): Profile is App's own sheet.
   useEffect(() => {
     const take = () => { if (takeOpenRequest(['profile'])) { setProfileInfoSection(undefined); setProfileInfoOpen(true) } }
@@ -3612,11 +3613,20 @@ function App() {
             dropdown row of the same weight as "Profile", for the one action
             here that abandons a profile. Replay the tour stays: the tour's
             own welcome step promises it is in the settings menu. */}
-        <ProfileMenu
-          onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }}
-          onReplayTour={replayAppTour}
-          tourOpen={tourStage === TOUR_OPENS.settingsMenu}
-        />
+        <div className="flex items-center gap-1">
+          {/* THE CORNER HEART (his question, 25 Nov 2026): "♥ 148" beside the gear while a paired strap is sending,
+              nothing otherwise, so it doubles as "the strap is connected". A tap opens the strap's row on Profile. */}
+          <LiveHeart
+            className="min-h-[44px] px-2 text-[0.8125rem] text-muted-foreground"
+            label="Heart rate strap"
+            onOpen={() => { setProfileInfoSection('health'); setProfileInfoOpen(true) }}
+          />
+          <ProfileMenu
+            onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }}
+            onReplayTour={replayAppTour}
+            tourOpen={tourStage === TOUR_OPENS.settingsMenu}
+          />
+        </div>
       </div>
       <div
         className="fixed left-3 right-14 z-40 flex justify-start"

@@ -32,6 +32,7 @@ function setHeartConnected(on: boolean): void {
 // The session figure's rule lives with the strap's reader (heart-strap.ts, no imports), so the live number on the
 // timer does not pull this file into the first download. One rule, both sources.
 import { summariseHeartRate, type HeartSummary } from './heart-strap'
+import { fitnessTrends, recoveryFlag, type CardioHeartRow, type FitnessTrend, type RecoveryFlag } from './heart-trends'
 export { summariseHeartRate, type HeartSummary }
 
 const isPlausibleResting = (n: number) => Number.isFinite(n) && n >= 25 && n <= 140
@@ -211,9 +212,55 @@ export async function fillHeartFromStrap(profileId: string, today: string): Prom
 }
 
 /** The last 14 days' resting figures, for Home's line. Empty before the migration or with none. */
-export async function readRestingHeartRate(profileId: string, today: string): Promise<{ date: string; bpm: number }[]> {
-  const from = addDays(today, -14)
+async function readRestingHeartRate(profileId: string, today: string, days = 14): Promise<{ date: string; bpm: number }[]> {
+  const from = addDays(today, -days)
   const { data, error } = await supabase.from('daily_resting_heart_rate').select('*').eq('profile_id', profileId).gte('date', from).lte('date', today)
   if (error) return []
   return ((data ?? []) as { date: string; bpm: number }[]).map(r => ({ date: r.date, bpm: r.bpm }))
+}
+
+// ---------------------------------------------------------------------------
+// WHAT THE HEART RATE SAYS, read once (his "Build 1, 2 and 3 now", 25 Nov 2026; the rules are heart-trends.ts):
+// the resting trend and any recovery flag, the steady sessions that now run at a lower heart rate, and the last week's
+// session figures. Home's Progress, the coach's opener and the coach's context all read this one picture, so they
+// cannot disagree. Every read is select('*') and names this person; a failed read is "nothing to say", never a throw.
+// ---------------------------------------------------------------------------
+export interface HeartPicture {
+  resting: { line: string; avg: number; change: number | null } | null
+  recovery: RecoveryFlag | null
+  fitness: FitnessTrend[]
+  sessions: { date: string; what: string; avg: number; max: number | null }[]
+}
+
+export async function readHeartPicture(profileId: string, today: string): Promise<HeartPicture> {
+  const empty: HeartPicture = { resting: null, recovery: null, fitness: [], sessions: [] }
+  try {
+    const restingRows = await readRestingHeartRate(profileId, today, 20)
+    const { data: cardio } = await supabase.from('cardio_logs').select('*').eq('user_id', profileId).gte('date', addDays(today, -84)).lte('date', today)
+    const { data: lifts } = await supabase.from('workout_sessions').select('*').eq('profile_id', profileId).gte('date', addDays(today, -7)).lte('date', today)
+    const cardioRows = (cardio ?? []) as (CardioHeartRow & { max_heart_rate?: number | null })[]
+    const sessions = [
+      ...cardioRows.filter(r => r.date >= addDays(today, -7) && Number(r.avg_heart_rate) > 0)
+        .map(r => ({ date: r.date, what: `${r.activity_name} ${r.duration_minutes} min`, avg: Number(r.avg_heart_rate), max: r.max_heart_rate ?? null })),
+      ...((lifts ?? []) as { date: string; split_type?: string | null; avg_heart_rate?: number | null; max_heart_rate?: number | null }[])
+        .filter(r => Number(r.avg_heart_rate) > 0)
+        .map(r => ({ date: r.date, what: `${r.split_type || 'Workout'} session`, avg: Number(r.avg_heart_rate), max: r.max_heart_rate ?? null })),
+    ].sort((a, b) => a.date.localeCompare(b.date))
+    return { resting: restingTrend(restingRows, today), recovery: recoveryFlag(restingRows, today), fitness: fitnessTrends(cardioRows), sessions }
+  } catch {
+    return empty
+  }
+}
+
+/**
+ * THE COACH IS TOLD (his "3"): facts, each with what it is, and the rule it may not cross. Empty when there is nothing,
+ * so a person with no watch or strap costs the coach no words.
+ */
+export function heartContextForCoach(p: HeartPicture): string {
+  const lines: string[] = []
+  if (p.resting) lines.push(p.resting.line + '.')
+  if (p.recovery) lines.push(p.recovery.line)
+  for (const f of p.fitness.slice(0, 2)) lines.push(`${f.line} (same steady effort, ${f.sessions} sessions): aerobic fitness improving.`)
+  for (const s of p.sessions.slice(-6)) lines.push(`${s.date}: ${s.what}, average ${s.avg}${s.max ? `, highest ${s.max}` : ''}.`)
+  return lines.join('\n')
 }
