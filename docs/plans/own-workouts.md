@@ -1,0 +1,66 @@
+# Your own workout
+
+His request, 25 Nov 2026, with Saturday's blank optional-cardio day on screen:
+
+> "how would you log a workout that isn't in your plan? ... on a blank day, on an empty day, you should just be able to
+> start exercising ... If you did an exercise machine, add it. If you did some cardio, add it. Put in the reps, put in
+> the time. After each set, because it's your own workout, you could put in your own rest. Start your own rest timer
+> however you want. Finish the rest time when you're done, and go to the next exercise. You should be able to create
+> your own workout ... 'Add squat, add bench press, add deadlift, rest, add an exercise' ... Have it all ready, and you
+> go to the gym and you just start ... Likewise, you can log it after you've done it ... on a blank day, or even on a
+> day that you've trained once."
+
+And the same day: "The I also did button just adds sets to the existing workout though rather than a separate workout."
+
+## Rulings
+
+- **Where a workout built ahead lives: "Both"** (his, 25 Nov 2026, from three options): a saved list you start on any
+  day, AND optionally put on a day, where it shows like a planned session with Start on that day.
+- **A separate workout** (his words above): its own name, start, finish and list, never sets added to the plan's.
+
+## Decisions mine (CSCS and mechanics), with the basis
+
+- **Its sets are ordinary sets.** History, personal bests and the next weight the plan prescribes for that lift read
+  them. A set lifted is evidence of what the lift can do, whichever screen logged it; the progression engine already
+  reads by lift, not by plan day.
+- **Set numbers run on after every set already on that date for that lift.** The database keys a set by date, lift and
+  number, so a second workout's "set 1" would otherwise write over the plan's set 1.
+- **Counting:** on a day with no session of the plan's (rest, recovery, a moved-away day), finishing marks the day
+  trained. Beside a plan session it does NOT: the plan's session is still to do, and "count it as today's workout" is
+  the option, never the default (his 22 Oct extra-cardio ruling).
+- **Rest is his:** 90 s to start (a middle rest for most lifts), 30 s to 5 min in steps, kept per exercise, Start and
+  Done by hand. No automatic rest: he asked to start and end it himself.
+- **Effort on cardio is asked, never chosen for him** (his 24 Sep cardio ruling).
+
+## Steps
+
+1. **Start one today, log one after the fact (BUILT 25 Nov 2026).** Under every day's card: "Start your own workout"
+   (rest day), "Start a separate workout" (beside the plan's), "Log a workout you did" (a past day). Full screen: add
+   an exercise from the catalogue (or a name it does not know), sets of weight x reps ticked as you go (Undo by tapping
+   again), your own rest, cardio with minutes, km and effort, a name, Finish. A past day has no ticks or timers and one
+   Save, written at that day's noon. The day lists every workout of his own on it. The name and list are kept on the
+   phone in this step (sets and cardio are in the database).
+2. **My workouts (BUILT 25 Nov 2026).** Start now opens a choice: "Empty workout", or one of his saved workouts. "Build
+   a new workout": a name, each exercise with sets (1-10), reps as he writes them ("8-10"), an optional weight and his
+   rest, cardio with minutes, reorder and remove; Save keeps it by name, Edit and Delete from the pencil. A day ahead
+   offers "Plan a workout": pick a saved one (or build one there) and it is on that day, "Take off" removes it. On the
+   day it shows "Planned · your workout" with Start (today) or "Log it" (a past day); started, it opens ready (his sets
+   in the boxes, the first number of his reps, his weight and rest, numbered after the day's) and the planned card goes.
+   Stored on the phone first (a gym with no signal) and in `own_workouts` where phones meet: the newer edit wins, a
+   deletion is kept as removed so another phone cannot copy it back. Before the migration is applied everything works on
+   the phone that made it, and the choice says so. CSCS, mine: a new exercise goes in at 3 sets of 8-10 with 90 s rest.
+3. **The coach.** "Build me a workout: squat, bench, deadlift" makes the same saved workout (and puts it on a day when
+   he names one); "start my push workout" opens it. Needs the `chat-gemini` deploy.
+
+## Not built yet, named
+
+- A planned workout of his own puts no dot on the week strip; the day's card shows it.
+- Step 1's finished workouts (the record of what was done) stay on the phone that made them; only saved workouts go to
+  the table.
+
+- A workout's name and list are on the phone that made it; another phone sees the sets in history, not the grouping.
+- A lift that is BOTH in the plan's session and in his own workout on the same day: his sets show in the plan card's
+  set list too (one list per lift per day) and count towards its "N of M sets".
+- "Count this as today's workout" beside a plan session.
+- A saved past-day set cannot be edited or removed from the workout screen (as "I did it, not in the app").
+- Units are kilograms.

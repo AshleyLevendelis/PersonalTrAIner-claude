@@ -124,6 +124,12 @@ export interface ActiveSessionValue extends ActiveSessionIdentity, RestState {
   refresh: () => void
   logSet: (input: SaveSetInput) => ExerciseSetLog | null
   /**
+   * A SET OF HIS OWN WORKOUT (own-workout.ts, 25 Nov 2026): the same one write path, without opening the plan's
+   * session. His own workout is a separate workout, so ticking one of its sets must never start the plan's clock or
+   * mark the plan's session running. Refused sets open nothing, as with logSet.
+   */
+  logOwnSet: (input: SaveSetInput) => ExerciseSetLog | null
+  /**
    * THE TOUR'S SET IS PRACTICE (his ruling 17 Nov 2026, "Practice, then removed"): sets logged between beginPractice and
    * endPractice are taken back off when the tour moves on, and a session the practice opened goes back to not started.
    */
@@ -562,6 +568,12 @@ export function ActiveSessionProvider({
   }, [identity.profileId, identity.date, identity.dayName, identity.liveWeek])
 
   const practice = useRef<{ wasIdle: boolean; sets: SaveSetInput[] } | null>(null)
+  const logOwnSet = useCallback((input: SaveSetInput): ExerciseSetLog | null => {
+    const result = saveSet(input)
+    if (result) refresh()
+    return result
+  }, [refresh])
+
   const logSet = useCallback((input: SaveSetInput): ExerciseSetLog | null => {
     const result = saveSet(input)
     if (result && practice.current) practice.current.sets.push(input)
@@ -982,6 +994,7 @@ export function ActiveSessionProvider({
     setsFor,
     refresh,
     logSet,
+    logOwnSet,
     deleteSet,
     retrySet: retryFailedSet,
     status,
