@@ -2,6 +2,12 @@
 
 Newest first. One line each.
 
+- [x] **A NEW PLAN AND THE HEART RATE SETTINGS (25 Nov 2026, found by the pre-merge sweep)**. `test:reset-clears-draft`
+  failed: three new phone-storage keys (the watch switch, the paired strap, the strap's raw readings) were not
+  classified. Decided (mine, mechanical): all three KEPT by a New Plan. The switch and the strap are the phone's, as the
+  steps switch is; the readings are matched to a session only by its own start and end, so none from before a New Plan
+  can land in the new plan's sessions, and they go after four hours. Gate green; its failure on the unfixed code is the
+  detector proven.
 - [x] **WHAT THE HEART RATE DOES FOR HIS TRAINING: FITNESS, RECOVERY, THE COACH, AND A CORNER HEART (his "Build 1, 2
   and 3 now", 25 Nov 2026)**. His question: "How do we best use this data in the app to complement the training".
   Offered (CSCS, mine): 1 a fitness trend, 2 a recovery offer from resting heart rate, 3 the coach told, 4 "that easy day

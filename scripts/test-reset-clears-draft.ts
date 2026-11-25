@@ -107,6 +107,14 @@ const KEYS: Record<string, { clear: boolean; why: string }> = {
   // the phone's own Health permission, which a New Plan does not take away, so the switch stays as the phone has it.
   fitplan_health_steps_connected: { clear: false, why: "this phone's Health permission switch — the phone's, not the plan's" },
 
+  // HEART RATE (24-25 Nov 2026, the phone app). The watch switch is this phone's Health permission, as steps are; the
+  // strap is this phone's paired Bluetooth device. The strap's raw readings stay on the phone for four hours and are
+  // only ever matched to a session by its start and end times, so a reading from before a New Plan can never land in
+  // the new plan's sessions, and they expire on their own.
+  fitplan_health_heart_connected: { clear: false, why: "this phone's Health permission switch for heart rate, as steps" },
+  fitplan_heart_strap: { clear: false, why: "the strap paired to this phone's Bluetooth — the phone's, not the plan's" },
+  fitplan_heart_strap_readings: { clear: false, why: 'raw strap readings, matched to a session by its own times only and gone after four hours' },
+
   fitplan_plan_pending_v1: { clear: false, why: 'plan weeks changed offline and not yet sent, keyed per person — dropped by the save that replaces them' },
 }
 
