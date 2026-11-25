@@ -27,6 +27,11 @@ if (platform === 'ios' || platform === 'android') {
       for (let t = start.getTime(), i = 0; t <= end.getTime(); t += 60000, i++) out.push({ bpm: 132 + (i % 10) * 4, at: new Date(t).toISOString() })
       return out
     },
+    // A RECORDED WALK OR RUN (25 Nov 2026, activity-recording.ts): what the watch wrote for the window.
+    //   &healthkcal=N   calories the watch reports (default 300); &healthkcal=0 a watch that has not synced yet
+    requestActivityAccess: async () => { calls.push({ request: ['steps', 'distance', 'calories', 'heartRate'] }); return q.get('healthdenied') !== '1' },
+    distanceMetersBetween: async (start, end) => { calls.push({ distance: [start.toISOString(), end.toISOString()] }); return Number(q.get('healthdistance') ?? '3840') },
+    activeKcalBetween: async (start, end) => { calls.push({ kcal: [start.toISOString(), end.toISOString()] }); return Number(q.get('healthkcal') ?? '300') },
     restingHeartRateSamples: async (_start, end) => {
       calls.push('resting')
       return Array.from({ length: 14 }, (_, i) => {

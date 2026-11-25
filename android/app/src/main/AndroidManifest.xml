@@ -48,7 +48,8 @@
     <!-- Coach notifications (23 Nov 2026). Asked only when he turns "On this phone" on, never at start. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- STEPS ONLY (20 Nov 2026). The health plugin declares read AND write for every kind of health data it supports;
-         Google Play refuses an app that declares health permissions it does not use, so every one but READ_STEPS, READ_HEART_RATE and READ_RESTING_HEART_RATE (24 Nov 2026) is
+         Google Play refuses an app that declares health permissions it does not use, so every one but READ_STEPS, READ_HEART_RATE and READ_RESTING_HEART_RATE (24 Nov 2026), READ_DISTANCE and
+         READ_ACTIVE_CALORIES_BURNED (a recorded walk or run, 25 Nov 2026) is
          removed here. Add a line back only when the app starts reading that kind of data. -->
     <!-- HEART RATE STRAP (option 3, 25 Nov 2026; src/lib/strap-live.ts). Android 12+: scan and connect, the scan
          declared never to work out where he is. The Bluetooth plugin also declares location for every Android version;
@@ -59,9 +60,9 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="30" tools:node="replace" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />
     <uses-permission android:name="android.permission.health.WRITE_STEPS" tools:node="remove" />
-    <uses-permission android:name="android.permission.health.READ_DISTANCE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_DISTANCE" />
     <uses-permission android:name="android.permission.health.WRITE_DISTANCE" tools:node="remove" />
-    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
     <uses-permission android:name="android.permission.health.WRITE_ACTIVE_CALORIES_BURNED" tools:node="remove" />
     <!-- HEART RATE, READ ONLY (his ruling 24 Nov 2026, "1 + 2"; src/lib/health-heart.ts): after a session and resting. -->
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />

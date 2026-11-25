@@ -2,6 +2,30 @@
 
 Newest first. One line each.
 
+- [x] **RECORD A WALK OR RUN: START, END, AND THE PHONE'S STEPS, DISTANCE AND CALORIES (his request and ruling, 25 Nov
+  2026)**. His words: "start workout and recording and end the workout and recording and the app then logs. 5k steps
+  logged 300kcal burned ... taking the kcal from the device which is recording ie watch or strap". A strap sends heart
+  rate only, so asked what calories it gives: options A an estimate marked as one, B nothing; **he chose "A, build it"**.
+  BUILT (`docs/plans/recorded-activity.md`): Tools → "Record a walk or run" → Start walk / Start run → End → one effort
+  tap logs a cardio log with steps, distance, calories (the device's, or "≈ N kcal (estimate)") and heart rate; Keep
+  going, Throw it away, Cancel that asks first; the recording survives a reload; a watch that syncs late fills in on
+  Home's open. **Mine (CSCS)**: calories burned never change the food target (the target already counts activity
+  level; watch figures run high); the device's figure always wins over the estimate; the estimate is Keytel 2005 with
+  the resting share taken off, not given under an average of 90 or without weight and age. **Mine (wording, told him
+  in the reply)**: the card's words. **Found on the way**: the iPhone permission sentence said "reads steps only" since
+  24 Nov while the heart rate switch already asked for heart rate, and `test:phone-app` pinned "steps only"; it now
+  names every kind read. The parity doc's screen-only count was stale a third time (freestyle three and cardio days
+  added without the count moving): re-derived, thirteen. And the card drew an empty result for a moment after End,
+  before the phone answered (a half-empty card reads as "no steps"), found by the driver racing it: it says "Reading
+  your phone…" until the figures arrive.
+  Verified: `test:recorded-activity` (39 checks; 19 mutations, 18 caught and the 19th was a rule written twice, now one
+  line), `verify:record-activity` (27 checks, browser at 390x844, screenshots read; mutations in the commit message),
+  `test:phone-app` re-anchored. My first mutation harness read only the standard output and called every catch a crash
+  (failures print to the error stream): the house rule "checks RAN is passes plus failures", relearned.
+  NOT proven: a real watch or strap on his phone; whether Health Connect returns calories for a window this short on his
+  watch; strap readings while the app is in the background. NEEDS: migration `20261125120000` (db:push-both) and a
+  phone app rebuild (new Android permissions). NOT BUILT: GPS, the coach told steps and calories, an indicator outside
+  Tools while recording.
 - [x] **A NEW PLAN AND THE HEART RATE SETTINGS (25 Nov 2026, found by the pre-merge sweep)**. `test:reset-clears-draft`
   failed: three new phone-storage keys (the watch switch, the paired strap, the strap's raw readings) were not
   classified. Decided (mine, mechanical): all three KEPT by a New Plan. The switch and the strap are the phone's, as the

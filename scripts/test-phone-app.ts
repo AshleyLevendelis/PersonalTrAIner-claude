@@ -35,8 +35,10 @@ console.log('\n1. Android declares READ_STEPS and removes every other health per
   check('the plugin was read (sanity check on this check: it brings more than one health permission)', pluginPerms.length > 10, pluginPerms.length)
   // + READ_HEART_RATE and READ_RESTING_HEART_RATE, his ruling 24 Nov 2026 "1 + 2" (health-heart.ts). An enumerated list ON PURPOSE: a
   // health permission joins only by a decision, and Google reviews every one.
-  check('READ_STEPS, READ_HEART_RATE and READ_RESTING_HEART_RATE are declared, and nothing else', JSON.stringify([...declared].sort()) === JSON.stringify(['READ_HEART_RATE', 'READ_RESTING_HEART_RATE', 'READ_STEPS']), declared)
-  const kept = pluginPerms.filter(p => !['READ_STEPS', 'READ_HEART_RATE', 'READ_RESTING_HEART_RATE'].includes(p) && !removed.has(p))
+  // + READ_DISTANCE and READ_ACTIVE_CALORIES_BURNED, his "A, build it" 25 Nov 2026 (a recorded walk or run, activity-recording.ts).
+  const allowed = ['READ_ACTIVE_CALORIES_BURNED', 'READ_DISTANCE', 'READ_HEART_RATE', 'READ_RESTING_HEART_RATE', 'READ_STEPS']
+  check('READ_STEPS, heart rate, distance and active calories are declared, and nothing else', JSON.stringify([...declared].sort()) === JSON.stringify(allowed), declared)
+  const kept = pluginPerms.filter(p => !allowed.includes(p) && !removed.has(p))
   check('every other health permission the plugin declares is removed', kept.length === 0, kept)
   check('the tools namespace the removals need is on the manifest', /xmlns:tools="http:\/\/schemas\.android\.com\/tools"/.test(app))
   const minSdk = Number((read('android/variables.gradle').match(/minSdkVersion\s*=\s*(\d+)/) ?? [])[1])
@@ -49,7 +51,9 @@ console.log('\n2. iPhone: the sentence on the permission sheet, and the HealthKi
 {
   const plist = read('ios/App/App/Info.plist')
   const share = (plist.match(/<key>NSHealthShareUsageDescription<\/key>\s*<string>([^<]+)<\/string>/) ?? [])[1] ?? ''
-  check('the read sentence is there and says steps', /step/i.test(share) && /steps only/i.test(share), share)
+  // Since 25 Nov 2026 (a recorded walk or run) the app reads more than steps, and the sentence must name every kind it
+  // asks for. It said "steps only" from 24 Nov while the heart rate switch was already asking for heart rate.
+  check('the read sentence names every kind the app reads: steps, distance, calories, heart rate', ['step', 'distance', 'calories', 'heart rate'].every(w => share.toLowerCase().includes(w)) && !/steps only/i.test(share), share)
   check('...and says it never writes to Health', /never writes/i.test(share), share)
   check('no write sentence: the app asks to write nothing', !/NSHealthUpdateUsageDescription/.test(plist))
   const ent = read('ios/App/App/App.entitlements')
@@ -64,7 +68,8 @@ console.log('\n3. The code asks for what the settings say, and the website never
   const asks = [...src.matchAll(/requestAuthorization\(\{([^}]*)\}\)/g)].map(m => m[1].replace(/\s+/g, ''))
   // Two requests since 24 Nov 2026 (his "1 + 2", health-heart.ts): steps, and heart rate with resting heart rate, each
   // asked only from its own switch. Read only, both.
-  check('two permission requests, steps and heart rate, read only and nothing else', JSON.stringify(asks) === JSON.stringify(["read:['steps']", "read:['heartRate','restingHeartRate']"]), asks)
+  // A third since 25 Nov 2026: the first Start of a recorded walk or run (activity-recording.ts).
+  check('three permission requests, steps, heart rate and a recording, read only and nothing else', JSON.stringify(asks) === JSON.stringify(["read:['steps']", "read:['heartRate','restingHeartRate']", "read:['steps','distance','calories','heartRate']"]), asks)
   check('nothing is ever written to Health', !/saveSample|write:/.test(src))
   check('the plugin is loaded by a dynamic import only (the website\'s download does not grow)', /await import\('@capgo\/capacitor-health'\)/.test(src))
   const statics = ['src/components/Dashboard.tsx', 'src/components/ProfileScreen.tsx', 'src/components/HealthStepsSection.tsx', 'src/lib/health-steps.ts', 'src/main.tsx', 'src/App.tsx']
@@ -117,4 +122,4 @@ console.log('\n6. Store icons and the upload key (store work, 20 Nov 2026)')
 
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.log(`${failures} check(s) failed`); process.exit(1) }
-console.log('The phone app asks for steps and nothing else, and says so everywhere it is asked.')
+console.log('The phone app reads only what it says it reads (steps, heart rate, and the distance and calories of a recorded walk), and writes nothing.')

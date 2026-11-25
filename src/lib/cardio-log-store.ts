@@ -42,6 +42,14 @@ export interface CardioLogInput {
   notes?: string | null
   /** Kilometres, only when she gave a distance. */
   distanceKm?: number | null
+  /** A RECORDED WALK OR RUN (activity-recording.ts, 25 Nov 2026): when Start and End were tapped, and what the phone
+   *  read for that window. All absent on every other log. */
+  startedAt?: string | null
+  endedAt?: string | null
+  steps?: number | null
+  activeKcal?: number | null
+  kcalEstimated?: boolean | null
+  maxHeartRate?: number | null
 }
 
 interface PendingCardioLog extends CardioLogInput {
@@ -112,6 +120,7 @@ function pendingToView(p: PendingCardioLog): CardioLogView {
     avg_heart_rate: p.avgHeartRate ?? null,
     notes: p.notes ?? null,
     ...(p.distanceKm != null ? { distance_km: p.distanceKm } : {}),
+    ...recordedShape(p),
     completed_at: p.completedAt,
     syncStatus: p.status,
   }
@@ -126,6 +135,18 @@ function pendingToView(p: PendingCardioLog): CardioLogView {
  * numbers until somebody notices. Same shape as MAX_PLAUSIBLE_DAILY_STEPS.
  */
 export const MAX_PLAUSIBLE_CARDIO_MINUTES = 24 * 60
+
+/** The columns a recorded walk or run adds, named on a row only when it has them. */
+const RECORDED_COLUMNS = ['started_at', 'steps', 'active_kcal', 'kcal_estimated', 'max_heart_rate'] as const
+type RecordedShape = Pick<CardioLog, 'started_at' | 'steps' | 'active_kcal' | 'kcal_estimated' | 'max_heart_rate'>
+function recordedShape(p: CardioLogInput): RecordedShape {
+  const out: RecordedShape = {}
+  if (p.startedAt) out.started_at = p.startedAt
+  if (p.steps != null) out.steps = p.steps
+  if (p.activeKcal != null) { out.active_kcal = p.activeKcal; out.kcal_estimated = !!p.kcalEstimated }
+  if (p.maxHeartRate != null) out.max_heart_rate = p.maxHeartRate
+  return out
+}
 
 /** The longest distance one cardio entry may carry, in km: the database's own bound. */
 export const MAX_PLAUSIBLE_DISTANCE_KM = 500
@@ -170,7 +191,8 @@ function saveCardioLogUnchecked(input: CardioLogInput): CardioLogView {
   const pending: PendingCardioLog = {
     ...input,
     clientId,
-    completedAt: getAppNow(input.userId).toISOString(),
+    // A recording ends when End was tapped, whatever the effort tap after it: its window is the one the phone was read for.
+    completedAt: input.endedAt ?? getAppNow(input.userId).toISOString(),
     savedAtMs: Date.now(),
     attempts: 0,
     status: 'pending',
@@ -351,9 +373,18 @@ async function syncPass(items: PendingCardioLog[]): Promise<void> {
       // THE DISTANCE IS NAMED ONLY WHEN THERE IS ONE, and a database that has not run its migration yet
       // (20261022120000) is retried without it: the session saves, the distance is the one thing lost.
       if (item.distanceKm != null) row.distance_km = item.distanceKm
+      Object.assign(row, recordedShape(item))
+      const recorded: readonly string[] = RECORDED_COLUMNS
       let { data, error } = await supabase.from('cardio_logs').insert(row).select('id').single()
       if (error && 'distance_km' in row && isMissingColumnError(error, 'distance_km')) {
         delete row.distance_km
+        ;({ data, error } = await supabase.from('cardio_logs').insert(row).select('id').single())
+      }
+      // A RECORDING'S FIGURES on a database before 20261125120000 (or 20261124180000 for max_heart_rate): the walk
+      // saves with its minutes, effort and heart rate; only the columns the database lacks are lost.
+      for (const col of recorded) {
+        if (!error || !(col in row) || !isMissingColumnError(error, col)) continue
+        delete row[col]
         ;({ data, error } = await supabase.from('cardio_logs').insert(row).select('id').single())
       }
       if (error) throw error
@@ -462,6 +493,7 @@ function serverShape(p: PendingCardioLog): CardioLog {
     avg_heart_rate: p.avgHeartRate ?? null,
     notes: p.notes ?? null,
     ...(p.distanceKm != null ? { distance_km: p.distanceKm } : {}),
+    ...recordedShape(p),
     completed_at: p.completedAt,
   }
 }

@@ -1836,6 +1836,12 @@ menu" stays true when a copy is also left outside it.
   must stay removed unless the app starts reading that data. Phone-only code loads only in the phone app.
   `test:phone-app`, `verify:health-steps`, `docs/plans/phone-app.md`. NOT BUILT natively yet: his machine
 
+- **Record a walk or run: his request and ruling 25 Nov 2026, "A, build it"**: Tools, Start walk / Start run, End; the
+  phone's steps, distance and calories for exactly that window (the watch's own figure), heart rate from the strap
+  first; with a strap and no watch, calories are an estimate printed "≈ N kcal (estimate)" (his A, over nothing). One
+  effort tap logs it; a watch that syncs late fills in. Calories burned NEVER change the food target (CSCS, mine).
+  `test:recorded-activity`, `verify:record-activity`, `docs/plans/recorded-activity.md`. Needs migration 20261125120000
+  and a phone app rebuild
 - **Heart rate from a watch: his "1 + 2, build it", 24 Nov 2026**: after each session its average and highest heart rate
   (from Health Connect, which the watch writes to) show under it, and Progress shows resting heart rate against last
   week. Read only, its own switch, phone app only; never a target or zone. `test:health-heart`, `verify:health-steps`
