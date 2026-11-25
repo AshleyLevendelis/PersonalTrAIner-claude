@@ -50,6 +50,42 @@ Newest first. One line each.
   mutation, caught); 166 logic gates and 17 screen drivers over the changed files green. NOT proven: the real chat turn
   "add 8x30s ..." on a live coach (the card builder is gate-held, the coach must still call its cardio tool), and the
   phone app until it is rebuilt from main.
+- [x] **THE WHY SHEET: THE COACH GIVES THE APP'S OWN REASONS (his question and "build the why sheet", 24 Nov 2026).**
+  His question: "Does the chat have the same cscs logic so it can answer questions correctly or will it take answers
+  from somewhere else?" MEASURED: the coach (Gemini) gets the plan's NUMBERS as data, and a REASON only where one is
+  written into its ~175k-character prompt; deloads, calibration and the main lift were there, protected rest, the
+  18-set cap, the 20-rep ceiling, the too-easy question and simple meals were not, so it answered "why" from its own
+  general knowledge. Its app map also said the rest timer starts after every set (false for warm-ups since September).
+  BUILT: `supabase/functions/_shared/app-decisions.ts`, 124 entries (what the app does, the code's own numbers, and the
+  reason its own record gives), drafted file by file from the 62 `src/lib` files that record a CSCS decision by three
+  read-only helpers, then rewritten as a coach's reasons (no dates, names or internal history) and checked by the gate.
+  IT TRAVELS BY TOPIC (mine): the whole sheet would add a quarter to every message, so each message carries only the
+  entries its words match (at most 8; the largest probe block is about 3.4k characters), and the coach is told to give
+  the app's reason, and when none matches to say what the plan shows and not invent one. One entry has no recorded
+  reason (late pregnancy's effort cap) and is passed as such. The app-map timer line is corrected in both copies.
+  `test:app-decisions` (30 checks, 14 mutations, 14 caught, one only after the number check was narrowed to the lines
+  near the rule: a whole 7,000-line file holds almost every small number, so "18 sets" changed to 19 passed). New exam
+  case `why-no-rest-between-warmups`. All 126 runnable gates that read the coach's files pass (the exam itself needs his
+  machine; running its grader here overwrote the saved scores, put back). LIMITS, named: the gate is per FILE, so a new
+  rule added to a file that already has an entry is not caught; retrieval is word matching, so a question in words
+  the entry does not share can miss (12 real questions probed, all reached); whether the coach USES the sheet is model
+  behaviour, unproven until the exam runs after the `chat-gemini` deploy.
+- [ ] **A SHORT REST AFTER THE LAST WARM-UP (his question and "build it", 24 Nov 2026) — BUILT ON THE BRANCH, NOT
+  FINISHED.** "I noticed that warm up sets don't get rest timers. Why not?" They never had one, on purpose (a build-up
+  is followed by the next build-up). Right between warm-ups, wrong after the LAST one, where the next thing is the
+  first heavy set. BUILT: ticking the last warm-up row before any working set starts a rest counting down to Set 1,
+  drawn under that row, or above Set 1 once the build-up folds shut (it folds when every row is logged, which first hid
+  the rest entirely: found by the driver). CSCS (mine): 60 s before ordinary work, 90 s before a main lift, 120 s before
+  a heavy main lift (top of the range 6 or fewer), never longer than the plan's working rest; nothing between earlier
+  warm-ups, nothing for a warm-up logged after the work started. `test:warmup-rest` (14 checks, 9 mutations, 9 caught),
+  `verify:warmup-rest` (7 checks; its mutation round was STOPPED by him part-way and NOT completed; the stop left one
+  mutation in the tree, found by `git diff` and removed). NOT DONE: the browser mutation round, the gates that read the
+  set grid, a sweep. AND THE COACH WOULD ANSWER IT WRONGLY: its instructions say "the rest timer starts on its own the
+  moment a set is logged", which was already false for warm-ups. His question, the same day: does the coach have the
+  app's CSCS reasoning? Measured: it is given the plan's numbers, and a reason only where one is written into its
+  prompt (deloads, calibration, the main lift: yes; protected rest, the 18-set cap, the 20-rep ceiling, the
+  too-easy question, simple meals: no). Proposed to him: one "how the app decides" sheet the coach reads, held complete
+  by a check. Awaiting his answer.
 - [x] **HIS WEDNESDAY ASSAULT BIKE SESSION GETS ITS START BUTTON: ROUNDS READ OFF THE COACH'S REASON (his live report 24 Nov 2026, screenshot: "I have a planned assault bike session planned for tomorrow but it doesn't show like weight sessions do"; mechanical, no ruling needed)**. The round-timer build of 23 Nov WAS on his phone (the preview he sent is its layout), but his session had been saved with the numbers only in the coach's reason ("4 rounds of 3-min hard effort with 60s rest to match Muay Thai rounds...") and no rounds field, so the app found no rounds: no shape line, and on the day no Start, only the minutes-and-effort row. Two causes, both fixed: (1) the interval reader did not read a hyphenated duration ("3-min"); (2) a session's rounds were read from the stored field or the name only. Now, after those two, from the coach's reason on the card he approved, only when the rounds fit inside the session's own minutes (the same guard the coach's card uses for the reply he said yes to). The cardio row reads them the same way. No data repair needed: it is read, not stored. CSCS: nothing prescribed changes; the timer runs the coach's own numbers. `test:planned-rounds` §1b (39 checks; 6 mutations, 5 caught, 1 equivalent: dropping the "no minutes" guard leaves a comparison with nothing that is already false), `verify:planned-rounds` G1-G3 (31 checks; the mutation reproduces his screen exactly). Not done: a reason with its numbers in other shapes ("three-minute rounds") is still read as none; frontend only.
 - [x] **"I LOGGED LEG CURL, I ACTUALLY DID LEG EXTENSIONS" MOVES THE SETS, CHAT AND SCREEN (his live report 24 Nov 2026, with screenshots; mine)**. The coach logged ONE invented set under Leg Extensions (25 x 14, numbers he never said) and left the three leg curl sets, because nothing in the app could move logged sets. Now one planner (`move-logged-sets.ts`) moves every set as logged (weights, reps, effort, kind, drops), writes before it deletes, and undoes exactly; the coach has `move_logged_sets` (names from his words and today's own log, no numbers) and a rule that a wrong exercise is a move; the ⋮ menu has "Logged the wrong exercise?". NOT DONE: a past day; the coach's `log_workout` still does not check that the NUMBERS are his (the general fix, next). `test:move-logged-sets` (27, 12/12 mutations), `verify:wrong-exercise` (10, 2/2), `docs/plans/move-logged-sets.md`. Needs the `chat-gemini` deploy.
 - [x] **THE SWING WARM-UP IS A REAL BELL, PRICED ONE WAY (his report 24 Nov 2026, "Kettlebell Swings at 8kg was way too light"; CSCS, mine)**. TRACED and RUN: fresh plans priced it at 14 kg (male, intermediate, 85 kg) and every edit at 8 (the testing week's half, then the warm-up half); a halved weight could feed back as last week's; a logged swing stepped up every session; the anchor treated a warm-up as a test. NOW: a primer is priced from the person on every route, never discounted or progressed from its log; a ballistic primer (the swing) carries its easy estimate unhalved (26 kg for him; a trained man warms up with 16-24); wrist and forearm drills keep the half; a saved plan's warm-ups are corrected on open. Changes what the 18 Sep "half the working load" means for the swing. `test:primer-dose` (16, 7/7 mutations), `docs/plans/primer-dose.md`. Frontend only.

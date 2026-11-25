@@ -1252,6 +1252,11 @@ menu" stays true when a copy is also left outside it.
   (`coach-texting`, 21 checks, 9 mutations). Whether it is one line per thing,
   and whether a question matters, stays the exam's to judge — the same split
   as the cardio ruling
+- **It explains the app's OWN reasons — his request 24 Nov 2026, "build the why sheet"**: every coaching decision the app
+  makes has a plain-words line and its reason on one sheet (`_shared/app-decisions.ts`), and each message carries the
+  lines it matches; the coach never invents the app's reason. A NEW CSCS DECISION GETS A LINE THERE in the same change
+  (the gate only sees files, not new rules in a file it already covers). `test:app-decisions`. Needs the `chat-gemini`
+  deploy and an exam run
 - Never claims a capability, screen or guarantee it lacks; proposes,
   confirms, can be undone — `coach-promises`, `chat-app-reality`,
   `pending-actions`, `log-correction`, `replace-without-losing`,
