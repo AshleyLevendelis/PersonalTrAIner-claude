@@ -2,6 +2,20 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH-VOICE WORK WAS NEVER ON MAIN, AND THE HEART-RATE MIGRATION NEVER APPLIED (25 Nov 2026)**. The 24 Nov
+  coach-voice branch (`ccr-74a169c3-gto5y6`: training-partner voice, days ahead, the Saturday review, rest-day cardio)
+  was deployed to production FROM ITS BRANCH and never merged. Every chat-gemini deploy from main after it (the why
+  sheet v114, the plank fix v115, heart rate v116) put main's older coach back, so the live coach lost the voice work
+  from v114 on; coach-reach-out kept it. My error: I handed deploys from main without checking that branch was in main.
+  And `db:push-both` refused heart rate (20261124180000) and cardio days (20261124160000), because days_ahead
+  (20261125120000), applied from that branch, is dated after them and was absent from main; parity still read "77,
+  identical" because both projects lacked the same two. Fixed: the branch merged in; `db:push-both` passes
+  `--include-all` (dry run against TEST: exactly those two would apply); the why sheet gained the leg-sport clash
+  entry the merge's `days-ahead.ts` needed (`test:app-decisions` was the one merge-caused failure); the total bundle
+  budget 3415 -> 3427 (measured 3418). Sweep of the 453 checks reading the merged files: 400 pass, 50 fail, 49 of them
+  fail identically on a clean checkout of main on this Windows machine (line endings, spawn), the 50th fixed. Not run:
+  `test:quality`, `test:audit`. Needs: `db:push-both`, chat-gemini prod and TEST deploys, then the exam.
+
 - [x] **A NEW PLAN AND THE HEART RATE SETTINGS (25 Nov 2026, found by the pre-merge sweep)**. `test:reset-clears-draft`
   failed: three new phone-storage keys (the watch switch, the paired strap, the strap's raw readings) were not
   classified. Decided (mine, mechanical): all three KEPT by a New Plan. The switch and the strap are the phone's, as the
