@@ -69,7 +69,7 @@ import { FinishSection } from './FinisherRow'
 import { isScheduledDay, dayDetail, prescriptionLine } from '@/lib/activity-day'
 import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
-import { RestDayCard, ActiveRecoveryCard, MovedDayCard } from './RestDayCard'
+import { RestDayCard, ActiveRecoveryCard, MovedDayCard, PeekRecoveryDay } from './RestDayCard'
 import type { WhatHappenedTarget } from './WhatHappenedSheet'
 import type { RemoveTarget } from './RemoveExerciseSheet'
 import type { ReasonAnswer } from './EditReasonStep'
@@ -1669,6 +1669,17 @@ export function TodayPanel({
                 16 minutes." was his whole view of it. What it is, its rounds and why, read off the plan. */}
             {!peekBeforePlan && peekWorkout?.plannedActivity ? (
               <PlannedActivityPreview dayName={peekDay} focus={peekWorkout.focus} planned={peekWorkout.plannedActivity} onBack={() => setPeekDate(null)} />
+            ) : !peekBeforePlan && peekWorkout?.recommendedCardio && peekDate ? (
+              /* THE DAY'S OWN CARD, NOT A SENTENCE (his report 25 Nov 2026): the optional cardio is a row like an
+                 exercise, loggable on a past day, previewed on a day to come. */
+              <PeekRecoveryDay
+                dayName={peekDay}
+                date={peekDate}
+                today={today}
+                focus={peekWorkout.focus}
+                cardio={peekWorkout.recommendedCardio}
+                back={<PeekBackToToday onClick={() => setPeekDate(null)} />}
+              />
             ) : (
             <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 text-center text-sm text-muted-foreground" data-testid="peek-rest-day">
               {/* A peeked day with a prescribed activity is NOT a rest day, and
@@ -1679,8 +1690,6 @@ export function TodayPanel({
                   her less than the plan knew. */}
               {peekBeforePlan
                 ? `${peekDay} was before your plan began, so there is no session on it.`
-                : peekWorkout?.recommendedCardio
-                ? `${peekDay} is a rest day. Optional: ${prescriptionLine(peekWorkout.recommendedCardio)}.`
                 : peekWorkout?.conditioning_note
                 ? `${peekDay} is a rest day. Optional: ${peekWorkout.conditioning_note}`
                 : `${peekDay} is a rest or recovery day.`}

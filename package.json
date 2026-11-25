@@ -742,7 +742,8 @@
     "test:account-auth": "tsx scripts/test-account-auth.ts",
     "verify:welcome": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/welcome.mjs",
     "measure:meal-protein-spread": "tsx scripts/measure-meal-protein-spread.ts",
-    "test:meal-protein-spread": "tsx scripts/test-meal-protein-spread.ts"
+    "test:meal-protein-spread": "tsx scripts/test-meal-protein-spread.ts",
+    "test:peek-recovery": "tsx scripts/test-peek-recovery.ts"
   },
   "dependencies": {
     "@capacitor/android": "8.6.2",

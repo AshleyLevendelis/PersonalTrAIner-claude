@@ -2,6 +2,19 @@
 
 Newest first. One line each.
 
+- [x] **ANOTHER DAY'S REST-DAY CARDIO IS A ROW, LOGGABLE ON A PAST DAY (25 Nov 2026, his report with a screenshot of
+  Saturday: "Why do rest days look like this. The optional rest day exercises should be loggable like other
+  exercises").** Opened ON the day, a recovery day has been its card with a loggable Optional row since 24 Sep; opened
+  from the strip on any OTHER day it was one grey sentence ("Saturday is a rest day. Optional: ... · 39 min · Easy.").
+  Now the peek is the same card (`PeekRecoveryDay`): the same head, the same Optional row. Which days log it
+  (`optionalCardioMode`, mine): today and past days up to two weeks back log it TO THAT DAY (the chat's 19 Nov rule for
+  an earlier day); a day to come shows the row and "You can log it on Saturday." with no boxes, as a peeked training
+  day's exercises are read-only before their day; older is read-only. Decided unprompted: not logging ahead, because
+  nothing done yet can be counted (his "a missed day stays missed" and the week counts read logs by date). The row's
+  `onDate` reads and writes that date's logs. `test:peek-recovery` (9 checks, 4 of 4 mutations caught),
+  `verify:rest-day` §11 (7 checks; mutations below), `verify:live-run-5` E4 and `verify:qa-training` T11 re-anchored to
+  the card. NOT checked: the strip's mark for that day after a past-day log (it read "–" in the screenshot both before
+  and after; whether an optional cardio log should mark a rest day is unruled). Frontend only.
 - [x] **THE SATURDAY REVIEW SAYS WHAT MOVED (25 Nov 2026, his "build the weekly review that says what moved").** It only
   counted sessions ("4 of 4 sessions done. Anything you'd change?"). Now: Home sends this week's bests ahead with the
   days (`weekBestsOf`, from the records Home already lists, this Monday-to-Sunday week only, at most two, each said

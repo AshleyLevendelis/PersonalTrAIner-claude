@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { getRecentActivityDurations, DEFAULT_ACTIVITY_MINUTES, readCardioLogs } 
 import { runForToday, RUN_ACTIVITY, type RunToday } from '@/lib/running'
 import { addDays } from '@/lib/session-move'
 import type { PlannedActivity } from '@/lib/types'
+import { optionalCardioMode } from '@/lib/activity-day'
 import { PlannedRoundsStart, usePlannedRound } from './PlannedRoundsStart'
 import { PlannedCardioRow, UnplannedCardioEntry, CardioReceipts, useCardioReceiptsToday, type CardioPick } from './CardioSetRow'
 // Its own chunk — see the file for the measurement that put it there.
@@ -568,4 +569,60 @@ function useRunHeldToLog(planned: PlannedActivity | undefined, raceDate: string 
     return { ...planned, duration: held.minutes, heldBack: held.heldBack, reason: 'Easy throughout: you can talk in full sentences.', targetRpe: Math.min(planned.targetRpe ?? 4, 4) }
   }
   return { ...planned, duration: held.minutes, heldBack: held.heldBack }
+}
+
+/**
+ * ANOTHER DAY'S RECOVERY CARD (his report 25 Nov 2026, a future Saturday: "Why do rest days look like this. The optional
+ * rest day exercises should be loggable like other exercises"). A peeked rest day with optional cardio was one grey
+ * sentence ("Saturday is a rest day. Optional: Zone 2 ... · 39 min · Easy.") while the same day, opened ON the day, has
+ * been the recovery card with a loggable row since 24 Sep. Now it is that card: the same head, the same row. On a past
+ * day inside the last two weeks the row logs to THAT day; on a day to come it shows what to do and says when it can be
+ * logged, as a peeked training day's exercises are read-only until their day.
+ */
+export function PeekRecoveryDay({
+  dayName,
+  date,
+  today,
+  focus,
+  cardio,
+  back,
+}: {
+  dayName: string
+  date: string
+  today: string
+  focus: string
+  cardio: { activity: string; duration: number; targetRpe?: number }
+  back: ReactNode
+}) {
+  const mode = optionalCardioMode(date, today)
+  const previewNote = mode === 'ahead'
+    ? `You can log it on ${dayName}.`
+    : mode === 'closed'
+      ? 'Too far back to log here.'
+      : undefined
+  return (
+    <Card className="bg-[color:var(--surface-deep)]" data-testid="peek-recovery-day">
+      <CardContent className="py-4 space-y-3">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex items-center justify-center size-10 rounded-full shrink-0"
+            style={{ background: 'color-mix(in srgb, var(--role-ai) 16%, transparent)' }}
+          >
+            <Heart className="size-[19px] text-[color:var(--role-ai-text)]" />
+          </div>
+          <div className="space-y-0.5">
+            <p className="text-[1.1875rem] font-semibold tracking-[-.01em] text-foreground leading-tight">{`Active recovery · ${dayName}`}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{focus}</p>
+          </div>
+        </div>
+        <PlannedCardioRow
+          prescription={cardio}
+          label="Optional"
+          onDate={mode === 'log' && date !== today ? date : undefined}
+          previewNote={previewNote}
+        />
+        <div className="flex justify-center">{back}</div>
+      </CardContent>
+    </Card>
+  )
 }

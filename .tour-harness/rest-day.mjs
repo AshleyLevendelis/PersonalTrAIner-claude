@@ -427,6 +427,66 @@ check('10b. the heading still names TODAY', heading === `Today · ${todayName}`,
 check('10c. ...and the session is named as the borrowed day\'s', whose === `${borrowedFrom}'s session`, { whose, borrowedFrom })
 await shoot('rest-day-borrowed')
 
+// 11. ANOTHER DAY'S OPTIONAL CARDIO IS THE DAY'S OWN CARD (his report 25 Nov 2026, a future Saturday: "Why do rest
+// days look like this. The optional rest day exercises should be loggable like other exercises"). It was one grey
+// sentence. Opened from the day before, the row shows what to do and when it can be logged (a training day's
+// exercises are read-only before their day too); opened from the day after, the same row logs to THAT day.
+console.log('\n11. A recovery day opened from another day shows its cardio as a row, and logs it on a past day\n')
+const shiftDay = (iso, n) => { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+const recDate = suggested?.date ?? '2000-01-01'
+const recName = new Date(`${recDate}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
+const peekCard = () => ev(`(() => {
+  const card = document.querySelector('[data-testid="peek-recovery-day"]')
+  const back = card ? card.querySelector('[data-testid="peek-back-today"]') : null
+  const r = back ? back.getBoundingClientRect() : null
+  return {
+    card: !!card,
+    oldSentence: !!document.querySelector('[data-testid="peek-rest-day"]'),
+    label: card ? (card.querySelector('[data-testid="cardio-planned"]')?.innerText || '').split('\\n')[0].trim() : '',
+    line: (card?.querySelector('[data-testid="cardio-prescription"]')?.textContent ?? '').trim(),
+    note: (card?.querySelector('[data-testid="cardio-preview-note"]')?.textContent ?? '').trim(),
+    minutes: card ? card.querySelectorAll('input[data-field="minutes"]').length : -1,
+    saves: card ? card.querySelectorAll('[data-testid="cardio-save"]').length : -1,
+    lit: card ? [...card.querySelectorAll('[data-testid="cardio-save"]')].filter(b => b.className.includes('glow-pulse')).length : -1,
+    readback: (card?.querySelector('[data-testid="cardio-readback"]')?.innerText ?? '').replace(/\\s+/g, ' ').trim(),
+    backH: r ? Math.round(r.height) : 0,
+    inView: r ? r.top >= 0 && r.bottom <= innerHeight + 400 : false,
+  }
+})()`)
+const head = (suggested?.activity ?? '###').split(' — ')[0]
+await send('Page.navigate', { url: `${BASE}&today=${shiftDay(recDate, -1)}&n=peek-ahead#/tab/exercise` })
+await wait(4000)
+await tap(`[data-strip-date="${recDate}"]`)
+await wait(900)
+const peekAhead = await peekCard()
+check('11a. the day before: tapping the recovery day opens its card, not the old sentence', peekAhead.card && !peekAhead.oldSentence, peekAhead)
+check('11b. ...an Optional row in the plan\'s own words ("… · N min · Easy")', /optional/i.test(peekAhead.label) && peekAhead.line.startsWith(head.split(' (')[0]) && / · \d+ min · (Easy|Steady|Hard)$/.test(peekAhead.line), { peekAhead, head })
+check(`11c. ...and a day to come is not logged ahead: no boxes, and it says "You can log it on ${recName}."`, peekAhead.minutes === 0 && peekAhead.saves === 0 && peekAhead.note === `You can log it on ${recName}.`, peekAhead)
+check('11d. ...with a 44px way back to today', peekAhead.backH >= 44, peekAhead)
+await ev('window.scrollTo(0, 0)')
+await shoot('rest-day-11-peek-ahead')
+
+const logsBefore = await ev(`(window.__fakeDb?.cardio_logs ?? []).length`)
+await send('Page.navigate', { url: `${BASE}&today=${shiftDay(recDate, 1)}&n=peek-past#/tab/exercise` })
+await wait(4000)
+// The strip starts at today (his 15 Nov ruling); yesterday is one page back.
+await tap('[data-testid="strip-prev"]')
+await wait(700)
+await tap(`[data-strip-date="${recDate}"]`)
+await wait(900)
+const past = await peekCard()
+check('11e. the day after: the same card, now with one Minutes box and one ✓, its effort already the plan\'s', past.card && past.minutes === 1 && past.saves === 1 && past.lit === 1 && !past.note, past)
+await ev('window.scrollTo(0, 0)')
+await shoot('rest-day-11-peek-past')
+await tap('[data-testid="peek-recovery-day"] [data-testid="cardio-save"]')
+await wait(1200)
+const pastAfter = await peekCard()
+const written = await ev(`(window.__fakeDb?.cardio_logs ?? []).map(r => ({ date: r.date, activity: r.activity_name, minutes: r.duration_minutes }))`)
+const mine = (written ?? []).filter(r => r.activity === suggested?.activity)
+check('11f. the ✓ logs it and the row reads it back, boxes gone', / · \d+ min · (Easy|Steady|Hard)/.test(pastAfter.readback) && pastAfter.minutes === 0, pastAfter)
+check(`11g. ...written to ${recDate}, the day it belongs to, not to today`, mine.length === 1 && mine[0].date === recDate, { written, logsBefore, recDate })
+await shoot('rest-day-11-peek-past-logged')
+
 const errs = await ev(`(window.__errors ?? []).length`)
 check('9. nothing on the page threw', !errs, errs)
 

@@ -74,3 +74,23 @@ export function dayDetail(day: WorkoutDay): string {
   const n = day.exercises.length
   return `${n} exercise${n === 1 ? '' : 's'}`
 }
+
+/** How far back another day's optional cardio can be logged from its own day: the chat's rule for an earlier day (19 Nov 2026). */
+export const LOG_BACK_DAYS = 14
+
+/**
+ * ANOTHER DAY'S OPTIONAL CARDIO, AS AN EXERCISE (his report 25 Nov 2026: "The optional rest day exercises should be
+ * loggable like other exercises"). Today's card has logged it since 24 Sep; any other day showed one grey sentence.
+ *   - `log`: today, or a past day inside the plan and the last LOG_BACK_DAYS days. The row logs to THAT date.
+ *   - `ahead`: a day still to come. The row shows the prescription; nothing is logged before it happens, the rule a
+ *     peeked training day keeps (its exercises are read-only).
+ *   - `closed`: further back than that, read-only.
+ * Dates are YYYY-MM-DD local; compared as days, never instants.
+ */
+export function optionalCardioMode(date: string, today: string): 'log' | 'ahead' | 'closed' {
+  if (date > today) return 'ahead'
+  const [y, m, d] = today.split('-').map(Number)
+  const back = new Date(Date.UTC(y, m - 1, d - LOG_BACK_DAYS))
+  const earliest = back.toISOString().slice(0, 10)
+  return date >= earliest ? 'log' : 'closed'
+}
