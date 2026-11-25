@@ -1675,6 +1675,8 @@ export function TodayPanel({
                 16 minutes." was his whole view of it. What it is, its rounds and why, read off the plan. */}
             {!peekBeforePlan && peekWorkout?.plannedActivity ? (
               <PlannedActivityPeek dayName={peekDay} focus={peekWorkout.focus} planned={peekWorkout.plannedActivity} onExit={() => setPeekDate(null)} />
+            ) : !peekBeforePlan && peekWorkout?.recommendedCardio ? (
+              <PlannedActivityPeek dayName={peekDay} focus={peekWorkout.focus} planned={peekWorkout.recommendedCardio} optional onExit={() => setPeekDate(null)} />
             ) : (
             <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 text-center text-sm text-muted-foreground" data-testid="peek-rest-day">
               {/* A peeked day with a prescribed activity is NOT a rest day, and
