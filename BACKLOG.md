@@ -8,6 +8,13 @@ Newest first. One line each.
   steps switch is; the readings are matched to a session only by its own start and end, so none from before a New Plan
   can land in the new plan's sessions, and they go after four hours. Gate green; its failure on the unfixed code is the
   detector proven.
+  **The same sweep found two more, both fixed.** (1) `test:local-dates`: the recovery flag's "since" date was worked
+  out the UTC way (`toISOString().slice`). Harmless from a midday anchor, but the house rule is local calendar dates; it
+  now steps the date as `addDays` does (inlined, the file takes no imports). (2) `test:meal-favourite`: the browser
+  stand-in database did not know the new heart columns (`cardio_logs.max_heart_rate`, `workout_sessions.avg/max_heart_rate`,
+  `daily_resting_heart_rate.bpm`) hold whole numbers, so a decimal would have passed there and failed live. Added; every
+  heart writer already rounds, and `verify:heart-uses`, `verify:heart-strap`, `verify:health-steps` pass against the
+  stricter fake. Both gates failed on the old code, so both detectors are seen to fire.
 - [x] **WHAT THE HEART RATE DOES FOR HIS TRAINING: FITNESS, RECOVERY, THE COACH, AND A CORNER HEART (his "Build 1, 2
   and 3 now", 25 Nov 2026)**. His question: "How do we best use this data in the app to complement the training".
   Offered (CSCS, mine): 1 a fitness trend, 2 a recovery offer from resting heart rate, 3 the coach told, 4 "that easy day

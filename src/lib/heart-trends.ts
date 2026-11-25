@@ -102,7 +102,10 @@ export function recoveryFlag(rows: { date: string; bpm: number }[], today: strin
     recent.push(v)
   }
   const above = Math.round(mean(recent)) - usual
-  // From the date string, never back from the rounded day number (which sits half a day off and named the next day).
-  const since = new Date(Date.parse(`${today}T12:00:00Z`) - (RAISED_DAYS - 1) * 86400000).toISOString().slice(0, 10)
+  // From the date string as a LOCAL calendar date (session-move's addDays, inlined: this file has no imports), never back
+  // from the rounded day number (which sits half a day off and named the next day).
+  const d = new Date(`${today}T12:00:00`)
+  d.setDate(d.getDate() - (RAISED_DAYS - 1))
+  const since = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   return { usual, above, since, line: `Your resting heart rate has been about ${above} above your usual (${usual}) for ${RAISED_DAYS} mornings.` }
 }
