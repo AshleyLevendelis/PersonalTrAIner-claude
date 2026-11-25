@@ -25,7 +25,7 @@
 // is not the person's. See `.tour-harness/anchor.mjs` and test:harness-clock.
 // ---------------------------------------------------------------------------
 
-import { coachMessage, coachMessageShortcut } from './coach-voice'
+import { coachMessage, coachMessageShortcut, coachMessageChips } from './coach-voice'
 
 /**
  * Every moment that can reach a phone, in the order they outrank each other.
@@ -36,9 +36,11 @@ export const MOMENT_KEYS = [
   'session_feel',
   'comeback',
   'door_open',
+  'load_clash',
   'workout_today',
   'session_not_logged',
   'missed_yesterday',
+  'pattern_spotted',
   'week_review',
   'plan_week',
   'meal_not_logged',
@@ -95,6 +97,100 @@ export interface MomentFacts {
    */
   name?: string | null
   finishedWhen?: 'this morning' | 'this afternoon' | 'this evening' | 'yesterday' | null
+  /**
+   * WHAT IS COMING UP (25 Nov 2026, his "not proactive enough"): today's session by name and main lift, a hard class
+   * or sport against a heavy leg day, and one pattern worth raising. Words and two decisions (the clash, the pattern);
+   * read off the days Home sent ahead (aheadFacts). Absent on a caller that knows none of it.
+   */
+  todaySession?: { name: string; lift: string | null; weight: string | null } | null
+  clash?: { activity: string; when: 'today' | 'yesterday'; lift: string | null } | null
+  pattern?: PatternFact | null
+  /** Days since the pattern message was last said, or null when never: it is said at most once a week. */
+  daysSincePatternSaid?: number | null
+}
+
+/** One pattern worth a message (days-ahead.ts PatternAhead, the same shape). */
+export type PatternFact =
+  | { kind: 'stuck_lift'; lift: string; weight: string; sessions: number }
+  | { kind: 'too_hard'; times: number }
+  | { kind: 'low_protein'; days: number }
+
+/** The pattern message is said at most once in this many days. */
+export const PATTERN_EVERY_DAYS = 7
+/** The pattern message waits for the afternoon: never in front of the morning's session. */
+export const PATTERN_FROM_HOUR = 12
+
+/** A calendar date stepped by whole days: pure arithmetic on the date's own numbers, no clock and no timezone. */
+function dateShift(date: string, n: number): string {
+  const [y, m, d] = date.split('-').map(Number)
+  // Days from the civil date (Howard Hinnant's algorithm), stepped, and back.
+  const yy = m <= 2 ? y - 1 : y
+  const era = Math.floor(yy / 400)
+  const yoe = yy - era * 400
+  const doy = Math.floor((153 * (m + (m > 2 ? -3 : 9)) + 2) / 5) + d - 1
+  const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy
+  const z = era * 146097 + doe + n
+  const era2 = Math.floor(z / 146097)
+  const doe2 = z - era2 * 146097
+  const yoe2 = Math.floor((doe2 - Math.floor(doe2 / 1460) + Math.floor(doe2 / 36524) - Math.floor(doe2 / 146096)) / 365)
+  const doy2 = doe2 - (365 * yoe2 + Math.floor(yoe2 / 4) - Math.floor(yoe2 / 100))
+  const mp = Math.floor((5 * doy2 + 2) / 153)
+  const day = doy2 - Math.floor((153 * mp + 2) / 5) + 1
+  const month = mp < 10 ? mp + 3 : mp - 9
+  const year = yoe2 + era2 * 400 + (month <= 2 ? 1 : 0)
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+function text(v: unknown, max = 80): string | null {
+  return typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null
+}
+function count(v: unknown): number | null {
+  const n = Number(v)
+  return Number.isFinite(n) && n > 0 && n < 100 ? Math.round(n) : null
+}
+
+/**
+ * THE DAYS HOME SENT AHEAD, read for one local date (days-ahead.ts writes them). Every field is checked, because the
+ * server reads what a phone wrote: anything malformed is simply absent. The clash rule is mine (CSCS, basis in
+ * BACKLOG): a session built around a heavy lower-body lift, with a hard leg-taxing class the same day or the day before.
+ * A pattern is trusted for two days after Home worked it out.
+ */
+export function aheadFacts(ahead: unknown, localToday: string): Pick<MomentFacts, 'todaySession' | 'clash' | 'pattern'> {
+  const out: Pick<MomentFacts, 'todaySession' | 'clash' | 'pattern'> = { todaySession: null, clash: null, pattern: null }
+  if (!ahead || typeof ahead !== 'object') return out
+  const a = ahead as { asOf?: unknown; days?: unknown; pattern?: unknown }
+  const days = a.days && typeof a.days === 'object' ? a.days as Record<string, unknown> : {}
+  const day = (date: string) => {
+    const d = days[date]
+    if (!d || typeof d !== 'object') return null
+    const r = d as Record<string, unknown>
+    return {
+      session: text(r.session),
+      lift: text(r.lift),
+      weight: text(r.weight, 30),
+      heavyLegs: r.heavyLegs === true,
+      hard: Array.isArray(r.hardActivities) ? r.hardActivities.map(x => text(x, 40)).filter((x): x is string => !!x) : [],
+    }
+  }
+  const today = day(localToday)
+  const yesterday = day(dateShift(localToday, -1))
+  if (today?.session) {
+    out.todaySession = { name: today.session, lift: today.lift, weight: today.lift ? today.weight : null }
+    if (today.heavyLegs) {
+      if (today.hard[0]) out.clash = { activity: today.hard[0], when: 'today', lift: today.lift }
+      else if (yesterday?.hard[0]) out.clash = { activity: yesterday.hard[0], when: 'yesterday', lift: today.lift }
+    }
+  }
+  const asOf = typeof a.asOf === 'string' ? a.asOf : null
+  const fresh = !!asOf && asOf <= localToday && dateShift(asOf, 2) >= localToday
+  const p = fresh && a.pattern && typeof a.pattern === 'object' ? a.pattern as Record<string, unknown> : null
+  if (p?.kind === 'stuck_lift' && text(p.lift) && text(p.weight, 30) && count(p.sessions)) {
+    out.pattern = { kind: 'stuck_lift', lift: text(p.lift)!, weight: text(p.weight, 30)!, sessions: count(p.sessions)! }
+  } else if (p?.kind === 'too_hard' && count(p.times)) {
+    out.pattern = { kind: 'too_hard', times: count(p.times)! }
+  } else if (p?.kind === 'low_protein' && count(p.days)) {
+    out.pattern = { kind: 'low_protein', days: count(p.days)! }
+  }
+  return out
 }
 
 /** Which moments this person has left switched on. Absent means on — see DEFAULT_MOMENT_SWITCHES. */
@@ -206,6 +302,8 @@ export interface CoachMoment {
   text: string
   /** The small button under the message in the chat, if it has one. */
   shortcut: 'exercise' | 'nutrition' | null
+  /** The one-tap answers under the message in the chat (coachMessageChips); empty when it offers nothing. */
+  chips: string[]
 }
 
 /** Is this moment live, on the facts alone? Switches and quiet hours are applied above. */
@@ -219,7 +317,7 @@ function inLapse(f: MomentFacts): boolean {
 }
 
 function isLive(key: MomentKey, f: MomentFacts): boolean {
-  if ((key === 'workout_today' || key === 'session_not_logged' || key === 'missed_yesterday') && inLapse(f)) return false
+  if ((key === 'workout_today' || key === 'session_not_logged' || key === 'missed_yesterday' || key === 'load_clash' || key === 'pattern_spotted') && inLapse(f)) return false
   switch (key) {
     case 'session_feel': return f.awaitingFeel
     // NOT "it is a training day" — "it is a training day, it is evening, and
@@ -235,7 +333,11 @@ function isLive(key: MomentKey, f: MomentFacts): boolean {
     case 'beat_target': return f.beatTargetPending
     // NOT "today is a training day": a reminder after she has already logged
     // is a reminder about nothing, and one after lunch is the evening nudge early.
-    case 'workout_today': return f.plannedToday && !f.loggedToday && f.localHour < WORKOUT_REMINDER_BEFORE_HOUR
+    // THE CLASH SAYS IT INSTEAD (25 Nov 2026): the same morning, the same session, and the clash is the thing worth saying.
+    case 'workout_today': return f.plannedToday && !f.loggedToday && f.localHour < WORKOUT_REMINDER_BEFORE_HOUR && !(f.clash && f.todaySession)
+    case 'load_clash': return !!f.clash && !!f.todaySession && f.plannedToday && !f.loggedToday && f.localHour < WORKOUT_REMINDER_BEFORE_HOUR
+    case 'pattern_spotted': return !!f.pattern && f.localHour >= PATTERN_FROM_HOUR
+      && (f.daysSincePatternSaid == null || f.daysSincePatternSaid >= PATTERN_EVERY_DAYS)
     // ONLY SOMEONE WHO LOGS MEALS. Somebody who has never logged one is not
     // reminded every evening about a habit she does not have; that is a daily
     // nag, and the switch would be the only way out of it.
@@ -291,8 +393,9 @@ export function momentsToRaise(
     if (isLive(key, facts)) {
       out.push({
         key,
-        text: coachMessage(key, { name: facts.name, mealsLogged: facts.mealsAccountedToday ?? 0, finishedWhen: facts.finishedWhen, weekDone: facts.weekSessionsDone, weekPlanned: facts.weekSessionsPlanned }),
+        text: coachMessage(key, { name: facts.name, mealsLogged: facts.mealsAccountedToday ?? 0, finishedWhen: facts.finishedWhen, weekDone: facts.weekSessionsDone, weekPlanned: facts.weekSessionsPlanned, session: facts.todaySession ?? null, clash: facts.clash ?? null, pattern: facts.pattern ?? null }),
         shortcut: coachMessageShortcut(key),
+        chips: coachMessageChips(key, { pattern: facts.pattern ?? null }),
       })
     }
   }

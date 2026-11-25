@@ -361,9 +361,13 @@ console.log('\n2b. The coach is not on the path to first paint')
   // MOVED 22 Nov 2026: 620 -> 628. Reached at 620 by the persona fixes (plan rules for older, pregnant and low-recovery
   // trainees, the block's exercises held, the week-balance passes), all in the first chunk because the plan is built
   // there. MEASURED 620 through this gate on the change. 628 is 8 kB over today, the margin every move here has used.
-  headroom('first paint fetches', firstLoadGzip, 628, 'kB gzipped')
+  // MOVED 25 Nov 2026: 628 -> 636. Reached at 628 by the coach's proactive messages (the session named in the
+  // morning reminder, a clash and a pattern sentence, their one-tap answers: the phrasebook is first-paint code). The
+  // briefs and the pattern finders were moved OFF first paint first (loaded when Home works them out); MEASURED 627 on
+  // a clean checkout and 628 with this change. 636 is 8 kB over today, the margin every move here has used.
+  headroom('first paint fetches', firstLoadGzip, 636, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 628, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 636, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))

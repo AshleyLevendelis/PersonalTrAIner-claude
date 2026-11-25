@@ -555,6 +555,10 @@ export interface CoachMessageDetail {
   mealsLogged?: number
   /** When the session being asked about finished, in her words. Absent reads as "earlier". */
   finishedWhen?: 'this morning' | 'this afternoon' | 'this evening' | 'yesterday' | null
+  /** What is coming up (25 Nov 2026): today's session, a clash, a pattern. Absent reads as the plain sentence. */
+  session?: { name: string; lift: string | null; weight: string | null } | null
+  clash?: { activity: string; when: 'today' | 'yesterday'; lift: string | null } | null
+  pattern?: { kind: 'stuck_lift'; lift: string; weight: string; sessions: number } | { kind: 'too_hard'; times: number } | { kind: 'low_protein'; days: number } | null
 }
 
 export function coachMessage(key: string, d: CoachMessageDetail = {}): string {
@@ -562,7 +566,27 @@ export function coachMessage(key: string, d: CoachMessageDetail = {}): string {
   const hey = name ? `Hey ${name}, ` : 'Hey, '
   switch (key) {
     case 'session_feel': return `${hey}how was the workout ${d.finishedWhen ?? 'earlier'}?`
-    case 'workout_today': return `${hey}are you ready for your session today?`
+    case 'workout_today': {
+      // THE SESSION BY NAME (25 Nov 2026, his "not proactive enough"): which session, and the lift it is built around.
+      const s = d.session
+      if (!s) return `${hey}are you ready for your session today?`
+      return `${hey}${s.name} today${s.lift && s.weight ? `, with ${s.lift} at ${s.weight}` : ''}. Ready for it?`
+    }
+    case 'load_clash': {
+      const c = d.clash
+      const session = d.session?.name ?? "today's session"
+      if (!c) return ''
+      return c.when === 'today'
+        ? `${hey}${session} and ${c.activity} on the same day. Lift first, and want me to trim the extras so your legs have something left?`
+        : `${hey}${c.activity} yesterday and ${session} today, so your legs may be tired. Want me to trim the extras and keep ${c.lift ?? 'the main lift'} as planned?`
+    }
+    case 'pattern_spotted': {
+      const p = d.pattern
+      if (!p) return ''
+      if (p.kind === 'stuck_lift') return `${hey}${p.lift} has sat at ${p.weight} for ${p.sessions} sessions. Normal, and there's a fix. Want it?`
+      if (p.kind === 'too_hard') return `${hey}you've marked ${p.times} lifts as too hard this week. Want your next session lighter so you recover?`
+      return `${hey}protein's come in short ${p.days} days running. Want a hand closing the gap?`
+    }
     case 'session_not_logged': return `${hey}today's session is still waiting. Even a short one keeps you moving forward. Got twenty minutes?`
     case 'missed_yesterday': return `${hey}yesterday's session got away from you, and that's fine. Want to move it or let it go?`
     case 'comeback': return `${hey}how about a ten-minute walk today? Small still counts.`
@@ -594,7 +618,7 @@ export function coachMessage(key: string, d: CoachMessageDetail = {}): string {
  * carries a small button to it, so the one tap she liked is still there.
  */
 export function coachMessageShortcut(key: string): 'exercise' | 'nutrition' | null {
-  if (key === 'workout_today' || key === 'session_not_logged') return 'exercise'
+  if (key === 'workout_today' || key === 'session_not_logged' || key === 'load_clash') return 'exercise'
   if (key === 'meal_not_logged' || key === 'protein_short') return 'nutrition'
   return null
 }
@@ -1685,4 +1709,24 @@ export function effortLine(effort: 'easy' | 'right' | 'hard'): string {
   if (effort === 'easy') return 'Next time starts heavier and finds your weight.'
   if (effort === 'right') return 'Good. Keep this up and the weight goes up.'
   return 'Next time holds this weight.'
+}
+
+/**
+ * THE EASY OUT (25 Nov 2026, his brief: "make it effortless to say nah, keep it as-is"): a message that offers
+ * something carries the yes and the no as one-tap answers in the chat. A tap is his reply to the coach, so the yes
+ * reaches a tool the coach already has (trim today: propose_session_shorten) and the no is simply heard.
+ */
+export function coachMessageChips(key: string, d: { pattern?: { kind: string } | null } = {}): string[] {
+  switch (key) {
+    case 'load_clash': return ["Trim today's session", 'Keep it as is']
+    case 'pattern_spotted': {
+      const k = d.pattern?.kind
+      if (k === 'stuck_lift') return ["What's the fix?", 'Leave it for now']
+      if (k === 'too_hard') return ['Lighten my next session', "I'm fine"]
+      if (k === 'low_protein') return ['Help me hit it', 'Leave it']
+      return []
+    }
+    case 'missed_yesterday': return ['Move it', 'Let it go']
+    default: return []
+  }
 }

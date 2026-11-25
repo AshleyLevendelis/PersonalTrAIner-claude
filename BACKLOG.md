@@ -2,6 +2,34 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH'S VOICE AND PROACTIVITY (25 Nov 2026, his "still robotic, still no personality, still not
+  enthusiastic, and still not proactive enough", with a brief of his and Gemini's; "Review, build but also add in what
+  you think will make it better").** `docs/plans/coach-voice-and-proactivity.md`. FOUND FIRST: the coach's
+  instructions defined it by prohibitions; the second-pass editor's job ("drop everything else") cut exactly the
+  reaction, opinion and energy he is missing; the reminder writer was told only "today is a training day", so the best
+  it could say was "are you ready for your session today?"; and an offer had no one-tap answer. BUILT: a WHO YOU ARE
+  section first in the coach's instructions (sharp, upbeat, grounded; makes the call; real energy earned; two gears,
+  gym floor keyed to a part-done session; spots patterns; four say/don't-say pairs); the editor shortens and never
+  flattens; Home sends yesterday's, today's and tomorrow's session briefs and one pattern ahead (`days-ahead.ts`, the
+  `days_ahead` column); the morning reminder names the session and lift; two NEW switchable moments inside his daily
+  limit: a CLASH (heavy leg day with a hard class that day or the day before: trim the extras, keep the main lift; it
+  replaces that morning's plain reminder and is the chat's hello) and a PATTERN (stuck lift, too-hard piling up,
+  protein short; afternoon, once a week); one-tap answers under any offer, kept on the chat row, each mapped in the
+  coach's instructions to a tool that exists; the reminder writer gets the persona, the facts, a time-of-day greeting
+  and must end on the question its buttons answer. DECISIONS: upbeat-grounded over dry (his brief); a greeting that fits
+  the time over always "Hey" (widens his 6 Nov example, flagged to him); the clash rule and the trim are mine (CSCS):
+  hard leg-dominant conditioning, running or combat on the day of or the day before a lower-body main lift is where
+  fatigue and interference cost the lift most, and the standard answer (his 13 Sep shortening ruling too) keeps the
+  main lift and cuts accessory volume; gentle activity is never a clash. CSCS review: (1) no prescription changes
+  unless he taps the trim, which is the existing shortest version; (2) nothing taken away; (3) fundamentals untouched;
+  (4) no floor or ceiling moved; (5) in scope. The first-paint bundle budget moved 628 -> 636 (measured 627 clean, 628
+  with this; the briefs and pattern finders were moved off first paint first). `test:coach-proactive` (72 checks, 22
+  mutations, all caught); `test:coach-moments` and `test:coach-nudge` taught the two moments (one mechanism-pinned
+  regex re-anchored); three exam cases (voice-make-the-call, reminder-tap-trim, reminder-tap-keep). NOT PROVEN: that the
+  model sounds different (exam after the deploy); a real phone. NOT BUILT: a squeezed-weekday pattern, a weekly review
+  that says what moved, iPhone push. Needs the `days_ahead` migration and the `chat-gemini` and `coach-reach-out`
+  deploys.
+
 - [x] **NOTIFICATIONS IN THE ANDROID APP (23 Nov 2026, his report "Now the app is on my phone as a proper app ...
   Notifications dont seem to be working", then "yes build it for Android").** Cause: the phone app (Capacitor) has no
   browser push service or service worker, so Profile > Reminders said "This browser can't show notifications from the

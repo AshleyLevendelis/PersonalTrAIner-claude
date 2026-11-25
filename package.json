@@ -725,6 +725,7 @@
     "verify:health-steps": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/health-steps.mjs",
     "test:phone-app": "tsx scripts/test-phone-app.ts",
     "test:native-push": "tsx scripts/test-native-push.ts",
+    "test:coach-proactive": "tsx scripts/test-coach-proactive.ts",
     "phone:sync": "npm run build && npx cap sync",
     "verify:countdown-timer": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/countdown-timer.mjs",
     "verify:report-reply": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/report-reply.mjs",

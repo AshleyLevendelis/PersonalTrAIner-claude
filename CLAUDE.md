@@ -1789,6 +1789,14 @@ menu" stays true when a copy is also left outside it.
   website; the iPhone app says it is not built yet. `test:native-push`, `verify:reminders` §6. Needs the
   `coach-reach-out` and `chat-gemini` deploys and the `FCM_SERVICE_ACCOUNT` secret
 
+- **The coach is a sharp, upbeat, grounded training partner who makes the call, and speaks first with a reason: his
+  brief 25 Nov 2026** ("still robotic, no personality, not enthusiastic, not proactive enough"): WHO YOU ARE first in
+  its instructions, two gears (gym floor on a part-done session), an editor that shortens and never flattens; reminders
+  name the session and lift; a CLASH (hard class next to heavy legs: trim the extras, keep the main lift) and a PATTERN
+  (afternoon, weekly) moment, each switchable inside his limit; one-tap answers under any offer. A reminder may greet by
+  the time of day, not only "Hey" (widens his 6 Nov example). `test:coach-proactive`, `docs/plans/coach-voice-and-
+  proactivity.md`. Needs the `days_ahead` migration and the `chat-gemini` and `coach-reach-out` deploys and an exam run
+
 ### His rulings of 17 Nov 2026
 - **The coach exam's judge is Fable 5.2: his ruling 17 Nov 2026, "Switch to Fable"** (over keeping Opus 5 and over
   marking once with both). The judge is stamped on the scores; scores marked by another judge are stale (re-grade the

@@ -423,7 +423,7 @@ export interface UnpromptedInput {
   /** The opener's pick for today, built only when it is needed. */
   hello: () => { text: string; chips: string[]; kind?: string } | null
   /** Time-of-day moments live now, best first, switches and waking hours applied (momentsToRaise). */
-  moments: { key: string; text: string; shortcut: 'exercise' | 'nutrition' | null }[]  /**
+  moments: { key: string; text: string; shortcut: 'exercise' | 'nutrition' | null; chips?: string[] }[]  /**
    * AFTER A RED FLAG (his ruling 14 Nov 2026, "Park it, go quiet"): 'quiet' says nothing unprompted; 'checkin' says the
    * one "how are you?" (on a later open, once), whatever the day's limits, because it is not a cheerful message.
    */
@@ -456,6 +456,14 @@ export function pickUnprompted(input: UnpromptedInput): Unprompted | null {
     }
   }
 
+  // A CLASH IS THE MORNING'S HELLO (25 Nov 2026, his "not proactive enough"), as an event due is: a hard class against
+  // heavy legs is the one thing worth saying before the session, so it is not held behind a general hello.
+  if (helloDue) {
+    const clash = input.moments.find(x => x.key === 'load_clash' && !input.momentsSaidToday.includes(x.key)
+      && !input.said.includes(`moment:${x.key}:${input.today}`))
+    if (clash) return { text: clash.text, chips: clash.chips ?? [], keys: [`moment:${clash.key}:${input.today}`, hello], moment: clash.key, shortcut: clash.shortcut, fromOpener: false }
+  }
+
   if (helloDue) {
     const h = input.hello()
     if (h) return { text: h.text, chips: h.chips, keys: [hello], moment: HELLO_MOMENT, shortcut: null, fromOpener: true, openerKind: h.kind }
@@ -466,7 +474,7 @@ export function pickUnprompted(input: UnpromptedInput): Unprompted | null {
     && !input.momentsSaidToday.includes(x.key)
     && !input.said.includes(`moment:${x.key}:${input.today}`))
   if (!m) return null
-  return { text: m.text, chips: [], keys: [`moment:${m.key}:${input.today}`, hello], moment: m.key, shortcut: m.shortcut, fromOpener: false }
+  return { text: m.text, chips: m.chips ?? [], keys: [`moment:${m.key}:${input.today}`, hello], moment: m.key, shortcut: m.shortcut, fromOpener: false }
 }
 
 /**
