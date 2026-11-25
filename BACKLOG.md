@@ -95,6 +95,75 @@ Newest first. One line each.
   (6 checks, 3 mutations: 2 caught on screen, the third, the sync's own switch check, is behind the screen's own check
   and caught by `test:health-heart`), `test:phone-app`. NOT proven: a real watch on his phone; iPhone (not built);
   the coach is not told these figures yet. NEXT: 3, live heart rate from a Bluetooth strap during a session.
+- [x] **REST-DAY CARDIO IS DRAWN AS A SESSION, UNDER AN "OPTIONAL · REST DAY" BANNER (25 Nov 2026, his follow-up with
+  his Wednesday Assault Bike card: "It should look more like this. This but with a banner to say its optional, so users
+  dont think they are being forced into a workout in their rest day").** Today's optional cardio and any other day's now
+  use the session hero main shipped the same day (`PlannedSessionHero`): the name as the title (the choices and pace
+  under it, `optionalCardioTitle`), the minutes and effort as figures, one big Start and "Or log it yourself" on the
+  day, and a banner FIRST, in the recovery colour: "Optional · rest day. Only if you feel like moving. Skip it and
+  nothing is missed: rest is the plan." (the wording is mine; his to change). A past day logs to that day with no Start
+  and no "Change for today"; a day ahead shows the figures and "You can log it on Saturday." with no Start and no boxes.
+  `verify:rest-day` §8b and §11 re-anchored on the banner and the figures (removing the banner: 3 caught), `test:rest-day-card`
+  and `test:planned-rounds` re-anchored (dropping `optional`: caught by each). Merged with main the same day; the size
+  budgets moved to the merged tree's measured 1670 and 3378 kB. Frontend only.
+- [x] **ANOTHER DAY'S REST-DAY CARDIO IS A ROW, LOGGABLE ON A PAST DAY (25 Nov 2026, his report with a screenshot of
+  Saturday: "Why do rest days look like this. The optional rest day exercises should be loggable like other
+  exercises").** Opened ON the day, a recovery day has been its card with a loggable Optional row since 24 Sep; opened
+  from the strip on any OTHER day it was one grey sentence ("Saturday is a rest day. Optional: ... · 39 min · Easy.").
+  Now the peek is the same card (`PeekRecoveryDay`): the same head, the same Optional row. Which days log it
+  (`optionalCardioMode`, mine): today and past days up to two weeks back log it TO THAT DAY (the chat's 19 Nov rule for
+  an earlier day); a day to come shows the row and "You can log it on Saturday." with no boxes, as a peeked training
+  day's exercises are read-only before their day; older is read-only. Decided unprompted: not logging ahead, because
+  nothing done yet can be counted (his "a missed day stays missed" and the week counts read logs by date). The row's
+  `onDate` reads and writes that date's logs. `test:peek-recovery` (12 checks, 7 of 7 mutations caught),
+  `verify:rest-day` §11 (7 checks; mutations below), `verify:live-run-5` E4 and `verify:qa-training` T11 re-anchored to
+  the card. NOT checked: the strip's mark for that day after a past-day log (it read "–" in the screenshot both before
+  and after; whether an optional cardio log should mark a rest day is unruled). Frontend only.
+- [x] **THE SATURDAY REVIEW SAYS WHAT MOVED (25 Nov 2026, his "build the weekly review that says what moved").** It only
+  counted sessions ("4 of 4 sessions done. Anything you'd change?"). Now: Home sends this week's bests ahead with the
+  days (`weekBestsOf`, from the records Home already lists, this Monday-to-Sunday week only, at most two, each said
+  through `personalBest` so a reps best is never a weight); the review names them ("all 4 sessions done, and a new best
+  on Barbell Squats: 85kg × 5"), then the ONE thing that dragged from the pattern finders, as an offer ("Barbell Squats
+  has sat at 80kg though. Want a fix for it next week?"), with its one-tap yes and no; with nothing dragged it is pleased
+  and offers "Look back at my week" / "All good"; with nothing moved and nothing dragged, the old sentence word for word.
+  On a review Saturday the pattern message waits (the review carries it). A week that did not go to plan is still said
+  with no guilt. The reminder writer is told what moved and what dragged. Mine: two bests at most, so the message stays a
+  text; "this week" is Monday to Sunday, his 15 Oct ruling. No migration (rides in `days_ahead`). `test:coach-proactive`
+  §9 (16 checks; 14 mutations, all caught, one only after the fixture put last week's record first so "this week only"
+  binds); `test:coach-moments` taught that the review carries the pattern. Needs the `days_ahead` migration and the
+  `chat-gemini` and `coach-reach-out` deploys, as the voice work does.
+
+- [x] **THE COACH'S VOICE AND PROACTIVITY (25 Nov 2026, his "still robotic, still no personality, still not
+  enthusiastic, and still not proactive enough", with a brief of his and Gemini's; "Review, build but also add in what
+  you think will make it better").** `docs/plans/coach-voice-and-proactivity.md`. FOUND FIRST: the coach's
+  instructions defined it by prohibitions; the second-pass editor's job ("drop everything else") cut exactly the
+  reaction, opinion and energy he is missing; the reminder writer was told only "today is a training day", so the best
+  it could say was "are you ready for your session today?"; and an offer had no one-tap answer. BUILT: a WHO YOU ARE
+  section first in the coach's instructions (sharp, upbeat, grounded; makes the call; real energy earned; two gears,
+  gym floor keyed to a part-done session; spots patterns; four say/don't-say pairs); the editor shortens and never
+  flattens; Home sends yesterday's, today's and tomorrow's session briefs and one pattern ahead (`days-ahead.ts`, the
+  `days_ahead` column); the morning reminder names the session and lift; two NEW switchable moments inside his daily
+  limit: a CLASH (heavy leg day with a hard class that day or the day before: trim the extras, keep the main lift; it
+  replaces that morning's plain reminder and is the chat's hello) and a PATTERN (stuck lift, too-hard piling up,
+  protein short; afternoon, once a week); one-tap answers under any offer, kept on the chat row, each mapped in the
+  coach's instructions to a tool that exists; the reminder writer gets the persona, the facts, a time-of-day greeting
+  and must end on the question its buttons answer. DECISIONS: upbeat-grounded over dry (his brief); a greeting that fits
+  the time over always "Hey" (widens his 6 Nov example, flagged to him); the clash rule and the trim are mine (CSCS):
+  hard leg-dominant conditioning, running or combat on the day of or the day before a lower-body main lift is where
+  fatigue and interference cost the lift most, and the standard answer (his 13 Sep shortening ruling too) keeps the
+  main lift and cuts accessory volume; gentle activity is never a clash. CSCS review: (1) no prescription changes
+  unless he taps the trim, which is the existing shortest version; (2) nothing taken away; (3) fundamentals untouched;
+  (4) no floor or ceiling moved; (5) in scope. The briefs and pattern finders load only when Home works them out, off
+  the first download; after merging main (whose own move took the first-paint budget to 637) it measures 634 of 637. `test:coach-proactive` (72 checks, 22
+  mutations, all caught); `test:coach-moments` and `test:coach-nudge` taught the two moments (one mechanism-pinned
+  regex re-anchored); three exam cases (voice-make-the-call, reminder-tap-trim, reminder-tap-keep). NOT PROVEN: that the
+  model sounds different (exam after the deploy); a real phone. NOT BUILT: a squeezed-weekday pattern, a weekly review
+  that says what moved, iPhone push. Needs the `days_ahead` migration and the `chat-gemini` and `coach-reach-out`
+  deploys. ALSO FIXED, found by the new screen check (`verify:coach-texts-you` 3d-3g, 3 mutations caught): a coach
+  message the server wrote while the chat was open stopped 53px short of the bottom (101px with its one-tap answers),
+  its shortcut and easy out under the message box; the chat now follows it as its buttons land, only when he was at
+  the bottom. Two checks re-anchored on the deliberate changes (`test:reminder-writer`'s greeting, `verify:reminders`'
+  switch count 12 -> 14).
 - [x] **THE PLANK ANSWER (his "fix the plank answer", 25 Nov 2026)**. Asked on his phone after the why-sheet deploy, "why is my plank time going up each week" got "We increase your hold time by 5 to 10 seconds each week ... before moving to a harder exercise!". Neither half is the app: holds go up 5 seconds a week (week 1 the base, week 2 +5, week 3 +10, the deload back to the base; `stepHoldSeconds`), and nothing in the code ever changes the exercise. CAUSE, both halves in the sheet, not the model: the entry read "add 5 seconds in week 2 and 10 in week 3" (two numbers that read as two different steps), and its reason said "then the exercise itself gets harder", copied from a coaching note in the code's comment that no code carries out. FIXED: the entry now states one 5-second step a week with the worked example 30-45s, 35-50s, 40-55s and the deload back to week 1's time; the reason no longer claims a harder exercise; and the block tells the coach to keep an entry's numbers and weeks exactly as written and add no step it does not state. `test:app-decisions` §7 (6 checks; the example is CALLED against `stepHoldSeconds`, not read): 8 mutations, 8 caught (the old wording, a wrong example, "5 to 10 seconds each week", the harder-exercise claim, a deload that is not week 1, the instruction removed, the code's step at 10 seconds, the code's deload not the base). `test:coach-promises` fails identically on unchanged main in this Windows checkout (CRLF in a pinned slice), not this change. Needs the `chat-gemini` deploy. Whether the coach now SAYS it right is model behaviour: ask him the same question after the deploy. ALSO: the coach exam against TEST was stopped at 87 turns, 15 of them HTTP 429 after the runner's full retry ladder (about 45 s), the last several in a row, so TEST's Gemini key looks out of today's quota; partial transcripts discarded, nothing graded or committed.
 
 - [x] **TODAY'S CARDIO SESSION CAN BE CHANGED FOR TODAY (his request 25 Nov 2026, on the new session card: "make sure it's easy to change, say for example the user had less time and can't do 8x3 they should easily be able to change it to 6x3 ... Let them be able to edit it")**. "Change for today" under the figures opens steppers: Rounds, Work and Rest for a rounds session (the round timer's own steps; never under 2 rounds, 10s work or 5s rest, so the Start can never be lost), Minutes for a steady one (5 a tap, 5 to 240). The figures, the bar, the length, the Start (round timer or countdown) and the one-tap log all follow; closed, a line names the plan ("Plan: 4 × 3 min, 1 min rest"), and "Back to the plan" undoes it. TODAY ONLY, mine on CSCS grounds: it is the session done on a day with less time, so the plan, progression and the next session are untouched and the log records what was done; kept on the phone for that date so a tab change keeps it. Not offered a day early (the preview stays his "Keep it as is"), nor once logged or while its timer runs. Effort is not a stepper: the log's own Easy/Steady/Hard already changes it. `withTodayChange`, `stepTodayRounds`, `stepTodayMinutes`; `test:planned-rounds` §1d (64 checks; 7 mutations, 7 caught), `verify:planned-rounds` J1-J10 (2 mutations, both caught); screenshots read. Not built: changing it from the chat ("only 20 minutes today" for a cardio day already exists as the shorten tool for lifting days, not this). Frontend only.

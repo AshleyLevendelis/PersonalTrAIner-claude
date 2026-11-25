@@ -1,0 +1,8 @@
+{
+  "name": "voice-make-the-call",
+  "why": "Ashley's brief, 25 Nov 2026: 'still robotic, still no personality ... users don't open a coach to get five neutral options and a disclaimer.' The coach is told to make the call (§0). He asks a real either/or with a cost on each side; a pass picks one, says why in plain words, and sounds like a person. A neutral menu of both, or a hedge with no pick, fails voice.",
+  "messages": [
+    "I've only got 35 minutes tonight. Better to rush the whole session or do half of it properly?"
+  ],
+  "checks": {}
+}

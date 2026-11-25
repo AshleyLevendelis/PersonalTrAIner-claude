@@ -1,0 +1,12 @@
+{
+  "name": "reminder-tap-trim",
+  "why": "25 Nov 2026: the coach's morning message about a hard class next to a heavy leg day carries one-tap answers, and the yes arrives as his message 'Trim today's session'. It must reach the trim at once (the shortest version: main lift kept, extras cut), never a question back or advice in words.",
+  "messages": [
+    "Trim today's session"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      { "turn": 0, "oneOf": ["propose_session_shorten"] }
+    ]
+  }
+}

@@ -40,6 +40,7 @@ import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek, ExerciseSetL
 import { dayLengthParts, formatDayLength } from './session-duration'
 import { readBorrowedDay } from './borrowed-day'
 import { honestSessionMinutes } from './session-derive'
+import type { DaysAhead } from './days-ahead'
 import { sessionForDate, addDays, dayNameOf, daysBetween, type SessionMove } from './session-move'
 import { readTrainingWeeksBack, tallyWeek, dayCountsTowardWeek, dayCountsAsDone, type TrainingWeekDay } from '@/hooks/useTrainingWeek'
 
@@ -261,6 +262,11 @@ export interface DashboardData {
    * 2a moved "Tomorrow" from its own row into that line). Null while the plan
    * is unknown, for the same reason tomorrowLabel is.
    */
+  /**
+   * WHAT IS COMING UP (25 Nov 2026, his "not proactive enough"): yesterday's, today's and tomorrow's briefs and one
+   * pattern, sent ahead so the coach's reminders can say something specific (days-ahead.ts). Null when the plan is unknown.
+   */
+  ahead?: DaysAhead | null
   tomorrow: { rest: true } | { rest: false; focus: string; /** Work minutes, the estimator today's length uses. Absent on a cached day from before 31 Oct. */ minutes?: number | null } | null
   /** Every coach tip true today, the day's pick first — the Home note rotates through them (2a). */
   coachTips: SelectedCoachTip[]
@@ -802,10 +808,41 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
       }
     : null
 
+  // ---- What is coming up, for the coach's reminders (days-ahead.ts) ------
+  let ahead: DaysAhead | null = null
+  if (planKnown) {
+    try {
+      // Loaded here, not at the top: none of it is needed to draw Home, and it keeps the first download its size.
+      const [{ dayBriefOf, patternAheadOf, weekBestsOf }, { stuckLifts, lowProtein, tirednessBuilding }] = await Promise.all([import('./days-ahead'), import('./coach-patterns')])
+      const yesterdayStr = addDays(todayStr, -1)
+      const activities = profile.concurrent_activities
+      const eaten = await proteinP
+      const byDate = eaten ? Object.fromEntries(Object.entries(eaten).map(([d, g]) => [d, { protein: Number(g) || 0, meals: Number(g) > 0 ? 1 : 0 }])) : null
+      ahead = {
+        asOf: todayStr,
+        days: {
+          [yesterdayStr]: dayBriefOf(null, dayNameOf(yesterdayStr), activities),
+          [todayStr]: dayBriefOf(todayWorkoutDay, dayNameOf(todayStr), activities),
+          [tomorrowStr]: dayBriefOf(tomorrowWorkoutDay, tomorrowName, activities),
+        },
+        pattern: patternAheadOf({
+          stuck: stuckLifts(workingLogs),
+          tooHard: tirednessBuilding(workingLogs, todayStr),
+          protein: proteinTarget > 0 ? lowProtein(byDate, todayStr, proteinTarget) : null,
+        }),
+        // The review's "what moved": the records Home itself lists, this week only.
+        week: weekBestsOf(recentPRs, todayStr),
+      }
+    } catch (err) {
+      console.warn('[dashboard] working out the days ahead failed:', err)
+    }
+  }
+
   return {
     today: todayStr,
     dayName,
     session,
+    ahead,
     tomorrowLabel,
     tomorrow: !planKnown ? null
       : tomorrowWorkoutDay && tomorrowWorkoutDay.exercises.length > 0
