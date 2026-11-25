@@ -96,6 +96,7 @@ export const COACH_ACTIONS: Record<string, CoachAction> = {
   log_weight: { family: 'logging', screen: 'screen', card: 'propose_weigh_in', rule: none('a surprising weigh-in is asked about first (weigh-in-check)') },
   log_meal: { family: 'logging', screen: 'screen', card: 'propose_meal_log', rule: none('a food that cannot be counted is asked about before any card') },
   log_workout_set: { family: 'logging', screen: 'screen', rule: none('sets in his words; odd reps are asked about once') },
+  move_logged_sets: { family: 'logging', screen: 'screen', rule: none('the sets come from today\'s own log; the exercise he did must be in his words') },
   record_fact: { family: 'memory', screen: 'screen', rule: none('his verbatim quote must be in his message') },
   record_goal: { family: 'memory', screen: 'screen', rule: none('his verbatim quote must be in his message') },
   record_context_fact: { family: 'memory', screen: 'screen', rule: none('his verbatim quote must be in his message') },

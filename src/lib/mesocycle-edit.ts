@@ -5,7 +5,7 @@ import { getSmartReplacements, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, get
 import { getConstrainedPool, getFlaggedJoints, daysOwnPatterns, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, isTempoEligible, repRangeForIncomingExercise, EQUIPMENT_QUALITY_TIERS, hasBetterLoadingPeer, POOL_WIDE_IMPLEMENT_TIERS } from './exercise-plan'
 import { prescribeLoad, type LoadPrescription, isExternallyLoaded, DELOAD_LOAD_FRACTION } from './load-prescription'
 import { getGoalPolicy } from './goal-policies'
-import { resolveLoadFields } from './warmup'
+import { resolveLoadFields, primerPrescription } from './warmup'
 import { PHASE_CONFIGS, getPhaseTempo, formatTempo, stepHoldSeconds } from './periodization'
 // Dynamically imported inside recomputeLoad(), not statically here — importing
 // progression-engine.ts pulls in supabase.ts, which reads import.meta.env at
@@ -368,6 +368,9 @@ export async function recomputeLoad(
   /** See buildReplacementSlot's previousLoadingWeek: with no logged number, step up from it (never past the estimate) or hold it. */
   previousLoadingWeek?: { kg: number; step: boolean },
 ): Promise<LoadPrescription> {
+  // A WARM-UP MOVE IS PRICED FROM THE PERSON, as generation prices it (24 Nov 2026, warmup.ts primerPrescription):
+  // never the testing week's discount, never its own halved weight read back as last week's.
+  if (entry.mechanics_tier === 'primer') return primerPrescription(entry, profile, sets)
   if (isMainLiftReset) {
     // NOTE, 9 Oct 2026: `isFirstBlock` below is accepted by prescribeLoad and
     // read by nothing — so the "conservative first-prescription" this

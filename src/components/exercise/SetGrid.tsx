@@ -30,7 +30,9 @@ import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateC
 import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG, repsLookImpossible, prescribedRepsHigh } from '@/lib/set-plausibility'
 import { blankWeightFor, carriedWeightFor, type BlankWeight } from '@/lib/set-row'
 import type { UserProfile } from '@/lib/types'
-import { EFFORT_RPE, effortFromRpe, type LiftEffort } from '@/lib/lift-effort'
+import { EFFORT_RPE, PROBE_RPE, effortFromRpe, type LiftEffort } from '@/lib/lift-effort'
+import { restAfterWarmupSeconds } from '@/lib/warmup-rest'
+import { parseRestSeconds } from '@/lib/session-duration'
 
 // REPLACED 8 Sep 2026 by set-plausibility.ts's MAX_LOGGABLE_SET_KG. The old
 // constant here was 9999.99 — the width of the database column, not a claim
@@ -352,6 +354,8 @@ export function SetGrid({
     ]),
   ]
   const isWarm = (ref: SetRef) => ref.kind === 'warmup'
+  /** The warm-up row directly above Set 1: the only one followed by a rest (warmup-rest.ts). -1 when there is none. */
+  const lastWarmupRowIndex = rowRefs.reduce((last, r, i) => (r.kind === 'warmup' ? i : last), -1)
   const isDrop = (ref: SetRef) => (ref.dropIndex ?? 0) > 0
   /** The last logged working set, and the last ROW belonging to it — where the one "add a drop" link sits. */
   const lastLoggedSetNumber = loggedSetNumbers.length ? Math.max(...loggedSetNumbers) : null
@@ -875,6 +879,18 @@ export function SetGrid({
     if (!warm && !drop && onSetCompleted && prescribedReps) {
       onSetCompleted(exerciseName, setNumber, weight, reps, restTime || '60s', totalSets, prescribedReps, tier)
     }
+    // EXCEPT THE LAST WARM-UP (24 Nov 2026, his "build it"): the next thing is Set 1, so a short rest counting down to
+    // it, sized in warmup-rest.ts. Reported as "set 0", so the rest's next set is Set 1.
+    if (warm && onSetCompleted && prescribedReps && lastWarmupRowIndex >= 0 && rowKey(rowRefs[lastWarmupRowIndex]) === k) {
+      const seconds = restAfterWarmupSeconds({
+        isLastWarmup: true,
+        workingSetsLogged: existingLogs.length,
+        workingRestSeconds: restTime ? parseRestSeconds(restTime) : 0,
+        isMainLift: tier === 'tier_1_primary',
+        repsHigh: prescribedRepsHigh(prescribedReps),
+      })
+      if (seconds > 0) onSetCompleted(exerciseName, 0, weight, reps, `${seconds}s`, totalSets, prescribedReps, tier)
+    }
   }
 
   const handleDeleteSet = (ref: SetRef) => {
@@ -1092,7 +1108,10 @@ export function SetGrid({
         const isActive = !!activeRow && rowKey(activeRow) === k
         // THE REST SITS UNDER THE SET IT FOLLOWS (Exercise 2a) — after that
         // set's drops, never after the last set. One engine, read here.
-        const restHere = !warm && rowIndex === lastRowOfSet(setNumber) && restBelongsToSet(rest, exerciseName, setNumber)
+        const restHere = warm
+          // The rest before Set 1 sits under the last warm-up (warmup-rest.ts).
+          ? rowIndex === lastWarmupRowIndex && restBelongsToSet(rest, exerciseName, 0)
+          : rowIndex === lastRowOfSet(setNumber) && restBelongsToSet(rest, exerciseName, setNumber)
         // THE PLATE BUTTON SITS IN THE BOX (2a): it works out the plates for
         // whatever this row would log. Not on a cable — the pin is the weight
         // (takesPlateCalculator) — and not where no handler is threaded.
@@ -1119,6 +1138,9 @@ export function SetGrid({
               <span className="text-[0.625rem] text-muted-foreground whitespace-nowrap" data-testid={onToggleRamp && !warm ? 'logged-count' : undefined}>{groupHead.right}</span>
             </div>
           )}
+          {/* THE REST BEFORE SET 1, WHEN THE WARM-UPS HAVE FOLDED AWAY (24 Nov 2026): ticking the last warm-up closes the
+              build-up, so its rest is drawn here, above Set 1, rather than inside a fold nobody can see. */}
+          {!warm && !drop && !showWarm && lastWarmupRowIndex >= 0 && rowIndex === lastWarmupRowIndex + 1 && restBelongsToSet(rest, exerciseName, 0) && <InlineRest />}
           {/* THE TESTING WEEK ASKS, THEN FILLS — his ruling 15 Nov 2026, "Ask, then fill", over clearer words only and
               over copying set 1 down (docs/plans/test-week-ask-then-fill.md). Only in a testing week, only on an
               unlogged working set whose set above is logged: "How was set 1 at 25 kg?" Easy / About right / Hard,
@@ -1151,7 +1173,18 @@ export function SetGrid({
                         data-next-kg={kg}
                         aria-pressed={chosen === a.feel}
                         className={`min-h-[44px] rounded-full border px-3 text-xs ${chosen === a.feel ? 'border-primary bg-primary/20 text-primary-text' : 'border-primary/50 text-foreground'}`}
-                        onClick={() => { setProbeFeel(prev => ({ ...prev, [k]: a.feel })); updateInput(ref, 'weight', String(kg)) }}
+                        onClick={() => {
+                          setProbeFeel(p => ({ ...p, [k]: a.feel }))
+                          updateInput(ref, 'weight', String(kg))
+                          // THE ANSWER IS KEPT ON THE SET IT IS ABOUT (24 Nov 2026): the testing week reads it to set
+                          // next week's weight in both directions (calibration-anchor.ts). It had lived on screen only.
+                          if (profileId) logSet({
+                            userId: profileId, date: today, weekNumber: liveWeek, day: dayName, exerciseId, exerciseName,
+                            setNumber: prev.set_number, weightKg: prev.weight_kg, repsCompleted: prev.reps_completed,
+                            unit: prev.unit, isBodyweight: prev.is_bodyweight, addedLoadKg: prev.added_load_kg ?? null,
+                            isWarmup: false, dropIndex: 0, rpe: PROBE_RPE[a.feel],
+                          })
+                        }}
                         aria-label={`${a.label}, ${a.hint}: set ${setNumber} at ${kg} kg`}
                       >
                         {a.label}
@@ -1512,7 +1545,7 @@ export function SetGrid({
           )}
           {restHere && <InlineRest />}
           {/* "+ Add warm-up" sits with the build-up it adds to, inside the open ramp. */}
-          {hasFold && showWarmupControls && warm && rowIndex === rowRefs.reduce((last, r, i) => (r.kind === 'warmup' ? i : last), -1) && addWarmupButton}
+          {hasFold && showWarmupControls && warm && rowIndex === lastWarmupRowIndex && addWarmupButton}
           </React.Fragment>
         )
       })}

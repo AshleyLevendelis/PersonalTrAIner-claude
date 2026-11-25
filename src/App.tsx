@@ -50,6 +50,7 @@ import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@
 import { supabase } from '@/lib/supabase'
 import { describeRebuild } from '@/lib/rebuild-card'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, restoreMesocycle } from '@/lib/mesocycle-persistence'
+import { repricePrimerSlots } from '@/lib/primer-repair'
 import { snapPlanStart } from '@/lib/plan-week'
 import { buildRestartedPlan } from '@/lib/plan-restart'
 import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } from '@/lib/reprice-plan'
@@ -1183,6 +1184,8 @@ function App() {
       running_goal: typeof profileRow.running_goal === 'string' ? profileRow.running_goal : null,
       running_race_date: typeof profileRow.running_race_date === 'string' ? profileRow.running_race_date : null,
       running_base_minutes: typeof profileRow.running_base_minutes === 'number' ? profileRow.running_base_minutes : null,
+      // Cardio days a week (cardio-days.ts), absent before its migration: read as none asked.
+      cardio_days_per_week: typeof profileRow.cardio_days_per_week === 'number' ? profileRow.cardio_days_per_week : null,
       // Slice 4's two settings, absent before their migration: read as the defaults.
       meal_variety: profileRow.meal_variety === 'some' || profileRow.meal_variety === 'same' ? profileRow.meal_variety : 'variety',
       show_numbers: profileRow.show_numbers !== false,
@@ -1989,6 +1992,8 @@ function App() {
         health_conditions: enrichedProfile.health_conditions ?? [],
         // The running goal (running.ts). Column pending its migration: dropped on retry below.
         running_goal: enrichedProfile.running_goal ?? null,
+        // Cardio days a week (cardio-days.ts). Column pending its migration: dropped on retry below.
+        cardio_days_per_week: enrichedProfile.cardio_days_per_week ?? null,
         meals_per_day: enrichedProfile.meals_per_day ?? 3,
         include_snacks: enrichedProfile.include_snacks ?? true,
         // NAMED HERE OR WRITTEN ONCE AND NEVER READ BACK — this insert is
@@ -2046,7 +2051,7 @@ function App() {
     // migration costs that one answer and never the whole profile.
     {
       let pending: Record<string, unknown> = profileInsert
-      const PENDING_COLUMNS = ['date_of_birth', 'enjoyed_activities', 'running_goal', 'health_conditions']
+      const PENDING_COLUMNS = ['date_of_birth', 'enjoyed_activities', 'running_goal', 'health_conditions', 'cardio_days_per_week']
       for (let tries = 0; tries < PENDING_COLUMNS.length; tries++) {
         // Whichever one the database named, in either order.
         const column = PENDING_COLUMNS.find(c => c in pending && insertError && isMissingColumnError(insertError, c))
@@ -2780,6 +2785,18 @@ function App() {
     return () => { live = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id, planReady, mesocycleCreatedAt, sweepToday, logsVersion, coachDataVersion])
+
+  // A SAVED PLAN TAKES THE CURRENT WARM-UP PRICE (24 Nov 2026, primer-repair.ts): a warm-up weight written by an older
+  // rule (his 8 kg swing) is corrected once the plan is read from the server, and saved. Quiet: no live users yet.
+  useEffect(() => {
+    if (!profile?.id || !planReady) return
+    const profileId = profile.id
+    const { next, changed } = repricePrimerSlots(mesocycleNow.current, profile)
+    if (changed.length === 0) return
+    setMesocycle(next)
+    Promise.all(changed.map(w => saveMesocycleWeek(profileId, w))).catch(err => console.error('[primer-repair] could not save:', err))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id, planReady, profile?.weight_kg, profile?.training_experience, profile?.gender])
 
   /**
    * The write behind a ban — recording the preference, rewriting the plan,

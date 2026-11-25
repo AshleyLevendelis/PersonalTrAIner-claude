@@ -15,6 +15,13 @@ export type LiftEffort = 'easy' | 'right' | 'hard'
 /** What one tap stores, on the 1-10 effort scale: about five left, about two left, nothing left. */
 export const EFFORT_RPE: Record<LiftEffort, number> = { easy: 5, right: 8, hard: 10 }
 
+/**
+ * The testing week's per-set answer ("How was set 1 at 40 kg?"), kept on that set (24 Nov 2026,
+ * docs/plans/testing-week-both-ways.md). Its own numbers, because its hints are its own: Easy "5 or more reps left",
+ * About right "3 or 4 left", Hard "2 or fewer left". Each still reads back as the same word through effortFromRpe.
+ */
+export const PROBE_RPE: Record<LiftEffort, number> = { easy: 5, right: 7, hard: 9.5 }
+
 /** Six or under is four or more reps left; nine and a half or over is the limit. Null when no effort was given. */
 export function effortFromRpe(rpe: number | null | undefined): LiftEffort | null {
   if (rpe == null || !Number.isFinite(rpe)) return null

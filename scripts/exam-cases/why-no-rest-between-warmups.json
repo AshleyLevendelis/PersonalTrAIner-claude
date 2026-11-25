@@ -1,0 +1,8 @@
+{
+  "name": "why-no-rest-between-warmups",
+  "why": "Ashley, 24 Nov 2026: \"If the user asked 'why dont i have a rest timer after my warm up' would the chat answer correctly?\" It could not: the coach was told the timer starts after every set. The app's own reason is on its why sheet: no rest between warm-ups because each one is the next step up, and a short rest after the LAST one before set 1. The answer must give that reason, not a general one and not an invented one, and must not tell him he should be getting a timer after every warm-up.",
+  "messages": [
+    "why dont i get a rest timer after my warm up sets"
+  ],
+  "checks": {}
+}

@@ -197,6 +197,17 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   mine, 23 Nov 2026, his Push & Press day): never after isolation, finisher or trunk work. `test:compound-order`,
   `measure:compound-order` (735 -> 88 of 4,608 days; the 88 are knee-rehab days). The label and the block rotation can
   still name different main lifts on 826 of 4,499 days (BACKLOG)
+- **The testing week sets week 2 both ways** (CSCS, mine, 24 Nov 2026, his "some too light, others too heavy"): the
+  "How was set 1?" answer is kept on the set; every set becomes an estimated max carried to next week's reps; a Hard,
+  short or lighter testing session LOWERS the rest of the testing block (the one exception to "never downward"), a
+  heavy low-rep set is never copied into a higher-rep week. `test:testing-week-both-ways`, `verify:calibration-search` 10c
+- **A warm-up move weighs the same on every route, and the swing is not halved** (CSCS, mine, 24 Nov 2026, his "8kg was
+  way too light"): priced from the person (never the testing week's discount, never its log); a ballistic primer carries
+  its easy estimate, the 18 Sep half stays for wrist and forearm drills; a saved plan is corrected on open.
+  `test:primer-dose`
+- **Sets logged under the wrong exercise move to the one he did** (24 Nov 2026, his live report): chat
+  (`move_logged_sets`, names from his words and today's log, never numbers) and the ⋮ menu, one planner, with Undo.
+  `test:move-logged-sets`, `verify:wrong-exercise`. Needs the `chat-gemini` deploy
 - **A beginner's session holds at most 18 working sets — his ruling 21 Nov 2026, "yes cap beginners at 18 sets"** (over
   filling the time with lifting): the spare minutes go to optional mobility. It narrows his session-length rulings for
   beginners only. `test:older-beginner` §14
@@ -702,14 +713,33 @@ menu" stays true when a copy is also left outside it.
   that costs nothing. Anything built on a model JUDGEMENT should be split this
   way and the two halves named separately.
   `cardio-session`, `verify:cardio-session`, `coach-parity`
+- **A rest day's optional cardio is drawn as a session, under an "Optional · rest day" banner: his request 25 Nov 2026**
+  ("so users dont think they are being forced into a workout in their rest day"): the session hero on the day (Start,
+  one-tap log), on a past day within two weeks it logs to THAT day, on a day ahead it is a preview ("You can log it on
+  Saturday."). Skipping it misses nothing. `verify:rest-day` §8b, §11, `test:peek-recovery`
 - **An interval session on the plan runs on the round timer: his ruling 23 Nov 2026, "A"** (over a log line with a
   timer button, from his "start the workout, it starts the round timer ... you log it completed at the end"): a planned
   session keeps its rounds, work and rest; its card has Start (the round timer at those numbers, his countdown), and when
   the rounds end one effort tap logs it under the session's own name, so the day reads done; the round timer's own Log
   session asks the same one question. The coach's card carries the coach's three numbers, else the intervals of the
   reply he said yes to when they fit the session. Another day shows the session as a preview, never one line. A saved
-  cardio log now re-reads the week strip. `test:planned-rounds`, `verify:planned-rounds`. Needs the `chat-gemini` deploy
+  cardio log now re-reads the week strip. A session with its numbers only in the coach's reason (his Wednesday, 24 Nov
+  2026) reads them from there, when they fit its minutes. A day early it stays a preview with no Start: his ruling 24 Nov 2026, "Keep it as is". Drawn as a weight day is (his request the same night): the header, an Intervals row with the effort on the right,
+  a bar segment per round and "4 × 3 min hard · 1 min rest". **And on the day it is drawn as a session (his "improve the look of logging cardio, use your
+  best judgment", 25 Nov 2026)**: the weight day's hero, three figures (time, rounds, effort), the round bar that fills
+  when logged, one big Start, and "Or log it yourself" over the same one-tap row (`PlannedSessionHero.tsx`). **And it can be
+  changed for today (his request the same day, "can't do 8x3 ... change it to 6x3")**: rounds, work and rest (or minutes)
+  on steppers, everything on the card follows, "Back to the plan" undoes it; the plan is never written. `test:planned-rounds`, `verify:planned-rounds`. Needs the `chat-gemini` deploy
   for the coach to send rounds itself
+- **Every planned cardio session starts a timer and logs in one tap: his report 24 Nov 2026** ("add a 30min jog ... a
+  workout with timer built in", "even optional cardio on rest days"): rounds on the round timer (read from his own words,
+  the coach's reply, or the session's note when they fit), minutes on a countdown tagged with the session; the minutes it
+  ran are logged under the session's name. `test:planned-rounds`, `verify:planned-rounds` G-I
+- **Cardio days a week: his ruling 24 Nov 2026, "A, build it"** (over coach only and Profile only): setup asks someone who
+  loves cardio how many (0-3), Profile asks anyone; they take training days from lifting down to two (CSCS, mine), one
+  intervals / one steady / two intervals at three, low impact by feel, a health condition capped at RPE 7, and count as
+  the goal's conditioning; a running goal wins. The conditioning after lifting has the same Start. `test:cardio-days`,
+  `verify:cardio-days`, `verify:finisher` 5c. Needs the `cardio_days_per_week` migration
 - **Swap the session for a circuit of timer blocks, block by block** — both surfaces since
   8 Oct 2026. Ashley, from the gym: rope, push-ups, sit-ups and the bike off the round timer could
   only be logged as "Intervals". His ruling, from three options: **A, one workout made of blocks**.
@@ -1231,6 +1261,11 @@ menu" stays true when a copy is also left outside it.
   (`coach-texting`, 21 checks, 9 mutations). Whether it is one line per thing,
   and whether a question matters, stays the exam's to judge — the same split
   as the cardio ruling
+- **It explains the app's OWN reasons — his request 24 Nov 2026, "build the why sheet"**: every coaching decision the app
+  makes has a plain-words line and its reason on one sheet (`_shared/app-decisions.ts`), and each message carries the
+  lines it matches; the coach never invents the app's reason. A NEW CSCS DECISION GETS A LINE THERE in the same change
+  (the gate only sees files, not new rules in a file it already covers). `test:app-decisions`. Needs the `chat-gemini`
+  deploy and an exam run
 - Never claims a capability, screen or guarantee it lacks; proposes,
   confirms, can be undone — `coach-promises`, `chat-app-reality`,
   `pending-actions`, `log-correction`, `replace-without-losing`,

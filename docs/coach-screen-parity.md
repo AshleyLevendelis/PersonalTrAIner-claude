@@ -35,6 +35,7 @@ it is wrong.
 | `log_workout` | SCREEN | Exercise → the set grid. |
 | `log_workout_session` | SCREEN | Exercise → finish session. |
 | `log_workout_set` | SCREEN | Exercise → the set grid's tick. |
+| `move_logged_sets` | SCREEN | Exercise → a logged exercise's ⋮ → "Logged the wrong exercise?" (the same planner, move-logged-sets.ts). |
 | `propose_concurrent_activity` | SCREEN | Profile → other sports. |
 | `propose_custom_meal` | EXCEPTION | Coach-only FOR A NAMED DAY. NARROWED AGAIN 11 Nov 2026 (his "My usual meals first"): the screen can now add a meal he describes (a name, which meal, its foods with amounts) to that meal's options, on Profile → Foods you like → My meals, through this tool's own builder and `propose_meal_addition`'s, so it is checked by the same code; it can then be chosen for a day from the meal's swap list. What stays coach-only is doing both in one step, "make this my lunch today", and (11 Nov 2026) a meal SOMEBODY ELSE COOKS: with `cooked_for_me` the coach supplies ordinary portions and the app keeps it as an ESTIMATE for that one day, never one of his options and never shopped for (`meals-elsewhere.ts`); the screen has no form for that. NARROWED 14 Sep 2026: the "no free-text entry" half of this reason is gone — the food search built for `propose_meal_food_add` could serve here too. What is left is the real reason: a custom meal is an open-ended list of foods AND a dish name AND a decision about what the rest of the day does around it, which is a screen someone has to design, not a control to bolt onto a row. |
 | `propose_equipment_adaptation` | SCREEN | Profile → Equipment. |
@@ -112,6 +113,12 @@ header alone. Count what is below before trusting what is here.
   and two rows on Profile → Meals & shopping. The coach logs what he ate on a freestyle day with its existing food
   logging, is told when numbers are off, and sees the week's average. NOT BUILT rather than decided against: a coach
   card for each.
+
+- **Cardio days a week.** `screen only`, added 24 Nov 2026 with the feature (his ruling, "A, build it";
+  `src/lib/cardio-days.ts`): asked in setup of someone who loves cardio, and Profile → Goal → "Cardio days". The coach
+  cannot set the COUNT. What it can do is the per-day half that already existed: "make Wednesday my HIIT day" is
+  `propose_cardio_session`, for every week of the block, with the rounds read from his words. NOT BUILT rather than
+  decided against: a coach card offering the count, on the running goal's shape (`propose_running_goal`).
 
 - **Which meals are cooked for him, on which days.** `screen only`, added
   11 Nov 2026 with the feature (his ruling, "Set days + optional menu"):

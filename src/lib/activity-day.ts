@@ -94,3 +94,18 @@ export function optionalCardioMode(date: string, today: string): 'log' | 'ahead'
   const earliest = back.toISOString().slice(0, 10)
   return date >= earliest ? 'log' : 'closed'
 }
+
+/**
+ * THE OPTIONAL CARDIO'S NAME AS A TITLE (his 25 Nov 2026 screenshot: rest-day cardio drawn like today's session). A
+ * plan line reads "Zone 2 Aerobic Base (walking, cycling, swimming) — conversational pace, ~60-70% max HR": the title is
+ * the name alone, and the choices and the protocol go on the line under it, in that order.
+ */
+export function optionalCardioTitle(activity: string): { title: string; detail: string | null } {
+  const dash = /^(.*?)\s+[—–-]\s+(.+)$/.exec(activity.trim())
+  const name = dash ? dash[1] : activity.trim()
+  const protocol = dash ? dash[2] : null
+  const paren = /^(.*?)\s*\(([^)]+)\)\s*$/.exec(name)
+  const title = paren ? paren[1] : name
+  const detail = [paren ? paren[2] : null, protocol].filter(Boolean).join(' · ')
+  return { title, detail: detail || null }
+}

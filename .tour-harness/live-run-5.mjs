@@ -212,9 +212,9 @@ await until(`document.querySelectorAll('[data-strip-day]').length > 0`, 12000)
 await wait(800)
 await tapExpr(q(`[data-strip-day="${sugg?.day ?? 'none'}"]`))
 // Since 25 Nov 2026 the recovery day is its own card with the cardio as a row (verify:rest-day §11), not a sentence.
-const recov = await until(`document.querySelector('[data-testid="peek-recovery-day"] [data-testid="cardio-prescription"]')?.innerText.replace(/\\s+/g, ' ').trim() || null`, 6000)
+const recov = await until(`(() => { const c = document.querySelector('[data-testid="peek-recovery-day"]'); return c ? { title: c.querySelector('[data-testid="activity-day-title"]')?.textContent.trim() ?? '', figures: c.querySelector('[data-testid="cardio-prescription"]')?.innerText.replace(/\\s+/g, ' ').trim() ?? '' } : null })()`, 6000)
 const head = (sugg?.activity ?? '###').split(' — ')[0]
-check('E4. A RECOVERY DAY SAYS ITS SUGGESTED CARDIO, in the plan\'s phrase ("… · 20 min · Easy")', !!recov && recov.startsWith(head.split(' (')[0]) && / · \d+ min · (Easy|Steady|Hard)$/.test(recov), { recov, sugg })
+check('E4. A RECOVERY DAY SAYS ITS SUGGESTED CARDIO: its name, its minutes and its effort', !!recov && recov.title === head.split(' (')[0] && /^\d+ min TIME (Easy|Steady|Hard) EFFORT$/i.test(recov.figures), { recov, sugg })
 await shoot('live-run-5-peek-recovery')
 
 const txt = await bodyText()

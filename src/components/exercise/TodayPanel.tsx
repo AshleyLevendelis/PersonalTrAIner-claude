@@ -51,7 +51,7 @@ import { ReadOnlyDayList } from './ReadOnlyDayList'
 import { weekPhaseLine } from '@/lib/exercise-week'
 import { weekRangeLabel } from '@/lib/nutrition-week'
 import { PRIMARY_CTA_CLASS, PRIMARY_CTA_STYLE } from '@/components/OnePage'
-import { PeekPanel, PeekWhatYouDid } from './PeekPanel'
+import { PeekPanel, PeekWhatYouDid, PlannedActivityPeek } from './PeekPanel'
 import { SectionLabel, sectionLabelFor } from './ExerciseLine'
 import { WarmupSection } from './WarmupSection'
 import { NextSetButton } from './NextSetButton'
@@ -115,8 +115,6 @@ import { FirstSessionLiftsCard } from './FirstSessionLiftsCard'
 import { CircuitOffer } from './CircuitOffer'
 import { describeDayGap, dayGapCanAddPress } from '@/lib/day-gap-note'
 import type { Exercise, WorkoutDay, MesocycleWeek, UserProfile, PlannedActivity } from '@/lib/types'
-import { plannedRoundsOf } from '@/lib/planned-rounds'
-import { blockShape } from '@/lib/timer-engine'
 import type { LoadSource } from './LoadChip'
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -372,7 +370,10 @@ export function TodayPanel({
       workout.exercises
         // ONLY A REP PRESCRIPTION (19 Nov 2026, his summary: "Suitcase Carry — Hit 40 reps on every set"): a carry's
         // "40m" and a hold's "30-45s" were read as rep counts. They follow the plan's own distance and load ramp.
-        .filter(ex => (ex.suggested_load_kg != null || ex.suggested_added_load_kg != null) && prescribedRepsHigh(ex.reps) != null)
+        .filter(ex => (ex.suggested_load_kg != null || ex.suggested_added_load_kg != null) && prescribedRepsHigh(ex.reps) != null
+          // A WARM-UP MOVE IS NOT PROGRESSED FROM ITS LOG (24 Nov 2026, warmup.ts primerPrescription): a dose for the
+          // person, priced the same on every route (checkDoubleProgression already leaves primers out).
+          && getExerciseEntry(ex.name)?.mechanics_tier !== 'primer')
         .map(async ex => {
           const rec = ex.suggested_added_load_kg != null
             ? await getAddedLoadProgression(profileId!, ex.name, dayAfterStr, parseRepsHigh(ex.reps))
@@ -1002,7 +1003,10 @@ export function TodayPanel({
       workout.exercises
         // ONLY A REP PRESCRIPTION (19 Nov 2026, his summary: "Suitcase Carry — Hit 40 reps on every set"): a carry's
         // "40m" and a hold's "30-45s" were read as rep counts. They follow the plan's own distance and load ramp.
-        .filter(ex => (ex.suggested_load_kg != null || ex.suggested_added_load_kg != null) && prescribedRepsHigh(ex.reps) != null)
+        .filter(ex => (ex.suggested_load_kg != null || ex.suggested_added_load_kg != null) && prescribedRepsHigh(ex.reps) != null
+          // A WARM-UP MOVE IS NOT PROGRESSED FROM ITS LOG (24 Nov 2026, warmup.ts primerPrescription): a dose for the
+          // person, priced the same on every route (checkDoubleProgression already leaves primers out).
+          && getExerciseEntry(ex.name)?.mechanics_tier !== 'primer')
         .map(async ex => {
           if (ex.suggested_added_load_kg != null) {
             const added = await getAddedLoadProgression(profileId, ex.name, today, parseRepsHigh(ex.reps))
@@ -1054,11 +1058,13 @@ export function TodayPanel({
         if (printed == null) { nextLoads[name] = load.weightKg; nextNotes[name] = { note: load.note, didProgress: load.didProgress }; continue }
         const then = load.lastDate ? planDaysForDate(load.lastDate, today, liveWeekPlan, mesocycle, planCreatedAt) : null
         const thenWeek = then?.week != null ? mesocycle?.find(w => w.week_number === then.week) : undefined
+        const thenSlot = then?.days.flatMap(d => d.exercises).find(e => e.name === name)
         const card = cardLoadFor(load, {
           printedKg: printed,
-          printedThenKg: then?.days.flatMap(d => d.exercises).find(e => e.name === name)?.suggested_load_kg ?? undefined,
+          printedThenKg: thenSlot?.suggested_load_kg ?? undefined,
           todayIsDeload: !!currentMesoWeekObj?.is_deload,
           lastWasDeload: !!thenWeek?.is_deload,
+          testingWeekDecided: !!thenWeek?.isCalibrationWeek && thenSlot?.calibration_anchored_kg != null,
         }, name)
         nextLoads[name] = card.weightKg
         nextNotes[name] = { note: card.note, didProgress: card.didProgress, findWeight: card.findWeight }
@@ -1668,7 +1674,7 @@ export function TodayPanel({
             {/* A PLANNED SESSION ON ANOTHER DAY IS SHOWN AS A SESSION (23 Nov 2026): "Wednesday: Assault Bike Rounds,
                 16 minutes." was his whole view of it. What it is, its rounds and why, read off the plan. */}
             {!peekBeforePlan && peekWorkout?.plannedActivity ? (
-              <PlannedActivityPreview dayName={peekDay} focus={peekWorkout.focus} planned={peekWorkout.plannedActivity} onBack={() => setPeekDate(null)} />
+              <PlannedActivityPeek dayName={peekDay} focus={peekWorkout.focus} planned={peekWorkout.plannedActivity} onExit={() => setPeekDate(null)} />
             ) : !peekBeforePlan && peekWorkout?.recommendedCardio && peekDate ? (
               /* THE DAY'S OWN CARD, NOT A SENTENCE (his report 25 Nov 2026): the optional cardio is a row like an
                  exercise, loggable on a past day, previewed on a day to come. */
@@ -1676,7 +1682,6 @@ export function TodayPanel({
                 dayName={peekDay}
                 date={peekDate}
                 today={today}
-                focus={peekWorkout.focus}
                 cardio={peekWorkout.recommendedCardio}
                 back={<PeekBackToToday onClick={() => setPeekDate(null)} />}
               />
@@ -2476,21 +2481,3 @@ function PeekBackToToday({ onClick }: { onClick: () => void }) {
   )
 }
 
-/**
- * ANOTHER DAY'S PLANNED SESSION, READ-ONLY (23 Nov 2026): its name, the prescription in the words a log reads back
- * in, the rounds when it is intervals, and the coach's reason. Started and logged on its own day.
- */
-function PlannedActivityPreview({ dayName, focus, planned, onBack }: { dayName: string; focus: string; planned: PlannedActivity; onBack: () => void }) {
-  const { name, protocol } = splitActivity(planned.activity)
-  const rounds = plannedRoundsOf(planned)
-  const shape = protocol ?? (rounds ? blockShape(rounds) : null)
-  return (
-    <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 space-y-1.5" data-testid="peek-planned-activity">
-      <p className="text-[1.0625rem] font-semibold text-foreground leading-tight">{`${focus || name} · ${dayName}`}</p>
-      <p className="text-sm font-medium text-foreground" data-testid="peek-planned-line">{prescriptionLine({ activity: name, duration: planned.duration, targetRpe: planned.targetRpe })}</p>
-      {shape && <p className="text-xs text-muted-foreground" data-testid="peek-planned-shape">{shape}</p>}
-      {planned.reason && <p className="text-xs leading-[1.5] text-muted-foreground">{planned.reason}</p>}
-      <div className="pt-1.5 flex justify-center"><PeekBackToToday onClick={onBack} /></div>
-    </div>
-  )
-}

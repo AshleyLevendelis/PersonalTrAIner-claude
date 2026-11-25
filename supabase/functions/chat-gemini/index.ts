@@ -8,6 +8,7 @@ import { deliverReply, type ReplyPushDeps } from "./reply-push.ts";
 import { pushServer, sendPush } from "../_shared/push.ts";
 import type { NotificationSettings } from "../_shared/coach-moments.ts";
 import { GEMINI_MODEL, coachShortLine } from "../_shared/gemini.ts";
+import { appDecisionsFor } from "../_shared/app-decisions.ts";
 import { withoutPhotoAllergenClaims, PHOTO_MAX_BASE64, PHOTO_MIME } from "../_shared/photo-safety.ts";
 import { writeOpener } from "../_shared/reminder-writer.ts";
 import { voicePass } from "./voice-pass.ts";
@@ -1703,6 +1704,19 @@ const toolDeclarations = [
     },
   },
   {
+    name: "move_logged_sets",
+    description:
+      "Moves sets ALREADY LOGGED today from the exercise he logged them under by mistake to the exercise he actually did ('I logged leg curl but I actually did leg extensions', 'those were incline not flat bench'). The app takes every set, weight and rep from its OWN log and writes them under the exercise he names, removing them from the wrong one, with an Undo. Pass no numbers. Use this, never log_workout, when the exercise was wrong and the sets were right. Copy both names verbatim from his message.",
+    parameters: {
+      type: "object",
+      properties: {
+        from_phrase: { type: "string", description: "The exercise he logged by mistake, verbatim from his message (e.g. 'leg curl')." },
+        to_phrase: { type: "string", description: "The exercise he actually did, verbatim from his message (e.g. 'leg extensions')." },
+      },
+      required: ["from_phrase", "to_phrase"],
+    },
+  },
+  {
     name: "log_workout",
     description:
       "Logs a natural-language description of completed exercise sets (VISION-ARCHITECTURE.md §3.1: 'the model segments, code owns every number'). Segment the user's message into one entry per exercise — identify WHICH SPAN OF TEXT is the exercise name and which is the sets/reps/weight/RPE description. Copy those spans VERBATIM from the user's message. Do NOT compute, convert, round, or reinterpret any number yourself — the app parses every quantity deterministically from the phrases you pass through. Prefer this over log_workout_session whenever the user describes more than one exercise in natural language (e.g. 'did 6x8 @100kg bench, 4x12 @20kg DB flyes, felt like RPE 7 on the last set').",
@@ -2508,6 +2522,8 @@ She wants people to LEARN as they use the app: the reason behind the food and th
 - A confirmation can carry a why too, in a clause, when it teaches something useful ("moved to Thursday, so you still get two leg days with a rest between").
 - The why never replaces the answer: answer first, then the reason.
 
+${appDecisionsFor(typeof message === 'string' ? message : '')}
+
 === 1-LEARN. LESSONS THAT BUILD OVER TIME (Ashley's ruling 6 Nov 2026) ===
 ${context.lesson_brief ? `${context.lesson_brief}
 - When a LESSON TO TEACH is given above, teach it ONCE in this conversation, in your own words, in one or two short lines, tied to what is happening for them right now. Weave it into your reply where it fits; a short extra text after a [BREAK] is fine. Never call it a lesson, never announce "here's a tip".
@@ -2587,7 +2603,7 @@ Five tabs, bottom of the screen: Home, Nutrition, Exercise, Tools, Chat (this co
 - Home: the greeting, the weeks on plan ("9 of 12 weeks": of the last finished weeks, how many were on plan; never a run), today so far as four rings (calories, protein, water, steps) with one percentage and a key under them, a rotating tip from you, then Up next as rows — today's session (the week as seven dots beside it; once finished it shows the time, the sets and any PR, and opens its summary), the next meal, and tomorrow — and Progress: the weight with its trend (tap it to weigh in), the latest PR and this week's volume. A Start button sits at the bottom until the session is done. Calories, protein and water there are read-outs that open Nutrition; step-count logging happens right here (tap Steps in the key). On shopping day a Shopping card appears here too, with how many things are left to buy and the first few of them.
 - Nutrition: a strip of today and the next six days (no earlier day can be opened there: what was eaten on a past day is not on any screen, only in what you are told below), and a "Week" button beside the title. For TODAY: one circle of rings (water, calories, protein, carbs and fat) with the calories left in the middle, and a row under it for each, eaten against target. Water logging happens here: tap "+ Water" on that card for the +250/+500 quick-adds. Tap an upcoming day on the strip and the card shows that day's PLANNED totals against target and whether the day is on target, with a button to add that day to the shopping list. "Week" shows all seven days on one screen, each with its planned calories and its meals, one day opened at a time, and a "Shop the whole week" button that builds the shopping list for 7 days. Then the day's meals, each with its calories and a bar of protein, carbs and fat, marked eaten or next, with per-meal logging (open a meal and tap Log; tap again to unlog), and "Eating out" on an upcoming meal, which asks Light, Normal or Big night and keeps the meal in the day as an estimate the rest of the day fits around; a round + that opens this chat to log something else; a "Grocery list" button that opens the shopping list; and a "Targets & plan settings" row that opens the BMR/TDEE derivation, the macro split, the water target and the Standard/Dynamic method picker.
 - Exercise: a strip of this week's days over today's workout (sets/reps/load, warm-up, rest timer), swap/ban an exercise, a "Week" button beside the title that shows every day of this week on one screen (each day's main lift with its weight, its minutes, and whether it is done; one day opened at a time with its first few exercises), the full training-week program view ("Program"), and a per-exercise screen from the row's menu with three tabs — Summary (a body diagram of the muscles it works, and a strength trend), History (past sessions and PRs), How to (the app's own form cues).
-- Tools: a Timers card at the top with four tiles, each opening its timer directly — a round/interval timer (Tabata, EMOM, plain rounds, or your own numbers, with a Full screen option), a countdown timer ("Timer": set minutes and seconds, it counts down and beeps at zero), a stopwatch, and a lap timer — plus a Start button for the last round run, once there is one. While a round is actually running, its card takes the Timers card's place. Under it a plate calculator card: a ± 2.5 kg stepper that starts on the next barbell lift in the plan and shows the plates for each side of a 20 kg bar; tapping it opens the full calculator. Then rows for the full training program, session history, and the grocery list. The rest timer is NOT set up anywhere — it starts on its own the moment a set is logged, in the session dock.
+- Tools: a Timers card at the top with four tiles, each opening its timer directly — a round/interval timer (Tabata, EMOM, plain rounds, or your own numbers, with a Full screen option), a countdown timer ("Timer": set minutes and seconds, it counts down and beeps at zero), a stopwatch, and a lap timer — plus a Start button for the last round run, once there is one. While a round is actually running, its card takes the Timers card's place. Under it a plate calculator card: a ± 2.5 kg stepper that starts on the next barbell lift in the plan and shows the plates for each side of a 20 kg bar; tapping it opens the full calculator. Then rows for the full training program, session history, and the grocery list. The rest timer is NOT set up anywhere — it starts on its own the moment a working set is logged, in the session dock; between warm-up sets there is none, and after the last warm-up it runs a short rest counting down to set 1.
 - A TIMER YOU SUGGEST STARTS FROM YOUR MESSAGE (his request, 16 Nov 2026). When timing something would help, name it plainly in your reply and the app puts a start button under it: for intervals give all three numbers ("30 seconds on, 30 seconds rest, 10 rounds"); otherwise say "the stopwatch" (a run for time, a plank hold, "time how long it takes") or "the lap timer" (time each lap or length). WHEN HE ASKS YOU TO START A TIMER, YOU CAN: say back exactly what will run ("3 rounds, 30 seconds on, 30 seconds rest") and the start button is under your reply. Never say you can't start it, never tell him to go to Tools or tap Timers, and never promise a button: say what to time. Asked for a round timer with no numbers, ask for the rounds, work and rest in one short question.
 Shopping list: its own full screen rather than part of a tab. Built from the week's meals; opened from the link on Nutrition, from the Shopping card on Home on shopping day, or from the Grocery list row on Tools. One list, three doors — not three lists.
 - Chat: this thread. There is no separate "message your coach" feature or human-support inbox — talking here IS reaching your coach.
@@ -3023,6 +3039,7 @@ PERIODIZATION COACHING RULES:
 - THE ONE EXCEPTION: a WARM-UP/BUILD-UP set or a DROP set (e.g. "did a couple of light warm-ups first", "then dropped to 60kg for 8 more", "I did a drop after my third set of squats"). log_workout's parser has no way to mark either kind — it would log it as an ordinary working set, indistinguishable from a real one, which is the exact mistake the app spent 19-22 Sep closing everywhere else it could happen. Use log_workout_set instead, with is_warmup or is_drop set correctly, even for just one set. If the SAME message also reports ordinary working sets, split it: log_workout for those, log_workout_set for the warm-up/drop line.
 - CRITICAL — never invent an exercise name. exercise_phrase/exercise_name must be a span of text the user actually wrote. If the message states sets/reps/weight but names no exercise at all (e.g. "I did 5x5 at 80kg", "just hit 3x10 at 60"), do NOT guess one from today's plan, their history, or the conversation so far — however confident the guess feels, a wrong guess silently writes sets against the wrong exercise with no easy way to notice. Ask a single short question instead ("Which exercise was that?") and wait for their answer before calling any log tool.
 - CRITICAL — NEVER INVENT REPS OR SETS EITHER. The same rule as the exercise name above, and it was learned the same way. If the user says "3" when asked for sets and reps, that is a SET COUNT and the rep count is still missing — do not complete it from the prescription, the plan, their history, or what would be typical. Measured live: the plan said 3x8, she answered "3", and the app recorded 3x8 @100kg. The 8 was never said by anyone but the app. Ask "how many reps?" and wait. A number you supplied is indistinguishable from a number they reported the moment it is written.
+- THE WRONG EXERCISE IS A MOVE, NOT A NEW LOG. "I logged leg curl but I actually did leg extensions", "those were incline, not flat": call move_logged_sets with both names in his words. The app moves every set as logged and removes them from the wrong exercise; never call log_workout for this, and never write sets or numbers he did not say (measured live 24 Nov 2026: one invented set was added and the three wrong ones stayed).
 - A CORRECTION REPLACES; IT NEVER ADDS. When a message fixes something just logged — "no, 3x10 deadlifts", "actually 100kg", "sorry, only 2 sets" — call log_workout with corrects_previous: true. Getting this wrong is not a cosmetic error: logged as an addition, the same session is counted twice and every future weight builds on sets that never happened. Live example: 3x8 was logged wrongly, she said "No 3x10 deadlifts", and her log ended up with SIX sets against three prescribed. If you genuinely cannot tell a correction from extra work, ask which — do not guess.
 - DO NOT THROW AWAY WHAT THEY JUST TOLD YOU. "No 3x10 deadlifts" contains the exercise, the sets AND the reps. Carry every stated value into the tool call and ask only for what is actually still missing. Re-asking for something they said in the very message you are replying to reads as not listening, and it is how a two-turn exchange becomes six.
 - NEVER ASK THE SAME QUESTION TWICE IN A ROW. If you asked for a weight and their answer did not get you there, do NOT repeat the identical sentence — either the question was ambiguous or their answer was, and repeating it verbatim changes neither. Say what you have and what is missing ("got 100kg for the deadlifts — how many reps per set?"), or ask a narrower question. Measured live: "What weight did you use for Deadlifts?" three times running, answered "100kg" every time.
@@ -4882,6 +4899,19 @@ Keep this context in mind to ensure your greetings and questions naturally align
         });
         return new Response(
           JSON.stringify({ reply: spoken.reply }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "move_logged_sets") {
+        // Forwarded untouched, as log_workout is: the client reads the sets from today's own log and writes the move,
+        // so no number the model wrote is ever recorded (src/lib/move-logged-sets.ts). `reply` is empty on purpose:
+        // the client's receipt is what he sees.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            moveLoggedSets: { from_phrase: String(args.from_phrase ?? ""), to_phrase: String(args.to_phrase ?? "") },
+          }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

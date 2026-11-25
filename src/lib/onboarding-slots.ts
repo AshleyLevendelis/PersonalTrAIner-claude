@@ -505,6 +505,8 @@ export interface OnboardingSlotValues {
   enjoyedActivities: string[]
   /** A running goal (his 13 Nov 2026 strategy, slice 6): 'none' or a RunningGoal. Optional, asked of everyone. */
   runningGoal: string | null
+  /** Cardio days a week, '0'-'3' (cardio-days.ts, his 24 Nov 2026 "A"); asked only of someone who loves cardio. */
+  cardioDays: string | null
 }
 
 /**
@@ -553,6 +555,7 @@ export function initialSlotValues(): OnboardingSlotValues {
     kitTicks: null,
     enjoyedActivities: [],
     runningGoal: null,
+    cardioDays: null,
   }
 }
 
@@ -739,6 +742,15 @@ const RUNNING_GOAL_SLOT_OPTIONS: { value: string; icon: string; label: string; d
 function lovesCardio(values: OnboardingSlotValues): boolean {
   return values.conditioningPreference === 'love'
 }
+
+// CARDIO DAYS A WEEK (his ruling 24 Nov 2026, "A, build it"): sessions of their own, taken from the training days (lifting
+// keeps two). One icon each, the number said in words.
+const CARDIO_DAYS_SLOT_OPTIONS: { value: string; icon: string; label: string; description: string }[] = [
+  { value: '0', icon: '🏋️', label: 'None, just lifting', description: 'Any cardio sits inside your lifting days' },
+  { value: '1', icon: '🚴', label: '1 day', description: 'One interval session a week' },
+  { value: '2', icon: '🚣', label: '2 days', description: 'Intervals and a steady session' },
+  { value: '3', icon: '🔥', label: '3 days', description: 'Two interval sessions and one steady' },
+]
 
 const ENJOYED_OPTIONS: { value: EnjoyedActivity; icon: string; label: string; description: string }[] =
   ENJOYED_ACTIVITY_OPTIONS.map(o => ({ value: o.value, icon: o.value === 'swimming' ? '🏊' : '🚴', label: o.label, description: `A ${o.label.toLowerCase()} session in place of one walk a week` }))
@@ -1008,6 +1020,9 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // A RUNNING GOAL, OPTIONAL, AND ONLY FOR SOMEONE WHO LOVES CARDIO (his 13 Nov 2026 strategy, slice 6; his ruling that
   // day, "Only if they like cardio"). Only the distance: a race date is the coach's to ask (his ruling, "Coach only").
   { key: 'runningGoal', question: 'Would you like to work towards a running goal?', inputHint: 'A distance, or skip', shortLabel: 'Running goal', control: 'single', required: false, requiredIf: lovesCardio, options: RUNNING_GOAL_SLOT_OPTIONS, destination: 'column', validate: isOneOf(RUNNING_GOAL_SLOT_OPTIONS) },
+  // CARDIO DAYS, OPTIONAL, AND ONLY FOR SOMEONE WHO LOVES CARDIO (his ruling 24 Nov 2026, "A, build it"). One more
+  // question for them; setup is the same length for everyone else.
+  { key: 'cardioDays', question: 'How many days a week would you like a cardio session of its own?', why: "They take some of your training days; lifting always keeps two.", inputHint: 'None, 1, 2 or 3', shortLabel: 'Cardio days', control: 'single', required: false, requiredIf: lovesCardio, options: CARDIO_DAYS_SLOT_OPTIONS, destination: 'column', validate: isOneOf(CARDIO_DAYS_SLOT_OPTIONS) },
   { key: 'enjoyedActivities', question: 'Apart from walking, do you enjoy swimming or cycling?', why: "I'll swap one walk a week for it.", inputHint: 'Swimming, cycling, or neither', shortLabel: 'Also enjoy', control: 'multi', required: false, requiredIf: choseThePathway, options: ENJOYED_OPTIONS, destination: 'column', validate: isSubsetOf(ENJOYED_OPTIONS) },
   // REQUIRED, and the comment that used to sit here argued the opposite.
   //
@@ -1556,6 +1571,7 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     enjoyed_activities: choseThePathway(data) ? data.enjoyedActivities.filter(isEnjoyedActivity) : [],
     // A running goal when he chose one (running.ts); "Not for now" and no answer are both none.
     running_goal: lovesCardio(data) && isRunningGoal(data.runningGoal) ? data.runningGoal : null,
+    cardio_days_per_week: lovesCardio(data) && /^[0-3]$/.test(data.cardioDays ?? '') ? Number(data.cardioDays) : null,
     ...PROFILE_CONSTANTS,
   }
 }

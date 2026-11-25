@@ -342,8 +342,10 @@ export function PlannedCardioRow({
   hideEntry,
   onDate,
   previewNote,
+  hideTitle = false,
+  entryLabel,
 }: {
-  prescription: { activity: string; duration: number; targetRpe?: number; rounds?: { rounds: number; workSeconds: number; restSeconds: number } }
+  prescription: { activity: string; duration: number; targetRpe?: number; rounds?: { rounds: number; workSeconds: number; restSeconds: number }; reason?: string }
   /** A planned interval session's Start (PlannedRoundsStart), drawn under the prescription and over the boxes. */
   timer?: ReactNode
   /** The boxes step aside while the session's round runs or asks how hard it was: one way to log at a time. */
@@ -359,14 +361,19 @@ export function PlannedCardioRow({
   onDate?: string
   /** A day still to come: the row is the prescription and this line, never boxes (nothing is logged ahead of its day). */
   previewNote?: string
+  /** The session hero already says what the plan asks (PlannedSessionHero): the row is only the way to log it. */
+  hideTitle?: boolean
+  /** A quiet label over the boxes, the hero's "Or log it yourself". */
+  entryLabel?: string
 }) {
   const { profileId, date: today } = useActiveSession()
   const date = onDate ?? today
   const logs = useCardioLogsToday(onDate)
   const split = splitActivity(prescription.activity)
   const { name } = split
-  // A session's rounds stored beside its name read as its protocol line, the way one written into the name does.
-  const storedRounds = !split.protocol && prescription.rounds ? plannedRoundsOf(prescription) : null
+  // A session's rounds stored beside its name (or read off the coach's reason) read as its protocol line, the way one
+  // written into the name does.
+  const storedRounds = !split.protocol ? plannedRoundsOf(prescription) : null
   const protocol = split.protocol ?? (storedRounds ? blockShape(storedRounds) : null)
   const [minutes, setMinutes] = useState('')
   const [effort, setEffort] = useState<EffortKey | null>(effortForRpe(prescription.targetRpe))
@@ -406,7 +413,7 @@ export function PlannedCardioRow({
 
   return (
     <div className="space-y-1.5" data-testid={testid ?? 'cardio-planned'}>
-      <div className="pl-2.5 pr-1">
+      {!hideTitle && <div className="pl-2.5 pr-1">
         {label && <p className={`${MICRO} text-primary-text`}>{label}</p>}
         {/* WHAT THE PLAN ASKS, in the exact words the saved row will use for
             what was DONE — "Walk · 20 min · Easy" over "✓ Walk · 20 min ·
@@ -416,8 +423,9 @@ export function PlannedCardioRow({
           {prescriptionLine({ activity: name, duration: prescription.duration, targetRpe: prescription.targetRpe })}
         </p>
         {protocol && <p className="text-[0.6875rem] leading-4 text-muted-foreground">{protocol}</p>}
-      </div>
+      </div>}
       {!saved && timer}
+      {!saved && !hideEntry && entryLabel && <p className={`${MICRO} pt-1.5 pl-2.5 text-muted-foreground`} data-testid="cardio-entry-label">{entryLabel}</p>}
       {saved ? (
         <CardioReadback
           log={saved}
@@ -707,6 +715,21 @@ export function EaseOffAsk({ question, onDone }: { question: EaseOffQuestion; on
 // Lives here, beside the row, so every cardio log a screen writes goes through this one file (test:cardio-effort §5).
 /** LOGS A FINISHED ROUND AS THE PLANNED SESSION: its own name (so the day reads done), the timer's minutes, the
  *  rounds as the note, and the effort he tapped. Returns false when the store did not take it. */
+/**
+ * A TIMED PLANNED SESSION, LOGGED AT ITS END (24 Nov 2026): the minutes the timer actually ran (at least one), under the
+ * session's own name so the day reads done, at the effort he tapped.
+ */
+export function logPlannedTimed(args: { profileId: string; date: string; planned: { activity: string; targetRpe?: number }; minutes: number; effort: EffortKey }): boolean {
+  const view = saveCardioLog({
+    userId: args.profileId,
+    date: args.date,
+    activityName: args.planned.activity,
+    durationMinutes: Math.max(1, Math.round(args.minutes)),
+    intensityRpe: rpeToStore(args.effort, args.planned.targetRpe),
+  })
+  return !!view
+}
+
 export function logPlannedRound(args: { profileId: string; date: string; planned: { activity: string; targetRpe?: number }; config: RoundConfig; effort: EffortKey }): boolean {
   const summary = roundLogSummary(args.config)
   const view = saveCardioLog({

@@ -383,6 +383,7 @@ const rowsOnCard = () => ev(`(() => {
   return {
     found: true,
     label: (planned?.innerText || '').split('\\n')[0].trim(),
+    banner: (card.querySelector('[data-testid="optional-banner"]')?.innerText || '').replace(/\\s+/g, ' ').trim(),
     minutes: card.querySelectorAll('input[data-field="minutes"]').length,
     saves: card.querySelectorAll('[data-testid="cardio-save"]').length,
     headers: [...card.querySelectorAll('span')].filter(s => s.textContent.trim() === 'How hard').length,
@@ -393,7 +394,7 @@ const rowsOnCard = () => ev(`(() => {
   }
 })()`)
 const atRest = await rowsOnCard()
-check('8b. the card holds the Optional row and the chips', atRest.found && /optional/i.test(atRest.label), atRest)
+check('8b. the card holds the optional cardio, under its "Optional · rest day" banner, and the chips', atRest.found && /^Optional · rest day/.test(atRest.banner ?? ''), atRest)
 check('8c. THE DEFECT: one Minutes box, one "How hard" and one ✓ on the card, not two',
   atRest.minutes === 1 && atRest.headers === 1 && atRest.saves === 1, atRest)
 check('8d. ...the one being the suggestion\'s: "did you move today?" draws no row until something is chosen', atRest.unplannedRows === 0, atRest)
@@ -442,8 +443,13 @@ const peekCard = () => ev(`(() => {
   return {
     card: !!card,
     oldSentence: !!document.querySelector('[data-testid="peek-rest-day"]'),
-    label: card ? (card.querySelector('[data-testid="cardio-planned"]')?.innerText || '').split('\\n')[0].trim() : '',
-    line: (card?.querySelector('[data-testid="cardio-prescription"]')?.textContent ?? '').trim(),
+    banner: (card?.querySelector('[data-testid="optional-banner"]')?.innerText ?? '').replace(/\\s+/g, ' ').trim(),
+    bannerFirst: !!card && !!card.querySelector('[data-testid="optional-banner"]') && !!card.querySelector('[data-testid="activity-day-title"]') && !!(card.querySelector('[data-testid="optional-banner"]').compareDocumentPosition(card.querySelector('[data-testid="activity-day-title"]')) & Node.DOCUMENT_POSITION_FOLLOWING),
+    kicker: (card?.querySelector('[data-testid="planned-hero-kicker"]')?.textContent ?? '').trim(),
+    title: (card?.querySelector('[data-testid="activity-day-title"]')?.textContent ?? '').trim(),
+    time: (card?.querySelector('[data-testid="planned-stat-time"]')?.innerText ?? '').replace(/\\s+/g, ' ').trim(),
+    effort: (card?.querySelector('[data-testid="planned-stat-effort"]')?.innerText ?? '').replace(/\\s+/g, ' ').trim(),
+    start: card ? [...card.querySelectorAll('button')].filter(b => /^Start/.test((b.textContent || '').trim())).length : -1,
     note: (card?.querySelector('[data-testid="cardio-preview-note"]')?.textContent ?? '').trim(),
     minutes: card ? card.querySelectorAll('input[data-field="minutes"]').length : -1,
     saves: card ? card.querySelectorAll('[data-testid="cardio-save"]').length : -1,
@@ -460,8 +466,8 @@ await tap(`[data-strip-date="${recDate}"]`)
 await wait(900)
 const peekAhead = await peekCard()
 check('11a. the day before: tapping the recovery day opens its card, not the old sentence', peekAhead.card && !peekAhead.oldSentence, peekAhead)
-check('11b. ...an Optional row in the plan\'s own words ("… · N min · Easy")', /optional/i.test(peekAhead.label) && peekAhead.line.startsWith(head.split(' (')[0]) && / · \d+ min · (Easy|Steady|Hard)$/.test(peekAhead.line), { peekAhead, head })
-check(`11c. ...and a day to come is not logged ahead: no boxes, and it says "You can log it on ${recName}."`, peekAhead.minutes === 0 && peekAhead.saves === 0 && peekAhead.note === `You can log it on ${recName}.`, peekAhead)
+check('11b. ...drawn as a session: the "Optional · rest day" banner FIRST, the day, the name, its minutes and effort as figures', /^Optional · rest day/.test(peekAhead.banner) && peekAhead.bannerFirst && peekAhead.kicker === recName && peekAhead.title === head.split(' (')[0] && /^\d+ min Time$/i.test(peekAhead.time) && /^(Easy|Steady|Hard) Effort$/i.test(peekAhead.effort), { peekAhead, head })
+check(`11c. ...and a day to come is not logged ahead: no Start, no boxes, and it says "You can log it on ${recName}."`, peekAhead.start === 0 && peekAhead.minutes === 0 && peekAhead.saves === 0 && peekAhead.note === `You can log it on ${recName}.`, peekAhead)
 check('11d. ...with a 44px way back to today', peekAhead.backH >= 44, peekAhead)
 await ev('window.scrollTo(0, 0)')
 await shoot('rest-day-11-peek-ahead')
@@ -475,7 +481,7 @@ await wait(700)
 await tap(`[data-strip-date="${recDate}"]`)
 await wait(900)
 const past = await peekCard()
-check('11e. the day after: the same card, now with one Minutes box and one ✓, its effort already the plan\'s', past.card && past.minutes === 1 && past.saves === 1 && past.lit === 1 && !past.note, past)
+check('11e. the day after: the same card, with one Minutes box and one ✓ (its effort already the plan\'s) and no Start (it is over)', past.card && /^Optional · rest day/.test(past.banner) && past.minutes === 1 && past.saves === 1 && past.lit === 1 && past.start === 0 && !past.note, past)
 await ev('window.scrollTo(0, 0)')
 await shoot('rest-day-11-peek-past')
 await tap('[data-testid="peek-recovery-day"] [data-testid="cardio-save"]')

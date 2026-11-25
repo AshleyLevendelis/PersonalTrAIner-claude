@@ -397,6 +397,66 @@ export function patchBlockFromLiftedKg(
   return { next, patched }
 }
 
+/**
+ * THE TESTING WEEK'S OTHER ANSWER: THE GUESS WAS TOO HEAVY (24 Nov 2026; docs/plans/testing-week-both-ways.md).
+ *
+ * `patchBlockFromLiftedKg` only ever raises, and that is right for the accelerator. In the testing week the printed
+ * number was an admitted guess, and a set he rated Hard, fell short of the range on, or chose to lift lighter is the
+ * same kind of evidence as a heavier set. Ashley, 24 Nov 2026: "Week 2 and some prescribed sets are too light while
+ * others are too heavy": the heavy half was the guess plus a step, written whatever week 1 said.
+ *
+ * Every week of the block after the testing week is scaled by the same ratio (the week after it lands on `toKg`), so
+ * the block keeps its own climb and its deload stays a deload. Never raises a week. Pure; the caller saves.
+ */
+export function lowerBlockFromKg(
+  mesocycle: MesocycleWeek[],
+  profile: UserProfile,
+  anchor: LiftedAnchor & { fromKg: number },
+): { next: MesocycleWeek[]; patched: boolean } {
+  const entry = getExerciseEntry(anchor.exerciseName)
+  if (!entry || !(anchor.fromKg > 0) || !(anchor.liftedKg > 0) || anchor.liftedKg >= anchor.fromKg) return { next: mesocycle, patched: false }
+  const ratio = anchor.liftedKg / anchor.fromKg
+  const fromWeek = anchor.fromWeekInBlock ?? 1
+  let patched = false
+  const next = mesocycle.map(week => {
+    if (week.block_number !== anchor.blockNumber || (week.week_in_block ?? 1) < fromWeek) return week
+    const home = week.days.find(d => d.day === anchor.dayName)
+    const at = home?.exercises[anchor.exIndex]?.name === anchor.exerciseName
+      ? { dayName: anchor.dayName, index: anchor.exIndex }
+      : week.days.flatMap(d => d.exercises.map((e, i) => ({ dayName: d.day, index: i, name: e.name })))
+        .find(x => x.name === anchor.exerciseName) ?? null
+    if (!at) return week
+    const target = week.days.find(d => d.day === at.dayName)!.exercises[at.index]
+    if (target.suggested_load_kg == null) return week
+    const load = prescribeLoad(entry, profile, {
+      targetRpeLabel: target.intensity || '',
+      isFirstBlock: false,
+      sets: target.sets,
+      repRangeLabel: target.reps,
+      forceStartingWeightKg: target.suggested_load_kg * ratio,
+    })
+    // NEVER RAISES: rounding to the implement can land on the printed number or above it, and then the week stays.
+    if (load.starting_weight_kg == null || load.starting_weight_kg >= target.suggested_load_kg) return week
+    const patchedEx: Exercise = {
+      ...target,
+      suggested_load: load.display,
+      suggested_load_kg: load.starting_weight_kg,
+      per_set_load: load.per_set,
+      load_guidance: load.basis,
+      load_hold: load.hold ?? undefined,
+      load_from_log: true,
+    }
+    patched = true
+    return {
+      ...week,
+      days: week.days.map(d => (d.day === at.dayName
+        ? { ...d, exercises: d.exercises.map((e, i) => (i === at.index ? patchedEx : e)) }
+        : d)),
+    }
+  })
+  return { next, patched }
+}
+
 export async function confirmBeatTargetOffer(
   { offerId, mesocycle, profile, profileId }: ConfirmBeatTargetParams,
 ): Promise<MesocycleWeek[] | null> {

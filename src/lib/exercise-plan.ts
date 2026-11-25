@@ -12,7 +12,7 @@ import {
 } from './experience-config'
 import { PREGNANCY_LATE_EXCLUDED, PREGNANCY_LATE_REPLACEMENTS, lateReplacementKind, PELVIC_FLOOR_WARMUP_ITEM, pregnancyExclusion as pregnancyExclusionLate } from './pregnancy-rules'
 import { isOlderBeginner, needsBeginnerSafeguards, beginnerSafeguardExclusion, olderAdultExclusion, OLDER_BEGINNER_REASON_TEXT, OLDER_BEGINNER_FOUNDATIONS } from './older-beginner'
-import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields, shortenRampsToFit, withBalanceWork } from './warmup'
+import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields, shortenRampsToFit, withBalanceWork, PRIMER_INTENSITY } from './warmup'
 import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, isPerSideLoad, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
@@ -25,6 +25,7 @@ import { HEAVY_TRACKS, activityDays, reorderTracksForClassDays, effectiveRecover
 import { dayAnchorExercise, anchorScore, canAnchor } from './session-derive'
 import { isStartingOut, applyStartingOut, startingOutActivity } from './starting-out'
 import { applyPathwayWeek, PATHWAY_STRENGTH_NOTE, PATHWAY_STRENGTH_RUN_NOTE, BALANCE_WARMUP_ITEM } from './pathway'
+import { withCardioDays, cardioSplitFor } from './cardio-days'
 import { liftingDaysFor, withRunDays, pathwayWithRuns, runningWeekNote, runningGoalOf, runOnDay, ladderWeekOf } from './running'
 import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS, yieldFillerTo, optionalFillerSeconds } from './session-duration'
 import { implausibleLifts } from './lift-plausibility'
@@ -6188,7 +6189,8 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
   const restDayNames = allDayNames.filter(d => !trainingDayNames.has(d) && !classDays.has(d))
 
   const cardioForGoal = getConditioningProfile(goal, hasHealthCondition(profile))
-  let remaining = Math.max(0, Math.round(resolveConditioningFrequency(policy, profile.conditioning_preference)))
+  // CARDIO DAYS ARE THE GOAL'S CONDITIONING (cardio-days.ts): each one he asked for is one fewer to add elsewhere.
+  let remaining = Math.max(0, Math.round(resolveConditioningFrequency(policy, profile.conditioning_preference)) - (isStartingOut(profile) ? 0 : (cardioSplitFor(profile)?.cardioDays.length ?? 0)))
 
   for (const day of days) {
     if (day.focus !== 'Conditioning & Core') continue
@@ -6706,7 +6708,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
       const isPrimer = slot.entry.mechanics_tier === 'primer'
       // Primers are deliberately submaximal — prescribing an RPE target on a
       // warm-up movement invites people to load it, which defeats the point.
-      const intensity = isPrimer ? 'Light — movement prep' : experience.target_rpe
+      const intensity = isPrimer ? PRIMER_INTENSITY : experience.target_rpe
       // This is a first, unverified plan for someone we've never seen lift —
       // isFirstBlock stays true here regardless of self-reported experience.
       // No phase yet either (that's a mesocycle concept), so this always
@@ -10488,6 +10490,12 @@ export function generateMesocycle(
       if (runningGoalOf(profile) && !isStartingOut(profile)) {
         const withRuns = withRunDays(days, ladderWeekOf(weekCounter, profile.running_start_week), profile)
         days.splice(0, days.length, ...withRuns)
+      }
+      // THE CARDIO DAYS (cardio-days.ts, his 24 Nov 2026 "A"), last too, for the same reason: their rounds and minutes
+      // are cardio-days.ts's, and no lifting pass may trim them.
+      if (!isStartingOut(profile)) {
+        const withCardio = withCardioDays(days, profile, w, blockIndex, isDeload)
+        days.splice(0, days.length, ...withCardio)
       }
       const runNote = runningWeekNote(days)
       weeks.push({

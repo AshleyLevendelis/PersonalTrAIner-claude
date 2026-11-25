@@ -101,7 +101,9 @@ console.log('\n2. One rest timer, under the set it follows')
   const inlineBarPx = Number(/mt-2\.5 h-(\d+) overflow-hidden/.exec(inline)?.[1] ?? 0)
   check('...and its progress bar is thick enough to see at arm\'s length (at least 8px)', inlineBarPx * 4 >= 8)
   const grid = code('src/components/exercise/SetGrid.tsx')
-  check('the grid draws it only where restBelongsToSet says, after the set\'s last row (its drops)', /const restHere = !warm && rowIndex === lastRowOfSet\(setNumber\) && restBelongsToSet\(rest, exerciseName, setNumber\)/.test(grid) && /\{restHere && <InlineRest \/>\}/.test(grid))
+  // RE-ANCHORED 24 Nov 2026: a working set's rest still sits after its last row; the last warm-up now has its own rest
+  // before Set 1 (warmup-rest.ts, test:warmup-rest), so the warm-up branch is no longer simply excluded.
+  check('the grid draws it only where restBelongsToSet says, after the set\'s last row (its drops)', /const restHere = warm[\s\S]{0,200}: rowIndex === lastRowOfSet\(setNumber\) && restBelongsToSet\(rest, exerciseName, setNumber\)/.test(grid) && /\{restHere && <InlineRest \/>\}/.test(grid))
   check('unticking (deleting) a working set cancels ITS rest', /deleteSet\(\{[^}]*\}\)\s*if \(!isWarm\(ref\) && !isDrop\(ref\) && restBelongsToSet\(rest, exerciseName, ref\.setNumber\)\) dismissRest\(\)/.test(grid))
   const dock = code('src/components/BottomDock.tsx')
   check('the dock stands aside while the row is in view — one countdown on screen', /useSyncExternalStore\(subscribeInlineRest, inlineRestOnScreen/.test(dock) && /\(hasRest && !inlineRestShown\)/.test(dock))
