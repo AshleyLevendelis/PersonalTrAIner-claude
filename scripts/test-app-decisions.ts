@@ -10,6 +10,7 @@
 // ---------------------------------------------------------------------------
 import { readFileSync, readdirSync, existsSync } from 'fs'
 import { join } from 'path'
+import { stepHoldSeconds } from '../src/lib/periodization'
 import { APP_DECISIONS, APP_DECISIONS_EXEMPT, pickAppDecisions, appDecisionsFor, type AppDecision } from '../supabase/functions/_shared/app-decisions'
 
 const ROOT = join(import.meta.dirname, '..')
@@ -133,6 +134,23 @@ check('the warm-up answer is in the block for his question', /no rest timer betw
 for (const p of ['supabase/functions/chat-gemini/index.ts', 'supabase/functions/_shared/coach-rules.ts']) {
   check(`${p.split('/').slice(-2).join('/')} no longer says the timer starts after every set`, !/starts on its own the moment a set is logged/.test(read(p)) && /between warm-up sets there is none/.test(read(p)))
 }
+
+// HIS PLANK QUESTION, 25 Nov 2026: the coach answered "5 to 10 seconds each week ... before moving to a harder
+// exercise". The entry said "add 5 seconds in week 2 and 10 in week 3" (read as two different steps) and its reason
+// claimed the exercise gets harder, which no code does. So the entry's worked example is CALLED against the function
+// that prescribes holds, and the block tells the coach to keep an entry's numbers as written.
+console.log('\n7. His plank question')
+const plank = APP_DECISIONS.find(d => d.anchor.token === 'stepHoldSeconds')
+const plankText = `${plank?.rule ?? ''} ${plank?.why ?? ''}`
+const example = [...(plank?.rule ?? '').matchAll(/(\d+-\d+s)/g)].map(m => m[1])
+const fromCode = [1, 2, 3].map(w => stepHoldSeconds('30-45s', w, false))
+check('the plank entry\'s example weeks are what the app prescribes for a 30-45s hold', example.length === 3 && example.join() === fromCode.join(), { example, fromCode })
+check('...and its deload is week 1\'s time, as the app prescribes', /deload[^.]*week 1/i.test(plank?.rule ?? '') && stepHoldSeconds('30-45s', 4, true) === fromCode[0], stepHoldSeconds('30-45s', 4, true))
+check('...and it states one 5-second step a week, the app\'s step', /5 seconds a week/.test(plank?.rule ?? '') && stepHoldSeconds('30s', 2, false) === '35s' && stepHoldSeconds('30s', 3, false) === '40s')
+check('the plank entry never says the exercise itself changes (no code does)', !/exercise (itself )?(gets|becomes) harder|harder (exercise|variation)|moves? (on )?to a harder/i.test(plankText), plankText)
+check('his question reaches the plank entry', pickAppDecisions('why is my plank time going up each week').some(d => d.anchor.token === 'stepHoldSeconds'))
+const plankBlock = appDecisionsFor('why is my plank time going up each week')
+check('the block tells the coach to keep an entry\'s numbers and weeks as written and add no step', /numbers and weeks exactly as written/.test(plankBlock) && /never add a step the entry does not state/.test(plankBlock))
 
 console.log(`\n${ran} checks ran, ${failures} failed`)
 if (failures > 0) process.exit(1)
