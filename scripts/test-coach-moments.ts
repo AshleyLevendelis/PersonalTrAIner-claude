@@ -24,7 +24,8 @@ import {
 import { coachMessage, coachMessageShortcut, coachShortcutLabel } from '../src/lib/coach-voice'
 // The second argument is this week's sessions done, out of one more planned (the weekly review's one number, his
 // 13 Nov 2026 ruling: weekly consistency in place of the streak).
-const notification = (k: string, week = 0, meals = 0) => coachMessage(k, { name: 'Ashley', weekDone: week, weekPlanned: week + 1, mealsLogged: meals })
+// A clash and a pattern have no words without their facts (25 Nov 2026), so the helper hands them one of each.
+const notification = (k: string, week = 0, meals = 0) => coachMessage(k, { name: 'Ashley', weekDone: week, weekPlanned: week + 1, mealsLogged: meals, clash: { activity: 'Muay Thai', when: 'today', lift: null }, pattern: { kind: 'too_hard', times: 4 } })
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (f: string) => readFileSync(join(ROOT, f), 'utf8')
@@ -80,12 +81,15 @@ console.log('\n2. At most ONE thing, ever')
     missedYesterday: true, daysSinceAnyLog: 0,
     blockJustEnded: true, beatTargetPending: true,
     logsMeals: true, mealsAccountedToday: 0, weekday: 6, weekSessionsDone: 2, weekSessionsPlanned: 4,
+    pattern: { kind: 'too_hard', times: 4 },
   }
   // The morning reminder and the evening ones cannot share an hour, so "every
   // moment live at once" is every moment but the morning one, at 7pm — and
   // the morning one has its own case below.
   // A lapse (comeback, door open) and Sunday's plan the week cannot share this Saturday evening either; each has its own case.
-  const eveningKeys = MOMENT_KEYS.filter(k => !['workout_today', 'protein_short', 'comeback', 'door_open', 'plan_week'].includes(k))
+  // The clash is a morning moment, like the plain reminder (25 Nov 2026); it has its own case below.
+  // And on a review Saturday the review carries the pattern as its one change (25 Nov 2026), so the pattern waits.
+  const eveningKeys = MOMENT_KEYS.filter(k => !['workout_today', 'load_clash', 'pattern_spotted', 'protein_short', 'comeback', 'door_open', 'plan_week'].includes(k))
   check('every evening moment really is live on this day', eveningKeys.every(k => liveMoments(everything).includes(k)),
     liveMoments(everything))
   const got = momentToRaise(everything)
@@ -112,6 +116,8 @@ console.log('\n3. Each moment fires on its own fact, and only on it')
     ['block_review', { blockJustEnded: true }],
     ['beat_target', { beatTargetPending: true }],
     ['workout_today', { plannedToday: true, localHour: 9 }],
+    ['load_clash', { plannedToday: true, localHour: 9, todaySession: { name: 'Legs', lift: 'Barbell Squats', weight: '80kg' }, clash: { activity: 'Muay Thai', when: 'yesterday', lift: 'Barbell Squats' } }],
+    ['pattern_spotted', { localHour: 14, pattern: { kind: 'too_hard', times: 4 } }],
     ['meal_not_logged', { logsMeals: true, mealsAccountedToday: 0, localHour: 19 }],
     ['protein_short', { proteinTargetG: 160, proteinEatenToday: 100, mealsAccountedToday: 3, localHour: 19 }],
   ]
@@ -257,7 +263,7 @@ console.log('\n7. Every word comes from the phrasebook')
   check('every message opens with her name, "Hey Ashley, ..."', MOMENT_KEYS.every(k => notification(k).startsWith('Hey Ashley, ')),
     MOMENT_KEYS.map(k => notification(k)))
   check('...and with no name on the profile, just "Hey, ..." (never "Hey undefined" or "Hey null")',
-    MOMENT_KEYS.every(k => coachMessage(k, { name: null }).startsWith('Hey, ') && coachMessage(k, { name: '  ' }).startsWith('Hey, ')
+    MOMENT_KEYS.every(k => coachMessage(k, { name: null, clash: { activity: 'Muay Thai', when: 'today', lift: null }, pattern: { kind: 'low_protein', days: 3 } }).startsWith('Hey, ') && coachMessage(k, { name: '  ', clash: { activity: 'Muay Thai', when: 'today', lift: null }, pattern: { kind: 'low_protein', days: 3 } }).startsWith('Hey, ')
       && !/undefined|null/.test(coachMessage(k, {}))))
   check('the check-in names when the session was: "how was the workout this morning?"',
     coachMessage('session_feel', { name: 'Ashley', finishedWhen: 'this morning' }) === 'Hey Ashley, how was the workout this morning?'
@@ -267,9 +273,9 @@ console.log('\n7. Every word comes from the phrasebook')
   check('the weekly review counts sessions, "5 of 6 sessions done", never days',
     /\b5 of 6 sessions done\b/.test(notification('week_review', 5)) && !/\bdays?\b/i.test(notification('week_review', 5)), notification('week_review', 5))
   check('the session and food messages carry their shortcut, the rest none',
-    coachMessageShortcut('workout_today') === 'exercise' && coachMessageShortcut('session_not_logged') === 'exercise'
+    coachMessageShortcut('workout_today') === 'exercise' && coachMessageShortcut('session_not_logged') === 'exercise' && coachMessageShortcut('load_clash') === 'exercise'
       && coachMessageShortcut('meal_not_logged') === 'nutrition' && coachMessageShortcut('protein_short') === 'nutrition'
-      && MOMENT_KEYS.filter(k => !['workout_today', 'session_not_logged', 'meal_not_logged', 'protein_short'].includes(k)).every(k => coachMessageShortcut(k) === null))
+      && MOMENT_KEYS.filter(k => !['workout_today', 'session_not_logged', 'load_clash', 'meal_not_logged', 'protein_short'].includes(k)).every(k => coachMessageShortcut(k) === null))
   check('...worded as she chose: "Open today\'s session", "Open Nutrition"',
     coachShortcutLabel('exercise') === "Open today's session" && coachShortcutLabel('nutrition') === 'Open Nutrition')
   check('...and every moment raised carries its message and its shortcut',
@@ -277,7 +283,8 @@ console.log('\n7. Every word comes from the phrasebook')
       && momentsToRaise({ ...QUIET, localHour: 9, plannedToday: true, name: 'Ashley' })[0]?.text === 'Hey Ashley, are you ready for your session today?')
   check('the weekly review is the only one carrying a number',
     /\b9\b/.test(notification('week_review', 9))
-    && MOMENT_KEYS.filter(k => k !== 'week_review').every(k => !/\d/.test(notification(k, 9))),
+    // A pattern is said WITH its count (25 Nov 2026): "marked 4 lifts as too hard" is the fact, read off his own answers.
+    && MOMENT_KEYS.filter(k => k !== 'week_review' && k !== 'pattern_spotted').every(k => !/\d/.test(notification(k, 9))),
     MOMENT_KEYS.map(k => notification(k, 9)))
   // The house voice, applied to a surface that arrives uninvited.
   check('...and none of them shouts', MOMENT_KEYS.every(k => !notification(k).includes('!')))

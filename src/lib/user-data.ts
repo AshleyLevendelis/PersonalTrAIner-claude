@@ -73,6 +73,8 @@ export const EXPORTED_TABLES: { table: string; column: string }[] = [
   // A tester's recorded activity and reports (tester toolkit, 25 Nov 2026).
   { table: 'tester_events', column: 'profile_id' },
   { table: 'tester_reports', column: 'profile_id' },
+  // His saved workouts ("My workouts", 25 Nov 2026): built ahead, his, and downloaded with everything else.
+  { table: 'own_workouts', column: 'user_id' },
 ]
 
 export interface DataExport {

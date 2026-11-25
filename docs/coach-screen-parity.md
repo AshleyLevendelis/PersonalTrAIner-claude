@@ -88,11 +88,15 @@ it is wrong.
 
 ## Things the screen can do that the coach cannot
 
-**Eight screen-only, as of 11 Nov 2026** — the pre-session tightness check,
-macro mode, macro split, logging a build-up set, logging a drop set,
+**Twelve screen-only, as of 25 Nov 2026** (the macro MODE was taken out that day, his "Take it out": one method,
+the split's choices kept) — the pre-session tightness check,
+macro split, logging a build-up set, logging a drop set,
 "Train anyway" on a rest day, saying how a lift felt on a set already
-logged, and which meals are cooked for him on which days (re-derived from the
-bullets that day, when the seventh and then the eighth were added). The calorie target below is a seventh entry but
+logged, which meals are cooked for him on which days, a freestyle day, "Show
+numbers", "Meal variety", cardio days a week, and recording a walk or run
+(re-derived from the bullets on 25 Nov 2026: the freestyle three and cardio days
+had been added as bullets without the count moving, the failure the note below
+names, a third time). The calorie target below is a seventh entry but
 a different kind: it is on NEITHER surface and cannot be, because it is
 derived rather than set.
 CORRECTED 22 Sep 2026: this said "Four... as of 17 Sep 2026" while the
@@ -107,6 +111,12 @@ count is one of the numbers that answer rests on.
 been wrong twice — "None" while tightness shipped, then "One" while three more
 sat listed underneath it. Both times somebody edited a bullet and left the
 header alone. Count what is below before trusting what is here.
+
+- **Recording a walk or run.** `screen only`, added 25 Nov 2026 with the feature (his ruling, "A, build it";
+  `src/lib/activity-recording.ts`): Tools → "Record a walk or run", Start and End. Start and End are physical acts
+  timed by the phone, so the coach cannot be the one to press them; what it CAN do already exists, logging a walk he
+  tells it about (its existing extra-cardio logging), and a recorded walk reaches it as an ordinary cardio log. NOT BUILT: the coach is not
+  yet told a log's steps and calories burned.
 
 - **Freestyle a day, and the starter tier's "Show numbers" and "Meal variety" switches.** `screen only`, added
   13 Nov 2026 with the strategy's slice 4 (`docs/plans/flexible-nutrition.md`): Nutrition's "Freestyle this day",
@@ -176,9 +186,9 @@ the difference.
   screen can do this" was itself only half true, because changing it had never
   rebuilt the plan. Closing it meant fixing the screen as well as adding the
   tool.
-- **Macro mode** (Standard / Dynamic CSCS) and **macro split**. `screen only`.
-  Both bypass the Profile screen's own writer and are applied from `App.tsx`
-  with their own optimistic-apply and revert, so a coach path cannot simply
+- **Macro split**. `screen only`. (The macro MODE, Standard / Dynamic CSCS, was taken out 25 Nov 2026, his ruling
+  "Take it out".) It bypasses the Profile screen's own writer and is applied from `App.tsx`
+  with its own optimistic-apply and revert, so a coach path cannot simply
   reuse the profile-field executor.
 - **Logging a build-up set.** `screen only`, added 17 Sep 2026 the same day the
   rows were built — written here BY the person adding it, which is the thing

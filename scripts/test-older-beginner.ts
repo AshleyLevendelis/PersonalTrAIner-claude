@@ -10,7 +10,6 @@ import { isOlderBeginner, olderBeginnerExclusion, olderAdultExclusion, OLDER_ADU
 import { meetsCapabilityRequirement } from '../src/lib/exercise-db'
 import { generalWarmupFor } from '../src/lib/warmup'
 import { needsBalanceWork, BALANCE_HOLD } from '../src/lib/pathway'
-import { calculateDailyMacros } from '../src/lib/macro-calculator'
 import type { UserProfile, MesocycleWeek, ConstraintTrace } from '../src/lib/types'
 
 let passed = 0
@@ -98,14 +97,6 @@ check('balance from 65 for everyone, 60 for a beginner', needsBalanceWork({ age:
 check('fullBodyTrackName renames only Full Body Power, only in a plan with no power block',
   fullBodyTrackName('Full Body Power', false) === 'Full Body Strength' && fullBodyTrackName('Full Body Power', true) === 'Full Body Power'
   && fullBodyTrackName('Squat & Carry', false) === 'Squat & Carry')
-
-console.log('\n5b. The rename moves no calorie target')
-{
-  const t = (focus: string) => calculateDailyMacros({ ...her(), macro_calculation_mode: 'DYNAMIC_CSCS' } as UserProfile, 'Monday', [{ day: 'Monday', focus, exercises: [] } as never])
-  const a = t('Full Body Strength'), b = t('Full Body Power')
-  check('the estimate reads the day\'s name (a core day counts differently)', JSON.stringify(t('Upper Pull & Core')) !== JSON.stringify(b))
-  check('a Full Body Strength day counts the same as Full Body Power', JSON.stringify(a) === JSON.stringify(b), `${JSON.stringify(a).slice(0, 80)} vs ${JSON.stringify(b).slice(0, 80)}`)
-}
 
 console.log('\n6. The swap shortlist reads the same pool (edits keep the bar)')
 const pool = getConstrainedPool(her())

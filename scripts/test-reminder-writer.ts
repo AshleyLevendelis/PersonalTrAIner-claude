@@ -53,7 +53,8 @@ async function main() {
     refused('Hey Ashley, **today** is the day.') === 'formatting or a list'
       && refused('Hey Ashley, two things:\n1. train\n2. eat') === 'formatting or a list'
       && refused('Hey Ashley, go train. [LESSON: deload]') === 'formatting or a list')
-  check('a message not opening "Hey" is refused (her WhatsApp shape)', refused('Ashley, your session is waiting.') === 'does not open "Hey"')
+  // Her WhatsApp shape, widened 25 Nov 2026 to a greeting that fits the time ("Morning Ashley, ..."); no greeting at all is still refused.
+  check('a message not opening with a greeting is refused (her WhatsApp shape)', refused('Ashley, your session is waiting.') === 'does not open with a greeting')
   check('a number the fixed sentence does not carry is refused (the coach never invents one)',
     /a number it was not given \(40\)/.test(refused("Hey Ashley, you're 40g short today.", PROTEIN) ?? ''), refused("Hey Ashley, you're 40g short today.", PROTEIN))
   // A CASE WHERE THE ALLOWANCE BINDS: the review carries 5 and 6, so those are allowed and 7 is not.
@@ -91,12 +92,12 @@ async function main() {
 
   console.log('\n3. The brief')
   const brief = reminderPrompt(PROTEIN, F)
-  check('it opens with her name the way she asked', /Start with "Hey Ashley,"/.test(brief))
+  check('it opens with a greeting that fits the time, then her name', /Start with a greeting that fits the time of day \("Hey", "Evening"\), then "Ashley"/.test(brief), brief)
   check('...says what the moment is for, and never to name a food', /behind on their protein target/.test(brief) && /never name a food/i.test(brief))
-  check('...asks for a short why and the coach\'s warmth', /one short why/.test(brief) && /warm, encouraging/.test(brief))
+  check('...asks for a short why and is told who the coach is (25 Nov 2026)', /one short why/.test(brief) && /sharp, upbeat, grounded/.test(brief))
   check('...says nothing is logged when nothing is, and the part of the day', /Nothing has been trained or logged today/.test(brief) && /It is evening for them/.test(brief))
   check('...and carries no number other than the fixed sentence\'s', ((brief.match(/\d+/g) ?? []).filter(n => !(PROTEIN.text.match(/\d+/g) ?? []).includes(n) && !['200'].includes(n))).length === 0, brief.match(/\d+/g))
-  check('with no name, it says "Hey," and nothing else', /Start with "Hey,"/.test(reminderPrompt(PROTEIN, { ...F, name: null })))
+  check('with no name, it asks for the greeting and no name (never "undefined" or "null")', (() => { const b = reminderPrompt(PROTEIN, { ...F, name: null }); return /Start with a greeting that fits the time of day \("Hey", "Evening"\), and keep/.test(b) && !/undefined|null/.test(b) })())
 
   console.log('\n4. The whole run: the chat and the phone get the same words')
   const NONE: LiveFacts = { activityDates: [], marks: {}, movedInto: [], unratedRecentSession: false, beatTargetOffered: false }

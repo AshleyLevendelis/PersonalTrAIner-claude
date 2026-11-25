@@ -41,6 +41,7 @@ import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { chatStarters } from '@/lib/chat-starters'
 import { preparePhoto, photoMessageText } from '@/lib/photo-prepare'
 import { stuckLifts, lowProtein, tirednessBuilding, coachPatternLines } from '@/lib/coach-patterns'
+import { daysSinceMomentSaid } from '@/lib/chat-history-merge'
 import { loadChatSummary, saveChatSummaryLocally, messagesToSummarise, nextSummary, type ChatSummary } from '@/lib/chat-summary'
 import { isMissingColumnError } from '@/lib/missing-column'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, waitingOnAnswer, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
@@ -192,7 +193,7 @@ import {
   type NudgeInput, type NudgeStore,
   RED_FLAG_CHECKIN_MOMENT,
 } from '@/lib/coach-nudge'
-import { momentsToRaise, dailyCap, type NotificationSettings, type MomentFacts } from '@/lib/coach-moments'
+import { momentsToRaise, dailyCap, aheadFacts, type NotificationSettings, type MomentFacts } from '@/lib/coach-moments'
 import { loadSwitches, saveSwitches, frequencyOf, frequencyLabel } from '@/lib/coach-reach-out'
 import { turnDownFor } from '@/lib/engagement'
 
@@ -1635,6 +1636,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     proteinEatenToday: proactiveData.hasNutritionTargets ? proactiveData.proteinEaten : 0,
     proteinTargetG: proactiveData.hasNutritionTargets ? proactiveData.proteinTarget : 0,
     name: profile.display_name || null,
+    // WHAT IS COMING UP (25 Nov 2026): today's session by name, a clash with a hard class, a pattern; the same days
+    // Home sends the server (days-ahead.ts), read by the same function the server uses.
+    ...aheadFacts(proactiveData.ahead ?? null, proactiveData.today),
+    daysSincePatternSaid: daysSinceMomentSaid(messages, 'pattern_spotted', proactiveData.today),
   } : null
   const momentFactsInputRef = useRef(momentFacts)
   momentFactsInputRef.current = momentFacts
@@ -1765,7 +1770,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           const chips = pick.chips.length > 0 ? pick.chips : null
           text = (await askCoachOpener(pick.text, chips ? openerQuestion(pick.text) : null, !!chips)) ?? pick.text
         }
-        const marker = { source: 'reminder', moment: pick.moment, shortcut: pick.shortcut }
+        // The chips ride on the row (25 Nov 2026), so the easy out is still there after a reload.
+        const marker = { source: 'reminder', moment: pick.moment, shortcut: pick.shortcut, ...(pick.chips.length > 0 ? { chips: pick.chips } : {}) }
         const { data, error } = await supabase
           .from('chat_messages')
           .insert({ profile_id: profileId, role: 'assistant', content: text, status: 'complete', action_data: marker })
@@ -2010,7 +2016,25 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         .limit(PAGE_SIZE)
       if (!data || data.length === 0) return
       const loaded = data.reverse().map(rowToMessage)
+      // FOLLOW A MESSAGE THAT ARRIVES WHILE HE IS AT THE BOTTOM, buttons and all (25 Nov 2026, found by
+      // verify:coach-texts-you): a coach message written by the server and drawn while the chat was open stopped 53px
+      // short (101px with its one-tap answers), its shortcut and its easy out under the message box. Its buttons draw
+      // a beat after the bubble, so the follow is repeated as they land; only when he was at the bottom before.
+      const wasAtBottom = isNearBottomRef.current || checkIfNearBottom()
       setMessages(prev => addServerMessages(prev, loaded))
+      if (wasAtBottom) {
+        for (const ms of [60, 350, 900]) {
+          setTimeout(() => {
+            const el = scrollRef.current
+            if (!el || !isNearBottomRef.current && !checkIfNearBottom()) return
+            isNearBottomRef.current = true
+            el.scrollTo({ top: el.scrollHeight, behavior: 'instant' })
+            selfScrollTopRef.current = el.scrollTop
+            followedHeightRef.current = el.scrollHeight
+            setShowScrollPill(false)
+          }, ms)
+        }
+      }
     } catch (err) {
       console.error('Re-reading the chat failed:', err)
     }

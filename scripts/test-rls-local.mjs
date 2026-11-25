@@ -410,6 +410,20 @@ try {
     const n = psql(`SELECT count(*) FROM coach_reply_reports WHERE note = 'sore back';`, { role: 'authenticated', uid: UID_A })
     check('...the row is there to read', n === '1', n)
   }
+
+  console.log('\n11. His saved workouts ("My workouts", 25 Nov 2026) are his alone')
+  {
+    const asA = { role: 'authenticated', uid: UID_A }
+    const asB = { role: 'authenticated', uid: UID_B }
+    const save = expectRefused(`INSERT INTO own_workouts (id, user_id, name, items, on_dates) VALUES ('plan-a1', '${PROFILE_A}', 'Push', '[{"kind":"lift","name":"Barbell Bench Press"}]', '{2026-11-27}');`, asA)
+    check('his own workout saves, signed in as him', save === null, save)
+    check('...he reads it back, with its day', psql(`SELECT name || ' ' || on_dates::text FROM own_workouts WHERE id = 'plan-a1';`, asA) === 'Push {2026-11-27}', psql(`SELECT name || ' ' || on_dates::text FROM own_workouts WHERE id = 'plan-a1';`, asA))
+    check('somebody else reads none of it', psql(`SELECT count(*) FROM own_workouts;`, asB) === '0')
+    check('...and cannot write one as him', expectRefused(`INSERT INTO own_workouts (id, user_id, name) VALUES ('plan-x', '${PROFILE_A}', 'Sneaky');`, asB) !== null)
+    psql(`UPDATE own_workouts SET name = 'Changed' WHERE id = 'plan-a1';`, asB)
+    psql(`DELETE FROM own_workouts WHERE id = 'plan-a1';`, asB)
+    check('...nor change or delete his', psql(`SELECT name FROM own_workouts WHERE id = 'plan-a1';`, asA) === 'Push')
+  }
 } finally {
   stop()
 }

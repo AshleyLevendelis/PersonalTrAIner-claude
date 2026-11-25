@@ -1,0 +1,12 @@
+{
+  "name": "reminder-tap-keep",
+  "why": "25 Nov 2026, the easy out: 'make it effortless to say nah, keep it as-is'. His tap 'Keep it as is' under the coach's offer is heard: one short warm line, no card, no second attempt at the offer.",
+  "messages": [
+    "Keep it as is"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      { "turn": 0, "oneOf": [] }
+    ]
+  }
+}

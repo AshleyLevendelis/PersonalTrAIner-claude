@@ -182,7 +182,7 @@ function realDeps(now: Date, appServer: webpush.ApplicationServer): ReachOutDeps
         },
         body: JSON.stringify({
           profile_id: userId, role: "assistant", content: message.content, status: "complete",
-          action_data: { source: "reminder", moment: message.moment, shortcut: message.shortcut },
+          action_data: { source: "reminder", moment: message.moment, shortcut: message.shortcut, ...(message.chips && message.chips.length > 0 ? { chips: message.chips } : {}) },
         }),
       });
       if (!res.ok) throw new Error(`POST chat_messages ${res.status}: ${await res.text()}`);

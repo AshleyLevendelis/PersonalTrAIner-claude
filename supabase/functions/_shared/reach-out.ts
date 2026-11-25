@@ -23,7 +23,7 @@
 // ---------------------------------------------------------------------------
 
 import {
-  momentsToRaise, dailyCap, MIN_HOURS_BETWEEN,
+  momentsToRaise, dailyCap, aheadFacts, MIN_HOURS_BETWEEN,
   type MomentFacts, type MomentKey, type NotificationSettings,
 } from './coach-moments.ts'
 import { writeReminder } from './reminder-writer.ts'
@@ -56,6 +56,8 @@ export interface MomentFactsRow {
   week_as_of?: string | null
   /** Today's protein target in grams, as Home last showed it. Absent or 0 means unknown: no protein nudge. */
   protein_target_g?: number | null
+  /** What is coming up, as Home worked it out (src/lib/days-ahead.ts), keyed by date. Read only through aheadFacts. */
+  days_ahead?: unknown
   updated_at?: string | null
 }
 
@@ -132,7 +134,7 @@ export interface ReachOutDeps {
    * with a shortcut"): an assistant row, written BEFORE the push so a tap
    * always finds it. Returns its id.
    */
-  insertChatMessage(userId: string, message: { content: string; moment: MomentKey; shortcut: 'exercise' | 'nutrition' | null }): Promise<string>
+  insertChatMessage(userId: string, message: { content: string; moment: MomentKey; shortcut: 'exercise' | 'nutrition' | null; chips?: string[] }): Promise<string>
   /** Takes the message back when no phone took the push: the chat never holds a message nobody was sent. */
   deleteChatMessage(userId: string, id: string): Promise<void>
   /**
@@ -279,7 +281,15 @@ export function factsFor(row: MomentFactsRow | null, live: LiveFacts, localToday
     proteinTargetG: Math.max(0, Number(row?.protein_target_g ?? 0) || 0),
     name: words.name ?? null,
     finishedWhen: finishedWhen(live.lastFinishedAt, localToday, words.timezone ?? 'UTC'),
+    // WHAT IS COMING UP (25 Nov 2026): today's session, a clash, a pattern, read off the days Home sent ahead.
+    ...aheadFacts(row?.days_ahead ?? null, localToday),
   }
+}
+
+/** Whole days since this moment was last sent, or null when it never was (the pattern message waits a week). */
+export function daysSinceSent(recent: SentRecord[], moment: MomentKey, localToday: string): number | null {
+  const last = recent.filter(r => r.moment === moment).map(r => r.sent_on).sort().pop()
+  return last ? daysBetween(last, localToday) : null
 }
 
 /**
@@ -325,7 +335,8 @@ export function dayAllows(recent: SentRecord[], localToday: string, now: Date, c
  */
 export function mayNotify(recent: SentRecord[], localToday: string, moment: MomentKey): 'ok' | 'said_today' | 'same_as_yesterday' {
   if (recent.some(r => r.sent_on === localToday && r.moment === moment)) return 'said_today'
-  if (moment === 'workout_today') return 'ok'
+  // A reminder of THE DAY: Monday's session and Tuesday's are two different things, and so are two days' clashes.
+  if (moment === 'workout_today' || moment === 'load_clash') return 'ok'
   const yesterday = addDays(localToday, -1)
   if (recent.some(r => r.sent_on === yesterday && r.moment === moment)) return 'same_as_yesterday'
   return 'ok'
@@ -361,7 +372,7 @@ export async function runReachOut(deps: ReachOutDeps): Promise<ReachOutReport> {
       ])
       // THE FIRST LIVE MOMENT ITS OWN LIMITS ALLOW, not merely the first live
       // one: a nudge already said today must not stand in front of the next.
-      const facts = factsFor(row, live, today, hour, { name: profile.name, timezone: devices[0].timezone })
+      const facts = { ...factsFor(row, live, today, hour, { name: profile.name, timezone: devices[0].timezone }), daysSincePatternSaid: daysSinceSent(recent, 'pattern_spotted', today) }
       const moment = momentsToRaise(facts, profile.settings, deps.now.getTime())
         .find(m => mayNotify(recent, today, m.key) === 'ok')
       if (!moment) { report.quiet++; continue }
@@ -383,7 +394,7 @@ export async function runReachOut(deps: ReachOutDeps): Promise<ReachOutReport> {
 
       let messageId: string
       try {
-        messageId = await deps.insertChatMessage(userId, { content: text, moment: moment.key, shortcut: moment.shortcut })
+        messageId = await deps.insertChatMessage(userId, { content: text, moment: moment.key, shortcut: moment.shortcut, chips: moment.chips })
       } catch (err) {
         await deps.unrecordSent(userId, today, moment.key)
         throw err

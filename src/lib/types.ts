@@ -1135,5 +1135,12 @@ export interface CardioLog {
   notes?: string | null
   /** How far, in km, only when she gave it (Sam, 20 Oct 2026). Absent on a database without the column yet. */
   distance_km?: number | null
+  /** A RECORDED WALK OR RUN (activity-recording.ts, 25 Nov 2026): when Start was tapped (completed_at is End), the
+   *  steps and calories the phone read for that window, and whether the calories are the app's estimate. Absent on
+   *  every other log, and on a database before 20261125140000. */
+  started_at?: string | null
+  steps?: number | null
+  active_kcal?: number | null
+  kcal_estimated?: boolean | null
   completed_at?: string
 }

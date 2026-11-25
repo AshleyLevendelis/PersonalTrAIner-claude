@@ -315,7 +315,8 @@ async function main() {
       return a > 0 && b > a && /peekDidLogs\.length > 0 \? 'opacity-60'/.test(today.replace(/peekCell\?\.state === 'swapped' \|\| /, ''))
     })())
   check('...and reads the day\'s own logs from the week', /const peekDidLogs = peekCell\?\.workingLogs \?\? \[\]/.test(today))
-  check('a recovery day says its suggested cardio in the plan\'s own phrase', /prescriptionLine\(peekWorkout\.recommendedCardio\)/.test(today) && /peekWorkout\?\.conditioning_note/.test(today))
+  // Since 25 Nov 2026 the recovery day is its own card, the cardio drawn as a session (verify:rest-day §11 drives it).
+  check('a recovery day shows its suggested cardio: the day\'s own card from the plan\'s prescription, the note otherwise', /<PeekRecoveryDay[^>]*cardio=\{peekWorkout\.recommendedCardio\}/.test(today) && /peekWorkout\?\.conditioning_note/.test(today))
 
   console.log(`\n${ran} checks ran.`)
   if (failures > 0) { console.error(`${failures} check(s) failed`); process.exit(1) }

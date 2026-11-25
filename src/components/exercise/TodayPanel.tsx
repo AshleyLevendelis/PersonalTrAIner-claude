@@ -70,7 +70,8 @@ import { FinishSection } from './FinisherRow'
 import { isScheduledDay, dayDetail, prescriptionLine } from '@/lib/activity-day'
 import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
-import { RestDayCard, ActiveRecoveryCard, MovedDayCard } from './RestDayCard'
+import { OwnWorkoutDay } from './OwnWorkoutDay'
+import { RestDayCard, ActiveRecoveryCard, MovedDayCard, PeekRecoveryDay } from './RestDayCard'
 import type { WhatHappenedTarget } from './WhatHappenedSheet'
 import type { RemoveTarget } from './RemoveExerciseSheet'
 import type { ReasonAnswer } from './EditReasonStep'
@@ -1678,6 +1679,16 @@ export function TodayPanel({
                 16 minutes." was his whole view of it. What it is, its rounds and why, read off the plan. */}
             {!peekBeforePlan && peekWorkout?.plannedActivity ? (
               <PlannedActivityPeek dayName={peekDay} focus={peekWorkout.focus} planned={peekWorkout.plannedActivity} onExit={() => setPeekDate(null)} />
+            ) : !peekBeforePlan && peekWorkout?.recommendedCardio && peekDate ? (
+              /* THE DAY'S OWN CARD, NOT A SENTENCE (his report 25 Nov 2026): the optional cardio is a row like an
+                 exercise, loggable on a past day, previewed on a day to come. */
+              <PeekRecoveryDay
+                dayName={peekDay}
+                date={peekDate}
+                today={today}
+                cardio={peekWorkout.recommendedCardio}
+                back={<PeekBackToToday onClick={() => setPeekDate(null)} />}
+              />
             ) : (
             <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 text-center text-sm text-muted-foreground" data-testid="peek-rest-day">
               {/* A peeked day with a prescribed activity is NOT a rest day, and
@@ -1688,8 +1699,6 @@ export function TodayPanel({
                   her less than the plan knew. */}
               {peekBeforePlan
                 ? `${peekDay} was before your plan began, so there is no session on it.`
-                : peekWorkout?.recommendedCardio
-                ? `${peekDay} is a rest day. Optional: ${prescriptionLine(peekWorkout.recommendedCardio)}.`
                 : peekWorkout?.conditioning_note
                 ? `${peekDay} is a rest day. Optional: ${peekWorkout.conditioning_note}`
                 : `${peekDay} is a rest or recovery day.`}
@@ -2133,6 +2142,23 @@ export function TodayPanel({
             exclusions={exclusions}
           />
         </div>
+      )}
+
+      {/* YOUR OWN WORKOUT (his request 25 Nov 2026): under whichever day is showing, every workout of his own on it and
+          the way to start one (today) or log one (a past day). A separate workout, never sets added to the plan's. */}
+      {!weekOpen && (!peekDay || peekDate) && (
+        <OwnWorkoutDay
+          profileId={profileId}
+          date={peekDay && peekDate ? peekDate : today}
+          today={today}
+          weekNumber={peekDay && peekDate ? peekWeekOf(peekDate) : liveWeek}
+          planHasSession={peekDay
+            ? !!peekWorkout && (peekWorkout.exercises.length > 0 || !!peekWorkout.plannedActivity) && !peekMovedTo
+            : !!workout && (workout.exercises.length > 0 || !!workout.plannedActivity) && !(isMovedAway && movedAwayTo)}
+          equipmentAccess={profile?.equipment_access}
+          profile={profile}
+          exclusions={exclusions}
+        />
       )}
 
       {/* THE PROGRAM ROW LEFT THIS PAGE on 30 Oct 2026 ("less is more"): "Program ›" and the week line at

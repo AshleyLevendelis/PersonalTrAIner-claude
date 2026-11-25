@@ -13,6 +13,7 @@
     "test:audit": "NODE_ENV=production tsx scripts/run-constraint-audit.ts",
     "test:kit-list": "tsx scripts/test-kit-list.ts",
     "test:health-heart": "tsx scripts/test-health-heart.ts",
+    "test:recorded-activity": "tsx scripts/test-recorded-activity.ts",
     "test:heart-strap": "tsx scripts/test-heart-strap.ts",
     "test:strap-live": "tsx scripts/test-strap-live.ts",
     "test:heart-trends": "tsx scripts/test-heart-trends.ts",
@@ -735,9 +736,11 @@
     "verify:account-row": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/account-row.mjs",
     "verify:heart-uses": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/heart-uses.mjs",
     "verify:heart-strap": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/heart-strap.mjs && node .tour-harness/heart-strap-app.mjs && node .tour-harness/heart-strap-workout.mjs",
+    "verify:record-activity": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/record-activity.mjs",
     "verify:health-steps": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/health-steps.mjs",
     "test:phone-app": "tsx scripts/test-phone-app.ts",
     "test:native-push": "tsx scripts/test-native-push.ts",
+    "test:coach-proactive": "tsx scripts/test-coach-proactive.ts",
     "phone:sync": "npm run build && npx cap sync",
     "verify:countdown-timer": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/countdown-timer.mjs",
     "measure:main-lift-kept": "tsx scripts/measure-main-lift-kept.ts",
@@ -751,6 +754,8 @@
     "test:cardio-days": "tsx scripts/test-cardio-days.ts",
     "test:planned-rounds": "tsx scripts/test-planned-rounds.ts",
     "verify:cardio-days": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/cardio-days.mjs",
+    "test:own-workout": "tsx scripts/test-own-workout.ts",
+    "verify:own-workout": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/own-workout.mjs",
     "verify:planned-rounds": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/planned-rounds.mjs",
     "test:account-auth": "tsx scripts/test-account-auth.ts",
     "verify:welcome": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/welcome.mjs",
@@ -759,7 +764,8 @@
     "test:primer-dose": "tsx scripts/test-primer-dose.ts",
     "verify:wrong-exercise": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/wrong-exercise.mjs",
     "measure:meal-protein-spread": "tsx scripts/measure-meal-protein-spread.ts",
-    "test:meal-protein-spread": "tsx scripts/test-meal-protein-spread.ts"
+    "test:meal-protein-spread": "tsx scripts/test-meal-protein-spread.ts",
+    "test:peek-recovery": "tsx scripts/test-peek-recovery.ts"
   },
   "dependencies": {
     "@capacitor-community/bluetooth-le": "8.3.0",

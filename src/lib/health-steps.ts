@@ -37,6 +37,13 @@ export interface HealthAdapter {
   heartRateSamples?(start: Date, end: Date): Promise<{ bpm: number; at: string }[]>
   /** Resting heart rate, one or more a day, between two instants. */
   restingHeartRateSamples?(start: Date, end: Date): Promise<{ bpm: number; at: string }[]>
+  /** A RECORDED WALK OR RUN (activity-recording.ts, his 25 Nov 2026 "A, build it"): the phone's sheet for steps,
+   *  distance, calories burned and heart rate, asked on the first Start. */
+  requestActivityAccess?(): Promise<boolean>
+  /** Metres between two instants, summed by the phone. */
+  distanceMetersBetween?(start: Date, end: Date): Promise<number>
+  /** Active calories burned between two instants (the watch's or phone's own figure), summed by the phone. */
+  activeKcalBetween?(start: Date, end: Date): Promise<number>
 }
 
 /** Tests and the browser test pages hand in a pretend health store on this global; `null` means "no phone app". */
@@ -79,6 +86,18 @@ export function healthAdapter(): Promise<HealthAdapter | null> {
           heartRateSamples: async (start, end) => {
             const res = await Health.readSamples({ dataType: 'heartRate', startDate: start.toISOString(), endDate: end.toISOString(), limit: 5000, ascending: true })
             return res.samples.map(s => ({ bpm: s.value, at: s.startDate }))
+          },
+          requestActivityAccess: async () => {
+            const status = await Health.requestAuthorization({ read: ['steps', 'distance', 'calories', 'heartRate'] })
+            return status.readAuthorized.includes('steps')
+          },
+          distanceMetersBetween: async (start, end) => {
+            const res = await Health.queryAggregated({ dataType: 'distance', startDate: start.toISOString(), endDate: end.toISOString(), bucket: 'day', aggregation: 'sum' })
+            return res.samples.reduce((sum, s) => sum + (Number.isFinite(s.value) ? s.value : 0), 0)
+          },
+          activeKcalBetween: async (start, end) => {
+            const res = await Health.queryAggregated({ dataType: 'calories', startDate: start.toISOString(), endDate: end.toISOString(), bucket: 'day', aggregation: 'sum' })
+            return res.samples.reduce((sum, s) => sum + (Number.isFinite(s.value) ? s.value : 0), 0)
           },
           restingHeartRateSamples: async (start, end) => {
             const res = await Health.readSamples({ dataType: 'restingHeartRate', startDate: start.toISOString(), endDate: end.toISOString(), limit: 200, ascending: true })

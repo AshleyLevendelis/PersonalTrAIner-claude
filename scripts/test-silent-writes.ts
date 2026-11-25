@@ -293,22 +293,10 @@ console.log('\n8. The five found by the whole-app audit, 5 Sep 2026')
   check('...and the dialog title changes when it has not landed',
     /serverCloseFailed \? 'Session saved'/.test(summary))
 
-  // (b) The Nutrition Method switch applied every macro on screen and dropped
-  // the update's error — the handler immediately below it in the same file
-  // has done this correctly since it was written.
-  const mode = handlerBody(app, 'const handleMacroModeChange')
-  check('the macro-mode switch reads its write\'s error', /const \{ error \}/.test(mode), mode.slice(0, 200))
-  // BOTH halves of the revert, named separately. The first version checked
-  // only for `macro_calculation_mode: previousMode`, which also appears in
-  // the setMacros recompute on the next line — so deleting the setProfile
-  // revert entirely left this green. Found by mutation.
-  check('...and reverts the stored profile when it failed',
-    /setProfile\(prev => \(prev \? \{ \.\.\.prev, macro_calculation_mode: previousMode \} : prev\)\)/.test(mode))
-  check('...and recomputes the macros back with it',
-    /setMacros\(computeTargets\(\{ \.\.\.updated, macro_calculation_mode: previousMode \}/.test(mode))
-  // A target snapshot written for a change that failed is a number in the
-  // history the user was shown for a second and never actually had.
-  for (const [label, body] of [['mode', mode], ['split', handlerBody(app, 'const handleMacroSplitChange')]] as const) {
+  // (b) The Nutrition Method switch (Standard / Dynamic CSCS) was TAKEN OUT on 25 Nov 2026 (his ruling, "Take it out"),
+  // and its three checks with it. What it guarded lives on in the split handler, held below.
+  check('the method switch is gone, not left half-wired', !/handleMacroModeChange|onMacroModeChange/.test(app))
+  for (const [label, body] of [['split', handlerBody(app, 'const handleMacroSplitChange')]] as const) {
     const snapshotAt = body.indexOf('snapshotTargetsIfChanged')
     const writeAt = body.indexOf('fitness_profiles')
     check(`the ${label} handler snapshots only after the write`, snapshotAt > writeAt && writeAt >= 0, { snapshotAt, writeAt })

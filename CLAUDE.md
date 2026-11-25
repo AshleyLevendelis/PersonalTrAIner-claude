@@ -660,6 +660,14 @@ Browse already worked this way; today's card was the odd one out.
 menu, AND that no change-verb is left loose on the row, because "it is in the
 menu" stays true when a copy is also left outside it.
 
+**Your own workout, on any day — his request 25 Nov 2026** ("on a blank day ... just be able to start exercising"; "a
+separate workout", not sets added to the plan's): Start it today (rest day, or "a separate workout" beside the plan's) or
+log one on a past day; add exercises as you go, tick sets, your own rest by hand, cardio, Finish. Its sets are ordinary
+sets numbered after the day's (never over the plan's); a plan day stays the plan's. **"Both"** (his, for step 2): saved
+workouts in a list AND optionally on a day; BUILT (Start opens Empty or a saved one; "Plan a workout" a day ahead; phone
+first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workout`, `test:rls-local` §11,
+`docs/plans/own-workouts.md`. Needs the `own_workouts` migration
+
 **Changing one workout**
 - Move it to another day; it leaves today on every screen — both surfaces
   since 10 Sep 2026 ("What happened?" on the day menu); `session-move`,
@@ -713,6 +721,10 @@ menu" stays true when a copy is also left outside it.
   that costs nothing. Anything built on a model JUDGEMENT should be split this
   way and the two halves named separately.
   `cardio-session`, `verify:cardio-session`, `coach-parity`
+- **A rest day's optional cardio is drawn as a session, under an "Optional · rest day" banner: his request 25 Nov 2026**
+  ("so users dont think they are being forced into a workout in their rest day"): the session hero on the day (Start,
+  one-tap log), on a past day within two weeks it logs to THAT day, on a day ahead it is a preview ("You can log it on
+  Saturday."). Skipping it misses nothing. `verify:rest-day` §8b, §11, `test:peek-recovery`
 - **An interval session on the plan runs on the round timer: his ruling 23 Nov 2026, "A"** (over a log line with a
   timer button, from his "start the workout, it starts the round timer ... you log it completed at the end"): a planned
   session keeps its rounds, work and rest; its card has Start (the round timer at those numbers, his countdown), and when
@@ -942,7 +954,12 @@ menu" stays true when a copy is also left outside it.
   one word apart ("today" / "from now on") and the tools are not. Both sides of
   that pair are now the coach's too, and the prompt rule keys on the TIME SCOPE
   rather than the number, because both requests carry a minute figure
-- Targets and macro mode — `screen only`, and "targets" is not one thing:
+- **One calorie method: his ruling 25 Nov 2026, "Take it out"** (over fixing it and over leaving it): the day-by-day
+  "Dynamic CSCS" mode is gone. It cycled only today's targets while the meals, the week and the shopping list planned
+  every day to them; one set of numbers, the split's choices kept, the sport's energy spread across the week. A saved
+  Dynamic profile reads as Standard. "How your targets are set" is redrawn in the app's style. `test:sport-fuel` §3,
+  `verify:sport-fuel` 3, `verify:one-calorie-target` 3, `test:nutrition-layout`
+- Targets and macro split — `screen only`, and "targets" is not one thing:
   `calorie_target` has no control anywhere and never did. It is written once
   at onboarding and derived by `computeTargets` thereafter, so changing it
   means changing its INPUTS — macro split, activity level, or goal (which is
@@ -1846,6 +1863,12 @@ menu" stays true when a copy is also left outside it.
   must stay removed unless the app starts reading that data. Phone-only code loads only in the phone app.
   `test:phone-app`, `verify:health-steps`, `docs/plans/phone-app.md`. NOT BUILT natively yet: his machine
 
+- **Record a walk or run: his request and ruling 25 Nov 2026, "A, build it"**: Tools, Start walk / Start run, End; the
+  phone's steps, distance and calories for exactly that window (the watch's own figure), heart rate from the strap
+  first; with a strap and no watch, calories are an estimate printed "≈ N kcal (estimate)" (his A, over nothing). One
+  effort tap logs it; a watch that syncs late fills in. Calories burned NEVER change the food target (CSCS, mine).
+  `test:recorded-activity`, `verify:record-activity`, `docs/plans/recorded-activity.md`. Needs migration 20261125140000
+  and a phone app rebuild
 - **Heart rate from a watch: his "1 + 2, build it", 24 Nov 2026**: after each session its average and highest heart rate
   (from Health Connect, which the watch writes to) show under it, and Progress shows resting heart rate against last
   week. Read only, its own switch, phone app only; never a target or zone. `test:health-heart`, `verify:health-steps`
@@ -1865,6 +1888,15 @@ menu" stays true when a copy is also left outside it.
   uses Firebase (an `fcm:` row in the same phones table, no migration); the same switch, tags and limits as the
   website; the iPhone app says it is not built yet. `test:native-push`, `verify:reminders` §6. Needs the
   `coach-reach-out` and `chat-gemini` deploys and the `FCM_SERVICE_ACCOUNT` secret
+
+- **The coach is a sharp, upbeat, grounded training partner who makes the call, and speaks first with a reason: his
+  brief 25 Nov 2026** ("still robotic, no personality, not enthusiastic, not proactive enough"): WHO YOU ARE first in
+  its instructions, two gears (gym floor on a part-done session), an editor that shortens and never flattens; reminders
+  name the session and lift; a CLASH (hard class next to heavy legs: trim the extras, keep the main lift) and a PATTERN
+  (afternoon, weekly) moment, each switchable inside his limit; one-tap answers under any offer. A reminder may greet by
+  the time of day, not only "Hey" (widens his 6 Nov example). **And the Saturday review says what moved** (his request
+  the same day): this week's bests by name and number, then the one thing that dragged, offered. `test:coach-proactive`, `docs/plans/coach-voice-and-
+  proactivity.md`. Needs the `days_ahead` migration and the `chat-gemini` and `coach-reach-out` deploys and an exam run
 
 ### His rulings of 17 Nov 2026
 - **The coach exam's judge is Fable 5.2: his ruling 17 Nov 2026, "Switch to Fable"** (over keeping Opus 5 and over

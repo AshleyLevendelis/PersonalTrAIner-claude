@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Clock, Minus, Pencil, Plus } from 'lucide-react'
+import { Clock, Heart, Minus, Pencil, Plus } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { splitActivity } from '@/lib/cardio-lines'
 import { effortForRpe, effortLabel } from '@/lib/cardio-effort'
@@ -80,14 +80,56 @@ function StepRow({ label, value, onMinus, onPlus, testid }: { label: string; val
   )
 }
 
-export function PlannedSessionHero({ dayName, focus, planned: asPlanned }: { dayName: string; focus: string; planned: Planned }) {
+/**
+ * IT'S YOUR REST DAY (his words 25 Nov 2026, over the optional cardio drawn as a session: "with a banner to say its
+ * optional, so users dont think they are being forced into a workout in their rest day"). First thing on the card,
+ * before the name, in the recovery colour; it says what skipping costs, which is nothing (a rest day is never missed).
+ */
+export const OPTIONAL_BANNER = {
+  title: 'Optional · rest day',
+  body: 'Only if you feel like moving. Skip it and nothing is missed: rest is the plan.',
+} as const
+
+function OptionalBanner() {
+  return (
+    <div
+      className="flex items-start gap-2.5 rounded-[14px] px-3 py-2.5"
+      style={{ background: 'color-mix(in srgb, var(--role-ai) 14%, transparent)' }}
+      data-testid="optional-banner"
+    >
+      <Heart className="mt-0.5 size-4 shrink-0 text-[color:var(--role-ai-text)]" aria-hidden />
+      <span className="min-w-0">
+        <span className="block text-[0.8125rem] font-semibold text-foreground">{OPTIONAL_BANNER.title}</span>
+        <span className="block text-[0.75rem] leading-[1.45] text-muted-foreground">{OPTIONAL_BANNER.body}</span>
+      </span>
+    </div>
+  )
+}
+
+export function PlannedSessionHero({ dayName, focus, planned: asPlanned, optional = false, subtitle, kicker, onDate, previewNote, testid }: {
+  dayName: string
+  focus: string
+  planned: Planned
+  /** A rest day's optional cardio: the banner first, and the card never reads as a session owed. */
+  optional?: boolean
+  /** A line under the title (the optional cardio's choices and pace). */
+  subtitle?: string | null
+  /** Over the title; "Today · <day>" unless another day's card says its own. */
+  kicker?: string
+  /** A past day: logged to that date, no timer (it is over), no change for today. */
+  onDate?: string
+  /** A day to come: the numbers and this line, no Start and no boxes. */
+  previewNote?: string
+  testid?: string
+}) {
   const [change, setChange] = useTodayChange(asPlanned.activity)
+  const notToday = !!onDate || !!previewNote
   const [editing, setEditing] = useState(false)
   // THE SESSION AS HE WILL DO IT TODAY, handed to every part below, so the figures, the Start and the log agree.
   const planned = withTodayChange(asPlanned, change)
   const planRounds = plannedRoundsOf(asPlanned)
   const changed = planned !== asPlanned
-  const logs = useCardioLogsToday()
+  const logs = useCardioLogsToday(onDate)
   const done = logs.some(l => l.activity_name === planned.activity)
   const row = plannedSessionRow(planned)
   const rounds = plannedRoundsOf(planned)
@@ -97,16 +139,17 @@ export function PlannedSessionHero({ dayName, focus, planned: asPlanned }: { day
   const key = effortForRpe(planned.targetRpe)
   const title = (focus || name).trim().split(/\s+/)
   const work = rounds ? (rounds.workSeconds % 60 === 0 ? `× ${rounds.workSeconds / 60} min` : `× ${rounds.workSeconds}s`) : ''
-  const canEdit = !done && !timerBusy
+  const canEdit = !done && !timerBusy && !notToday
   const stepRounds = (field: 'rounds' | 'work' | 'rest', dir: 1 | -1) => rounds && setChange({ rounds: stepTodayRounds(rounds, field, dir) })
   const stepMinutes = (dir: 1 | -1) => setChange({ minutes: stepTodayMinutes(planned.duration, dir) })
   // WHAT THE PLAN SAID, beside the change, so the change is never mistaken for the plan.
   const planWords = planRounds ? blockShape(planRounds) : `${asPlanned.duration} min`
   return (
-    <div className="space-y-3.5" data-testid="planned-activity">
+    <div className="space-y-3.5" data-testid={testid ?? 'planned-activity'}>
+      {optional && <OptionalBanner />}
       <div>
         <div className="flex items-center justify-between gap-3">
-          <span className="whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[.12em] text-primary-text">{`Today · ${dayName}`}</span>
+          <span className="whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[.12em] text-primary-text" data-testid="planned-hero-kicker">{kicker ?? `Today · ${dayName}`}</span>
           <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[0.75rem] text-text-tertiary" data-testid="planned-hero-status">
             {done ? 'Done' : <><Clock className="size-3.5" aria-hidden /> {`${minutes} min`}</>}
           </span>
@@ -115,6 +158,7 @@ export function PlannedSessionHero({ dayName, focus, planned: asPlanned }: { day
           {title.slice(0, -1).join(' ')}{title.length > 1 ? ' ' : ''}
           <span className="text-primary-text glow-text">{title[title.length - 1]}</span>
         </p>
+        {subtitle && <p className="mt-1.5 text-[0.8125rem] leading-[1.45] text-muted-foreground" data-testid="planned-hero-subtitle">{subtitle}</p>}
       </div>
       {/* THE NUMBERS, then the rounds as a bar that fills once it is logged (the set bar of an exercise row). */}
       <div className="rounded-[14px] bg-[color:var(--surface-raised)]" data-testid="cardio-prescription">
@@ -176,10 +220,12 @@ export function PlannedSessionHero({ dayName, focus, planned: asPlanned }: { day
       {planned.heldBack && <p className="text-xs leading-[1.5] text-foreground px-0.5" data-testid="run-held-back">{planned.heldBack}</p>}
       {/* ONE BIG START, the way to do it; the boxes under it are the quiet second way, still one tap for the plan. */}
       <PlannedCardioRow prescription={planned}
-        timer={<PlannedSessionStart planned={planned} big />}
+        timer={notToday ? undefined : <PlannedSessionStart planned={planned} big />}
         hideEntry={timerBusy}
         hideTitle
-        entryLabel="Or log it yourself"
+        entryLabel={notToday ? (onDate ? 'Did it? Log it' : undefined) : 'Or log it yourself'}
+        onDate={onDate}
+        previewNote={previewNote}
       />
       {planned.reason && <p className="text-[0.8125rem] leading-[1.5] text-muted-foreground px-0.5" data-testid="planned-reason">{planned.reason}</p>}
     </div>

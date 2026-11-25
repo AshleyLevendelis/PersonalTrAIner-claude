@@ -118,6 +118,8 @@ const KEYS: Record<string, { clear: boolean; why: string }> = {
   fitplan_health_heart_connected: { clear: false, why: "this phone's Health permission switch for heart rate, as steps" },
   fitplan_heart_strap: { clear: false, why: "the strap paired to this phone's Bluetooth — the phone's, not the plan's" },
   fitplan_heart_strap_readings: { clear: false, why: 'raw strap readings, matched to a session by its own times only and gone after four hours' },
+  fitplan_activity_recording: { clear: false, why: 'a walk or run being recorded right now (25 Nov 2026) — a New Plan mid-walk must not lose the walk' },
+  fitplan_activity_access_asked: { clear: false, why: 'this phone was asked once for steps, distance and calories — the phone\'s, not the plan\'s' },
 
   fitplan_plan_pending_v1: { clear: false, why: 'plan weeks changed offline and not yet sent, keyed per person — dropped by the save that replaces them' },
 }

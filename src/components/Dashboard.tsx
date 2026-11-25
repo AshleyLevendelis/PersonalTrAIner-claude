@@ -286,6 +286,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             exercisePlan, mesocycle: mesocycle ?? [], planCreatedAt,
             now: getAppNow(profile.id), weekSessions: fresh.weekSessions, today: activeSession.date,
             proteinTarget: fresh.hasNutritionTargets ? fresh.proteinTarget : null,
+            daysAhead: fresh.ahead ?? null,
           }))
         }
       })
@@ -424,6 +425,8 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         .then(async m => {
           // A PAIRED STRAP (option 3, strap-live.ts) fills first, so its figure is the one kept where both exist.
           await m.fillHeartFromStrap(id, date)
+          // A RECORDED WALK OR RUN whose watch synced late gets its steps, distance and calories (activity-recording.ts).
+          await import('@/lib/activity-recording').then(r => r.fillRecordedFromHealth(id, date)).catch(() => 0)
           const watch = m.isHealthHeartConnected()
           if (watch) await m.syncHeartFromHealth(id, date)
           // A strap alone gives session figures (so the fitness line) but no resting figure.

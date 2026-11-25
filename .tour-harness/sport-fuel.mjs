@@ -92,9 +92,9 @@ const readSheet = async () => {
   await tap('[data-targets-row]')
   await wait(400)
   const r = await ev(`(() => { const d = [...document.querySelectorAll('[role="dialog"]')].find(x => /How your targets are set/.test(x.innerText)); if (!d) return null
-    const nums = [...d.querySelectorAll('.tabular-mono')].map(n => Number(n.innerText.replace(/[^0-9-]/g, '')))
+    const fig = id => Number((d.querySelector('[data-testid="' + id + '"]')?.innerText ?? '').replace(/[^0-9-]/g, ''))
     const note = d.querySelector('[data-testid="sport-fuel-note"]'); const b = note ? note.getBoundingClientRect() : null
-    return { tdee: nums[1], target: nums[3], note: note ? note.innerText.trim() : null, inView: !!b && b.top >= 0 && b.bottom <= innerHeight } })()`)
+    return { tdee: fig('targets-tdee'), target: fig('targets-kcal'), note: note ? note.innerText.trim() : null, inView: !!b && b.top >= 0 && b.bottom <= innerHeight } })()`)
   return r
 }
 
@@ -114,11 +114,12 @@ const perDay = Number((withSport?.note ?? '').match(/\+(\d+) kcal a day/)?.[1] ?
 check('2b. the day\'s burn is higher by exactly what the sentence says', !!withSport && !!without && withSport.tdee - without.tdee === perDay, { with: withSport?.tdee, without: without?.tdee, perDay })
 check('2c. ...and so is the target (after the goal\'s own adjustment)', !!withSport && !!without && withSport.target > without.target && withSport.target - without.target <= perDay * 1.25 + 10, { with: withSport?.target, without: without?.target })
 
-console.log('\n3. Dynamic')
+console.log('\n3. One method (his "Take it out", 25 Nov 2026)')
 await open('nutrition', 'muay=1&macromode=dynamic')
 const dyn = await readSheet()
-check('3a. it says the extra goes on the day itself', /, on the day itself\.$/.test(dyn?.note ?? ''), dyn?.note)
-await shoot('sport-fuel-dynamic')
+check('3a. a profile saved on the old day-by-day mode is told the same, spread across the week, with the same target', dyn?.note === withSport?.note && dyn?.target === withSport?.target, { dyn, withSport })
+check('3b. the sheet has no method switch and no weekly table any more', await ev(`(() => { const d = [...document.querySelectorAll('[role="dialog"]')].find(x => /How your targets are set/.test(x.innerText)); return !!d && !/Dynamic CSCS|Standard Static|Weekly dynamic|Method/.test(d.innerText) })()`))
+await shoot('sport-fuel-sheet')
 
 console.log(`\n${ran} checks ran`)
 ws.close(); chrome.kill(); server.close()

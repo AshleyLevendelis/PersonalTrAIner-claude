@@ -29,6 +29,8 @@ interface ReminderMarker {
   source: 'reminder'
   moment: string
   shortcut: 'exercise' | 'nutrition' | null
+  /** The one-tap answers it carries (25 Nov 2026, the easy out), when it offers something. */
+  chips: string[]
 }
 
 function reminderOf(actionData: unknown): ReminderMarker | null {
@@ -36,7 +38,25 @@ function reminderOf(actionData: unknown): ReminderMarker | null {
   const a = actionData as Record<string, unknown>
   if (a.source !== 'reminder' || typeof a.moment !== 'string') return null
   const shortcut = a.shortcut === 'exercise' || a.shortcut === 'nutrition' ? a.shortcut : null
-  return { source: 'reminder', moment: a.moment, shortcut }
+  const chips = Array.isArray(a.chips) ? a.chips.filter((c): c is string => typeof c === 'string' && c.trim().length > 0 && c.length <= 60).slice(0, 4) : []
+  return { source: 'reminder', moment: a.moment, shortcut, chips }
+}
+
+/**
+ * HOW LONG SINCE THE CHAT LAST HELD THIS UNPROMPTED MESSAGE, in whole days by the local calendar, or null when it never
+ * has. The pattern message is said at most once a week (coach-moments.ts PATTERN_EVERY_DAYS), from the chat as from the
+ * phone: every unprompted message is a chat row with the reminder marker.
+ */
+export function daysSinceMomentSaid(messages: readonly ChatMessage[], moment: string, today: string): number | null {
+  let latest: string | null = null
+  for (const m of messages) {
+    if (m.role !== 'assistant' || m.reminder?.moment !== moment || !m.created_at) continue
+    const d = new Date(m.created_at)
+    const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    if (!latest || local > latest) latest = local
+  }
+  if (!latest) return null
+  return Math.round((Date.parse(`${today}T12:00:00Z`) - Date.parse(`${latest}T12:00:00Z`)) / 86_400_000)
 }
 
 function isPlanAction(a: unknown): a is PlanAction {
@@ -56,6 +76,8 @@ export function rowToMessage(row: ChatRow): ChatMessage {
     // lesson's record, coach-lessons.ts) is never drawn as an action.
     action: reminder || !isPlanAction(row.action_data) ? undefined : row.action_data,
     ...(reminder ? { reminder: { moment: reminder.moment, shortcut: reminder.shortcut } } : {}),
+    // A reminder's easy out comes back as its one-tap answers.
+    ...(reminder && reminder.chips.length > 0 ? { quickReplies: reminder.chips } : {}),
     // A REPLY'S QUOTE (22 Nov 2026), saved with it: never a plan action (it names no type).
     ...(replyTo ? { replyTo } : {}),
     created_at: row.created_at,
