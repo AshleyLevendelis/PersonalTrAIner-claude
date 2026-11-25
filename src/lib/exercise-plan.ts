@@ -7306,7 +7306,7 @@ type RotationTier = 'main' | 'accessory' | 'core'
  * Barbell Squats) is externally loaded already, so dropping the check
  * changes classification for exactly these two exercises and nothing else.
  */
-function classifyRotationTiers(exercises: Exercise[]): RotationTier[] {
+function classifyRotationTiers(exercises: Exercise[], byAnchor = false): RotationTier[] {
   let mainCount = 0
   // A DAY WITH NO TIER-1 LIFT STILL HAS A MAIN LIFT (21 Nov 2026, the four leftovers): its first compound. Read as
   // tier 1 only, a bodyweight or limited-kit day, and an older beginner's (her barbells are out), had no anchor, so
@@ -7315,6 +7315,23 @@ function classifyRotationTiers(exercises: Exercise[]): RotationTier[] {
   const hasTier1 = exercises.some(ex => getExerciseEntry(ex.name)?.mechanics_tier === 'tier1_compound')
   const mainTier = hasTier1 ? 'tier1_compound' : 'tier2_compound'
   const mainCap = hasTier1 ? 2 : 1
+  // ONE DEFINITION OF THE MAIN LIFT KEPT (25 Nov 2026, the 826 named under compound-order): with no tier-1 lift, the lift
+  // kept for the whole plan is the one the day is LABELLED with and given the main-lift rest floor, dayAnchorExercise
+  // (the hardest standalone compound), not merely the first tier-2 compound. They had disagreed on 861 of 4,499 days,
+  // and the labelled lift was rotated away at the next block as an accessory. With no anchor (the hardest lift sits in
+  // a superset), the first tier-2 compound stays main, as before.
+  // ONLY FOR WHICH EXERCISE IS KEPT (byAnchor, the block rotation). Where a block's extra sets go and what the time trim
+  // protects still read the first tier-2 compound, unchanged: those move prescriptions and are a separate, measured change.
+  const anchor = hasTier1 || !byAnchor ? undefined : dayAnchorExercise(exercises)
+  if (anchor) {
+    return exercises.map(ex => {
+      if (ex === anchor) return 'main'
+      const dbEntry = getExerciseEntry(ex.name)
+      if (!dbEntry || dbEntry.mechanics_tier === 'primer') return 'core'
+      if (dbEntry.movement_pattern === 'core' || dbEntry.movement_pattern === 'carry') return 'core'
+      return 'accessory'
+    })
+  }
   return exercises.map(ex => {
     const dbEntry = getExerciseEntry(ex.name)
     if (!dbEntry || dbEntry.mechanics_tier === 'primer') return 'core'
@@ -8692,7 +8709,7 @@ export function generateMesocycle(
       // two compound lifts of each day keep their exercise in every block, so the strength record is read off one lift
       // for the whole plan; only sets, reps and rest change with the phase. Accessories still rotate by block. The
       // tiers are read off the BASE day, before anything rotates.
-      const baseTiers = classifyRotationTiers(day.exercises)
+      const baseTiers = classifyRotationTiers(day.exercises, true)
       const exercises = day.exercises.map((ex, exIdx) => {
         const avoidFamilies = new Set(
           dayFamiliesByIndex.filter((f, i) => f && i !== exIdx) as string[]

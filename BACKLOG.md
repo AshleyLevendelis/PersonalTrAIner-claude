@@ -2,6 +2,32 @@
 
 Newest first. One line each.
 
+- [x] **THE LIFT LABELLED "MAIN LIFT" IS THE ONE KEPT FOR THE WHOLE PLAN (25 Nov 2026, the 826 named under the
+  compound-order entry; CSCS, mine).** Traced first (three definitions of a day's main lift, not two: the label and
+  the rest floor rank by difficulty, the block rotation took the first tier-2 compound, and a dozen readers use the
+  slot tier only). MEASURED with a new `measure:main-lift-kept` (every 8th grid plan, the same day in block 1 and
+  block 2): the lift labelled main in block 1 was GONE from that day in block 2 on 635 of 4,499 days and still there
+  but no longer labelled on 226, against his 16 Nov "main lifts for the whole plan". Two causes, two fixes:
+  (1) on a day with no tier-1 lift, the block rotation now keeps the labelled lift (`dayAnchorExercise`), not the
+  first tier-2 compound; (2) trunk work and carries are never a day's main lift (a "Conditioning & Core" day had a
+  Russian Twist labelled MAIN LIFT, given the main-lift rest floor, and rotated away). AFTER: gone on 1 day; still
+  there, label moved, on ~375 (the label follows a harder accessory a later block adds). TRIED AND DROPPED: keeping
+  each new accessory no harder than the main lift took that to 141, but it changes which accessories the seeded
+  rotation draws, and persona plan #2103 (a knee plan) then broke the front/back-of-thigh balance (quad 9 sets to
+  hamstring 3, counting knee-rehab quad drills); fixing that properly means deciding whether rehab drills count as
+  training volume in that rule, which changes what a measure measures, so it is left named, not built. NOT CHANGED,
+  by decision: where a block's extra sets go and what the time trim protects still read the first tier-2 compound
+  (they move prescriptions; a separate measured change). Rebuild today on a no-tier-1 day still keeps nothing
+  (it reads slot tier only; the trace's finding, named). CSCS review: (1) the hardest standalone compound of the day
+  is the one progressed for the whole plan, which is what the day is for; the first compound now rotates as an
+  accessory; (2) takes away the first compound's plan-long continuity, and a core day's "main lift" rest floor;
+  (3) pattern coverage, push:pull and volume unchanged (rotation swaps within a slot; sets untouched); (4) the main-lift
+  rest floor no longer applies to trunk work or carries, the intended direction; (5) in scope. GATES: `test:older-
+  beginner`'s bodyweight check now reads the label (it read the first compound, a second definition); 3 mutations
+  caught across it and a new `test:session-derive` [23] (core day has no main lift, with a compound control).
+  `test:persona-audit-fixes`, `test:exercise-consistency`, `test:block-swap-reach`, `test:compound-order`, rest
+  floors, session length, `test:audit` green; `test:quality` result in the commit. Frontend only; existing plans keep
+  their exercises until rebuilt.
 - [x] **THE TESTER TOOLKIT (25 Nov 2026): his four rulings, "Everything", "Both", "Yes, they can untick", "Email +
   daily summary"** (asked together on his "work through all of these without stopping", each from options; my
   recommendations were errors-plus-actions, both, yes, email-plus-summary, and he chose more recording than I

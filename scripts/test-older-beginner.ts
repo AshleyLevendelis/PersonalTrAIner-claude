@@ -2,6 +2,7 @@
 // tighten the beginner and 60+ selection rules"). The five: barbell lifts on day one, pull-up negatives / assisted
 // pull-ups, a landmine press at an empty bar beside a 4 kg dumbbell press, a session called "Power", no balance work.
 // Seeded, so every run is the same plan. Every section has a contrast that shows its fixture binds.
+import { groupExercises, mainLiftGroupIndex } from '../src/lib/session-derive'
 import { bestEquipmentRank, generateMesocycle, generateExercisePlan, setRandomSource, capBeginnerSets, beginnerWorkingSets, BEGINNER_MAX_WORKING_SETS, getConstrainedPool, stageOlderBeginnerFilter, fullBodyTrackName, phaseSequenceFor } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { getExerciseEntry, EXERCISE_DATABASE, REHAB_ONLY, isRehabOnly, type ExerciseEntry } from '../src/lib/exercise-db'
@@ -268,12 +269,18 @@ console.log('\n15. HER FOUR LEFTOVERS (his "fix the four leftovers in her plan t
   check('a dumbbell row does not', bestEquipmentRank(entry('Bent-Over Dumbbell Row')) === 'high')
   check('no backpack or furniture lift in her full-gym plan', ![...herNames].some(n => /backpack|chair|towel row|table row/i.test(n)), [...herNames].filter(n => /backpack|chair|towel|table/i.test(n)).join(', '))
   // The measured offender for everyone: her own plan at 59 held a backpack row in week 5 before this.
-  // And the main-lift anchor on a day with no tier-1 lift (bodyweight): it holds for the whole plan.
+  // And the main-lift anchor on a day with no tier-1 lift (bodyweight): it holds for the whole plan. Read as the day's
+  // LABEL (25 Nov 2026, one definition of the main lift): the first tier-2 compound was a second definition, and the
+  // lift labelled main had rotated away on 861 of 4,499 days (measure:main-lift-kept).
   setRandomSource(seededRngFromKey('bwmain'))
   const bw = generateMesocycle(her({ age: 30, training_experience: 'intermediate', equipment_access: 'bodyweight', training_style: 'hybrid' }))
-  const bwMains = new Map<number, Set<string>>()
-  for (const w of bw.filter(x => !x.is_deload)) lifting([w]).forEach((d, i) => { const m = d.exercises.find(e => getExerciseEntry(e.name)?.mechanics_tier === 'tier2_compound' && getExerciseEntry(e.name)?.movement_pattern !== 'carry')?.name; if (m) (bwMains.get(i) ?? bwMains.set(i, new Set()).get(i)!).add(m) })
-  check('a bodyweight day keeps its main lift in every block (16 Nov "main lifts for the whole plan")', [...bwMains.values()].every(s => s.size === 1), [...bwMains.values()].map(s => [...s].join('/')).join(' | '))
+  // The lift LABELLED main in block 1 (25 Nov 2026, one definition of the main lift kept) is on that day in every
+  // loading week of the plan. (The label itself can still move to a harder accessory a later block adds: named in
+  // BACKLOG, measure:main-lift-kept.)
+  const bwWeeks = bw.filter(x => !x.is_deload).map(w => lifting([w]))
+  const labelOf = (d: { exercises: Parameters<typeof groupExercises>[0] }) => { const g = groupExercises(d.exercises); const gi = mainLiftGroupIndex(g, d.exercises); return gi >= 0 && g[gi].kind === 'single' ? g[gi].ex.name : undefined }
+  const bwLost = (bwWeeks[0] ?? []).flatMap((d, i) => { const m = labelOf(d); return m ? bwWeeks.filter(w => !w[i]?.exercises.some(e => e.name === m)).map(() => `${d.focus}: ${m}`) : [] })
+  check('a bodyweight day keeps its main lift in every block (16 Nov "main lifts for the whole plan")', (bwWeeks[0] ?? []).some(d => !!labelOf(d)) && bwLost.length === 0, [...new Set(bwLost)])
   // The balance hold once per warm-up.
   const twice = lifting(hersNow).filter(d => d.exercises.some(e => e.name === BALANCE_HOLD) && d.warmup?.mobility.some(m => m.name === BALANCE_HOLD))
   check('the balance hold is never both the movement prep and a warm-up line', twice.length === 0, twice.length)
