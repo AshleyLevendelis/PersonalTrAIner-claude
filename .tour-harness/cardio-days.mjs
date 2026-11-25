@@ -78,10 +78,13 @@ console.log('\n  A. The interval day')
 await load(`&today=${hiit?.date}`, 'exercise')
 await until(q('[data-testid="planned-activity"]'))
 const title = await textOf('[data-testid="activity-day-title"]')
-check('A1. the day is the session, by name', /^Cardio intervals · /.test(title ?? ''), title)
+check('A1. the day is the session, by name, under the day', /^Cardio intervals$/.test(title ?? '') && /^Today · /i.test((await ev(`document.querySelector('[data-testid="planned-activity"]')?.innerText?.trim() ?? ''`)) ?? ''), title)
 const start = await textOf('[data-testid="planned-rounds-start"]')
 const shape = hiit?.rounds ? `${hiit.rounds.rounds} × ${hiit.rounds.workSeconds}s, ${hiit.rounds.restSeconds === 60 ? '1 min' : hiit.rounds.restSeconds + 's'} rest` : '?'
-check('A2. Start runs the plan\'s own rounds', (start ?? '').startsWith(shape), { start, shape })
+// The rounds sit on the card above the big Start since 25 Nov 2026; the Start says the countdown.
+const legend = await textOf('[data-testid="planned-stat-legend"]')
+const legendShape = hiit?.rounds ? `${hiit.rounds.rounds} × ${hiit.rounds.workSeconds}s` : '?'
+check('A2. Start runs the plan\'s own rounds', /countdown|Start now/.test(start ?? '') && (legend ?? '').startsWith(legendShape) && (legend ?? '').includes(`${hiit?.rounds?.restSeconds === 60 ? '1 min' : hiit?.rounds?.restSeconds + 's'} rest`), { start, legend, shape })
 const why = await textOf('[data-testid="planned-activity"]')
 check('A3. ...and the card says where and how, low impact', /bike|rower|cross-trainer/i.test(why ?? '') && !/jump|burpee/i.test(why ?? ''), why)
 await shoot('cardio-days-intervals')

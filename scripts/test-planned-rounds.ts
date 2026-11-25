@@ -12,7 +12,7 @@
 
 import { readFileSync } from 'fs'
 import { setSupabaseClient } from '../src/lib/supabase'
-import { cardioSessionRounds, plannedRoundsOf, roundIsPlannedSession, roundsMinutes, sessionMinutesFor } from '../src/lib/planned-rounds'
+import { cardioSessionRounds, plannedRoundsOf, plannedSessionRow, stepTodayMinutes, stepTodayRounds, withTodayChange, roundIsPlannedSession, roundsMinutes, sessionMinutesFor } from '../src/lib/planned-rounds'
 import { isSensibleRoundConfig } from '../src/lib/timer-engine'
 import { executeCardioSession } from '../src/lib/pending-action-executor'
 import type { MesocycleWeek, UserProfile } from '../src/lib/types'
@@ -57,6 +57,42 @@ async function main() {
   check('...and with no minutes to check against, none is read', plannedRoundsOf({ activity: HIS.activity, reason: HIS.reason }) === null)
   check('a reason with no rounds in it is no timer', plannedRoundsOf({ activity: 'Easy Spin', duration: 30, reason: 'Keeps the legs moving between hard days.' }) === null)
   check('the stored rounds still win over the reason', same(plannedRoundsOf({ ...HIS, rounds: BIKE }), BIKE))
+
+  console.log('\n1c. Another day\'s session drawn as a weight day\'s row (his request 24 Nov 2026)')
+  {
+    const r = plannedSessionRow({ ...HIS, targetRpe: 8 })
+    check('his Wednesday: the Intervals tag, Hard effort, four segments', r.label === 'Intervals' && r.effort === 'Hard' && r.segments === 4, r)
+    check('...the legend "4 × 3 min hard" and "1 min rest"', r.dose === '4 × 3 min' && r.doseWord === 'hard' && r.rest === '1 min', r)
+    check('...and the meta line "4 rounds · 16 min"', r.meta === '4 rounds · 16 min', r.meta)
+    const short = plannedSessionRow({ activity: 'Assault Bike Rounds', duration: 10, targetRpe: 8, rounds: BIKE })
+    check('the meta line never says fewer minutes than the rounds take', short.meta === `4 rounds · ${roundsMinutes(BIKE)} min`, short.meta)
+    const walk = plannedSessionRow({ activity: 'Walk', duration: 20, targetRpe: 3 })
+    check('a steady session: the Cardio tag, one segment, "20 min easy", no rest', walk.label === 'Cardio' && walk.segments === 1 && walk.dose === '20 min' && walk.doseWord === 'easy' && walk.rest === null && walk.meta === '20 min', walk)
+    const noEffort = plannedSessionRow({ activity: 'Walk', duration: 20 })
+    check('no effort on the plan: none drawn, never guessed', noEffort.effort === null && noEffort.doseWord === 'session', noEffort)
+    const peek = readFileSync('src/components/exercise/TodayPanel.tsx', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    check('the Exercise screen draws another day\'s session with this card', /<PlannedActivityPeek /.test(peek))
+  }
+
+  console.log('\n1d. Changed for today (his request 25 Nov 2026: "can\'t do 8x3 ... change it to 6x3")')
+  {
+    const EIGHT = { rounds: 8, workSeconds: 180, restSeconds: 60 }
+    let r = EIGHT
+    r = stepTodayRounds(r, 'rounds', -1); r = stepTodayRounds(r, 'rounds', -1)
+    check('8 × 3 min, two taps down, is 6 × 3 min', same(r, { rounds: 6, workSeconds: 180, restSeconds: 60 }), r)
+    const changed = withTodayChange({ activity: 'Assault Bike Rounds', duration: 31, targetRpe: 8, reason: 'x' }, { rounds: r })
+    check('...and the session takes its rounds and the minutes they take (6 × 3 + 5 × 1 = 23)', same(plannedRoundsOf(changed), r) && changed.duration === 23, changed)
+    check('...the effort and the reason are kept', changed.targetRpe === 8 && changed.reason === 'x')
+    let low = { rounds: 2, workSeconds: 10, restSeconds: 5 }
+    low = stepTodayRounds(stepTodayRounds(stepTodayRounds(low, 'rounds', -1), 'work', -1), 'rest', -1)
+    check('it never steps below a timer the app would start: 2 rounds, 10s work, 5s rest', same(low, { rounds: 2, workSeconds: 10, restSeconds: 5 }) && plannedRoundsOf({ activity: 'X', rounds: low }) !== null, low)
+    check('work steps through the round timer\'s own steps (3:00 down is 2:00)', stepTodayRounds(EIGHT, 'work', -1).workSeconds === 120)
+    check('a steady session: five minutes a tap, 30 to 25, never under 5 or over 240', stepTodayMinutes(30, -1) === 25 && stepTodayMinutes(5, -1) === 5 && stepTodayMinutes(240, 1) === 240 && stepTodayMinutes(22, 1) === 25 && stepTodayMinutes(22, -1) === 20)
+    check('...and the session takes the minutes', withTodayChange({ activity: 'Easy jog', duration: 30 }, { minutes: 25 }).duration === 25)
+    const plain = { activity: 'Easy jog', duration: 30 }
+    check('no change: the plan itself, the same object', withTodayChange(plain, null) === plain)
+    check('a stored change that is not a timer is ignored, never half-applied', withTodayChange(plain, { rounds: { rounds: 1, workSeconds: 2, restSeconds: 0 } }) === plain && withTodayChange(plain, { minutes: 999 }) === plain)
+  }
 
   console.log('\n2. The coach\'s card carries the rounds')
   const said = 'For Muay Thai conditioning, try 4 × 3 min hard on the assault bike, 1 min rest between, like a fight. Would you like me to add this to your plan?'
@@ -122,8 +158,12 @@ async function main() {
   check('the card asks cardioSessionRounds( with the minutes, the last coach reply and his own words', /cardioSessionRounds\(rawArgs, minutes, lastCoachReply, userSaid\)/.test(builder))
   check('...and the payload carries the rounds and the session\'s minutes', /\brounds,\s*\n/.test(builder) && /minutes: sessionMinutes/.test(builder))
   const card = strip(readFileSync('src/components/exercise/RestDayCard.tsx', 'utf8'))
-  check('the day\'s card hands the row its Start, and hides the boxes while its timer runs or asks',
-    /<PlannedCardioRow prescription=\{planned\} timer=\{<PlannedSessionStart planned=\{planned\} \/>\} hideEntry=\{timerBusy\}/.test(card) && /const timerBusy = usePlannedTimerBusy\(planned\)/.test(card))
+  // THE SESSION CARD (PlannedSessionHero, 25 Nov 2026) is where the day's row now sits, with the big Start.
+  const hero = strip(readFileSync('src/components/exercise/PlannedSessionHero.tsx', 'utf8'))
+  check('the day\'s card draws the session card, which hands the row its big Start and hides the boxes while its timer runs or asks',
+    /<PlannedSessionHero dayName=\{workout\.day\} focus=\{workout\.focus\} planned=\{planned\} \/>/.test(card)
+      && /<PlannedCardioRow\s+prescription=\{planned\}\s+timer=\{<PlannedSessionStart planned=\{planned\} big \/>\}\s+hideEntry=\{timerBusy\}/.test(hero)
+      && /const timerBusy = usePlannedTimerBusy\(planned\)/.test(hero))
   check('...and the rest day\'s optional cardio gets the same Start (24 Nov 2026)',
     /<PlannedCardioRow prescription=\{cardio\} label="Optional" timer=\{<PlannedSessionStart planned=\{cardio\} \/>\} hideEntry=\{optionalBusy\}/.test(card))
   check('the countdown on Tools asks the timed session\'s question', /<PlannedCountdownLog planned=\{countdownSession\} \/>/.test(strip(readFileSync('src/components/ToolsTab.tsx', 'utf8'))))
@@ -132,7 +172,7 @@ async function main() {
   const tools = strip(readFileSync('src/components/ToolsTab.tsx', 'utf8'))
   check('the round timer logs a planned round as the session (one effort tap)', /roundIsPlannedSession\(timers\.roundConfig, p\.activity, todayDate\)/.test(tools) && /\[todaysPlanned, todaysConditioning\]/.test(tools) && /<PlannedRoundEffort/.test(tools))
   const peek = strip(readFileSync('src/components/exercise/TodayPanel.tsx', 'utf8'))
-  check('another day\'s planned session is a preview, not one sentence', /peekWorkout\?\.plannedActivity \? \(\s*<PlannedActivityPreview /.test(peek) && !/plannedActivity\.duration\} minutes\./.test(peek))
+  check('another day\'s planned session is a preview, not one sentence', /peekWorkout\?\.plannedActivity \? \(\s*<PlannedActivityPeek /.test(peek) && !/plannedActivity\.duration\} minutes\./.test(peek))
 
   console.log(`\n${ran} checks ran`)
   if (failures > 0) { console.error(`${failures} failure(s)`); process.exit(1) }

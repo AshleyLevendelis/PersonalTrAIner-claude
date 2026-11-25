@@ -118,9 +118,10 @@ if (!card.found) {
 // lifting set" ruling): "Walk · 20 min · Easy", not "20m · RPE 3".
 const word = rpe => (rpe <= 4 ? 'Easy' : rpe <= 6 ? 'Steady' : 'Hard')
 check('2. the prescription names the activity, the minutes and the effort',
+  // The session card since 25 Nov 2026: the name, then the minutes and the effort as figures ("20 min TIME", "Easy EFFORT").
   card.prescription.includes(want.activity) &&
-    card.prescription.includes(`${want.duration} min`) &&
-    (want.targetRpe == null || card.prescription.includes(`${want.duration} min · ${word(want.targetRpe)}`)),
+    card.prescription.includes(`${want.duration} min TIME`) &&
+    (want.targetRpe == null || card.prescription.includes(`${word(want.targetRpe)} EFFORT`)),
   { shown: card.prescription, want })
 
 // THE COACH'S REASON. It is written for a person and, before this, reached

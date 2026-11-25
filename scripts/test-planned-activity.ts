@@ -169,8 +169,15 @@ const readers: { file: string; must: Use[]; why: string }[] = [
     // cardio row, which is where the phrase is now printed — so the card must
     // read the field AND render that row, and the row must call the phrase.
     file: 'src/components/exercise/RestDayCard.tsx',
-    must: [{ symbol: 'plannedActivity', form: 'field' }, { symbol: '<PlannedCardioRow prescription={planned}', form: 'field' }],
+    // RE-ANCHORED 25 Nov 2026: the day's session is drawn by its own card (PlannedSessionHero, his "improve the look"),
+    // which renders the shared row; the day card must read the field and render that card.
+    must: [{ symbol: 'plannedActivity', form: 'field' }, { symbol: '<PlannedSessionHero', form: 'field' }],
     why: 'the card for the day itself — this is where the blank form was',
+  },
+  {
+    file: 'src/components/exercise/PlannedSessionHero.tsx',
+    must: [{ symbol: '<PlannedCardioRow prescription={planned}', form: 'field' }],
+    why: "the session card, which logs through the shared row",
   },
   {
     file: 'src/components/exercise/CardioSetRow.tsx',
@@ -229,7 +236,8 @@ for (const r of readers) {
   // first version compared `indexOf('plannedActivity')` — which finds the
   // const declaration near the top of the component — against the form, so it
   // was true however the JSX was ordered and proved nothing.
-  const prescriptionAt = src.indexOf('data-testid="planned-activity"')
+  // The session card (PlannedSessionHero, 25 Nov 2026) carries the planned-activity block, rendered at its own tag.
+  const prescriptionAt = src.indexOf('<PlannedSessionHero ')
   const blankFormAt = src.lastIndexOf('<ActivityLogEntry')
   check(
     'the prescription is rendered above the blank "log something else" form',

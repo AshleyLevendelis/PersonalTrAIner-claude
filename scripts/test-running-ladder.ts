@@ -237,7 +237,7 @@ const chat = readFileSync('src/components/ChatAssistant.tsx', 'utf8')
 check('the chat builds the card, applies it and can put it back',
   /buildRunningGoalProposal\(result\.proposal\.rawArgs\)/.test(chat) && /executeRunningGoal\(/.test(chat) && /row\.kind === 'propose_running_goal'\) \{\n\s+\/\/ The plan goes back/.test(chat))
 const card = readFileSync('src/components/exercise/RestDayCard.tsx', 'utf8')
-check('today\'s run card holds the run to the log and the race', /runForToday\(planned, date,/.test(card) && /data-testid="run-held-back"/.test(card))
+check('today\'s run card holds the run to the log and the race', /runForToday\(planned, date,/.test(card) && /data-testid="run-held-back"/.test(readFileSync('src/components/exercise/PlannedSessionHero.tsx', 'utf8')))
 
 void (async () => {
   console.log('\n8. A real rebuild that adds the goal at week 9')
