@@ -723,6 +723,15 @@ menu" stays true when a copy is also left outside it.
   2026) reads them from there, when they fit its minutes. A day early it stays a preview with no Start: his ruling 24 Nov 2026, "Keep it as is". Drawn as a weight day is (his request the same night): the header, an Intervals row with the effort on the right,
   a bar segment per round and "4 × 3 min hard · 1 min rest". `test:planned-rounds`, `verify:planned-rounds`. Needs the `chat-gemini` deploy
   for the coach to send rounds itself
+- **Every planned cardio session starts a timer and logs in one tap: his report 24 Nov 2026** ("add a 30min jog ... a
+  workout with timer built in", "even optional cardio on rest days"): rounds on the round timer (read from his own words,
+  the coach's reply, or the session's note when they fit), minutes on a countdown tagged with the session; the minutes it
+  ran are logged under the session's name. `test:planned-rounds`, `verify:planned-rounds` G-I
+- **Cardio days a week: his ruling 24 Nov 2026, "A, build it"** (over coach only and Profile only): setup asks someone who
+  loves cardio how many (0-3), Profile asks anyone; they take training days from lifting down to two (CSCS, mine), one
+  intervals / one steady / two intervals at three, low impact by feel, a health condition capped at RPE 7, and count as
+  the goal's conditioning; a running goal wins. The conditioning after lifting has the same Start. `test:cardio-days`,
+  `verify:cardio-days`, `verify:finisher` 5c. Needs the `cardio_days_per_week` migration
 - **Swap the session for a circuit of timer blocks, block by block** — both surfaces since
   8 Oct 2026. Ashley, from the gym: rope, push-ups, sit-ups and the bike off the round timer could
   only be logged as "Intervals". His ruling, from three options: **A, one workout made of blocks**.
@@ -1244,6 +1253,11 @@ menu" stays true when a copy is also left outside it.
   (`coach-texting`, 21 checks, 9 mutations). Whether it is one line per thing,
   and whether a question matters, stays the exam's to judge — the same split
   as the cardio ruling
+- **It explains the app's OWN reasons — his request 24 Nov 2026, "build the why sheet"**: every coaching decision the app
+  makes has a plain-words line and its reason on one sheet (`_shared/app-decisions.ts`), and each message carries the
+  lines it matches; the coach never invents the app's reason. A NEW CSCS DECISION GETS A LINE THERE in the same change
+  (the gate only sees files, not new rules in a file it already covers). `test:app-decisions`. Needs the `chat-gemini`
+  deploy and an exam run
 - Never claims a capability, screen or guarantee it lacks; proposes,
   confirms, can be undone — `coach-promises`, `chat-app-reality`,
   `pending-actions`, `log-correction`, `replace-without-losing`,

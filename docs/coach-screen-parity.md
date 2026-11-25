@@ -114,6 +114,12 @@ header alone. Count what is below before trusting what is here.
   logging, is told when numbers are off, and sees the week's average. NOT BUILT rather than decided against: a coach
   card for each.
 
+- **Cardio days a week.** `screen only`, added 24 Nov 2026 with the feature (his ruling, "A, build it";
+  `src/lib/cardio-days.ts`): asked in setup of someone who loves cardio, and Profile → Goal → "Cardio days". The coach
+  cannot set the COUNT. What it can do is the per-day half that already existed: "make Wednesday my HIIT day" is
+  `propose_cardio_session`, for every week of the block, with the rounds read from his words. NOT BUILT rather than
+  decided against: a coach card offering the count, on the running goal's shape (`propose_running_goal`).
+
 - **Which meals are cooked for him, on which days.** `screen only`, added
   11 Nov 2026 with the feature (his ruling, "Set days + optional menu"):
   Profile → Meals & shopping → "Meals cooked for me", a button a weekday. The

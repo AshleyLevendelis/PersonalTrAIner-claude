@@ -1,5 +1,6 @@
 import type { RecommendedCardio } from '@/lib/types'
 import { PlannedCardioRow } from './CardioSetRow'
+import { PlannedSessionStart, usePlannedTimerBusy } from './PlannedRoundsStart'
 import { isSeparateSession } from '@/lib/session-duration'
 
 // ---------------------------------------------------------------------------
@@ -43,11 +44,16 @@ export const SEPARATE_SESSION_NOTE = 'Not part of your lifting time. Do it any t
  *  as a second thing the session requires. And a session the plan has set
  *  apart from the lifting is never a "Finisher" at all: FinishSection below
  *  decides, so no caller can get it wrong. */
-export function FinisherRow({ cardio, onLogged, label = 'Finisher', testid }: { cardio: RecommendedCardio; onLogged?: () => void; label?: string; testid?: string }) {
+export function FinisherRow({ cardio, onLogged, label = 'Finisher', testid, withTimer = false }: { cardio: RecommendedCardio; onLogged?: () => void; label?: string; testid?: string; withTimer?: boolean }) {
+  // THE CONDITIONING AFTER LIFTING STARTS A TIMER TOO (his ruling 24 Nov 2026, "A"): rounds on the round timer, minutes
+  // on a countdown, one effort tap at the end, as a planned cardio day. Not the optional mobility close-out.
+  const busy = usePlannedTimerBusy(withTimer ? cardio : null)
   return (
     <PlannedCardioRow
       prescription={cardio}
       label={label}
+      timer={withTimer ? <PlannedSessionStart planned={cardio} /> : undefined}
+      hideEntry={busy}
       onLogged={onLogged}
       testid={testid ?? (label === 'Finisher' ? 'finisher-row' : `finisher-row-${label.toLowerCase()}`)}
     />
@@ -72,7 +78,7 @@ export function FinishSection({ cardio, mobilityFiller }: { cardio?: Recommended
           <p className="ds-label-compact" data-testid="finish-heading">Finish</p>
           {/* A filler the engine added to use spare time is counted as
               "optional" in the day's length, so its row says the same word. */}
-          {finisher && <FinisherRow cardio={finisher} label={finisher.is_filler ? 'Optional' : 'Finisher'} testid="finisher-row" />}
+          {finisher && <FinisherRow cardio={finisher} label={finisher.is_filler ? 'Optional' : 'Finisher'} testid="finisher-row" withTimer={!finisher.is_filler} />}
           {/* The optional mobility close-out on a day that already had its
               cardio and still ran short — applyDurationFiller. Its own row,
               after the cardio, because that is the order to do them in. */}
@@ -82,7 +88,7 @@ export function FinishSection({ cardio, mobilityFiller }: { cardio?: Recommended
       {separate && (
         <>
           <p className="ds-label-compact" data-testid="separate-heading">{SEPARATE_SESSION_HEADING}</p>
-          <FinisherRow cardio={separate} label={SEPARATE_SESSION_LABEL} testid="separate-session-row" />
+          <FinisherRow cardio={separate} label={SEPARATE_SESSION_LABEL} testid="separate-session-row" withTimer />
           <p className="text-xs text-muted-foreground" data-testid="separate-note">{SEPARATE_SESSION_NOTE}</p>
         </>
       )}

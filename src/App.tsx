@@ -1184,6 +1184,8 @@ function App() {
       running_goal: typeof profileRow.running_goal === 'string' ? profileRow.running_goal : null,
       running_race_date: typeof profileRow.running_race_date === 'string' ? profileRow.running_race_date : null,
       running_base_minutes: typeof profileRow.running_base_minutes === 'number' ? profileRow.running_base_minutes : null,
+      // Cardio days a week (cardio-days.ts), absent before its migration: read as none asked.
+      cardio_days_per_week: typeof profileRow.cardio_days_per_week === 'number' ? profileRow.cardio_days_per_week : null,
       // Slice 4's two settings, absent before their migration: read as the defaults.
       meal_variety: profileRow.meal_variety === 'some' || profileRow.meal_variety === 'same' ? profileRow.meal_variety : 'variety',
       show_numbers: profileRow.show_numbers !== false,
@@ -1990,6 +1992,8 @@ function App() {
         health_conditions: enrichedProfile.health_conditions ?? [],
         // The running goal (running.ts). Column pending its migration: dropped on retry below.
         running_goal: enrichedProfile.running_goal ?? null,
+        // Cardio days a week (cardio-days.ts). Column pending its migration: dropped on retry below.
+        cardio_days_per_week: enrichedProfile.cardio_days_per_week ?? null,
         meals_per_day: enrichedProfile.meals_per_day ?? 3,
         include_snacks: enrichedProfile.include_snacks ?? true,
         // NAMED HERE OR WRITTEN ONCE AND NEVER READ BACK — this insert is
@@ -2047,7 +2051,7 @@ function App() {
     // migration costs that one answer and never the whole profile.
     {
       let pending: Record<string, unknown> = profileInsert
-      const PENDING_COLUMNS = ['date_of_birth', 'enjoyed_activities', 'running_goal', 'health_conditions']
+      const PENDING_COLUMNS = ['date_of_birth', 'enjoyed_activities', 'running_goal', 'health_conditions', 'cardio_days_per_week']
       for (let tries = 0; tries < PENDING_COLUMNS.length; tries++) {
         // Whichever one the database named, in either order.
         const column = PENDING_COLUMNS.find(c => c in pending && insertError && isMissingColumnError(insertError, c))

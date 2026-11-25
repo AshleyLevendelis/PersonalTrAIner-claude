@@ -4298,7 +4298,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // THE ROUNDS HE SAID YES TO (23 Nov 2026): the coach's own three numbers, else the intervals its last reply
     // prescribed when they fit the session, so the day gets a round timer and not a line of words.
     const lastCoachReply = [...messages].reverse().find(m => m.role === 'assistant' && m.content.trim())?.content ?? null
-    const rounds = cardioSessionRounds(rawArgs, minutes, lastCoachReply)
+    const rounds = cardioSessionRounds(rawArgs, minutes, lastCoachReply, userSaid)
     const sessionMinutes = sessionMinutesFor(minutes, rounds)
     const line = `${prescriptionLine({ activity, duration: sessionMinutes, targetRpe })}${rounds ? `, ${blockShape(rounds)}` : ''}`
 

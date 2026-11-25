@@ -8,7 +8,7 @@ import { getRecentActivityDurations, DEFAULT_ACTIVITY_MINUTES, readCardioLogs } 
 import { runForToday, RUN_ACTIVITY, type RunToday } from '@/lib/running'
 import { addDays } from '@/lib/session-move'
 import type { PlannedActivity } from '@/lib/types'
-import { PlannedRoundsStart, usePlannedRound } from './PlannedRoundsStart'
+import { PlannedSessionStart, usePlannedTimerBusy } from './PlannedRoundsStart'
 import { PlannedCardioRow, UnplannedCardioEntry, CardioReceipts, useCardioReceiptsToday, type CardioPick } from './CardioSetRow'
 // Its own chunk — see the file for the measurement that put it there.
 const AddCardioSession = lazyWithReload(() => import('./AddCardioSessionSheet').then(m => ({ default: m.AddCardioSession })))
@@ -477,7 +477,8 @@ export function ActiveRecoveryCard({
   // did. This is not an add-on like recommendedCardio: it IS the session, which
   // is why it leads the card and why the card stops calling itself recovery.
   const planned = useRunHeldToLog(workout.plannedActivity, raceDate ?? null)
-  const roundState = usePlannedRound(planned)
+  const timerBusy = usePlannedTimerBusy(planned)
+  const optionalBusy = usePlannedTimerBusy(planned ? null : cardio)
   return (
     // THE RECOVERY COLOUR, as the rest day (Ashley's handoff, 4 Nov 2026, Exercise Screen option 4b): amber is for
     // warnings such as "That didn't save", and this card had kept it from before the 20 Sep rest-day rebuild.
@@ -509,7 +510,7 @@ export function ActiveRecoveryCard({
           <div className="space-y-1.5" data-testid="planned-activity">
             {/* ROUNDS RUN ON THE ROUND TIMER (23 Nov 2026): Start under the session's name, the effort tap when they
                 end, and the boxes step aside meanwhile so there is one way to log at a time. */}
-            <PlannedCardioRow prescription={planned} timer={<PlannedRoundsStart planned={planned} />} hideEntry={roundState === 'mine' || roundState === 'done'} />
+            <PlannedCardioRow prescription={planned} timer={<PlannedSessionStart planned={planned} />} hideEntry={timerBusy} />
             {planned.heldBack && (
               <p className="text-xs leading-[1.5] text-foreground px-0.5" data-testid="run-held-back">{planned.heldBack}</p>
             )}
@@ -524,7 +525,8 @@ export function ActiveRecoveryCard({
             or Light Swim" and left the person to guess which was the session —
             the same unanswerable question the type comment warns about, on
             screen instead of in the data. Found by the driver, on a real card. */}
-        {!planned && cardio && <PlannedCardioRow prescription={cardio} label="Optional" />}
+        {/* THE OPTIONAL CARDIO STARTS A TIMER TOO (24 Nov 2026), and logs the same way. */}
+        {!planned && cardio && <PlannedCardioRow prescription={cardio} label="Optional" timer={<PlannedSessionStart planned={cardio} />} hideEntry={optionalBusy} />}
         {tomorrow && <TomorrowPreview tomorrow={tomorrow} onPeek={onPeek} />}
         <ActivityLogEntry alsoLabel={!!planned} claimed={planned ? [planned.activity] : cardio ? [cardio.activity] : []} />
         {/* AN EMPTY DAY IS THE ONE YOU WANT TO FILL, and this is the card an

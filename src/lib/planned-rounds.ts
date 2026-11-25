@@ -80,11 +80,16 @@ export function cardioSessionRounds(
   args: { rounds?: unknown; work_seconds?: unknown; rest_seconds?: unknown; activity?: unknown },
   minutes: number,
   lastCoachReply?: string | null,
+  userSaid?: string | null,
 ): RoundConfig | null {
   const own = asConfig({ rounds: args.rounds as number, workSeconds: args.work_seconds as number, restSeconds: args.rest_seconds as number })
   if (own) return own
   const fromActivity = plannedRoundsOf({ activity: String(args.activity ?? '') })
   if (fromActivity) return fromActivity
+  // HIS OWN WORDS (24 Nov 2026): "add an interval workout 8 x 30 secs with 30 secs rest" names all three numbers, and
+  // the session he asked for is that one whatever the minutes the coach rounded it to.
+  const asked = parseIntervalSuggestion(userSaid)
+  if (asked && isSensibleRoundConfig(asked)) return asked
   const said = parseIntervalSuggestion(lastCoachReply)
   if (said && isSensibleRoundConfig(said) && roundsMinutes(said) <= minutes) return said
   return null

@@ -119,6 +119,10 @@ check('5b. ...holding the plan\'s minutes and its effort before any tap',
 const shot = await send('Page.captureScreenshot', { format: 'png' })
 writeFileSync(new URL('./finisher-detail.png', import.meta.url).pathname, Buffer.from(shot.result.data, 'base64'))
 
+// A START UNDER THE NAME (his ruling 24 Nov 2026, "A"): the plan's conditioning after lifting runs on the round timer
+// when it is rounds, else on a countdown, and is still logged by the ✓ without it.
+const startText = await ev(`(document.querySelector('[data-testid="finisher-row"] [data-testid="planned-rounds-start"], [data-testid="finisher-row"] [data-testid="planned-timed-start"]')?.innerText ?? '').replace(/\\s+/g, ' ').trim()`)
+check('5c. the finisher has a Start for its timer, beside the ✓', /^(\d+ × .+|Start \d+ min timer)/.test(startText) && !!(await ev(`!!document.querySelector('[data-testid="finisher-row"] [data-testid="cardio-save"]')`)), startText)
 const tapSave = await ev(`(() => {
   const n = document.querySelector('[data-testid="finisher-row"] [data-testid="cardio-save"]')
   if (!n) return false

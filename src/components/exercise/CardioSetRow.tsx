@@ -695,6 +695,21 @@ export function EaseOffAsk({ question, onDone }: { question: EaseOffQuestion; on
 // Lives here, beside the row, so every cardio log a screen writes goes through this one file (test:cardio-effort §5).
 /** LOGS A FINISHED ROUND AS THE PLANNED SESSION: its own name (so the day reads done), the timer's minutes, the
  *  rounds as the note, and the effort he tapped. Returns false when the store did not take it. */
+/**
+ * A TIMED PLANNED SESSION, LOGGED AT ITS END (24 Nov 2026): the minutes the timer actually ran (at least one), under the
+ * session's own name so the day reads done, at the effort he tapped.
+ */
+export function logPlannedTimed(args: { profileId: string; date: string; planned: { activity: string; targetRpe?: number }; minutes: number; effort: EffortKey }): boolean {
+  const view = saveCardioLog({
+    userId: args.profileId,
+    date: args.date,
+    activityName: args.planned.activity,
+    durationMinutes: Math.max(1, Math.round(args.minutes)),
+    intensityRpe: rpeToStore(args.effort, args.planned.targetRpe),
+  })
+  return !!view
+}
+
 export function logPlannedRound(args: { profileId: string; date: string; planned: { activity: string; targetRpe?: number }; config: RoundConfig; effort: EffortKey }): boolean {
   const summary = roundLogSummary(args.config)
   const view = saveCardioLog({

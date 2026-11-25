@@ -1,6 +1,7 @@
 import type { UserProfile, WorkoutDay, PlannedActivity } from '@/lib/types'
 import { PATHWAY_RUN_FOCUS } from '@/lib/pathway'
 import { addDays } from '@/lib/session-move'
+import { cardioSplitFor } from '@/lib/cardio-days'
 
 // ---------------------------------------------------------------------------
 // RUNNING (his 13 Nov 2026 strategy, slice 6, ruling 4 "the first sport is running"; built on his "Build it").
@@ -419,9 +420,18 @@ function scoreSplit(split: RunningSplit): number {
 }
 
 /** The training days a running goal leaves to lifting; everything else in the app sees only these. */
-export function liftingDaysFor(profile: Pick<UserProfile, 'running_goal' | 'training_days'>, isStartingOutPlan: boolean): Set<string> | null {
+export function liftingDaysFor(
+  profile: Pick<UserProfile, 'running_goal' | 'training_days'> & Partial<Pick<UserProfile, 'cardio_days_per_week' | 'training_experience' | 'recovery_capacity' | 'concurrent_activities'>>,
+  isStartingOutPlan: boolean,
+): Set<string> | null {
+  if (isStartingOutPlan) return null
   const goal = runningGoalOf(profile)
-  if (!goal || isStartingOutPlan) return null
+  // CARDIO DAYS A WEEK (cardio-days.ts, his 24 Nov 2026 "A"): with no running goal, the cardio days are taken out of
+  // lifting the way run days are, and added back week by week.
+  if (!goal) {
+    const split = cardioSplitFor(profile as Parameters<typeof cardioSplitFor>[0])
+    return split ? new Set(split.liftDays) : null
+  }
   const available = (profile.training_days ?? []).filter(d => d.available).map(d => d.day)
   return new Set(chooseRunningDays(available, goal).liftDays)
 }
