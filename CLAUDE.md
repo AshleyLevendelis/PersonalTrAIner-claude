@@ -1835,6 +1835,11 @@ menu" stays true when a copy is also left outside it.
   (from Health Connect, which the watch writes to) show under it, and Progress shows resting heart rate against last
   week. Read only, its own switch, phone app only; never a target or zone. `test:health-heart`, `verify:health-steps`
   §6-7. Needs migration 20261124180000 and a phone app rebuild
+- **A heart rate strap, live: his "then start working on 3", 24 Nov 2026** (option 3; options 1 and 2, the watch after each
+  session and resting on Home, built the day before): Profile pairs a strap with the phone's picker; the round timer,
+  countdown and today's workout show "♥ N" while it sends (nothing after 5s, out of range or without skin contact); each
+  session's figure comes from the strap first. Shown, never judged (CSCS, mine). `test:strap-live`, `verify:heart-strap`.
+  NOT on a real strap yet (his phone)
 - **Coach notifications reach the Android app: his request 23 Nov 2026, "yes build it for Android"**: the phone app
   uses Firebase (an `fcm:` row in the same phones table, no migration); the same switch, tags and limits as the
   website; the iPhone app says it is not built yet. `test:native-push`, `verify:reminders` §6. Needs the

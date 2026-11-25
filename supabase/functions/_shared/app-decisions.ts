@@ -438,6 +438,7 @@ export const APP_DECISIONS: AppDecision[] = [
 export const APP_DECISIONS_EXEMPT: Record<string, string> = {
   'src/lib/set-parse.ts': 'parses typed workouts; its one CSCS note points at the alias table, which has its own entry',
   'src/lib/types.ts': 'type definitions; the macro default it mentions is decided in macro-calculator.ts',
+  'src/lib/strap-live.ts': 'pairs and connects the strap and keeps its readings on the phone; it shows the number and prescribes nothing',
   'src/lib/heart-strap.ts': 'reads a chest strap over Bluetooth; it only drops readings outside 30-230 bpm, a sensor check, and prescribes nothing',
 }
 

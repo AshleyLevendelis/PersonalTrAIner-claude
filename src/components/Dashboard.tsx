@@ -420,6 +420,8 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     const pull = () => {
       void import('@/lib/health-heart')
         .then(async m => {
+          // A PAIRED STRAP (option 3, strap-live.ts) fills first, so its figure is the one kept where both exist.
+          await m.fillHeartFromStrap(id, date)
           if (!m.isHealthHeartConnected()) { if (live) setRestingLine(null); return }
           await m.syncHeartFromHealth(id, date)
           const trend = m.restingTrend(await m.readRestingHeartRate(id, date), date)

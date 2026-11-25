@@ -12,12 +12,23 @@
 // judged.
 // ---------------------------------------------------------------------------
 
-import { summariseHeartRate, type HeartSummary } from './health-heart'
 
 export const HEART_RATE_SERVICE = '0000180d-0000-1000-8000-00805f9b34fb'
 export const HEART_RATE_MEASUREMENT = '00002a37-0000-1000-8000-00805f9b34fb'
 
 const isPlausibleBpm = (n: number) => Number.isFinite(n) && n >= 30 && n <= 230
+
+export interface HeartSummary { avg: number; max: number; readings: number }
+
+/** The average and highest heart rate between two instants, or null with fewer than three believable readings. The
+ *  one rule for a session's figure, from a watch (health-heart.ts) or this strap. */
+export function summariseHeartRate(samples: { bpm: number; at: string }[], start: Date, end: Date): HeartSummary | null {
+  const s = start.getTime(), e = end.getTime()
+  const inside = samples.filter(x => isPlausibleBpm(x.bpm) && Date.parse(x.at) >= s && Date.parse(x.at) <= e).map(x => x.bpm)
+  if (inside.length < 3) return null
+  const avg = Math.round(inside.reduce((a, b) => a + b, 0) / inside.length)
+  return { avg, max: Math.round(Math.max(...inside)), readings: inside.length }
+}
 
 /** One Heart Rate Measurement notification, or null when it carries nothing to believe. */
 export function parseHeartRateMeasurement(value: DataView): number | null {
@@ -53,6 +64,15 @@ export class StrapReadings {
   /** The average and highest between two instants (a log's own time), or null with fewer than three readings. */
   summary(start: Date, end: Date): HeartSummary | null {
     return summariseHeartRate(this.samples, start, end)
+  }
+
+  /** Every reading held, oldest first (a copy). */
+  all(): { bpm: number; at: string }[] { return [...this.samples] }
+
+  /** Readings older than `t` go: once every session that could use them has its figure. */
+  dropBefore(t: Date): void {
+    const cut = t.getTime()
+    this.samples = this.samples.filter(s => Date.parse(s.at) >= cut)
   }
 
   clear(): void { this.samples = []; this.lastAt = 0 }

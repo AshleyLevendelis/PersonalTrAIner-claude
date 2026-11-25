@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Personal TrAIner connects to your heart rate strap so the timer and your workout can show your heart rate while you train. It reads heart rate only.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Personal TrAIner reads your step count so your daily steps fill in on Home without typing them. It reads steps only and never writes to Health.</string>
   <key>CAPACITOR_DEBUG</key>

@@ -2,6 +2,32 @@
 
 Newest first. One line each.
 
+- [x] **A HEART RATE STRAP, LIVE WHILE HE TRAINS (option 3, stage 2; his "then start working on 3", 24 Nov 2026)**.
+  BUILT 25 Nov 2026 (`docs/plans/live-heart-rate.md`): Profile → "Steps from your phone" → "Heart rate strap" → Find my
+  strap opens the phone's own Bluetooth picker, filtered to things sending heart rate; the strap is remembered on this
+  phone and connected whenever the app opens or comes back to the front. While it sends, the round timer (running), the
+  countdown and today's workout (beside the sets done) show "♥ N"; a reading over 5 seconds old, a strap out of range,
+  and a reading the strap took without skin contact are never shown. One store for all three (`strap-live.ts`). Readings
+  stay on the phone (the last four hours, written down when the app goes to the back); each session's average and
+  highest come from them FIRST, then the watch route fills what is left, so the strap's figure is kept where both exist.
+  Readings no session still needs are dropped; the last two hours always stay (a cardio log typed in later). The
+  session-figure rule moved into `heart-strap.ts` (no imports) so the live number does not pull the watch sync into the
+  first download; health-heart re-exports it, one rule for both sources.
+  Mine (measurement, CSCS): stale after 5s; nothing judges the number (no zone, target, colour); the strap prescribes
+  nothing and safety stays the red-flag rule. Android: BLUETOOTH_SCAN declared neverForLocation, BLUETOOTH_CONNECT, and
+  the location permissions the plugin declares for every version capped at Android 11 (where a scan still needs them).
+  iPhone: the Bluetooth sentence added to Info.plist (no iPhone app built yet). Plugin `@capacitor-community/bluetooth-le`
+  8.3.0, loaded by a dynamic import inside the phone app only. Bundle: app chunk 1665 -> 1672 (measured 1663), total
+  3374 -> 3401 (measured 3392, the plugin's own chunk).
+  VERIFIED: `test:strap-live` (33 checks), `verify:heart-strap` (Profile 12, timers 8, today's workout 4), with a pretend
+  strap sending the real notification bytes; screenshots read. MUTATIONS 15, 14 caught: the one MISSED first (a session
+  still running past two hours losing its readings) exposed a gate whose running session was inside the two hours that
+  always stay; a three-hour session was added and catches it. The other miss is equivalent (the strap row showing a
+  number only while 'connected': the number is already gone the moment the link drops), recorded, not given a check. NOT PROVEN: a real strap on a
+  real phone (stage 3, his machine): pairing, the phone's permission sheets, reconnecting after the screen locks, and
+  whether Android keeps the link while the app is in the back. OPEN, HIS: the Play store's nearby-devices form; whether
+  the coach is told a session's heart rate.
+
 - [x] **HEART RATE FROM A WATCH OR STRAP, AFTER EACH SESSION AND AT REST (his "1 + 2, build it", 24 Nov 2026)**.
   His question: pair heart sensors from a watch or monitor and feed the data in. Options put to him: 1 heart rate after
   each session, 2 resting heart rate on Home, 3 live heart rate from a Bluetooth strap during a session. He chose 1 and

@@ -29,19 +29,13 @@ function setHeartConnected(on: boolean): void {
   try { if (on) localStorage.setItem(HEALTH_HEART_CONNECTED_KEY, '1'); else localStorage.removeItem(HEALTH_HEART_CONNECTED_KEY) } catch { /* asked again */ }
 }
 
-export interface HeartSummary { avg: number; max: number; readings: number }
+// The session figure's rule lives with the strap's reader (heart-strap.ts, no imports), so the live number on the
+// timer does not pull this file into the first download. One rule, both sources.
+import { summariseHeartRate, type HeartSummary } from './heart-strap'
+export { summariseHeartRate, type HeartSummary }
 
-const isPlausibleBpm = (n: number) => Number.isFinite(n) && n >= 30 && n <= 230
 const isPlausibleResting = (n: number) => Number.isFinite(n) && n >= 25 && n <= 140
 
-/** The average and highest heart rate between two instants, or null with fewer than three believable readings. */
-export function summariseHeartRate(samples: { bpm: number; at: string }[], start: Date, end: Date): HeartSummary | null {
-  const s = start.getTime(), e = end.getTime()
-  const inside = samples.filter(x => isPlausibleBpm(x.bpm) && Date.parse(x.at) >= s && Date.parse(x.at) <= e).map(x => x.bpm)
-  if (inside.length < 3) return null
-  const avg = Math.round(inside.reduce((a, b) => a + b, 0) / inside.length)
-  return { avg, max: Math.round(Math.max(...inside)), readings: inside.length }
-}
 
 /**
  * A CARDIO LOG'S TIME IS A GUESS when it was typed in later ("I ran this morning", logged at lunch): its minutes back
@@ -167,6 +161,52 @@ export async function syncHeartFromHealth(profileId: string, today: string, now:
       if (!error) done.restingDays = rows.length
     }
   } catch { /* a failed read changes nothing */ }
+  return done
+}
+
+// ---------------------------------------------------------------------------
+// THE STRAP'S OWN READINGS (option 3, strap-live.ts): a paired strap gives a session its figure from the readings taken
+// while it ran, with no Health Connect needed. It runs BEFORE syncHeartFromHealth at every moment the two share, and
+// both fill only a session with no figure yet, so where both exist the strap's is the one kept (the session's own
+// readings, a second apart, against a watch's every few minutes). The same windows and the same cardio guard as above.
+// Readings no session could still need are then dropped from the phone.
+// ---------------------------------------------------------------------------
+export async function fillHeartFromStrap(profileId: string, today: string): Promise<{ cardio: number; workouts: number }> {
+  const done = { cardio: 0, workouts: 0 }
+  const strap = await import('./strap-live')
+  if (!strap.pairedStrap()) return done
+  const yesterday = addDays(today, -1)
+  // The earliest moment a session without its figure still needs readings from; nothing before it is kept.
+  let keepFrom: number = Date.now()
+  const needs = (start: Date) => { keepFrom = Math.min(keepFrom, start.getTime()) }
+  try {
+    const { data: cardio } = await supabase.from('cardio_logs').select('*').eq('user_id', profileId).in('date', [yesterday, today])
+    for (const row of (cardio ?? []) as { id?: string; avg_heart_rate?: number | null; completed_at?: string | null; duration_minutes: number }[]) {
+      if (!row.id || row.avg_heart_rate != null) continue
+      const w = cardioWindow(row)
+      if (!w) continue
+      const sum = strap.strapReadingsBetween(w.start, w.end)
+      if (!sum || !looksLikeExercise(sum)) continue
+      const { error } = await supabase.from('cardio_logs').update({ avg_heart_rate: sum.avg, max_heart_rate: sum.max }).eq('id', row.id)
+      if (!error) done.cardio++
+      else needs(w.start)
+    }
+    const { data: sessions } = await supabase.from('workout_sessions').select('*').eq('profile_id', profileId).in('date', [yesterday, today])
+    for (const row of (sessions ?? []) as { id?: string; avg_heart_rate?: number | null; started_at?: string | null; finished_at?: string | null; is_completed?: boolean }[]) {
+      if (!row.id || row.avg_heart_rate != null) continue
+      // A session still running needs every reading from its start.
+      if (!row.is_completed) { if (row.started_at && !Number.isNaN(Date.parse(row.started_at))) needs(new Date(row.started_at)); continue }
+      const w = workoutWindow(row)
+      if (!w) continue
+      const sum = strap.strapReadingsBetween(w.start, w.end)
+      if (!sum) continue
+      const { error } = await supabase.from('workout_sessions').update({ avg_heart_rate: sum.avg, max_heart_rate: sum.max }).eq('id', row.id)
+      if (!error) done.workouts++
+      else needs(w.start)
+    }
+    // Readings are kept for a cardio log typed in up to its own minutes later, so the last 2 hours always stay.
+    strap.forgetStrapReadingsBefore(new Date(Math.min(keepFrom, Date.now() - 2 * 3600000)))
+  } catch { /* a failed read changes nothing, and keeps every reading */ }
   return done
 }
 

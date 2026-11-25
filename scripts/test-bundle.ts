@@ -515,7 +515,9 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 23 Nov 2026: 1617 -> 1651, the same two changes. MEASURED 1626 through this gate; 25 kB over today.
   // MOVED 25 Nov 2026: 1651 -> 1665. Crossed by the cardio-timer, cardio-days and Android-notification branch merged
   // with main's moved-sets, testing-week and warm-up work. MEASURED 1656 on the merged tree; 9 kB over today.
-  const APP_CHUNK_BUDGET_KB = 1665
+  // MOVED 25 Nov 2026: 1665 -> 1672, the live heart rate on the timer, countdown and workout (strap-live.ts, the
+  // one store all three read). MEASURED 1663; 9 kB over today.
+  const APP_CHUNK_BUDGET_KB = 1672
   // 23 Nov 2026, main merged on top: MEASURED 1635, under the line, so it did not move.
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
@@ -836,7 +838,9 @@ console.log('\n3. Nothing has crept back up')
   // with main's moved-sets, testing-week and warm-up work. MEASURED 3356 on the merged tree; 9 kB over today.
   // MOVED 25 Nov 2026: 3365 -> 3374, the heart-rate reader (watch after each session and at rest) merged in, all
   // in its own lazy chunk. MEASURED 3365; 9 kB over today.
-  const TOTAL_BUDGET_KB = 3374
+  // MOVED 25 Nov 2026: 3374 -> 3401, the Bluetooth plugin's own chunk, loaded only inside the phone app, and the
+  // live heart rate. MEASURED 3392; 9 kB over today.
+  const TOTAL_BUDGET_KB = 3401
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)

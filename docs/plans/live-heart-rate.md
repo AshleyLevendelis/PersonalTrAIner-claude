@@ -40,7 +40,7 @@ DIRECTLY, while he trains, so the number is live.
 
 1. Parser + adapter + store of readings, with a gate (cloud).
 2. Profile pairing row, the live "♥" on the timer and workout, the after-session figure; a fake strap for the browser
-   driver (cloud).
+   driver (cloud). BUILT 25 Nov 2026 (BACKLOG).
 3. On his phone: pair a real strap, run a round, check the live number and the saved figure (his machine).
 
 ## Open, his
