@@ -133,8 +133,8 @@ export const APP_DECISIONS: AppDecision[] = [
     rule: 'Each block asks something different: Adaptation fewer sets, higher reps, shorter rest, easy effort; Hypertrophy more sets at a harder effort; Strength fewer reps and longer rest; Power longer rest at a lower effort.',
     why: 'A plan moves through blocks so each one builds on the last instead of repeating the same week.' },
   { area: 'Progression', anchor: { file: 'src/lib/periodization.ts', token: 'stepHoldSeconds' }, also: ['plank', 'hold', 'seconds'],
-    rule: 'Timed holds like planks add 5 seconds in week 2 and 10 in week 3 of a block, then drop back in the deload.',
-    why: 'One second a week is too small to feel; holds go up in round steps to about a minute, then the exercise itself gets harder.' },
+    rule: 'Timed holds like planks go up 5 seconds a week inside a block: week 2 is 5 seconds longer than week 1, week 3 is 10 seconds longer than week 1 (for example 30-45s, then 35-50s, then 40-55s), and the deload week goes back to week 1\'s time.',
+    why: 'One second a week is too small to feel or count, so a hold goes up in 5-second steps; going back to week 1\'s time in the deload is a real back-off, about ten seconds shorter than the week before.' },
   { area: 'Progression', anchor: { file: 'src/lib/mesocycle-edit.ts', token: 'swapExerciseInMesocycle' }, also: ['swap', 'swapped exercise', 'whole block'],
     rule: 'A lift swapped in for the whole block with no logged weight starts at the first-week price and climbs one step a loading week towards the estimate, never past it.',
     why: 'The plan\'s own untested lifts progress the same way.' },
@@ -491,6 +491,6 @@ export function appDecisionsFor(message: string): string {
   const picked = pickAppDecisions(message)
   const lines = picked.map(d => `- ${d.rule}${d.why ? ` Why: ${d.why}` : ' (No reason is recorded for this one: say what it does, not why.)'}`)
   return `=== 1-WHY-APP. WHY THE APP DID WHAT IT DID ===
-When they ask why the app did something to their plan, food or screen (a weight, a rest, a set count, an exercise, a target, a timer), answer with the app's OWN reason below, in your words, tied to them. Never give a different reason of your own as if it were the app's. If the reason is not below, say what the plan shows and that you do not have the app's reasoning for that one; do not invent it. Your own general knowledge is still yours for questions that are not about why the app did something.
+When they ask why the app did something to their plan, food or screen (a weight, a rest, a set count, an exercise, a target, a timer), answer with the app's OWN reason below, in your words, tied to them. Never give a different reason of your own as if it were the app's. Keep an entry's numbers and weeks exactly as written: never round, merge or widen them ("5 to 10 seconds each week" for "5 seconds a week"), and never add a step the entry does not state, such as the exercise changing. If the reason is not below, say what the plan shows and that you do not have the app's reasoning for that one; do not invent it. Your own general knowledge is still yours for questions that are not about why the app did something.
 ${lines.length ? `HOW THE APP DECIDES, the entries that match this message:\n${lines.join('\n')}` : 'No entry of the app\'s own reasons matches this message.'}`
 }
