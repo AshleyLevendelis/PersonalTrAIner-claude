@@ -9,6 +9,7 @@ import type { EffortKey } from '@/lib/cardio-effort'
 import { tabHash } from '@/lib/app-route'
 import { PLANNED_ROUNDS_WORDS, plannedRoundsOf, roundIsPlannedSession } from '@/lib/planned-rounds'
 import { EffortBox, logPlannedRound, logPlannedTimed, useCardioLogsToday } from './CardioSetRow'
+import { PRIMARY_CTA_CLASS, PRIMARY_CTA_STYLE } from '@/components/OnePage'
 
 // ---------------------------------------------------------------------------
 // START THE PLANNED ROUNDS, AND LOG THEM WHEN THEY END (Ashley, 23 Nov 2026, option A): "you could just start the
@@ -59,7 +60,7 @@ export function usePlannedRound(planned: Planned | null | undefined): 'none' | '
   return timers.isRoundComplete ? 'done' : 'mine'
 }
 
-export function PlannedRoundsStart({ planned }: { planned: Planned }) {
+export function PlannedRoundsStart({ planned, big = false }: { planned: Planned; big?: boolean }) {
   const { date } = useActiveSession()
   const timers = useTimers()
   const state = usePlannedRound(planned)
@@ -83,7 +84,8 @@ export function PlannedRoundsStart({ planned }: { planned: Planned }) {
   const lead = timers.timerPrefs.countdownSeconds
   return (
     <Button
-      className="w-full min-h-11 gap-2"
+      className={big ? `${PRIMARY_CTA_CLASS} gap-2` : 'w-full min-h-11 gap-2'}
+      style={big ? PRIMARY_CTA_STYLE : undefined}
       data-testid="planned-rounds-start"
       onClick={() => {
         timers.startRound({ ...config, leadInSeconds: lead, planned: { activity: planned.activity, date } })
@@ -91,7 +93,8 @@ export function PlannedRoundsStart({ planned }: { planned: Planned }) {
       }}
     >
       <Play className="size-4" />
-      {`${blockShape(config)} · ${startLabel(lead)}`}
+      {/* THE BIG START SAYS ONLY WHAT THE TAP DOES: the session's card shows the rounds above it. */}
+      {big ? startLabel(lead) : `${blockShape(config)} · ${startLabel(lead)}`}
     </Button>
   )
 }
@@ -155,7 +158,7 @@ export function PlannedTimedEffort({ planned, onLogged }: { planned: Planned; on
   )
 }
 
-export function PlannedTimedStart({ planned }: { planned: Planned }) {
+export function PlannedTimedStart({ planned, big = false }: { planned: Planned; big?: boolean }) {
   const { date } = useActiveSession()
   const timers = useTimers()
   const state = usePlannedTimed(planned)
@@ -181,7 +184,8 @@ export function PlannedTimedStart({ planned }: { planned: Planned }) {
   }
   return (
     <Button
-      className="w-full min-h-11 gap-2"
+      className={big ? `${PRIMARY_CTA_CLASS} gap-2` : 'w-full min-h-11 gap-2'}
+      style={big ? PRIMARY_CTA_STYLE : undefined}
       data-testid="planned-timed-start"
       onClick={() => { timers.startCountdown(minutes * 60_000, { activity: planned.activity, date }); openIt() }}
     >
@@ -192,8 +196,8 @@ export function PlannedTimedStart({ planned }: { planned: Planned }) {
 }
 
 /** THE START FOR ANY PLANNED CARDIO: the round timer for rounds, the countdown for minutes. */
-export function PlannedSessionStart({ planned }: { planned: Planned }) {
-  return plannedRoundsOf(planned) ? <PlannedRoundsStart planned={planned} /> : <PlannedTimedStart planned={planned} />
+export function PlannedSessionStart({ planned, big = false }: { planned: Planned; big?: boolean }) {
+  return plannedRoundsOf(planned) ? <PlannedRoundsStart planned={planned} big={big} /> : <PlannedTimedStart planned={planned} big={big} />
 }
 
 /** While the session's timer runs or asks how hard it was, the row's boxes step aside: one way to log at a time. */

@@ -138,8 +138,12 @@ async function main() {
   check('the card asks cardioSessionRounds( with the minutes, the last coach reply and his own words', /cardioSessionRounds\(rawArgs, minutes, lastCoachReply, userSaid\)/.test(builder))
   check('...and the payload carries the rounds and the session\'s minutes', /\brounds,\s*\n/.test(builder) && /minutes: sessionMinutes/.test(builder))
   const card = strip(readFileSync('src/components/exercise/RestDayCard.tsx', 'utf8'))
-  check('the day\'s card hands the row its Start, and hides the boxes while its timer runs or asks',
-    /<PlannedCardioRow prescription=\{planned\} timer=\{<PlannedSessionStart planned=\{planned\} \/>\} hideEntry=\{timerBusy\}/.test(card) && /const timerBusy = usePlannedTimerBusy\(planned\)/.test(card))
+  // THE SESSION CARD (PlannedSessionHero, 25 Nov 2026) is where the day's row now sits, with the big Start.
+  const hero = strip(readFileSync('src/components/exercise/PlannedSessionHero.tsx', 'utf8'))
+  check('the day\'s card draws the session card, which hands the row its big Start and hides the boxes while its timer runs or asks',
+    /<PlannedSessionHero dayName=\{workout\.day\} focus=\{workout\.focus\} planned=\{planned\} \/>/.test(card)
+      && /<PlannedCardioRow\s+prescription=\{planned\}\s+timer=\{<PlannedSessionStart planned=\{planned\} big \/>\}\s+hideEntry=\{timerBusy\}/.test(hero)
+      && /const timerBusy = usePlannedTimerBusy\(planned\)/.test(hero))
   check('...and the rest day\'s optional cardio gets the same Start (24 Nov 2026)',
     /<PlannedCardioRow prescription=\{cardio\} label="Optional" timer=\{<PlannedSessionStart planned=\{cardio\} \/>\} hideEntry=\{optionalBusy\}/.test(card))
   check('the countdown on Tools asks the timed session\'s question', /<PlannedCountdownLog planned=\{countdownSession\} \/>/.test(strip(readFileSync('src/components/ToolsTab.tsx', 'utf8'))))
