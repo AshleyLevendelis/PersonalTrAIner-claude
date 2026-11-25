@@ -434,7 +434,7 @@ function CardioCard({ cardio, live, picks, onChange, onTick, onRemove }: {
   )
 }
 
-function ExercisePicker({ profile, exclusions, onPick, onCancel }: { profile?: UserProfile | null; exclusions?: string[]; onPick: (name: string) => void; onCancel: () => void }) {
+export function ExercisePicker({ profile, exclusions, onPick, onCancel }: { profile?: UserProfile | null; exclusions?: string[]; onPick: (name: string) => void; onCancel: () => void }) {
   const [q, setQ] = useState('')
   const [ready, setReady] = useState(0)
   useEffect(() => { let alive = true; void ensureNearCopies().then(() => { if (alive) setReady(n => n + 1) }); return () => { alive = false } }, [])

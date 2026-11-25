@@ -519,7 +519,9 @@ console.log('\n3. Nothing has crept back up')
   // that day) measured 1665 kB, on the line; 4 kB above the measured value, on a screen drawn every cardio day.
   // MOVED 25 Nov 2026: 1669 -> 1677, his own workout on any day (the day's list and its Start; the workout screen itself
   // is its own chunk). MEASURED 1671 through this gate on the change; 6 kB over it.
-  const APP_CHUNK_BUDGET_KB = 1677
+  // MOVED 25 Nov 2026 again: 1677 -> 1685, "My workouts" (the day's choice, planned cards and the phone-first store;
+  // the builder is its own chunk). MEASURED 1679 through this gate; 6 kB over it.
+  const APP_CHUNK_BUDGET_KB = 1685
   // 23 Nov 2026, main merged on top: MEASURED 1635, under the line, so it did not move.
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
@@ -841,7 +843,8 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 25 Nov 2026 again: 3365 -> 3370, the same card, measured 3366 kB.
   // MOVED 25 Nov 2026: 3370 -> 3396, his own workout: the workout screen's own chunk (fetched when he opens one) and
   // the day's list. MEASURED 3390 through this gate; 6 kB over it.
-  const TOTAL_BUDGET_KB = 3396
+  // MOVED 25 Nov 2026 again: 3396 -> 3413, "My workouts" and its builder chunk. MEASURED 3407; 6 kB over it.
+  const TOTAL_BUDGET_KB = 3413
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)

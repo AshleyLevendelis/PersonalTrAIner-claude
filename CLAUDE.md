@@ -664,7 +664,9 @@ menu" stays true when a copy is also left outside it.
 separate workout", not sets added to the plan's): Start it today (rest day, or "a separate workout" beside the plan's) or
 log one on a past day; add exercises as you go, tick sets, your own rest by hand, cardio, Finish. Its sets are ordinary
 sets numbered after the day's (never over the plan's); a plan day stays the plan's. **"Both"** (his, for step 2): saved
-workouts in a list AND optionally on a day. `test:own-workout`, `verify:own-workout`, `docs/plans/own-workouts.md`
+workouts in a list AND optionally on a day; BUILT (Start opens Empty or a saved one; "Plan a workout" a day ahead; phone
+first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workout`, `test:rls-local` §11,
+`docs/plans/own-workouts.md`. Needs the `own_workouts` migration
 
 **Changing one workout**
 - Move it to another day; it leaves today on every screen — both surfaces

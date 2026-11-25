@@ -14,6 +14,17 @@ import {
   stepOwnRest, restWords, readWeight, readReps, newOwnWorkout, saveOwnWorkout, loadOwnWorkouts, ownWorkoutsOn,
   removeOwnWorkout, hasAnythingSaved, OWN_DEFAULT_REST, type OwnWorkout,
 } from '../src/lib/own-workout'
+import {
+  mergePlans, workoutFromPlan, planProblem, stepPlanSets, planSummary, newOwnPlan, newPlanLift, newPlanCardio, saveOwnPlan,
+  ownPlans, ownPlansOn, setPlanOnDate, deleteOwnPlan, type OwnPlan,
+} from '../src/lib/own-workout-plans'
+import { setSupabaseClient } from '../src/lib/supabase'
+
+const sent: Array<Record<string, unknown>> = []
+setSupabaseClient({
+  from: () => ({ upsert: (row: Record<string, unknown>) => { sent.push(row); return Promise.resolve({ error: null }) } }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+} as any)
 
 const store = new Map<string, string>()
 ;(globalThis as unknown as { localStorage: Storage }).localStorage = {
@@ -89,6 +100,47 @@ check('a damaged copy reads as nothing, never a crash', loadOwnWorkouts('p3').le
 store.set('fitplan_own_workouts_v1:p4', JSON.stringify({ not: 'a list' }))
 store.set('fitplan_own_workouts_v1:p5', JSON.stringify([{ id: 'ok', date: '2026-11-25', items: [] }, { junk: true }, null]))
 check('a copy that is not a list reads as nothing; a list keeps only real workouts', loadOwnWorkouts('p4').length === 0 && loadOwnWorkouts('p5').map(w => w.id).join() === 'ok')
+
+console.log('\n7. My workouts: built ahead, kept, started')
+const empty = newOwnPlan('2026-11-25T08:00:00.000Z')
+check('a workout needs a name, then one thing in it; nothing else', planProblem(empty) === 'Give it a name.' && planProblem({ ...empty, name: 'Push' }) === 'Add an exercise or a cardio.' && planProblem({ ...empty, name: 'Push', items: [newPlanCardio('Run', '20')] }) === null)
+check('a whitespace name is no name', planProblem({ ...empty, name: '   ', items: [newPlanCardio('Run', '20')] }) === 'Give it a name.')
+const bench = newPlanLift('Barbell Bench Press')
+check('an exercise goes in at 3 sets of 8-10, 90 s rest, its catalogue id', bench.sets === 3 && bench.reps === '8-10' && bench.restSeconds === 90 && bench.exerciseId === 'barbell-bench-press', bench)
+check('sets step 1 to 10 and hold there', stepPlanSets(1, -1) === 1 && stepPlanSets(10, 1) === 10 && stepPlanSets(3, 1) === 4)
+const push: OwnPlan = { ...empty, id: 'push', name: 'Push', items: [{ ...bench, sets: 4, reps: '6-8', weight: '60', restSeconds: 120 }, newPlanCardio('Run', '20')] }
+check('"1 exercise · 4 sets · 1 cardio"', planSummary(push) === '1 exercise · 4 sets · 1 cardio', planSummary(push))
+const started = workoutFromPlan(push, '2026-11-26', 'live', '2026-11-26T07:00:00.000Z', id => (id === 'barbell-bench-press' ? [1, 2] : []))
+const sl = started.items[0]
+check('started: named as saved, from the plan, live', started.name === 'Push' && started.planId === 'push' && started.mode === 'live' && started.date === '2026-11-26')
+check('...4 sets with his weight and the FIRST number of his reps in the boxes, nothing done', sl.kind === 'lift' && sl.sets.length === 4 && sl.sets.every(x => x.weight === '60' && x.reps === '6' && !x.done), sl)
+check('...numbered after the day\'s sets 1 and 2: 3, 4, 5, 6', sl.kind === 'lift' && sl.sets.map(x => x.setNumber).join() === '3,4,5,6', sl.kind === 'lift' ? sl.sets.map(x => x.setNumber) : null)
+check('...his rest, and the cardio with its minutes and no effort chosen', sl.kind === 'lift' && sl.restSeconds === 120 && started.items[1].kind === 'cardio' && started.items[1].minutes === '20' && started.items[1].effort === null)
+check('reps with no number ("AMRAP") leave the box empty', workoutFromPlan({ ...push, items: [{ ...bench, reps: 'AMRAP' }] }, '2026-11-26', 'live', '', () => []).items[0].kind === 'lift' && (workoutFromPlan({ ...push, items: [{ ...bench, reps: 'AMRAP' }] }, '2026-11-26', 'live', '', () => []).items[0] as { sets: { reps: string }[] }).sets[0].reps === '')
+
+console.log('\n8. Two phones meet')
+const L: OwnPlan = { ...push, updatedAt: '2026-11-25T10:00:00.000Z' }
+const Rold: OwnPlan = { ...push, name: 'Old', updatedAt: '2026-11-25T09:00:00.000Z' }
+const Rnew: OwnPlan = { ...push, name: 'Newer', updatedAt: '2026-11-25T11:00:00.000Z' }
+const m1 = mergePlans([L], [Rold])
+check('the phone\'s newer edit wins and is sent', m1.merged[0].name === 'Push' && m1.toSend.length === 1)
+const m2 = mergePlans([L], [Rnew])
+check('the table\'s newer edit wins and nothing is sent', m2.merged[0].name === 'Newer' && m2.toSend.length === 0)
+const m3 = mergePlans([], [{ ...push, id: 'other' }])
+check('one only on the table comes to the phone', m3.merged.length === 1 && m3.merged[0].id === 'other')
+const m4 = mergePlans([{ ...L, deleted: true, updatedAt: '2026-11-25T12:00:00.000Z' }], [Rnew])
+check('a removal made later wins over an older edit on another phone, and is sent', m4.merged[0].deleted === true && m4.toSend.length === 1)
+
+console.log('\n9. Kept on the phone, sent on')
+saveOwnPlan('p9', push, '2026-11-25T10:00:00.000Z')
+check('saved: listed, and sent to the table', ownPlans('p9').length === 1 && sent.some(r => r.id === 'push' && r.user_id === 'p9' && r.name === 'Push'))
+setPlanOnDate('p9', 'push', '2026-11-27', true, '2026-11-25T10:01:00.000Z')
+setPlanOnDate('p9', 'push', '2026-11-27', true, '2026-11-25T10:02:00.000Z')
+check('put on a day (twice is still once)', JSON.stringify(ownPlans('p9')[0].onDates) === '["2026-11-27"]' && ownPlansOn('p9', '2026-11-27').length === 1)
+setPlanOnDate('p9', 'push', '2026-11-27', false, '2026-11-25T10:03:00.000Z')
+check('taken off it, still saved', ownPlansOn('p9', '2026-11-27').length === 0 && ownPlans('p9').length === 1)
+deleteOwnPlan('p9', 'push', '2026-11-25T10:04:00.000Z')
+check('deleted: gone from the list, sent as removed', ownPlans('p9').length === 0 && sent[sent.length - 1]?.deleted === true)
 
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.log(`${failures} FAILED`); process.exit(1) }

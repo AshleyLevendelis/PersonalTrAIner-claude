@@ -58,6 +58,8 @@ export interface OwnWorkout {
   startedAtIso: string
   finishedAtIso: string | null
   items: OwnItem[]
+  /** The saved workout it was started from ("My workouts"), when it was. */
+  planId?: string
 }
 
 /** The rests a lifter actually picks, 30 s to 5 min. CSCS, mine: 90 s is the default, a middle rest for most lifts. */

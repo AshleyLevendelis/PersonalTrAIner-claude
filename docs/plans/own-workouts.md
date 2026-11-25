@@ -40,13 +40,23 @@ And the same day: "The I also did button just adds sets to the existing workout 
    again), your own rest, cardio with minutes, km and effort, a name, Finish. A past day has no ticks or timers and one
    Save, written at that day's noon. The day lists every workout of his own on it. The name and list are kept on the
    phone in this step (sets and cardio are in the database).
-2. **My workouts.** Build ahead (exercises, sets x reps, a weight if he wants, rest), save by name, start from any day;
-   put one on a day (strip and card show it, Start on the day). A table for workouts, so they reach every phone and
-   step 1's records move up to it. Needs a migration.
+2. **My workouts (BUILT 25 Nov 2026).** Start now opens a choice: "Empty workout", or one of his saved workouts. "Build
+   a new workout": a name, each exercise with sets (1-10), reps as he writes them ("8-10"), an optional weight and his
+   rest, cardio with minutes, reorder and remove; Save keeps it by name, Edit and Delete from the pencil. A day ahead
+   offers "Plan a workout": pick a saved one (or build one there) and it is on that day, "Take off" removes it. On the
+   day it shows "Planned · your workout" with Start (today) or "Log it" (a past day); started, it opens ready (his sets
+   in the boxes, the first number of his reps, his weight and rest, numbered after the day's) and the planned card goes.
+   Stored on the phone first (a gym with no signal) and in `own_workouts` where phones meet: the newer edit wins, a
+   deletion is kept as removed so another phone cannot copy it back. Before the migration is applied everything works on
+   the phone that made it, and the choice says so. CSCS, mine: a new exercise goes in at 3 sets of 8-10 with 90 s rest.
 3. **The coach.** "Build me a workout: squat, bench, deadlift" makes the same saved workout (and puts it on a day when
    he names one); "start my push workout" opens it. Needs the `chat-gemini` deploy.
 
-## Not in step 1, named
+## Not built yet, named
+
+- A planned workout of his own puts no dot on the week strip; the day's card shows it.
+- Step 1's finished workouts (the record of what was done) stay on the phone that made them; only saved workouts go to
+  the table.
 
 - A workout's name and list are on the phone that made it; another phone sees the sets in history, not the grouping.
 - A lift that is BOTH in the plan's session and in his own workout on the same day: his sets show in the plan card's
