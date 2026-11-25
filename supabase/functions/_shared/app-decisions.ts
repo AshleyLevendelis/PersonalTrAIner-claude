@@ -244,6 +244,9 @@ export const APP_DECISIONS: AppDecision[] = [
   { area: 'Training', anchor: { file: 'src/lib/cardio-presets.ts', token: 'cardioPresetsFor' }, also: ['cardio options', 'presets'],
     rule: 'Quick cardio picks follow your kit: a full gym gets incline walk, heavy bag, HIIT bike and Zone 2; everyone else brisk walk, run, bodyweight circuit and Zone 2.',
     why: 'A suggestion you cannot do is not a suggestion.' },
+  { area: 'Weekly structure', anchor: { file: 'src/lib/cardio-days.ts', token: 'cardioSplitFor' }, also: ['cardio days', 'hiit', 'intervals', 'steady cardio', 'conditioning'],
+    rule: 'Cardio days you ask for (up to three) take the place of lifting days but never leave fewer than two; with three, two are intervals and one steady, a beginner or low recovery gets one interval day at most, and a running goal comes first.',
+    why: 'Cardio replaces lifting rather than stacking on top so you can recover, and hard intervals are kept off the day before a lift.' },
 
   // ---- Weekly structure ---------------------------------------------------------------------------------------------
   { area: 'Weekly structure', anchor: { file: 'src/lib/exercise-plan.ts', token: 'lowerMainToPrefer' }, also: ['squat', 'deadlift', 'full body'],
