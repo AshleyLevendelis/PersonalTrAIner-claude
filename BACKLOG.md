@@ -124,6 +124,9 @@ Newest first. One line each.
   `verify:rest-day` §8b and §11 re-anchored on the banner and the figures (removing the banner: 3 caught), `test:rest-day-card`
   and `test:planned-rounds` re-anchored (dropping `optional`: caught by each). Merged with main the same day; the size
   budgets moved to the merged tree's measured 1670 and 3378 kB. Frontend only.
+  The pre-merge sweep found one more, fixed after main took it in: the two-week window was cut from a UTC date string
+  (`test:local-dates`; now built from the date's parts, 2 of 2 mutations caught). The why-sheet line for the clash rule
+  that sweep also asked for was written on main too; the branch's copy was dropped as a duplicate.
 - [x] **ANOTHER DAY'S REST-DAY CARDIO IS A ROW, LOGGABLE ON A PAST DAY (25 Nov 2026, his report with a screenshot of
   Saturday: "Why do rest days look like this. The optional rest day exercises should be loggable like other
   exercises").** Opened ON the day, a recovery day has been its card with a loggable Optional row since 24 Sep; opened
