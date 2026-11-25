@@ -8,182 +8,182 @@ PER-PAIR DETAIL
 ----------------------------------------------------------------------------------------------------
 
 [equipment] full_gym vs home_gym
-  exercise-name overlap: 20.7%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  8.7%   A={"isolation":43,"push":24,"pull":26,"squat":7,"hinge":8}  B={"isolation":50,"push":21,"pull":23,"squat":10,"hinge":5}
-  rep-range TVD:         3.7%   A={"hypertrophy(6-12)":57,"endurance(13-20)":51}  B={"hypertrophy(6-12)":52,"endurance(13-20)":54}
-  weekly sets:           A=108  B=109  (delta 0.9%)
-  shared-lift load ratio: mean deviation 0.0%  [8 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); neutral-grip dumbbell press: 16.0kg->16.0kg (x1.00); dumbbell tricep kickback: 4.0kg->4.0kg (x1.00); incline dumbbell curls: 6.0kg->6.0kg (x1.00); dumbbell pullover: 12.0kg->12.0kg (x1.00); dumbbell leg curl: 10.0kg->10.0kg (x1.00)
+  exercise-name overlap: 39.6%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  6.0%   A={"isolation":27,"push":25,"pull":25,"squat":12,"hinge":16}  B={"isolation":27,"push":19,"pull":21,"squat":12,"hinge":17}
+  rep-range TVD:         3.4%   A={"strength(1-5)":8,"hypertrophy(6-12)":63,"endurance(13-20)":32}  B={"strength(1-5)":8,"hypertrophy(6-12)":60,"endurance(13-20)":26}
+  weekly sets:           A=105  B=96  (delta 9.0%)
+  shared-lift load ratio: mean deviation 2.8%  [12 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); overhead tricep extension: 14.0kg->14.0kg (x1.00); rear delt flyes: 4.0kg->4.0kg (x1.00); barbell squats: 57.5kg->57.5kg (x1.00); trap bar deadlift: 70.0kg->70.0kg (x1.00); good mornings: 25.0kg->25.0kg (x1.00)
   phase/block sequence:  IDENTICAL across the full mesocycle
-  conditioning volume:   A=25min/wk  B=25min/wk  (delta 0.0%)
+  conditioning volume:   A=25min/wk  B=41min/wk  (delta 48.5%)
 
 [equipment] full_gym vs bodyweight
-  exercise-name overlap: 1.7%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  22.1%   A={"isolation":43,"push":24,"pull":26,"squat":7,"hinge":8}  B={"isolation":35,"push":8,"hinge":7,"pull":8,"squat":8}
-  rep-range TVD:         13.3%   A={"hypertrophy(6-12)":57,"endurance(13-20)":51}  B={"hypertrophy(6-12)":39,"endurance(13-20)":20}
-  weekly sets:           A=108  B=66  (delta 48.3%)
+  exercise-name overlap: 11.1%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  20.1%   A={"isolation":27,"push":25,"pull":25,"squat":12,"hinge":15}  B={"isolation":35,"push":12,"pull":12,"squat":14,"hinge":12}
+  rep-range TVD:         4.5%   A={"strength(1-5)":8,"hypertrophy(6-12)":62,"endurance(13-20)":34}  B={"strength(1-5)":8,"hypertrophy(6-12)":53,"endurance(13-20)":24}
+  weekly sets:           A=104  B=85  (delta 20.1%)
   shared-lift load ratio: no shared loaded lifts between the two plans (0 overlap on externally-loaded exercises)
   phase/block sequence:  diverges at week 9
-  conditioning volume:   A=25min/wk  B=139min/wk  (delta 139.0%)
+  conditioning volume:   A=25min/wk  B=88min/wk  (delta 111.5%)
 
 [equipment] home_gym vs bodyweight
-  exercise-name overlap: 9.4%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  16.1%   A={"isolation":50,"push":21,"pull":23,"squat":7,"hinge":8}  B={"isolation":35,"push":8,"hinge":7,"pull":8,"squat":8}
-  rep-range TVD:         17.8%   A={"hypertrophy(6-12)":55,"endurance(13-20)":51}  B={"hypertrophy(6-12)":39,"endurance(13-20)":17}
-  weekly sets:           A=109  B=66  (delta 49.1%)
+  exercise-name overlap: 14.0%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  17.6%   A={"isolation":27,"push":19,"pull":21,"squat":11,"hinge":17}  B={"isolation":35,"push":12,"pull":12,"squat":14,"hinge":12}
+  rep-range TVD:         1.2%   A={"strength(1-5)":8,"hypertrophy(6-12)":59,"endurance(13-20)":28}  B={"strength(1-5)":8,"hypertrophy(6-12)":53,"endurance(13-20)":24}
+  weekly sets:           A=95  B=85  (delta 11.1%)
   shared-lift load ratio: no shared loaded lifts between the two plans (0 overlap on externally-loaded exercises)
   phase/block sequence:  diverges at week 9
-  conditioning volume:   A=25min/wk  B=140min/wk  (delta 139.4%)
+  conditioning volume:   A=40min/wk  B=88min/wk  (delta 75.0%)
 
 [training_style] bodybuilding vs functional
-  exercise-name overlap: 17.5%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  16.9%   A={"isolation":44,"push":24,"pull":27,"squat":7,"hinge":9}  B={"isolation":57,"squat":14,"push":17,"pull":17,"hinge":12}
-  rep-range TVD:         14.4%   A={"hypertrophy(6-12)":58,"endurance(13-20)":53}  B={"hypertrophy(6-12)":70,"endurance(13-20)":36,"strength(1-5)":2}
-  weekly sets:           A=111  B=117  (delta 5.3%)
-  shared-lift load ratio: mean deviation 10.9%  [9 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); neutral-grip dumbbell press: 16.0kg->16.0kg (x1.00); dumbbell tricep kickback: 6.0kg->4.0kg (x0.67); close-grip lat pulldown: 42.5kg->42.5kg (x1.00); single-arm lat pulldown: 17.5kg->25.0kg (x1.43); front squat: 47.5kg->50.0kg (x1.05)
+  exercise-name overlap: 22.4%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  22.5%   A={"isolation":27,"push":25,"pull":25,"squat":12,"hinge":15}  B={"isolation":54,"hinge":14,"pull":16,"push":16,"squat":15}
+  rep-range TVD:         0.2%   A={"strength(1-5)":8,"hypertrophy(6-12)":62,"endurance(13-20)":32}  B={"strength(1-5)":8,"hypertrophy(6-12)":64,"endurance(13-20)":33}
+  weekly sets:           A=104  B=115  (delta 10.0%)
+  shared-lift load ratio: mean deviation 10.4%  [9 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); lat pulldown: 42.5kg->42.5kg (x1.00); barbell squats: 57.5kg->57.5kg (x1.00); deadlifts: 70.0kg->72.5kg (x1.04); romanian deadlifts: 18.0kg->32.0kg (x1.78); bulgarian split squats: 12.0kg->12.0kg (x1.00)
   phase/block sequence:  IDENTICAL across the full mesocycle
   conditioning volume:   A=25min/wk  B=25min/wk  (delta 0.0%)
 
 [training_style] bodybuilding vs combat
-  exercise-name overlap: 6.2%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  20.8%   A={"isolation":44,"push":24,"pull":27,"squat":7,"hinge":8}  B={"isolation":72,"squat":10,"push":16,"pull":16,"hinge":11}
-  rep-range TVD:         24.6%   A={"hypertrophy(6-12)":57,"endurance(13-20)":53}  B={"hypertrophy(6-12)":66,"endurance(13-20)":21,"strength(1-5)":2}
-  weekly sets:           A=110  B=125  (delta 12.8%)
-  shared-lift load ratio: mean deviation 4.8%  [3 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); neutral-grip dumbbell press: 16.0kg->16.0kg (x1.00); single-arm lat pulldown: 17.5kg->20.0kg (x1.14)
+  exercise-name overlap: 15.3%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  39.9%   A={"isolation":27,"push":25,"pull":25,"squat":9,"hinge":19}  B={"isolation":84,"squat":8,"pull":16,"push":16,"hinge":4}
+  rep-range TVD:         3.4%   A={"strength(1-5)":8,"hypertrophy(6-12)":63,"endurance(13-20)":32}  B={"strength(1-5)":8,"hypertrophy(6-12)":56,"endurance(13-20)":33}
+  weekly sets:           A=105  B=128  (delta 19.7%)
+  shared-lift load ratio: mean deviation 3.5%  [5 shared lifts]  e.g. barbell bench press: 42.5kg->45.0kg (x1.06); lat pulldown: 42.5kg->42.5kg (x1.00); barbell squats: 57.5kg->60.0kg (x1.04); deadlifts: 70.0kg->75.0kg (x1.07); cable lateral raises: 5.0kg->5.0kg (x1.00)
   phase/block sequence:  IDENTICAL across the full mesocycle
-  conditioning volume:   A=25min/wk  B=32min/wk  (delta 24.6%)
+  conditioning volume:   A=25min/wk  B=17min/wk  (delta 38.1%)
 
 [training_style] bodybuilding vs hybrid
-  exercise-name overlap: 21.7%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  22.7%   A={"isolation":43,"push":24,"pull":27,"squat":7,"hinge":9}  B={"isolation":67,"push":14,"hinge":7,"pull":14,"squat":8}
-  rep-range TVD:         4.4%   A={"hypertrophy(6-12)":58,"endurance(13-20)":52}  B={"hypertrophy(6-12)":60,"endurance(13-20)":45}
-  weekly sets:           A=110  B=110  (delta 0.0%)
-  shared-lift load ratio: mean deviation 4.3%  [10 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); neutral-grip dumbbell press: 16.0kg->16.0kg (x1.00); straight-bar tricep pushdown: 17.5kg->17.5kg (x1.00); t-bar rows: 42.5kg->42.5kg (x1.00); single-arm lat pulldown: 17.5kg->25.0kg (x1.43); single-leg leg extension: 22.5kg->22.5kg (x1.00)
+  exercise-name overlap: 22.8%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  29.2%   A={"isolation":27,"push":25,"pull":25,"squat":12,"hinge":15}  B={"isolation":59,"push":16,"hinge":4,"pull":16,"squat":12}
+  rep-range TVD:         5.5%   A={"strength(1-5)":8,"hypertrophy(6-12)":62,"endurance(13-20)":34}  B={"strength(1-5)":8,"hypertrophy(6-12)":53,"endurance(13-20)":34,"very_high(20+)":3}
+  weekly sets:           A=104  B=107  (delta 2.8%)
+  shared-lift load ratio: mean deviation 0.0%  [7 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); tricep pushdowns: 20.0kg->20.0kg (x1.00); barbell squats: 57.5kg->57.5kg (x1.00); leg extensions: 22.5kg->22.5kg (x1.00); dumbbell leg curl: 22.0kg->22.0kg (x1.00); trap bar deadlift: 70.0kg->70.0kg (x1.00)
   phase/block sequence:  IDENTICAL across the full mesocycle
   conditioning volume:   A=25min/wk  B=25min/wk  (delta 0.0%)
 
 [training_style] functional vs combat
-  exercise-name overlap: 17.9%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  7.9%   A={"isolation":59,"squat":15,"push":12,"pull":12,"hinge":14}  B={"isolation":68,"squat":11,"push":16,"pull":16,"hinge":11}
-  rep-range TVD:         10.0%   A={"hypertrophy(6-12)":63,"endurance(13-20)":36,"strength(1-5)":4}  B={"strength(1-5)":6,"hypertrophy(6-12)":63,"endurance(13-20)":23}
-  weekly sets:           A=112  B=122  (delta 8.5%)
-  shared-lift load ratio: mean deviation 12.5%  [3 shared lifts]  e.g. barbell squats: 57.5kg->57.5kg (x1.00); barbell bench press: 42.5kg->42.5kg (x1.00); dumbbell shrugs: 16.0kg->22.0kg (x1.38)
+  exercise-name overlap: 29.4%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  22.2%   A={"isolation":54,"squat":19,"push":20,"pull":20,"hinge":7}  B={"isolation":84,"hinge":11,"push":16,"pull":16,"squat":3}
+  rep-range TVD:         9.0%   A={"strength(1-5)":8,"hypertrophy(6-12)":72,"endurance(13-20)":27}  B={"strength(1-5)":8,"hypertrophy(6-12)":53,"endurance(13-20)":30}
+  weekly sets:           A=120  B=130  (delta 8.0%)
+  shared-lift load ratio: mean deviation 12.0%  [7 shared lifts]  e.g. barbell bench press: 42.5kg->45.0kg (x1.06); t-bar rows: 42.5kg->42.5kg (x1.00); landmine press: 25.0kg->25.0kg (x1.00); front raises: 4.0kg->4.0kg (x1.00); deadlifts: 72.5kg->75.0kg (x1.03); lat pulldown: 42.5kg->42.5kg (x1.00)
   phase/block sequence:  IDENTICAL across the full mesocycle
-  conditioning volume:   A=25min/wk  B=33min/wk  (delta 27.6%)
+  conditioning volume:   A=25min/wk  B=23min/wk  (delta 8.3%)
 
 [training_style] functional vs hybrid
-  exercise-name overlap: 14.1%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  12.1%   A={"isolation":59,"squat":16,"push":12,"pull":12,"hinge":13}  B={"isolation":66,"push":14,"hinge":7,"pull":14,"squat":8}
-  rep-range TVD:         13.3%   A={"strength(1-5)":2,"hypertrophy(6-12)":66,"endurance(13-20)":30}  B={"hypertrophy(6-12)":58,"endurance(13-20)":47,"strength(1-5)":2}
-  weekly sets:           A=112  B=109  (delta 2.7%)
-  shared-lift load ratio: mean deviation 1.7%  [5 shared lifts]  e.g. front squat: 50.0kg->47.5kg (x0.95); barbell bench press: 42.5kg->42.5kg (x1.00); deadlifts: 72.5kg->70.0kg (x0.97); lat pulldown: 42.5kg->42.5kg (x1.00); suitcase carry: 16.0kg->16.0kg (x1.00)
+  exercise-name overlap: 28.6%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  6.1%   A={"isolation":60,"hinge":11,"pull":16,"push":16,"squat":11}  B={"isolation":64,"push":16,"hinge":4,"pull":16,"squat":12}
+  rep-range TVD:         8.1%   A={"strength(1-5)":6,"hypertrophy(6-12)":64,"endurance(13-20)":33}  B={"strength(1-5)":8,"hypertrophy(6-12)":54,"endurance(13-20)":38}
+  weekly sets:           A=114  B=112  (delta 1.8%)
+  shared-lift load ratio: mean deviation 1.7%  [7 shared lifts]  e.g. close-grip lat pulldown: 42.5kg->42.5kg (x1.00); barbell bench press: 42.5kg->42.5kg (x1.00); front raises: 4.0kg->4.0kg (x1.00); trap bar deadlift: 72.5kg->70.0kg (x0.97); dumbbell leg curl: 24.0kg->22.0kg (x0.92); barbell squats: 57.5kg->57.5kg (x1.00)
   phase/block sequence:  IDENTICAL across the full mesocycle
   conditioning volume:   A=25min/wk  B=25min/wk  (delta 0.0%)
 
 [training_style] combat vs hybrid
-  exercise-name overlap: 27.3%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  7.4%   A={"isolation":69,"squat":10,"push":20,"pull":20,"hinge":11}  B={"isolation":69,"push":15,"hinge":7,"pull":15,"squat":8}
-  rep-range TVD:         18.4%   A={"hypertrophy(6-12)":74,"endurance(13-20)":21,"strength(1-5)":2}  B={"hypertrophy(6-12)":61,"endurance(13-20)":42,"strength(1-5)":2}
-  weekly sets:           A=130  B=114  (delta 13.1%)
-  shared-lift load ratio: mean deviation 6.4%  [9 shared lifts]  e.g. bulgarian split squats: 10.0kg->12.0kg (x1.20); single-arm lat pulldown: 20.0kg->25.0kg (x1.25); barbell bench press: 42.5kg->42.5kg (x1.00); push press: 25.0kg->25.0kg (x1.00); seated dip machine: 27.5kg->25.0kg (x0.91); neutral-grip dumbbell press: 16.0kg->16.0kg (x1.00)
+  exercise-name overlap: 28.3%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  8.0%   A={"isolation":72,"hinge":12,"pull":19,"push":19,"squat":4}  B={"isolation":59,"push":16,"hinge":4,"pull":16,"squat":12}
+  rep-range TVD:         10.9%   A={"strength(1-5)":8,"hypertrophy(6-12)":64,"endurance(13-20)":24}  B={"strength(1-5)":8,"hypertrophy(6-12)":53,"endurance(13-20)":34}
+  weekly sets:           A=126  B=107  (delta 16.3%)
+  shared-lift load ratio: mean deviation 4.4%  [6 shared lifts]  e.g. deadlifts: 75.0kg->70.0kg (x0.93); barbell bench press: 45.0kg->42.5kg (x0.94); lateral raises: 6.0kg->6.0kg (x1.00); close-grip lat pulldown: 42.5kg->42.5kg (x1.00); t-bar rows: 42.5kg->42.5kg (x1.00); preacher curl (ez bar): 17.5kg->15.0kg (x0.86)
   phase/block sequence:  IDENTICAL across the full mesocycle
-  conditioning volume:   A=27min/wk  B=25min/wk  (delta 7.7%)
+  conditioning volume:   A=29min/wk  B=25min/wk  (delta 14.8%)
 
 [fitness_goal] hypertrophy vs fat_loss
   exercise-name overlap: 100.0%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  3.9%   A={"isolation":44,"push":24,"pull":27,"squat":10,"hinge":5}  B={"isolation":42,"push":18,"pull":24,"squat":9,"hinge":6}
-  rep-range TVD:         4.3%   A={"hypertrophy(6-12)":57,"endurance(13-20)":53}  B={"hypertrophy(6-12)":47,"endurance(13-20)":52}
-  weekly sets:           A=110  B=99  (delta 10.5%)
-  shared-lift load ratio: mean deviation 2.1%  [26 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); neutral-grip dumbbell press: 16.0kg->16.0kg (x1.00); straight-bar tricep pushdown: 17.5kg->15.0kg (x0.86); overhead tricep extension: 14.0kg->12.0kg (x0.86); cable flyes: 17.5kg->17.5kg (x1.00); dumbbell flyes: 8.0kg->8.0kg (x1.00)
+  movement-pattern TVD:  8.3%   A={"isolation":27,"push":25,"pull":25,"squat":11,"hinge":17}  B={"isolation":32,"push":20,"pull":20,"squat":12,"hinge":15}
+  rep-range TVD:         6.0%   A={"strength(1-5)":8,"hypertrophy(6-12)":63,"endurance(13-20)":32}  B={"strength(1-5)":8,"hypertrophy(6-12)":53,"endurance(13-20)":35}
+  weekly sets:           A=105  B=99  (delta 5.9%)
+  shared-lift load ratio: mean deviation 5.4%  [25 shared lifts]  e.g. barbell bench press: 42.5kg->45.0kg (x1.06); skull crushers: 20.0kg->20.0kg (x1.00); cable flyes: 17.5kg->17.5kg (x1.00); pec deck machine: 17.5kg->17.5kg (x1.00); cable crossover: 17.5kg->17.5kg (x1.00); chest-supported row: 28.0kg->30.0kg (x1.07)
   phase/block sequence:  diverges at week 9
-  conditioning volume:   A=25min/wk  B=107min/wk  (delta 124.2%)
+  conditioning volume:   A=25min/wk  B=106min/wk  (delta 123.7%)
 
 [fitness_goal] hypertrophy vs functional
-  exercise-name overlap: 31.5%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  3.6%   A={"isolation":44,"push":24,"pull":27,"squat":7,"hinge":8}  B={"isolation":44,"push":25,"pull":26,"squat":10,"hinge":5}
-  rep-range TVD:         0.9%   A={"hypertrophy(6-12)":57,"endurance(13-20)":53}  B={"hypertrophy(6-12)":56,"endurance(13-20)":54}
-  weekly sets:           A=110  B=110  (delta 0.0%)
-  shared-lift load ratio: mean deviation 28.1%  [12 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); neutral-grip dumbbell press: 16.0kg->28.0kg (x1.75); cable flyes: 17.5kg->27.5kg (x1.57); close-grip lat pulldown: 42.5kg->57.5kg (x1.35); machine preacher curl: 12.5kg->20.0kg (x1.60); front squat: 47.5kg->47.5kg (x1.00)
+  exercise-name overlap: 75.0%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  2.3%   A={"isolation":27,"push":25,"pull":25,"squat":12,"hinge":16}  B={"isolation":30,"push":25,"pull":25,"squat":11,"hinge":16}
+  rep-range TVD:         2.3%   A={"strength(1-5)":8,"hypertrophy(6-12)":63,"endurance(13-20)":32}  B={"strength(1-5)":8,"hypertrophy(6-12)":62,"endurance(13-20)":35}
+  weekly sets:           A=105  B=107  (delta 1.9%)
+  shared-lift load ratio: mean deviation 41.7%  [20 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); skull crushers: 20.0kg->22.5kg (x1.13); cable crossover: 17.5kg->27.5kg (x1.57); cable flyes: 17.5kg->27.5kg (x1.57); pec deck machine: 17.5kg->27.5kg (x1.57); landmine row: 25.0kg->57.5kg (x2.30)
   phase/block sequence:  diverges at week 13
   conditioning volume:   A=25min/wk  B=50min/wk  (delta 66.7%)
 
 [fitness_goal] hypertrophy vs conditioning
-  exercise-name overlap: 31.5%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  5.5%   A={"isolation":43,"push":24,"pull":28,"squat":7,"hinge":10}  B={"isolation":43,"push":19,"pull":22,"squat":6,"hinge":8}
-  rep-range TVD:         44.5%   A={"hypertrophy(6-12)":59,"endurance(13-20)":53}  B={"hypertrophy(6-12)":8,"endurance(13-20)":90}
-  weekly sets:           A=112  B=98  (delta 13.3%)
-  shared-lift load ratio: mean deviation 24.8%  [12 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); neutral-grip dumbbell press: 16.0kg->26.0kg (x1.63); pec deck machine: 17.5kg->27.5kg (x1.57); face pulls: 15.0kg->15.0kg (x1.00); hip thrust: 45.0kg->57.5kg (x1.28); leg extensions: 25.0kg->42.5kg (x1.70)
+  exercise-name overlap: 62.8%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  10.1%   A={"isolation":24,"push":25,"pull":25,"squat":12,"hinge":18}  B={"isolation":32,"push":20,"pull":20,"squat":9,"hinge":18}
+  rep-range TVD:         60.3%   A={"strength(1-5)":8,"hypertrophy(6-12)":62,"endurance(13-20)":32}  B={"hypertrophy(6-12)":8,"endurance(13-20)":53,"very_high(20+)":35}
+  weekly sets:           A=104  B=99  (delta 4.9%)
+  shared-lift load ratio: mean deviation 27.3%  [20 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); cable crossover: 17.5kg->22.5kg (x1.29); dumbbell flyes: 8.0kg->12.0kg (x1.50); cable flyes: 17.5kg->22.5kg (x1.29); t-bar rows: 42.5kg->50.0kg (x1.18); close-grip lat pulldown: 42.5kg->50.0kg (x1.18)
   phase/block sequence:  diverges at week 5
-  conditioning volume:   A=25min/wk  B=157min/wk  (delta 145.1%)
+  conditioning volume:   A=25min/wk  B=140min/wk  (delta 139.4%)
 
 [fitness_goal] fat_loss vs functional
-  exercise-name overlap: 38.5%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  6.3%   A={"isolation":42,"push":18,"pull":24,"squat":6,"hinge":9}  B={"isolation":44,"push":23,"pull":26,"squat":10,"hinge":5}
-  rep-range TVD:         2.5%   A={"hypertrophy(6-12)":47,"endurance(13-20)":52}  B={"hypertrophy(6-12)":54,"endurance(13-20)":54}
-  weekly sets:           A=99  B=108  (delta 8.7%)
-  shared-lift load ratio: mean deviation 32.3%  [14 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); neutral-grip dumbbell press: 16.0kg->28.0kg (x1.75); pec deck machine: 17.5kg->27.5kg (x1.57); single-arm lat pulldown: 20.0kg->30.0kg (x1.50); machine preacher curl: 12.5kg->20.0kg (x1.60); machine pullover: 15.0kg->20.0kg (x1.33)
+  exercise-name overlap: 66.7%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  6.3%   A={"isolation":32,"push":20,"pull":20,"squat":12,"hinge":15}  B={"isolation":30,"push":25,"pull":25,"squat":11,"hinge":16}
+  rep-range TVD:         3.8%   A={"strength(1-5)":8,"hypertrophy(6-12)":52,"endurance(13-20)":36}  B={"strength(1-5)":8,"hypertrophy(6-12)":62,"endurance(13-20)":37}
+  weekly sets:           A=99  B=107  (delta 7.8%)
+  shared-lift load ratio: mean deviation 41.9%  [20 shared lifts]  e.g. barbell bench press: 45.0kg->42.5kg (x0.94); tricep pushdowns: 20.0kg->22.5kg (x1.13); pec deck machine: 17.5kg->27.5kg (x1.57); cable flyes: 17.5kg->27.5kg (x1.57); cable crossover: 17.5kg->27.5kg (x1.57); landmine row: 25.0kg->57.5kg (x2.30)
   phase/block sequence:  diverges at week 9
-  conditioning volume:   A=107min/wk  B=50min/wk  (delta 72.6%)
+  conditioning volume:   A=106min/wk  B=50min/wk  (delta 71.8%)
 
 [fitness_goal] fat_loss vs conditioning
-  exercise-name overlap: 42.0%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  5.8%   A={"isolation":42,"push":18,"pull":24,"squat":9,"hinge":6}  B={"isolation":43,"push":20,"pull":21,"squat":6,"hinge":8}
-  rep-range TVD:         39.3%   A={"hypertrophy(6-12)":47,"endurance(13-20)":52}  B={"hypertrophy(6-12)":8,"endurance(13-20)":90}
-  weekly sets:           A=99  B=98  (delta 1.0%)
-  shared-lift load ratio: mean deviation 30.6%  [15 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); neutral-grip dumbbell press: 16.0kg->26.0kg (x1.63); dumbbell tricep kickback: 4.0kg->6.0kg (x1.50); overhead tricep extension: 10.0kg->16.0kg (x1.60); dumbbell flyes: 8.0kg->14.0kg (x1.75); machine pullover: 15.0kg->20.0kg (x1.33)
+  exercise-name overlap: 63.6%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  4.3%   A={"isolation":32,"push":21,"pull":21,"squat":9,"hinge":18}  B={"isolation":32,"push":22,"pull":23,"squat":12,"hinge":15}
+  rep-range TVD:         55.6%   A={"strength(1-5)":8,"hypertrophy(6-12)":54,"endurance(13-20)":36}  B={"hypertrophy(6-12)":8,"endurance(13-20)":54,"very_high(20+)":42}
+  weekly sets:           A=101  B=104  (delta 2.9%)
+  shared-lift load ratio: mean deviation 27.5%  [20 shared lifts]  e.g. barbell bench press: 45.0kg->42.5kg (x0.94); overhead tricep extension: 14.0kg->20.0kg (x1.43); cable crossover: 17.5kg->22.5kg (x1.29); cable flyes: 17.5kg->22.5kg (x1.29); dumbbell flyes: 8.0kg->12.0kg (x1.50); close-grip lat pulldown: 42.5kg->50.0kg (x1.18)
   phase/block sequence:  diverges at week 5
-  conditioning volume:   A=107min/wk  B=157min/wk  (delta 37.9%)
+  conditioning volume:   A=106min/wk  B=135min/wk  (delta 24.1%)
 
 [fitness_goal] functional vs conditioning
-  exercise-name overlap: 33.3%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  6.7%   A={"isolation":44,"push":23,"pull":26,"squat":10,"hinge":5}  B={"isolation":43,"push":19,"pull":22,"squat":6,"hinge":8}
-  rep-range TVD:         41.8%   A={"hypertrophy(6-12)":54,"endurance(13-20)":54}  B={"hypertrophy(6-12)":8,"endurance(13-20)":90}
-  weekly sets:           A=108  B=98  (delta 9.7%)
-  shared-lift load ratio: mean deviation 2.5%  [11 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); neutral-grip dumbbell press: 28.0kg->26.0kg (x0.93); pec deck machine: 27.5kg->27.5kg (x1.00); front squat: 47.5kg->47.5kg (x1.00); single-leg leg press: 30.0kg->30.0kg (x1.00); leg extensions: 42.5kg->42.5kg (x1.00)
+  exercise-name overlap: 60.0%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  4.7%   A={"isolation":30,"push":25,"pull":25,"squat":10,"hinge":16}  B={"isolation":32,"push":21,"pull":24,"squat":9,"hinge":18}
+  rep-range TVD:         57.4%   A={"strength(1-5)":8,"hypertrophy(6-12)":61,"endurance(13-20)":37}  B={"hypertrophy(6-12)":8,"endurance(13-20)":54,"very_high(20+)":42}
+  weekly sets:           A=106  B=104  (delta 1.9%)
+  shared-lift load ratio: mean deviation 8.9%  [18 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); overhead tricep extension: 22.0kg->20.0kg (x0.91); cable flyes: 27.5kg->22.5kg (x0.82); pec deck machine: 27.5kg->22.5kg (x0.82); dumbbell flyes: 14.0kg->12.0kg (x0.86); close-grip lat pulldown: 57.5kg->50.0kg (x0.87)
   phase/block sequence:  diverges at week 5
-  conditioning volume:   A=50min/wk  B=158min/wk  (delta 103.8%)
+  conditioning volume:   A=50min/wk  B=135min/wk  (delta 91.9%)
 
 [training_experience] beginner vs advanced
-  exercise-name overlap: 28.6%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  5.6%   A={"isolation":31,"push":16,"pull":18,"squat":8,"hinge":6}  B={"isolation":38,"push":25,"pull":25,"squat":8,"hinge":9}
-  rep-range TVD:         0.9%   A={"hypertrophy(6-12)":46,"endurance(13-20)":33}  B={"hypertrophy(6-12)":59,"endurance(13-20)":44}
-  weekly sets:           A=79  B=105  (delta 28.3%)
-  shared-lift load ratio: mean deviation 80.2%  [12 shared lifts]  e.g. barbell bench press: 25.0kg->52.5kg (x2.10); neutral-grip dumbbell press: 10.0kg->24.0kg (x2.40); cable flyes: 12.5kg->22.5kg (x1.80); dumbbell flyes: 6.0kg->12.0kg (x2.00); single-arm lat pulldown: 12.5kg->20.0kg (x1.60); machine pullover: 10.0kg->15.0kg (x1.50)
+  exercise-name overlap: 42.6%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  18.5%   A={"isolation":32,"push":18,"pull":18,"squat":12,"hinge":12}  B={"isolation":22,"push":28,"pull":28,"squat":10,"hinge":21}
+  rep-range TVD:         7.3%   A={"hypertrophy(6-12)":56,"endurance(13-20)":33}  B={"strength(1-5)":8,"hypertrophy(6-12)":68,"endurance(13-20)":33}
+  weekly sets:           A=92  B=109  (delta 16.9%)
+  shared-lift load ratio: mean deviation 101.4%  [18 shared lifts]  e.g. barbell bench press: 25.0kg->52.5kg (x2.10); overhead tricep extension: 8.0kg->16.0kg (x2.00); pec deck machine: 12.5kg->20.0kg (x1.60); dumbbell flyes: 6.0kg->10.0kg (x1.67); cable flyes: 12.5kg->20.0kg (x1.60); close-grip lat pulldown: 20.0kg->45.0kg (x2.25)
   phase/block sequence:  diverges at week 9
-  conditioning volume:   A=72min/wk  B=25min/wk  (delta 96.9%)
+  conditioning volume:   A=25min/wk  B=25min/wk  (delta 0.0%)
 
 [sex] male vs female
-  exercise-name overlap: 94.6%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  1.8%   A={"isolation":44,"push":24,"pull":27,"squat":7,"hinge":8}  B={"isolation":44,"push":24,"pull":28,"squat":7,"hinge":10}
-  rep-range TVD:         0.4%   A={"hypertrophy(6-12)":57,"endurance(13-20)":53}  B={"hypertrophy(6-12)":59,"endurance(13-20)":54}
-  weekly sets:           A=110  B=113  (delta 2.7%)
-  shared-lift load ratio: mean deviation 29.5%  [26 shared lifts]  e.g. barbell bench press: 42.5kg->25.0kg (x0.59); neutral-grip dumbbell press: 16.0kg->10.0kg (x0.63); overhead tricep extension: 6.0kg->6.0kg (x1.00); straight-bar tricep pushdown: 12.5kg->12.5kg (x1.00); cable crossover: 17.5kg->12.5kg (x0.71); dumbbell flyes: 8.0kg->6.0kg (x0.75)
+  exercise-name overlap: 100.0%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  0.8%   A={"isolation":27,"push":25,"pull":25,"squat":11,"hinge":16}  B={"isolation":27,"push":25,"pull":25,"squat":11,"hinge":17}
+  rep-range TVD:         0.4%   A={"strength(1-5)":8,"hypertrophy(6-12)":62,"endurance(13-20)":32}  B={"strength(1-5)":8,"hypertrophy(6-12)":63,"endurance(13-20)":32}
+  weekly sets:           A=104  B=105  (delta 1.0%)
+  shared-lift load ratio: mean deviation 26.8%  [25 shared lifts]  e.g. barbell bench press: 42.5kg->25.0kg (x0.59); tricep pushdowns: 20.0kg->12.5kg (x0.63); cable crossover: 17.5kg->12.5kg (x0.71); dumbbell flyes: 8.0kg->6.0kg (x0.75); pec deck machine: 17.5kg->12.5kg (x0.71); dumbbell rows: 18.0kg->12.0kg (x0.67)
   phase/block sequence:  IDENTICAL across the full mesocycle
   conditioning volume:   A=25min/wk  B=25min/wk  (delta 0.0%)
 
 [bodyweight] 60kg vs 90kg
   exercise-name overlap: 100.0%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  2.4%   A={"isolation":44,"push":24,"pull":28,"squat":7,"hinge":10}  B={"isolation":44,"push":24,"pull":26,"squat":7,"hinge":8}
-  rep-range TVD:         1.8%   A={"hypertrophy(6-12)":59,"endurance(13-20)":54}  B={"hypertrophy(6-12)":55,"endurance(13-20)":54}
-  weekly sets:           A=113  B=109  (delta 3.6%)
-  shared-lift load ratio: mean deviation 40.5%  [27 shared lifts]  e.g. barbell bench press: 25.0kg->45.0kg (x1.80); neutral-grip dumbbell press: 12.0kg->16.0kg (x1.33); tricep pushdowns: 12.5kg->17.5kg (x1.40); machine tricep extension: 12.5kg->17.5kg (x1.40); cable flyes: 15.0kg->20.0kg (x1.33); dumbbell flyes: 8.0kg->10.0kg (x1.25)
+  movement-pattern TVD:  0.8%   A={"isolation":27,"push":25,"pull":25,"squat":9,"hinge":19}  B={"isolation":27,"push":25,"pull":25,"squat":9,"hinge":18}
+  rep-range TVD:         0.4%   A={"strength(1-5)":8,"hypertrophy(6-12)":63,"endurance(13-20)":34}  B={"strength(1-5)":8,"hypertrophy(6-12)":62,"endurance(13-20)":34}
+  weekly sets:           A=105  B=104  (delta 1.0%)
+  shared-lift load ratio: mean deviation 37.3%  [25 shared lifts]  e.g. barbell bench press: 25.0kg->45.0kg (x1.80); skull crushers: 15.0kg->20.0kg (x1.33); cable flyes: 12.5kg->17.5kg (x1.40); pec deck machine: 12.5kg->17.5kg (x1.40); dumbbell flyes: 6.0kg->8.0kg (x1.33); seated cable row: 30.0kg->45.0kg (x1.50)
   phase/block sequence:  IDENTICAL across the full mesocycle
   conditioning volume:   A=25min/wk  B=25min/wk  (delta 0.0%)
 
 [recovery_capacity] low vs high
   exercise-name overlap: 100.0%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  2.9%   A={"isolation":32,"push":16,"pull":17,"squat":7,"hinge":4}  B={"isolation":44,"push":24,"pull":27,"squat":10,"hinge":5}
-  rep-range TVD:         0.8%   A={"hypertrophy(6-12)":40,"endurance(13-20)":36}  B={"hypertrophy(6-12)":57,"endurance(13-20)":53}
-  weekly sets:           A=76  B=110  (delta 36.6%)
-  shared-lift load ratio: mean deviation 0.0%  [27 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); neutral-grip dumbbell press: 16.0kg->16.0kg (x1.00); skull crushers: 12.5kg->12.5kg (x1.00); dumbbell tricep kickback: 4.0kg->4.0kg (x1.00); cable flyes: 17.5kg->17.5kg (x1.00); dumbbell flyes: 8.0kg->8.0kg (x1.00)
+  movement-pattern TVD:  6.1%   A={"isolation":24,"push":16,"pull":16,"squat":9,"hinge":12}  B={"isolation":27,"push":25,"pull":25,"squat":12,"hinge":16}
+  rep-range TVD:         4.2%   A={"strength(1-5)":8,"hypertrophy(6-12)":43,"endurance(13-20)":26}  B={"strength(1-5)":8,"hypertrophy(6-12)":63,"endurance(13-20)":34}
+  weekly sets:           A=77  B=105  (delta 30.8%)
+  shared-lift load ratio: mean deviation 0.0%  [25 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); overhead tricep extension: 14.0kg->14.0kg (x1.00); cable flyes: 17.5kg->17.5kg (x1.00); pec deck machine: 17.5kg->17.5kg (x1.00); cable crossover: 17.5kg->17.5kg (x1.00); t-bar rows: 42.5kg->42.5kg (x1.00)
   phase/block sequence:  IDENTICAL across the full mesocycle
-  conditioning volume:   A=85min/wk  B=25min/wk  (delta 109.1%)
+  conditioning volume:   A=74min/wk  B=25min/wk  (delta 99.0%)
 
 [session_duration_preference] 30-45 vs 60-90
-  exercise-name overlap: 22.2%  (Jaccard over the representative week's exercise set)
-  movement-pattern TVD:  5.6%   A={"isolation":20,"push":11,"pull":11,"squat":3,"hinge":5}  B={"isolation":43,"push":24,"pull":27,"squat":10,"hinge":6}
-  rep-range TVD:         27.3%   A={"hypertrophy(6-12)":40,"endurance(13-20)":10}  B={"hypertrophy(6-12)":58,"endurance(13-20)":52}
-  weekly sets:           A=50  B=110  (delta 75.0%)
-  shared-lift load ratio: mean deviation 5.0%  [6 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); neutral-grip dumbbell press: 16.0kg->16.0kg (x1.00); machine tricep extension: 17.5kg->17.5kg (x1.00); tricep pushdowns: 17.5kg->17.5kg (x1.00); single-arm lat pulldown: 25.0kg->17.5kg (x0.70); overhead press: 25.0kg->25.0kg (x1.00)
+  exercise-name overlap: 32.5%  (Jaccard over the representative week's exercise set)
+  movement-pattern TVD:  11.2%   A={"isolation":13,"push":14,"pull":14,"squat":9,"hinge":2}  B={"isolation":27,"push":25,"pull":25,"squat":13,"hinge":15}
+  rep-range TVD:         20.9%   A={"strength(1-5)":8,"hypertrophy(6-12)":36,"endurance(13-20)":5}  B={"strength(1-5)":8,"hypertrophy(6-12)":63,"endurance(13-20)":32}
+  weekly sets:           A=52  B=105  (delta 67.5%)
+  shared-lift load ratio: mean deviation 12.8%  [6 shared lifts]  e.g. barbell bench press: 42.5kg->42.5kg (x1.00); rear delt flyes: 6.0kg->4.0kg (x0.67); barbell squats: 57.5kg->57.5kg (x1.00); romanian deadlifts: 32.0kg->18.0kg (x0.56); step-ups: 12.0kg->12.0kg (x1.00); overhead press: 25.0kg->25.0kg (x1.00)
   phase/block sequence:  IDENTICAL across the full mesocycle
   conditioning volume:   A=25min/wk  B=25min/wk  (delta 0.0%)
 
@@ -192,25 +192,25 @@ DIVERGENCE MATRIX  (●·· zero   ●●· small   ●●● large)
 ----------------------------------------------------------------------------------------------------
 dimension                    | pair                     | overlap | pattern | sets | reps | load | phase | cardio
 -----------------------------------------------------------------------------------------------------------------
-equipment                    | full_gym vs home_gym     | ●●● | ●●· | ●·· | ●·· | ●·· | ●·· | ●··
-equipment                    | full_gym vs bodyweight   | ●●● | ●●● | ●●● | ●●· | ●·· | ●●● | ●●●
-equipment                    | home_gym vs bodyweight   | ●●● | ●●· | ●●● | ●●· | ●·· | ●●● | ●●●
-training_style               | bodybuilding vs functional | ●●● | ●●· | ●●· | ●●· | ●●· | ●·· | ●··
-training_style               | bodybuilding vs combat   | ●●● | ●●● | ●●· | ●●● | ●·· | ●·· | ●●·
-training_style               | bodybuilding vs hybrid   | ●●● | ●●● | ●·· | ●·· | ●·· | ●·· | ●··
-training_style               | functional vs combat     | ●●● | ●●· | ●●· | ●●· | ●●· | ●·· | ●●·
+equipment                    | full_gym vs home_gym     | ●●● | ●●· | ●●· | ●·· | ●·· | ●·· | ●●●
+equipment                    | full_gym vs bodyweight   | ●●● | ●●● | ●●● | ●·· | ●·· | ●●● | ●●●
+equipment                    | home_gym vs bodyweight   | ●●● | ●●· | ●●· | ●·· | ●·· | ●●● | ●●●
+training_style               | bodybuilding vs functional | ●●● | ●●● | ●●· | ●·· | ●●· | ●·· | ●··
+training_style               | bodybuilding vs combat   | ●●● | ●●● | ●●● | ●·· | ●·· | ●·· | ●●●
+training_style               | bodybuilding vs hybrid   | ●●● | ●●● | ●·· | ●●· | ●·· | ●·· | ●··
+training_style               | functional vs combat     | ●●● | ●●● | ●●· | ●●· | ●●· | ●·· | ●··
 training_style               | functional vs hybrid     | ●●● | ●●· | ●·· | ●●· | ●·· | ●·· | ●··
-training_style               | combat vs hybrid         | ●●● | ●●· | ●●· | ●●· | ●●· | ●·· | ●··
-fitness_goal                 | hypertrophy vs fat_loss  | ●·· | ●·· | ●●· | ●·· | ●·· | ●●● | ●●●
-fitness_goal                 | hypertrophy vs functional | ●●● | ●·· | ●·· | ●·· | ●●● | ●●● | ●●●
-fitness_goal                 | hypertrophy vs conditioning | ●●● | ●●· | ●●· | ●●● | ●●● | ●●● | ●●●
-fitness_goal                 | fat_loss vs functional   | ●●● | ●●· | ●●· | ●·· | ●●● | ●●● | ●●●
-fitness_goal                 | fat_loss vs conditioning | ●●● | ●●· | ●·· | ●●● | ●●● | ●●● | ●●●
-fitness_goal                 | functional vs conditioning | ●●● | ●●· | ●●· | ●●● | ●·· | ●●● | ●●●
-training_experience          | beginner vs advanced     | ●●● | ●●· | ●●● | ●·· | ●●● | ●●● | ●●●
+training_style               | combat vs hybrid         | ●●● | ●●· | ●●● | ●●· | ●·· | ●·· | ●●·
+fitness_goal                 | hypertrophy vs fat_loss  | ●·· | ●●· | ●●· | ●●· | ●●· | ●●● | ●●●
+fitness_goal                 | hypertrophy vs functional | ●●· | ●·· | ●·· | ●·· | ●●● | ●●● | ●●●
+fitness_goal                 | hypertrophy vs conditioning | ●●· | ●●· | ●·· | ●●● | ●●● | ●●● | ●●●
+fitness_goal                 | fat_loss vs functional   | ●●· | ●●· | ●●· | ●·· | ●●● | ●●● | ●●●
+fitness_goal                 | fat_loss vs conditioning | ●●· | ●·· | ●·· | ●●● | ●●● | ●●● | ●●·
+fitness_goal                 | functional vs conditioning | ●●● | ●·· | ●·· | ●●● | ●●· | ●●● | ●●●
+training_experience          | beginner vs advanced     | ●●● | ●●· | ●●● | ●●· | ●●● | ●●● | ●··
 sex                          | male vs female           | ●·· | ●·· | ●·· | ●·· | ●●● | ●·· | ●··
 bodyweight                   | 60kg vs 90kg             | ●·· | ●·· | ●·· | ●·· | ●●● | ●·· | ●··
-recovery_capacity            | low vs high              | ●·· | ●·· | ●●● | ●·· | ●·· | ●·· | ●●●
+recovery_capacity            | low vs high              | ●·· | ●●· | ●●● | ●·· | ●·· | ●·· | ●●●
 session_duration_preference  | 30-45 vs 60-90           | ●●● | ●●· | ●●● | ●●● | ●●· | ●·· | ●··
 
 ----------------------------------------------------------------------------------------------------
@@ -218,20 +218,20 @@ PER-DIMENSION ROLLUP + PLAIN-ENGLISH VERDICT
 ----------------------------------------------------------------------------------------------------
 
 equipment  (3 pairs, worst-case across sub-pairs)
-  overlap=large pattern=large sets=large reps=small load=zero phase=large cardio=large
-  VERDICT: Clearly visible — large divergence on: exercise selection, movement-pattern mix, weekly volume, phase/deload timing, conditioning dosage. (Unchanged: prescribed load.)
+  overlap=large pattern=large sets=large reps=zero load=zero phase=large cardio=large
+  VERDICT: Clearly visible — large divergence on: exercise selection, movement-pattern mix, weekly volume, phase/deload timing, conditioning dosage. (Unchanged: rep-range profile, prescribed load.)
 
 training_style  (6 pairs, worst-case across sub-pairs)
-  overlap=large pattern=large sets=small reps=large load=small phase=zero cardio=small
-  VERDICT: Clearly visible — large divergence on: exercise selection, movement-pattern mix, rep-range profile. (Unchanged: phase/deload timing.)
+  overlap=large pattern=large sets=large reps=small load=small phase=zero cardio=large
+  VERDICT: Clearly visible — large divergence on: exercise selection, movement-pattern mix, weekly volume, conditioning dosage. (Unchanged: phase/deload timing.)
 
 fitness_goal  (6 pairs, worst-case across sub-pairs)
   overlap=large pattern=small sets=small reps=large load=large phase=large cardio=large
   VERDICT: Clearly visible — large divergence on: exercise selection, rep-range profile, prescribed load, phase/deload timing, conditioning dosage.
 
 training_experience  (1 pair, worst-case across sub-pairs)
-  overlap=large pattern=small sets=large reps=zero load=large phase=large cardio=large
-  VERDICT: Clearly visible — large divergence on: exercise selection, weekly volume, prescribed load, phase/deload timing, conditioning dosage. (Unchanged: rep-range profile.)
+  overlap=large pattern=small sets=large reps=small load=large phase=large cardio=zero
+  VERDICT: Clearly visible — large divergence on: exercise selection, weekly volume, prescribed load, phase/deload timing. (Unchanged: conditioning dosage.)
 
 sex  (1 pair, worst-case across sub-pairs)
   overlap=zero pattern=zero sets=zero reps=zero load=large phase=zero cardio=zero
@@ -242,8 +242,8 @@ bodyweight  (1 pair, worst-case across sub-pairs)
   VERDICT: Clearly visible — large divergence on: prescribed load. (Unchanged: exercise selection, movement-pattern mix, weekly volume, rep-range profile, phase/deload timing, conditioning dosage.)
 
 recovery_capacity  (1 pair, worst-case across sub-pairs)
-  overlap=zero pattern=zero sets=large reps=zero load=zero phase=zero cardio=large
-  VERDICT: Clearly visible — large divergence on: weekly volume, conditioning dosage. (Unchanged: exercise selection, movement-pattern mix, rep-range profile, prescribed load, phase/deload timing.)
+  overlap=zero pattern=small sets=large reps=zero load=zero phase=zero cardio=large
+  VERDICT: Clearly visible — large divergence on: weekly volume, conditioning dosage. (Unchanged: exercise selection, rep-range profile, prescribed load, phase/deload timing.)
 
 session_duration_preference  (1 pair, worst-case across sub-pairs)
   overlap=large pattern=small sets=large reps=large load=small phase=zero cardio=zero
