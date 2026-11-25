@@ -22,7 +22,7 @@ import { roundsMinutes } from '@/lib/planned-rounds'
 //   - A RUNNING GOAL WINS: runs are this person's cardio, so a running goal leaves the cardio days unused.
 // ---------------------------------------------------------------------------
 
-export const CARDIO_DAYS_OPTIONS = [0, 1, 2, 3] as const
+const CARDIO_DAYS_OPTIONS = [0, 1, 2, 3] as const
 export type CardioDaysCount = (typeof CARDIO_DAYS_OPTIONS)[number]
 
 /** The plan marks its cardio days by these activity names; the logs read them back by the same words. */
