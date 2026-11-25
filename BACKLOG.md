@@ -22,8 +22,10 @@ Newest first. One line each.
   rule added to a file that already has an entry is not caught; retrieval is word matching, so a question in words
   the entry does not share can miss (12 real questions probed, all reached); whether the coach USES the sheet is model
   behaviour, unproven until the exam runs after the `chat-gemini` deploy.
-- [ ] **A SHORT REST AFTER THE LAST WARM-UP (his question and "build it", 24 Nov 2026) — BUILT ON THE BRANCH, NOT
-  FINISHED.** "I noticed that warm up sets don't get rest timers. Why not?" They never had one, on purpose (a build-up
+- [x] **A SHORT REST AFTER THE LAST WARM-UP (his question and "build it", 24 Nov 2026) — FINISHED AND MERGED 25 Nov
+  2026** (his "finish and merge both"; browser mutations 9: the 4 on the screen caught, the 5 in the sizing equivalent
+  on the driver's main lift and caught by `test:warmup-rest`; `test:exercise-2a` re-anchored; two full sweeps, only
+  the known failures). "I noticed that warm up sets don't get rest timers. Why not?" They never had one, on purpose (a build-up
   is followed by the next build-up). Right between warm-ups, wrong after the LAST one, where the next thing is the
   first heavy set. BUILT: ticking the last warm-up row before any working set starts a rest counting down to Set 1,
   drawn under that row, or above Set 1 once the build-up folds shut (it folds when every row is logged, which first hid
