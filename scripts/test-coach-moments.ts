@@ -88,7 +88,8 @@ console.log('\n2. At most ONE thing, ever')
   // the morning one has its own case below.
   // A lapse (comeback, door open) and Sunday's plan the week cannot share this Saturday evening either; each has its own case.
   // The clash is a morning moment, like the plain reminder (25 Nov 2026); it has its own case below.
-  const eveningKeys = MOMENT_KEYS.filter(k => !['workout_today', 'load_clash', 'protein_short', 'comeback', 'door_open', 'plan_week'].includes(k))
+  // And on a review Saturday the review carries the pattern as its one change (25 Nov 2026), so the pattern waits.
+  const eveningKeys = MOMENT_KEYS.filter(k => !['workout_today', 'load_clash', 'pattern_spotted', 'protein_short', 'comeback', 'door_open', 'plan_week'].includes(k))
   check('every evening moment really is live on this day', eveningKeys.every(k => liveMoments(everything).includes(k)),
     liveMoments(everything))
   const got = momentToRaise(everything)

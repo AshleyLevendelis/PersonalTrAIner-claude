@@ -813,7 +813,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   if (planKnown) {
     try {
       // Loaded here, not at the top: none of it is needed to draw Home, and it keeps the first download its size.
-      const [{ dayBriefOf, patternAheadOf }, { stuckLifts, lowProtein, tirednessBuilding }] = await Promise.all([import('./days-ahead'), import('./coach-patterns')])
+      const [{ dayBriefOf, patternAheadOf, weekBestsOf }, { stuckLifts, lowProtein, tirednessBuilding }] = await Promise.all([import('./days-ahead'), import('./coach-patterns')])
       const yesterdayStr = addDays(todayStr, -1)
       const activities = profile.concurrent_activities
       const eaten = await proteinP
@@ -830,6 +830,8 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
           tooHard: tirednessBuilding(workingLogs, todayStr),
           protein: proteinTarget > 0 ? lowProtein(byDate, todayStr, proteinTarget) : null,
         }),
+        // The review's "what moved": the records Home itself lists, this week only.
+        week: weekBestsOf(recentPRs, todayStr),
       }
     } catch (err) {
       console.warn('[dashboard] working out the days ahead failed:', err)

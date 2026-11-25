@@ -58,6 +58,8 @@ export interface MomentFacts {
   pattern?: PatternFact | null
   /** Days since the pattern message was last said, or null when never: it is said at most once a week. */
   daysSincePatternSaid?: number | null
+  /** This week's bests, Monday to Sunday, as Home last counted them: the review's "what moved". */
+  weekBests?: { lift: string; best: string }[]
 }
 
 /** One pattern worth a message (days-ahead.ts PatternAhead, the same shape). */
@@ -71,6 +73,20 @@ export const PATTERN_EVERY_DAYS = 7
 /** The pattern message waits for the afternoon: never in front of the morning's session. */
 export const PATTERN_FROM_HOUR = 12
 
+/** The Monday of a date's Monday-to-Sunday week (the one "this week" every screen counts). */
+function mondayOf(date: string): string {
+  // 2026-11-23 is a Monday: whole days from it, modulo 7, is the weekday from Monday.
+  const back = ((dayNumber(date) - dayNumber('2026-11-23')) % 7 + 7) % 7
+  return dateShift(date, -back)
+}
+function dayNumber(date: string): number {
+  const [y, m, d] = date.split('-').map(Number)
+  const yy = m <= 2 ? y - 1 : y
+  const era = Math.floor(yy / 400)
+  const yoe = yy - era * 400
+  const doy = Math.floor((153 * (m + (m > 2 ? -3 : 9)) + 2) / 5) + d - 1
+  return era * 146097 + yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy
+}
 /** A calendar date stepped by whole days: pure arithmetic on the date's own numbers, no clock and no timezone. */
 function dateShift(date: string, n: number): string {
   const [y, m, d] = date.split('-').map(Number)
@@ -105,10 +121,10 @@ function count(v: unknown): number | null {
  * BACKLOG): a session built around a heavy lower-body lift, with a hard leg-taxing class the same day or the day before.
  * A pattern is trusted for two days after Home worked it out.
  */
-export function aheadFacts(ahead: unknown, localToday: string): Pick<MomentFacts, 'todaySession' | 'clash' | 'pattern'> {
-  const out: Pick<MomentFacts, 'todaySession' | 'clash' | 'pattern'> = { todaySession: null, clash: null, pattern: null }
+export function aheadFacts(ahead: unknown, localToday: string): Pick<MomentFacts, 'todaySession' | 'clash' | 'pattern' | 'weekBests'> {
+  const out: Pick<MomentFacts, 'todaySession' | 'clash' | 'pattern' | 'weekBests'> = { todaySession: null, clash: null, pattern: null, weekBests: [] }
   if (!ahead || typeof ahead !== 'object') return out
-  const a = ahead as { asOf?: unknown; days?: unknown; pattern?: unknown }
+  const a = ahead as { asOf?: unknown; days?: unknown; pattern?: unknown; week?: unknown }
   const days = a.days && typeof a.days === 'object' ? a.days as Record<string, unknown> : {}
   const day = (date: string) => {
     const d = days[date]
@@ -140,6 +156,14 @@ export function aheadFacts(ahead: unknown, localToday: string): Pick<MomentFacts
     out.pattern = { kind: 'too_hard', times: count(p.times)! }
   } else if (p?.kind === 'low_protein' && count(p.days)) {
     out.pattern = { kind: 'low_protein', days: count(p.days)! }
+  }
+  // THIS WEEK'S BESTS, trusted only for the Monday-to-Sunday week they were counted in.
+  const w = a.week && typeof a.week === 'object' ? a.week as { monday?: unknown; bests?: unknown } : null
+  if (w && w.monday === mondayOf(localToday) && Array.isArray(w.bests)) {
+    out.weekBests = w.bests
+      .map(b => (b && typeof b === 'object' ? { lift: text((b as Record<string, unknown>).lift), best: text((b as Record<string, unknown>).best, 30) } : null))
+      .filter((b): b is { lift: string; best: string } => !!b?.lift && !!b.best)
+      .slice(0, 2)
   }
   return out
 }
@@ -201,6 +225,8 @@ export interface CoachMessageDetail {
   session?: { name: string; lift: string | null; weight: string | null } | null
   clash?: { activity: string; when: 'today' | 'yesterday'; lift: string | null } | null
   pattern?: { kind: 'stuck_lift'; lift: string; weight: string; sessions: number } | { kind: 'too_hard'; times: number } | { kind: 'low_protein'; days: number } | null
+  /** This week's bests, named with their numbers (25 Nov 2026, the review that says what moved). */
+  weekBests?: { lift: string; best: string }[]
 }
 
 export function coachMessage(key: string, d: CoachMessageDetail = {}): string {
@@ -236,9 +262,20 @@ export function coachMessage(key: string, d: CoachMessageDetail = {}): string {
     case 'week_review': {
       const done = Math.max(0, d.weekDone ?? 0)
       const planned = Math.max(0, d.weekPlanned ?? 0)
-      if (planned > 0 && done >= planned) return `${hey}your week so far: all ${planned} sessions done. That's the part most people find hardest. Anything you'd change for next week?`
-      if (done > 0) return `${hey}your week so far: ${done} of ${planned} sessions done. Want a quick look at what worked, and what to change for next week?`
-      return `${hey}this week didn't go to plan, and that's fine. Want to make next week easier to fit in?`
+      // WHAT MOVED AND WHAT DRAGGED (25 Nov 2026, his "build the weekly review that says what moved"): a best set this
+      // week, named with its number, and the one thing to change, said as an offer. Without either, the plain review.
+      const bests = d.weekBests ?? []
+      const moved = bests.length === 0 ? ''
+        : bests.length === 1 ? `, and a new best on ${bests[0].lift}: ${bests[0].best}`
+          : `, and new bests on ${bests[0].lift} (${bests[0].best}) and ${bests[1].lift} (${bests[1].best})`
+      const p = d.pattern
+      const drag = !p ? null
+        : p.kind === 'stuck_lift' ? `${p.lift} has sat at ${p.weight} though. Want a fix for it next week?`
+          : p.kind === 'too_hard' ? `You've marked ${p.times} lifts too hard though. Want your next session lighter?`
+            : `Protein came in short ${p.days} days running though. Want a hand with it next week?`
+      if (planned > 0 && done >= planned) return `${hey}your week so far: all ${planned} sessions done${moved}. ${drag ?? (moved ? "That's real progress. Anything you'd change for next week?" : "That's the part most people find hardest. Anything you'd change for next week?")}`
+      if (done > 0) return `${hey}your week so far: ${done} of ${planned} sessions done${moved}. ${drag ?? 'Want a quick look at what worked, and what to change for next week?'}`
+      return `${hey}this week didn't go to plan, and that's fine. ${drag ?? 'Want to make next week easier to fit in?'}`
     }
     case 'plan_week': return `${hey}shall we plan next week? Which days suit training, and any meals out I should know about?`
     case 'meal_not_logged': return (d.mealsLogged ?? 0) >= 1
@@ -283,6 +320,14 @@ export function coachMessageChips(key: string, d: { pattern?: { kind: string } |
       return []
     }
     case 'missed_yesterday': return ['Move it', 'Let it go']
+    // The review's easy out (25 Nov 2026): the yes to its one change, else a look back at the week.
+    case 'week_review': {
+      const k = d.pattern?.kind
+      if (k === 'stuck_lift') return ["What's the fix?", 'Leave it for now']
+      if (k === 'too_hard') return ['Lighten my next session', "I'm fine"]
+      if (k === 'low_protein') return ['Help me hit it', 'Leave it']
+      return ['Look back at my week', 'All good']
+    }
     default: return []
   }
 }
@@ -306,7 +351,8 @@ function isLive(key: MomentKey, f: MomentFacts): boolean {
     // THE CLASH SAYS IT INSTEAD (25 Nov 2026): the same morning, the same session, and the clash is the thing worth saying.
     case 'workout_today': return f.plannedToday && !f.loggedToday && f.localHour < WORKOUT_REMINDER_BEFORE_HOUR && !(f.clash && f.todaySession)
     case 'load_clash': return !!f.clash && !!f.todaySession && f.plannedToday && !f.loggedToday && f.localHour < WORKOUT_REMINDER_BEFORE_HOUR
-    case 'pattern_spotted': return !!f.pattern && f.localHour >= PATTERN_FROM_HOUR
+    // The Saturday review carries the pattern as its one change, so the pattern waits that afternoon.
+    case 'pattern_spotted': return !!f.pattern && f.localHour >= PATTERN_FROM_HOUR && !isLive('week_review', f)
       && (f.daysSincePatternSaid == null || f.daysSincePatternSaid >= PATTERN_EVERY_DAYS)
     case 'meal_not_logged': return !!f.logsMeals && (f.mealsAccountedToday ?? 0) < 2 && f.localHour >= FOOD_NUDGE_AFTER_HOUR
     case 'protein_short': {
@@ -336,7 +382,7 @@ export function momentsToRaise(facts: MomentFacts, switches: NotificationSetting
     if (isLive(key, facts)) {
       out.push({
         key,
-        text: coachMessage(key, { name: facts.name, mealsLogged: facts.mealsAccountedToday ?? 0, finishedWhen: facts.finishedWhen, weekDone: facts.weekSessionsDone, weekPlanned: facts.weekSessionsPlanned, session: facts.todaySession ?? null, clash: facts.clash ?? null, pattern: facts.pattern ?? null }),
+        text: coachMessage(key, { name: facts.name, mealsLogged: facts.mealsAccountedToday ?? 0, finishedWhen: facts.finishedWhen, weekDone: facts.weekSessionsDone, weekPlanned: facts.weekSessionsPlanned, session: facts.todaySession ?? null, clash: facts.clash ?? null, pattern: facts.pattern ?? null, weekBests: facts.weekBests ?? [] }),
         shortcut: coachMessageShortcut(key),
         chips: coachMessageChips(key, { pattern: facts.pattern ?? null }),
       })

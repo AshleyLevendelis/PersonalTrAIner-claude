@@ -559,6 +559,8 @@ export interface CoachMessageDetail {
   session?: { name: string; lift: string | null; weight: string | null } | null
   clash?: { activity: string; when: 'today' | 'yesterday'; lift: string | null } | null
   pattern?: { kind: 'stuck_lift'; lift: string; weight: string; sessions: number } | { kind: 'too_hard'; times: number } | { kind: 'low_protein'; days: number } | null
+  /** This week's bests, named with their numbers (25 Nov 2026, the review that says what moved). */
+  weekBests?: { lift: string; best: string }[]
 }
 
 export function coachMessage(key: string, d: CoachMessageDetail = {}): string {
@@ -594,9 +596,20 @@ export function coachMessage(key: string, d: CoachMessageDetail = {}): string {
     case 'week_review': {
       const done = Math.max(0, d.weekDone ?? 0)
       const planned = Math.max(0, d.weekPlanned ?? 0)
-      if (planned > 0 && done >= planned) return `${hey}your week so far: all ${planned} sessions done. That's the part most people find hardest. Anything you'd change for next week?`
-      if (done > 0) return `${hey}your week so far: ${done} of ${planned} sessions done. Want a quick look at what worked, and what to change for next week?`
-      return `${hey}this week didn't go to plan, and that's fine. Want to make next week easier to fit in?`
+      // WHAT MOVED AND WHAT DRAGGED (25 Nov 2026, his "build the weekly review that says what moved"): a best set this
+      // week, named with its number, and the one thing to change, said as an offer. Without either, the plain review.
+      const bests = d.weekBests ?? []
+      const moved = bests.length === 0 ? ''
+        : bests.length === 1 ? `, and a new best on ${bests[0].lift}: ${bests[0].best}`
+          : `, and new bests on ${bests[0].lift} (${bests[0].best}) and ${bests[1].lift} (${bests[1].best})`
+      const p = d.pattern
+      const drag = !p ? null
+        : p.kind === 'stuck_lift' ? `${p.lift} has sat at ${p.weight} though. Want a fix for it next week?`
+          : p.kind === 'too_hard' ? `You've marked ${p.times} lifts too hard though. Want your next session lighter?`
+            : `Protein came in short ${p.days} days running though. Want a hand with it next week?`
+      if (planned > 0 && done >= planned) return `${hey}your week so far: all ${planned} sessions done${moved}. ${drag ?? (moved ? "That's real progress. Anything you'd change for next week?" : "That's the part most people find hardest. Anything you'd change for next week?")}`
+      if (done > 0) return `${hey}your week so far: ${done} of ${planned} sessions done${moved}. ${drag ?? 'Want a quick look at what worked, and what to change for next week?'}`
+      return `${hey}this week didn't go to plan, and that's fine. ${drag ?? 'Want to make next week easier to fit in?'}`
     }
     case 'plan_week': return `${hey}shall we plan next week? Which days suit training, and any meals out I should know about?`
     case 'meal_not_logged': return (d.mealsLogged ?? 0) >= 1
@@ -1727,6 +1740,14 @@ export function coachMessageChips(key: string, d: { pattern?: { kind: string } |
       return []
     }
     case 'missed_yesterday': return ['Move it', 'Let it go']
+    // The review's easy out (25 Nov 2026): the yes to its one change, else a look back at the week.
+    case 'week_review': {
+      const k = d.pattern?.kind
+      if (k === 'stuck_lift') return ["What's the fix?", 'Leave it for now']
+      if (k === 'too_hard') return ['Lighten my next session', "I'm fine"]
+      if (k === 'low_protein') return ['Help me hit it', 'Leave it']
+      return ['Look back at my week', 'All good']
+    }
     default: return []
   }
 }

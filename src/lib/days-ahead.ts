@@ -22,6 +22,8 @@ import { getExerciseEntry } from './exercise-db'
 import { formatLoad, isLowerBodyMovement, labelModeForEntry } from './load-prescription'
 import { activityDays } from './concurrent-activity'
 import type { stuckLifts, lowProtein } from './coach-patterns'
+import { personalBest, type BestReading } from './coach-voice'
+import type { PRMetric } from './pr-engine'
 
 export interface DayBrief {
   /** The session's name ("Lower Body Strength"); null on a rest day. */
@@ -47,6 +49,11 @@ export interface DaysAhead {
   /** Keyed by local date (YYYY-MM-DD). */
   days: Record<string, DayBrief>
   pattern: PatternAhead | null
+  /**
+   * THIS WEEK'S BESTS (25 Nov 2026, his "build the weekly review that says what moved"): up to two records beaten this
+   * Monday-to-Sunday week, each named with its number the way every screen says a best (personalBest).
+   */
+  week?: { monday: string; bests: { lift: string; best: string }[] }
 }
 
 /** What a class or sport asks of the legs, read off the demands the coach mapped it onto. */
@@ -95,4 +102,28 @@ export function patternAheadOf(input: {
   if (input.tooHard != null) return { kind: 'too_hard', times: input.tooHard }
   if (input.protein) return { kind: 'low_protein', days: input.protein.days }
   return null
+}
+
+/** The Monday of a date's Monday-to-Sunday week, by the calendar. */
+export function mondayOfDate(date: string): string {
+  const d = new Date(`${date}T12:00:00`)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** A record as every screen says it: the kind travels with the number (his "a number never reaches a screen without its unit"). */
+function readingOf(r: { metric: PRMetric; value: number; setReps?: number }): BestReading {
+  if (r.metric === 'reps') return { kind: 'reps', reps: r.value }
+  if (r.metric === 'added_load') return { kind: 'added_load', addedKg: r.value }
+  return r.setReps ? { kind: 'best_set', weightKg: r.value, reps: r.setReps } : { kind: 'load', weightKg: r.value }
+}
+
+/** This week's bests, Monday to today, in Home's own order (loaded records first), at most two. */
+export function weekBestsOf(prs: readonly { exerciseName: string; metric: PRMetric; value: number; setReps?: number; date: string }[], today: string): DaysAhead['week'] {
+  const monday = mondayOfDate(today)
+  const bests = prs
+    .filter(r => r.date >= monday && r.date <= today && r.value > 0)
+    .slice(0, 2)
+    .map(r => ({ lift: r.exerciseName, best: personalBest(readingOf(r)) }))
+  return { monday, bests }
 }

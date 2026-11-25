@@ -2,6 +2,20 @@
 
 Newest first. One line each.
 
+- [x] **THE SATURDAY REVIEW SAYS WHAT MOVED (25 Nov 2026, his "build the weekly review that says what moved").** It only
+  counted sessions ("4 of 4 sessions done. Anything you'd change?"). Now: Home sends this week's bests ahead with the
+  days (`weekBestsOf`, from the records Home already lists, this Monday-to-Sunday week only, at most two, each said
+  through `personalBest` so a reps best is never a weight); the review names them ("all 4 sessions done, and a new best
+  on Barbell Squats: 85kg × 5"), then the ONE thing that dragged from the pattern finders, as an offer ("Barbell Squats
+  has sat at 80kg though. Want a fix for it next week?"), with its one-tap yes and no; with nothing dragged it is pleased
+  and offers "Look back at my week" / "All good"; with nothing moved and nothing dragged, the old sentence word for word.
+  On a review Saturday the pattern message waits (the review carries it). A week that did not go to plan is still said
+  with no guilt. The reminder writer is told what moved and what dragged. Mine: two bests at most, so the message stays a
+  text; "this week" is Monday to Sunday, his 15 Oct ruling. No migration (rides in `days_ahead`). `test:coach-proactive`
+  §9 (16 checks; 14 mutations, all caught, one only after the fixture put last week's record first so "this week only"
+  binds); `test:coach-moments` taught that the review carries the pattern. Needs the `days_ahead` migration and the
+  `chat-gemini` and `coach-reach-out` deploys, as the voice work does.
+
 - [x] **THE COACH'S VOICE AND PROACTIVITY (25 Nov 2026, his "still robotic, still no personality, still not
   enthusiastic, and still not proactive enough", with a brief of his and Gemini's; "Review, build but also add in what
   you think will make it better").** `docs/plans/coach-voice-and-proactivity.md`. FOUND FIRST: the coach's

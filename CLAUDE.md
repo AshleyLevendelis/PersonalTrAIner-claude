@@ -1815,7 +1815,8 @@ menu" stays true when a copy is also left outside it.
   its instructions, two gears (gym floor on a part-done session), an editor that shortens and never flattens; reminders
   name the session and lift; a CLASH (hard class next to heavy legs: trim the extras, keep the main lift) and a PATTERN
   (afternoon, weekly) moment, each switchable inside his limit; one-tap answers under any offer. A reminder may greet by
-  the time of day, not only "Hey" (widens his 6 Nov example). `test:coach-proactive`, `docs/plans/coach-voice-and-
+  the time of day, not only "Hey" (widens his 6 Nov example). **And the Saturday review says what moved** (his request
+  the same day): this week's bests by name and number, then the one thing that dragged, offered. `test:coach-proactive`, `docs/plans/coach-voice-and-
   proactivity.md`. Needs the `days_ahead` migration and the `chat-gemini` and `coach-reach-out` deploys and an exam run
 
 ### His rulings of 17 Nov 2026

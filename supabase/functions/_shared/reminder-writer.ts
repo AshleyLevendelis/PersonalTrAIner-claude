@@ -74,7 +74,15 @@ function purpose(moment: CoachMoment, f: MomentFacts): string {
     case 'missed_yesterday': return "Yesterday's planned session did not happen. Be kind, no guilt, and ask whether to move it or let it go."
     case 'comeback': return 'Nothing has been logged for three days. Do NOT mention what was missed. Offer one small, easy next step for today, warmly, with no guilt.'
     case 'door_open': return 'Nothing has been logged for two weeks. Say, warmly and with no pressure, that the door is open whenever they want to start again, and that it will start gently. Ask nothing of them.'
-    case 'week_review': return `It is Saturday. This week so far: ${f.weekSessionsDone ?? 0} of ${f.weekSessionsPlanned ?? 0} planned sessions done. Name one thing that went well, give that one number, and offer to adjust next week. No guilt.`
+    case 'week_review': {
+      // WHAT MOVED AND WHAT DRAGGED (25 Nov 2026): the week's bests by name and number, and the one thing to change.
+      const bests = (f.weekBests ?? []).map(b => `${b.lift} ${b.best}`).join(' and ')
+      const p = f.pattern
+      const drag = !p ? '' : p.kind === 'stuck_lift' ? ` What dragged: ${p.lift} has sat at ${p.weight}; offer a fix for next week.`
+        : p.kind === 'too_hard' ? ` What dragged: ${p.times} lifts marked too hard; offer to make their next session lighter.`
+          : ` What dragged: protein short ${p.days} days running; offer a hand with it next week.`
+      return `It is Saturday. This week so far: ${f.weekSessionsDone ?? 0} of ${f.weekSessionsPlanned ?? 0} planned sessions done.${bests ? ` What moved: a new best on ${bests}; name it with its number and sound pleased about it.` : ''}${drag}${drag ? '' : ' Offer to adjust next week.'} No guilt, and end on the one offer as a short question.`
+    }
     case 'plan_week': return 'It is Sunday. Offer to plan next week together: which days suit training, and any meals out. One short question.'
     case 'meal_not_logged': return (f.mealsAccountedToday ?? 0) >= 1
       ? 'Only one meal is logged on Nutrition today. Encourage adding the rest so the day adds up.'

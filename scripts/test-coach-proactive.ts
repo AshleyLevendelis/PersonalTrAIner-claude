@@ -11,7 +11,7 @@
 //      the second-pass editor shortens and never flattens;
 //   8. the wiring: Home sends the days ahead, the column is in the migration and the retry list.
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
-import { dayBriefOf, isLegTaxing, patternAheadOf } from '../src/lib/days-ahead'
+import { dayBriefOf, isLegTaxing, patternAheadOf, weekBestsOf, mondayOfDate } from '../src/lib/days-ahead'
 import * as browser from '../src/lib/coach-moments'
 import * as server from '../supabase/functions/_shared/coach-moments'
 import { mayNotify, daysSinceSent, factsFor } from '../supabase/functions/_shared/reach-out'
@@ -191,6 +191,48 @@ const mig = readdirSync('supabase/migrations').find(f => /days_ahead/.test(f))
 check('the migration adds the column', !!mig && /ADD COLUMN IF NOT EXISTS days_ahead jsonb/.test(readFileSync(`supabase/migrations/${mig}`, 'utf8')))
 check('Home works the days ahead out from its own plan', /dayBriefOf\(todayWorkoutDay/.test(strip('src/lib/dashboard-data.ts')) && /dayBriefOf\(tomorrowWorkoutDay/.test(strip('src/lib/dashboard-data.ts')))
 check('both new switches are on the Reminders screen', /load_clash: '/.test(strip('src/lib/coach-reach-out.ts')) && /pattern_spotted: '/.test(strip('src/lib/coach-reach-out.ts')) && existsSync('src/components/RemindersSection.tsx'))
+
+console.log('\n9. The Saturday review says what moved (his "build the weekly review that says what moved", 25 Nov 2026)')
+const SAT = '2026-11-28'
+check('the Monday of a week, by the calendar', mondayOfDate(SAT) === '2026-11-23' && mondayOfDate('2026-11-23') === '2026-11-23' && mondayOfDate('2026-11-22') === '2026-11-16')
+// LAST WEEK'S RECORD FIRST, so "this week only" binds: without it the Deadlifts best would be one of the two.
+const prs = [
+  { exerciseName: 'Deadlifts', metric: 'load' as const, value: 140, date: '2026-11-21' },
+  { exerciseName: 'Barbell Squats', metric: 'load' as const, value: 85, setReps: 5, date: '2026-11-26' },
+  { exerciseName: 'Pull-Ups', metric: 'reps' as const, value: 12, date: '2026-11-24' },
+  { exerciseName: 'Barbell Bench Press', metric: 'load' as const, value: 72.5, date: '2026-11-25' },
+]
+const wk = weekBestsOf(prs, SAT)
+check('this week\'s bests only, at most two, each said with its unit', wk?.monday === '2026-11-23' && wk.bests.length === 2
+  && wk.bests[0].lift === 'Barbell Squats' && wk.bests[0].best === '85kg × 5' && wk.bests[1].best === '12 reps'
+  && !wk.bests.some(b => b.lift === 'Deadlifts'), wk)
+const satAhead = { asOf: SAT, days: {}, pattern: null, week: wk }
+check('read back in the same week', JSON.stringify(browser.aheadFacts(satAhead, SAT).weekBests) === JSON.stringify(wk?.bests))
+check('...and never in the next one', (browser.aheadFacts(satAhead, '2026-11-30').weekBests ?? []).length === 0 && (server.aheadFacts(satAhead, '2026-11-30').weekBests ?? []).length === 0)
+const sat = { ...base, weekday: 6, localHour: 13, loggedToday: true, plannedToday: false, weekSessionsDone: 4, weekSessionsPlanned: 4 }
+const review = (extra: Record<string, unknown>) => browser.momentsToRaise({ ...sat, ...extra } as never).find(m => m.key === 'week_review')
+const full = review({ weekBests: wk?.bests, pattern: pat })
+check('it names what moved, with the number', /all 4 sessions done, and new bests on Barbell Squats \(85kg × 5\) and Pull-Ups \(12 reps\)/.test(full?.text ?? ''), full?.text)
+check('...and what dragged, as the one change, offered', /Barbell Squats has sat at 80kg though\. Want a fix for it next week\?$/.test(full?.text ?? ''), full?.text)
+check('...with its yes and its easy no', JSON.stringify(full?.chips) === JSON.stringify(["What's the fix?", 'Leave it for now']), full?.chips)
+const oneBest = review({ weekBests: wk?.bests.slice(0, 1) })
+check('one best and nothing dragged: pleased, and the open offer', /, and a new best on Barbell Squats: 85kg × 5\. That's real progress\./.test(oneBest?.text ?? '') && JSON.stringify(oneBest?.chips) === JSON.stringify(['Look back at my week', 'All good']), oneBest)
+const plain = review({})
+check('nothing moved and nothing dragged: the review as it was', plain?.text === "Hey Ashley, your week so far: all 4 sessions done. That's the part most people find hardest. Anything you'd change for next week?", plain?.text)
+const thin = review({ weekSessionsDone: 0, pattern: { kind: 'low_protein', days: 3 } })
+check('a week that did not go to plan still gets no guilt, and the one change', /this week didn't go to plan, and that's fine\. Protein came in short 3 days running though\. Want a hand with it next week\?$/.test(thin?.text ?? ''), thin?.text)
+check('on a review Saturday the review carries the pattern; on a Friday the pattern speaks for itself',
+  !browser.momentsToRaise({ ...sat, pattern: pat } as never).some(m => m.key === 'pattern_spotted')
+  && browser.momentsToRaise({ ...sat, weekday: 5, pattern: pat } as never).some(m => m.key === 'pattern_spotted'))
+const reviewCases = [{ weekBests: wk?.bests, pattern: pat }, { weekBests: wk?.bests.slice(0, 1) }, {}, { weekSessionsDone: 2, pattern: { kind: 'too_hard', times: 3 } }, { weekSessionsDone: 0 }]
+check('the app and the server say every review word for word, chips too', reviewCases.every(e =>
+  JSON.stringify(browser.momentsToRaise({ ...sat, ...e } as never)) === JSON.stringify(server.momentsToRaise({ ...sat, ...e } as never))))
+const rm = server.momentsToRaise({ ...sat, weekBests: wk?.bests, pattern: pat } as never).find(m => m.key === 'week_review')!
+const rp = reminderPrompt(rm, { ...sat, weekBests: wk?.bests, pattern: pat } as never)
+check('the reminder writer is told what moved and what dragged', /What moved: a new best on Barbell Squats 85kg × 5 and Pull-Ups 12 reps/.test(rp) && /What dragged: Barbell Squats has sat at 80kg/.test(rp), rp)
+check('...and a coach-written review using those numbers passes the checks', checkReminder("Hey Ashley, all 4 sessions done and Barbell Squats hit 85kg × 5, that's a big one. Barbell Squats has sat at 80kg though, want a fix for it next week?", rm, { ...sat, weekBests: wk?.bests, pattern: pat } as never).ok)
+check('Home works the bests out from the records it lists', /week: weekBestsOf\(recentPRs, todayStr\)/.test(strip('src/lib/dashboard-data.ts')))
+check('the coach knows what "Look back at my week" asks for', /"Look back at my week" \(the Saturday review\)/.test(strip('supabase/functions/chat-gemini/index.ts')))
 
 console.log(`\n${ran} checks ran`)
 if (failures > 0) { console.log(`${failures} FAILED`); process.exit(1) }

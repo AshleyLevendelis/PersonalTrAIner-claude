@@ -45,6 +45,12 @@ add in our change what you think will make it better."
 - The reminder writer is the same coach (the persona), is given those facts, must give something (never "just checking
   in"), greets by the time of day ("Morning Ashley, ..."), and ends on the question its buttons answer.
 
+## The Saturday review says what moved (added the same day, his request)
+
+This week's bests (Monday to Sunday, at most two, each said with its unit) and the one thing that dragged (the
+pattern finders), offered with a one-tap yes and no. Nothing moved and nothing dragged: the old sentence. On a review
+Saturday the pattern message waits, because the review carries it. `test:coach-proactive` §9.
+
 ## Decisions
 
 - **Upbeat and grounded, over dry and punchy.** Gemini asked which; his brief says "sharp, upbeat, grounded" and he
@@ -65,7 +71,6 @@ add in our change what you think will make it better."
 ## Not built, named
 
 - Pattern of a squeezed weekday ("third week Tuesday's got squeezed"): the app has no finder for it yet.
-- A weekly review that says what moved (a best this week) and one tweak: the Saturday review still counts sessions.
 - An iPhone notification route (separate job).
 - Whether the model now SOUNDS different is unproven until the coach exam runs after the deploy. Three exam cases
   were added (making the call, the trim tap, the keep tap).
