@@ -172,6 +172,8 @@ console.log('\n6. What the heart rate looked like (the summary\'s graph, time by
   check('a whole session at 179 is zone 4, at 180 zone 5', flat(179) === '0,0,0,40,0' && flat(180) === '0,0,0,0,40', [flat(179), flat(180)])
   const over = heartZones(every(1, m => (m < 20 ? 150 : 200)), start, end, 180)
   check('a session that went over the estimate is measured against its own highest reading (150 is zone 3 of 200, not zone 4 of 180)', over?.maxUsed === 200 && over?.minutes.join(',') === '0,0,20,0,20', over)
+  const shortEnd = new Date(start.getTime() + 20000)
+  check('a session of a few seconds charts no zones (five rows of "0 min" say nothing)', heartZones(Array.from({ length: 6 }, (_, i) => ({ bpm: 140, at: new Date(start.getTime() + i * 4000).toISOString() })), start, shortEnd, 200) === null)
   check('no estimate (no age, or a condition ticked), no zones', heartZones(stepped, start, end, null) === null)
   check('a watch that dropped out for most of the session draws no zones (15 of 40 minutes read)', heartZones(stepped.slice(0, 4), start, end, 200) === null, heartZones(stepped.slice(0, 4), start, end, 200))
   check('...and a gap is not effort: one reading stands for five minutes at most', heartZones([stepped[0], stepped[1], stepped[2], ...stepped.slice(20)], start, end, 200)?.minutes[0] === 7, heartZones([stepped[0], stepped[1], stepped[2], ...stepped.slice(20)], start, end, 200))

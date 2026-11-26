@@ -1861,6 +1861,14 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   must stay removed unless the app starts reading that data. Phone-only code loads only in the phone app.
   `test:phone-app`, `verify:health-steps`, `docs/plans/phone-app.md`. NOT BUILT natively yet: his machine
 
+- **Cardio is started from Exercise, like any workout: his words 27 Nov 2026** ("it's under tools and it's different to
+  logging workouts ... choosing a workout, i.e. walk, jog, run, hill sprints, assault bike etc. and pressing start and
+  it picks up the steps or heart rate or both depending on which suits"). Exercise, Start a workout, pick the cardio,
+  Start; the open workout sits at the top of Exercise; End shows the summary and one effort tap logs it under the name
+  he picked. It REPLACES "Tools, Start walk / Start run" in the next line (the card is off Tools). Mine: steps and
+  distance for work on foot only, never for a bike, rower or swim (the phone is not asked, and a late sync cannot add
+  them); machines for a full gym only; today only. `test:recorded-activity` §7, `verify:record-activity`. Needs a phone
+  app rebuild
 - **Record a walk or run: his request and ruling 25 Nov 2026, "A, build it"**: Tools, Start walk / Start run, End; the
   phone's steps, distance and calories for exactly that window (the watch's own figure), heart rate from the strap
   first; with a strap and no watch, calories are an estimate printed "≈ N kcal (estimate)" (his A, over nothing). One

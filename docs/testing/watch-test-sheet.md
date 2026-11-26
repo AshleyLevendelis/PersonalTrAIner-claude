@@ -21,7 +21,7 @@ yet, so every line is a real test. Each test has a number so a report can be one
 | T4 | Record a strength workout on the watch (any length over 5 minutes). | The card shows time and the heart rate graph, NO zones, and a line about logging exercises on Exercise. |
 | T5 | On any watch card tap "Not mine". | It goes and never comes back, even after closing the app. |
 | T6 | On a day your plan has a cardio session, record that kind of workout on the watch. | The card shows "Today's plan" with Planned and You did, and "Today's session" is chosen. After logging, the day reads done. |
-| T7 | Tools → Start walk (or run) → walk 5+ minutes → End. | The same style of summary, then one effort tap logs it. |
+| T7 | Exercise → Start a workout → tap Walk (or Run) → Start → walk 5+ minutes → End workout. Then the same with a bike or rower if you have one. | The clock runs at the top of Exercise. At End, the same style of summary: steps and distance for the walk, none for the bike, heart rate for both. One effort tap logs it. |
 | T8 | Do a lifting session in the app while wearing the watch. Finish it. Open Home a little later. | Under the session: average and highest heart rate. |
 | T9 | After two or three nights with the watch on. | Home → Progress shows a resting heart rate line. |
 | T10 | The morning after wearing the watch to bed. | Home shows a Sleep row: hours last night, and bars for the week. Compare the hours with Samsung Health's "time asleep". |

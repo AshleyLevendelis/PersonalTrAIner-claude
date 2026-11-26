@@ -70,7 +70,7 @@ import { FinishSection } from './FinisherRow'
 import { isScheduledDay, dayDetail, prescriptionLine } from '@/lib/activity-day'
 import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
-import { OwnWorkoutDay } from './OwnWorkoutDay'
+import { ActiveCardio, OwnWorkoutDay } from './OwnWorkoutDay'
 import { RestDayCard, ActiveRecoveryCard, MovedDayCard, PeekRecoveryDay } from './RestDayCard'
 import type { WhatHappenedTarget } from './WhatHappenedSheet'
 import type { RemoveTarget } from './RemoveExerciseSheet'
@@ -1594,6 +1594,8 @@ export function TodayPanel({
           ),
         }}
       />
+      {/* A CARDIO WORKOUT OPEN NOW (27 Nov 2026): at the top, whatever day is showing. Started from the day's Start. */}
+      <ActiveCardio profileId={profileId} today={today} profile={profile} />
       <Suspense fallback={null}>
       <WhatHappenedSheet
         // THE TOUR'S STOP OPENS IT (22 Nov 2026): on today, or on the practice session's day when today has nothing.

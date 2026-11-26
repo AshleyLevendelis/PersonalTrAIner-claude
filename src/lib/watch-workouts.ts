@@ -240,7 +240,7 @@ export async function logWatchWorkout(p: {
   const { saveCardioLog } = await import('./cardio-log-store')
   const { rpeToStore } = await import('./cardio-effort')
   const w = p.workout
-  const f = await gatherFigures({ kind: 'walk', startedAt: w.start, endedAt: w.end }, p.body)
+  const f = await gatherFigures({ activity: watchActivityName(w.type), startedAt: w.start, endedAt: w.end }, p.body)
   const ownKcal = w.kcal != null && w.kcal > 0 ? Math.round(w.kcal) : null
   const ownKm = w.distanceM != null && w.distanceM > 0 ? Math.round(w.distanceM / 10) / 100 : null
   return saveCardioLog({

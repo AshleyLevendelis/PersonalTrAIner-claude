@@ -15,6 +15,7 @@ const store = new Map<string, string>()
 Object.defineProperty(globalThis, 'navigator', { value: { onLine: false }, configurable: true }) // the queue keeps the log on the phone; no network here
 
 import { setSupabaseClient } from '../src/lib/supabase'
+import { cardioKindsFor, customCardioName, tracksSteps } from '../src/lib/cardio-kinds'
 import { activityFiguresLine, clockText, estimateActiveKcal, recordingFigures } from '../src/lib/activity-figures'
 import {
   currentRecording, discardRecording, endRecording, fillRecordedFromHealth, gatherFigures, lateFill, logRecording,
@@ -63,15 +64,15 @@ async function main() {
 
   console.log('\n3. Start, End, Keep going, Throw away')
   const t0 = new Date('2026-11-25T08:00:00Z')
-  const r = await startRecording('run', t0)
-  check('Start keeps the recording on the phone', currentRecording()?.kind === 'run' && currentRecording()?.startedAt === t0.toISOString() && !!store.get('fitplan_activity_recording'))
-  const again = await startRecording('walk', new Date('2026-11-25T08:05:00Z'))
-  check('a second Start never restarts a running recording', again.startedAt === r.startedAt && again.kind === 'run')
+  const r = await startRecording('Run', t0)
+  check('Start keeps the recording on the phone', currentRecording()?.activity === 'Run' && currentRecording()?.startedAt === t0.toISOString() && !!store.get('fitplan_activity_recording'))
+  const again = await startRecording('Walk', new Date('2026-11-25T08:05:00Z'))
+  check('a second Start never restarts a running recording', again.startedAt === r.startedAt && again.activity === 'Run')
   endRecording(new Date('2026-11-25T08:30:00Z'))
   check('End fixes the window', currentRecording()?.endedAt === '2026-11-25T08:30:00.000Z')
   resumeRecording()
   check('Keep going takes End back, from the same start', currentRecording()?.endedAt === undefined && currentRecording()?.startedAt === t0.toISOString())
-  check('six hours is "forgotten", half an hour is not', looksForgotten({ kind: 'walk', startedAt: t0.toISOString(), endedAt: '2026-11-25T15:00:00Z' }) && !looksForgotten({ kind: 'walk', startedAt: t0.toISOString(), endedAt: '2026-11-25T08:30:00Z' }))
+  check('six hours is "forgotten", half an hour is not', looksForgotten({ activity: 'Walk', startedAt: t0.toISOString(), endedAt: '2026-11-25T15:00:00Z' }) && !looksForgotten({ activity: 'Walk', startedAt: t0.toISOString(), endedAt: '2026-11-25T08:30:00Z' }))
   discardRecording()
   check('Throw away leaves nothing', currentRecording() === null && !store.get('fitplan_activity_recording'))
 
@@ -88,7 +89,7 @@ async function main() {
     heartRateSamples: async (s: Date) => Array.from({ length: 20 }, (_, i) => ({ bpm: 120 + i, at: new Date(s.getTime() + i * 60000).toISOString() })),
   }
   ;(globalThis as { __healthAdapterForTest?: unknown }).__healthAdapterForTest = phone
-  await startRecording('walk', new Date('2026-11-25T08:00:00Z'))
+  await startRecording('Walk', new Date('2026-11-25T08:00:00Z'))
   check('the first Start asks the phone once', store.get('fitplan_activity_access_asked') === '1')
   const ended = endRecording(new Date('2026-11-25T08:48:00Z'))!
   const g = await gatherFigures(ended, body)
@@ -108,13 +109,13 @@ async function main() {
   check('logging clears the recording', currentRecording() === null)
 
   console.log('\n5. A watch that syncs late')
-  check('missing steps and distance are filled', JSON.stringify(lateFill({ steps: null, distance_km: null, active_kcal: 300 }, recordingFigures({ start, end, steps: 5000, distanceM: 3800, deviceKcal: 310 }, {}))) === JSON.stringify({ steps: 5000, distance_km: 3.8 }))
+  check('missing steps and distance are filled', JSON.stringify(lateFill({ activity_name: 'Walk', steps: null, distance_km: null, active_kcal: 300 }, recordingFigures({ start, end, steps: 5000, distanceM: 3800, deviceKcal: 310 }, {}))) === JSON.stringify({ steps: 5000, distance_km: 3.8 }))
   check('a device figure replaces an estimate', JSON.stringify(lateFill({ steps: 5000, distance_km: 3.8, active_kcal: 280, kcal_estimated: true }, recordingFigures({ start, end, deviceKcal: 310 }, {}))) === JSON.stringify({ active_kcal: 310, kcal_estimated: false }))
   check('a device figure already there is never overwritten, nor are steps', lateFill({ steps: 5000, distance_km: 3.8, active_kcal: 300, kcal_estimated: false }, recordingFigures({ start, end, steps: 6000, distanceM: 4000, deviceKcal: 410 }, {})) === null)
   const asked: string[] = []
   const updates: { patch: Record<string, unknown>; filters: string[] }[] = []
   const rows = [
-    { id: 'rec', user_id: 'p1', date: '2026-11-25', started_at: '2026-11-25T08:00:00Z', completed_at: '2026-11-25T08:48:00Z', steps: null, distance_km: null, active_kcal: 280, kcal_estimated: true },
+    { id: 'rec', user_id: 'p1', date: '2026-11-25', activity_name: 'Walk', started_at: '2026-11-25T08:00:00Z', completed_at: '2026-11-25T08:48:00Z', steps: null, distance_km: null, active_kcal: 280, kcal_estimated: true },
     { id: 'typed', user_id: 'p1', date: '2026-11-25', started_at: null, completed_at: '2026-11-25T12:00:00Z', steps: null },
   ]
   const query = () => {
@@ -146,6 +147,51 @@ async function main() {
   check('nothing that works out the targets reads a log\'s calories burned', !/active_kcal|activeKcal/.test(food))
   const card = readFileSync('src/components/RecordActivityCard.tsx', 'utf8')
   check('the card never picks an effort for him (EffortBox starts empty)', /<EffortBox effort=\{null\}/.test(card))
+
+  console.log('\n7. Any cardio, started from Exercise; steps and distance only on foot (his words, 27 Nov 2026)')
+  {
+    const gym = cardioKindsFor('full_gym').map(k => k.label)
+    const home = cardioKindsFor('home_gym').map(k => k.label)
+    check('the chooser offers what he named: walk, jog, run, hill sprints, assault bike', ['Walk', 'Jog', 'Run', 'Hill sprints', 'Assault bike'].every(k => gym.includes(k)), gym)
+    check('machines are offered to a full gym only; what needs nothing is offered to everyone', !home.includes('Assault bike') && !home.includes('Rower') && ['Walk', 'Jog', 'Run', 'Hill sprints'].every(k => home.includes(k)) && cardioKindsFor(null).length === home.length, home)
+    check('no two kinds share a name (the name is what the log is called)', new Set(cardioKindsFor('full_gym').map(k => k.activity)).size === cardioKindsFor('full_gym').length)
+    check('on foot: walk, jog, run, hill sprints, hike, treadmill', ['Walk', 'Jog', 'Run', 'Hill Sprints', 'Hike', 'Treadmill', 'Brisk Walk', 'Walk-run'].every(tracksSteps))
+    check('not on foot: bikes, rower, swim, skipping, elliptical, football', ['Assault Bike', 'Exercise Bike', 'Cycling', 'Rowing Machine', 'Swim', 'Skipping', 'Elliptical', 'Ski Erg', 'Football', '', null].every(a => !tracksSteps(a)))
+    check('his own name is tidied and capitalised; nothing that is not a name is taken', customCardioName('  football ') === 'Football' && customCardioName('boxing  class') === 'Boxing class' && customCardioName('') === null && customCardioName(' 12 ') === null && customCardioName('x') === null)
+    check('...and held to forty letters', (customCardioName('a'.repeat(80)) ?? '').length === 40)
+
+    // An Assault Bike, on a phone that holds 5,012 steps and 3.84 km for that hour.
+    discardRecording()
+    await startRecording('Assault Bike', new Date('2026-11-25T09:00:00Z'))
+    const bikeEnd = endRecording(new Date('2026-11-25T09:20:00Z'))!
+    const before = windows.length
+    const gb = await gatherFigures(bikeEnd, body)
+    check('a bike takes NO steps and NO distance, though the phone holds both for that time', gb.steps === null && gb.distanceKm === null && gb.phoneRead === true, gb)
+    check('...the phone is not even asked for its steps', windows.length === before, windows.slice(before))
+    check('...and it still gets its heart rate and its calories', gb.avgHeartRate != null && gb.kcal != null, gb)
+    const bikeView = logRecording({ profileId: 'p1', date: '2026-11-25', recording: bikeEnd, figures: gb, effort: 'hard' })
+    check('it is logged under the name he picked', bikeView?.activity_name === 'Assault Bike' && bikeView?.steps == null && bikeView?.distance_km == null, bikeView)
+    check('a watch that syncs later never hands a ride the day\'s steps or a distance worked out from them', lateFill({ activity_name: 'Assault Bike', steps: null, distance_km: null, active_kcal: 200, kcal_estimated: false }, recordingFigures({ start: new Date('2026-11-25T09:00:00Z'), end: new Date('2026-11-25T09:20:00Z'), steps: 900, distanceM: 600, deviceKcal: 210 }, {})) === null)
+    check('...but its calories still replace an estimate', JSON.stringify(lateFill({ activity_name: 'Assault Bike', steps: null, distance_km: null, active_kcal: 180, kcal_estimated: true }, recordingFigures({ start: new Date('2026-11-25T09:00:00Z'), end: new Date('2026-11-25T09:20:00Z'), steps: 900, distanceM: 600, deviceKcal: 210 }, {}))) === JSON.stringify({ active_kcal: 210, kcal_estimated: false }))
+
+    // A recording begun before this change was kept as one of two kinds.
+    store.set('fitplan_activity_recording', JSON.stringify({ kind: 'run', startedAt: '2026-11-25T10:00:00.000Z' }))
+    check('a recording kept the old way (a "run") is still his Run', currentRecording()?.activity === 'Run', currentRecording())
+    store.set('fitplan_activity_recording', JSON.stringify({ activity: '   ', startedAt: '2026-11-25T10:00:00.000Z' }))
+    check('...and one with no name at all is not a recording', currentRecording() === null)
+    discardRecording()
+
+    const strip = (x: string) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+    const tools = strip(readFileSync('src/components/ToolsTab.tsx', 'utf8'))
+    check('Tools no longer holds the recorder', !/RecordActivityCard|activity-recording/.test(tools))
+    const day = strip(readFileSync('src/components/exercise/OwnWorkoutDay.tsx', 'utf8'))
+    check('the Start chooser on Exercise offers cardio today only, and never over a recording already open', /\{isToday && !recording && \(\s*<div[^>]*data-testid="own-choose-cardio"/.test(day))
+    check('...he picks, then presses Start: nothing starts on the pick alone', /onClick=\{\(\) => setCardioPick\(/.test(day) && /data-testid="own-cardio-start" disabled=\{!cardioName\} onClick=\{startCardio\}/.test(day) && (day.match(/startRecording\(/g) ?? []).length === 1)
+    const panel = strip(readFileSync('src/components/exercise/TodayPanel.tsx', 'utf8'))
+    const row = panel.indexOf('<WeekContextRow'), active = panel.indexOf('<ActiveCardio'), own = panel.indexOf('<OwnWorkoutDay')
+    check('the open workout is drawn at the top of Exercise, above the day (End is never under a lifting day\'s exercises)', row > 0 && active > row && own > active, { row, active, own })
+    check('...and nothing of it is downloaded until a recording has been open', /if \(!profileId \|\| !\(recording \|\| seen\)\) return null/.test(day) && /lazyWithReload\(\(\) => import\('@\/components\/RecordActivityCard'\)\)/.test(day))
+  }
 
   console.log(`\n${ran} checks ran.`)
   if (failures > 0) { console.error(`${failures} check(s) failed`); process.exit(1) }

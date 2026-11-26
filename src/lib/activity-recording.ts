@@ -12,6 +12,11 @@
 // THE RECORDING IS KEPT ON THE PHONE (localStorage) until it is logged or thrown away: Start, End and the effort tap
 // can be minutes and an app restart apart.
 //
+// ANY CARDIO, STARTED FROM EXERCISE (his words 27 Nov 2026: "it's under tools and it's different to logging workouts
+// ... choosing a workout, i.e. walk, jog, run, hill sprints, assault bike etc. and pressing start and it picks up the
+// steps or heart rate or both depending on which suits"). A recording carries the NAME of what he picked
+// (cardio-kinds.ts), no longer one of two kinds; steps and distance are read only for work on foot.
+//
 // EFFORT IS ASKED, never chosen for him (his 24 Sep "nothing pre-chooses an effort the app cannot know").
 //
 // A WATCH THAT SYNCS LATE (Garmin, Samsung): the log saves at once with what the phone has, and
@@ -20,69 +25,32 @@
 // overwritten.
 // ---------------------------------------------------------------------------
 
-import { useSyncExternalStore } from 'react'
+import { readRecording, writeRecording, useRecording, type Recording } from './recording-store'
 import { recordingFigures, type BodyForEstimate, type RecordingFigures } from './activity-figures'
 import { saveCardioLog, type CardioLogView } from './cardio-log-store'
 import { rpeToStore, type EffortKey } from './cardio-effort'
 import { isPhoneApp } from './steps-store'
 import { addDays } from './session-move'
+import { tracksSteps } from './cardio-kinds'
 
-export type RecordingKind = 'walk' | 'run'
-export const RECORDING_NAMES: Record<RecordingKind, string> = { walk: 'Walk', run: 'Run' }
-
-export interface Recording {
-  kind: RecordingKind
-  startedAt: string
-  /** Set by End. Until then the clock runs. */
-  endedAt?: string
-}
-
-const KEY = 'fitplan_activity_recording'
 const ASKED_KEY = 'fitplan_activity_access_asked'
 /** A recording left running longer than this was forgotten, not walked: End says so. */
 const FORGOTTEN_AFTER_MS = 6 * 3600 * 1000
 
-const listeners = new Set<() => void>()
-let cached: Recording | null | undefined
-let cachedRaw: string | null | undefined
-
-function read(): Recording | null {
-  let raw: string | null = null
-  try { raw = localStorage.getItem(KEY) } catch { raw = null }
-  if (raw === cachedRaw && cached !== undefined) return cached
-  cachedRaw = raw
-  try {
-    const r = raw ? JSON.parse(raw) as Partial<Recording> : null
-    cached = r && (r.kind === 'walk' || r.kind === 'run') && typeof r.startedAt === 'string' && !Number.isNaN(Date.parse(r.startedAt))
-      ? { kind: r.kind, startedAt: r.startedAt, ...(typeof r.endedAt === 'string' && !Number.isNaN(Date.parse(r.endedAt)) ? { endedAt: r.endedAt } : {}) }
-      : null
-  } catch { cached = null }
-  return cached
-}
-function write(r: Recording | null): void {
-  try { if (r) localStorage.setItem(KEY, JSON.stringify(r)); else localStorage.removeItem(KEY) } catch { /* the screen still follows */ }
-  cached = undefined
-  for (const l of listeners) l()
-}
-
+// The open recording itself lives in recording-store.ts (in the first download); this file is fetched when needed.
+const read = readRecording
+const write = writeRecording
 export function currentRecording(): Recording | null { return read() }
-
-function subscribe(l: () => void): () => void {
-  listeners.add(l)
-  return () => { listeners.delete(l) }
-}
-export function useRecording(): Recording | null {
-  return useSyncExternalStore(subscribe, read, () => null)
-}
+export { useRecording, type Recording }
 
 /**
  * Start. In the phone app the first Start asks the phone, once, for steps, distance, calories and heart rate (his tap
  * is the reason the sheet appears). A refusal records anyway: the walk is still timed and logged.
  */
-export async function startRecording(kind: RecordingKind, now: Date = new Date()): Promise<Recording> {
+export async function startRecording(activity: string, now: Date = new Date()): Promise<Recording> {
   const existing = read()
   if (existing) return existing
-  const r: Recording = { kind, startedAt: now.toISOString() }
+  const r: Recording = { activity, startedAt: now.toISOString() }
   write(r)
   if (isPhoneApp()) {
     let asked = false
@@ -112,7 +80,7 @@ export function endRecording(now: Date = new Date()): Recording | null {
 /** Back to recording, after an End tapped by mistake. */
 export function resumeRecording(): void {
   const r = read()
-  if (r?.endedAt) write({ kind: r.kind, startedAt: r.startedAt })
+  if (r?.endedAt) write({ activity: r.activity, startedAt: r.startedAt })
 }
 
 export function discardRecording(): void { write(null) }
@@ -157,8 +125,11 @@ export async function gatherFigures(r: Recording, body: BodyForEstimate, now: Da
     const a = await healthAdapter()
     if (a && (await a.isAvailable()).available) {
       phoneRead = true
-      steps = await safe(() => a.stepsBetween(start, end))
-      distanceM = await safe(a.distanceMetersBetween && (() => a.distanceMetersBetween!(start, end)))
+      // STEPS AND DISTANCE ON FOOT ONLY (cardio-kinds.ts): on a bike or a rower they are the phone being shaken.
+      if (tracksSteps(r.activity)) {
+        steps = await safe(() => a.stepsBetween(start, end))
+        distanceM = await safe(a.distanceMetersBetween && (() => a.distanceMetersBetween!(start, end)))
+      }
       deviceKcal = await safe(a.activeKcalBetween && (() => a.activeKcalBetween!(start, end)))
       if (!heart && a.heartRateSamples) {
         const samples = await safe(() => a.heartRateSamples!(start, end))
@@ -179,7 +150,7 @@ export function logRecording(p: { profileId: string; date: string; recording: Re
   const view = saveCardioLog({
     userId: p.profileId,
     date: p.date,
-    activityName: RECORDING_NAMES[p.recording.kind],
+    activityName: p.recording.activity,
     durationMinutes: p.figures.minutes,
     intensityRpe: rpeToStore(p.effort),
     avgHeartRate: p.figures.avgHeartRate,
@@ -197,12 +168,14 @@ export function logRecording(p: { profileId: string; date: string; recording: Re
 
 /** The update a late sync may make to a recorded log: only what is missing, and a device's calories over an estimate. */
 export function lateFill(
-  row: { steps?: number | null; distance_km?: number | null; active_kcal?: number | null; kcal_estimated?: boolean | null },
+  row: { activity_name?: string | null; steps?: number | null; distance_km?: number | null; active_kcal?: number | null; kcal_estimated?: boolean | null },
   fresh: RecordingFigures,
 ): Record<string, unknown> | null {
   const out: Record<string, unknown> = {}
-  if (row.steps == null && fresh.steps != null) out.steps = fresh.steps
-  if (row.distance_km == null && fresh.distanceKm != null) out.distance_km = fresh.distanceKm
+  // On foot only, as at End: a ride logged with no steps must not be handed the day's shaking later.
+  const onFoot = tracksSteps(row.activity_name)
+  if (onFoot && row.steps == null && fresh.steps != null) out.steps = fresh.steps
+  if (onFoot && row.distance_km == null && fresh.distanceKm != null) out.distance_km = fresh.distanceKm
   if (fresh.kcal != null && !fresh.kcalEstimated && (row.active_kcal == null || row.kcal_estimated)) {
     out.active_kcal = fresh.kcal
     out.kcal_estimated = false
@@ -223,10 +196,11 @@ export async function fillRecordedFromHealth(profileId: string, today: string): 
     if (!a || !(await a.isAvailable()).available) return 0
     const { supabase } = await import('./supabase')
     const { data } = await supabase.from('cardio_logs').select('*').eq('user_id', profileId).in('date', [addDays(today, -1), today])
-    type Row = { id?: string; started_at?: string | null; completed_at?: string | null; steps?: number | null; distance_km?: number | null; active_kcal?: number | null; kcal_estimated?: boolean | null }
+    type Row = { id?: string; activity_name?: string | null; started_at?: string | null; completed_at?: string | null; steps?: number | null; distance_km?: number | null; active_kcal?: number | null; kcal_estimated?: boolean | null }
     for (const row of (data ?? []) as Row[]) {
       if (!row.id || !row.started_at || !row.completed_at) continue
-      if (row.steps != null && row.distance_km != null && row.active_kcal != null && !row.kcal_estimated) continue
+      const onFoot = tracksSteps(row.activity_name)
+      if ((!onFoot || (row.steps != null && row.distance_km != null)) && row.active_kcal != null && !row.kcal_estimated) continue
       const start = new Date(row.started_at), end = new Date(row.completed_at)
       if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) continue
       const read = async (f?: () => Promise<number>) => { if (!f) return null; try { return await f() } catch { return null } }

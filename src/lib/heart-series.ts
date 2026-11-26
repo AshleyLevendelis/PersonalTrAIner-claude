@@ -117,6 +117,8 @@ export function heartZones(samples: readonly HeartReading[], start: Date, end: D
   })
   if (ms.reduce((a, b) => a + b, 0) < span * 0.5) return null
   const mins = (x: number) => Math.round(x / 60000)
+  // A session too short for any zone to reach a minute has nothing to chart: five rows of "0 min" say nothing.
+  if (ms.every(x => mins(x) === 0)) return null
   return {
     minutes: [mins(ms[0]), mins(ms[1]), mins(ms[2]), mins(ms[3]), mins(ms[4])],
     floors: [0, Math.ceil(maxUsed * 0.6), Math.ceil(maxUsed * 0.7), Math.ceil(maxUsed * 0.8), Math.ceil(maxUsed * 0.9)],
