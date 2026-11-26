@@ -31,15 +31,14 @@ console.log('\n  A. THE EVENING BEFORE: THE APP IS OPEN AND THE COACH HAS SAID I
 await go('&slow=400&chat-yesterday&session-day')
 await until(() => ev(`${unprompted}.length`), v => v > 0, 200)
 await wait(1500)
-const clock = JSON.parse((await ev(`localStorage.getItem('fitplan_dev_clock_${PID}')`)) ?? '{}')
-const day1 = clock.date
+const day1 = await ev(`window.__harnessToday ?? null`)
 const next = (() => { const [y, m, dd] = day1.split('-').map(Number); const t = new Date(y, m - 1, dd + 1, 12); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}` })()
 check('A1. the app has a day, and the coach has spoken once on it', /^\d{4}-\d\d-\d\d$/.test(day1 ?? '') && (await onDay(day1)).length === 1, { day1, rows: await onDay(day1) })
 
 console.log('\n  B. THE NEXT MORNING: THE SERVER\'S 8:00 REMINDER, THEN HE OPENS THE APP AT 8:05')
 // INPUTS, as the coach's server writes them (coach-reach-out): the reminder row with its marker, shortcut and answers.
 await ev(`(() => {
-  localStorage.setItem('fitplan_dev_clock_${PID}', JSON.stringify({ date: '${next}', enabled: true, time: '08:05' }))
+  window.__nextMorning('08:05')
   window.__fakeDb.chat_messages.push({ id: 'srv-8am', profile_id: '${PID}', role: 'assistant', status: 'complete',
     content: "Hey Sam, today's session is on, with your main lift first. Ready for it?",
     action_data: { source: 'reminder', moment: 'workout_today', shortcut: 'exercise', chips: ["I'm short on time today", "I'm tired today", 'Something hurts today', "I can't train today"] },

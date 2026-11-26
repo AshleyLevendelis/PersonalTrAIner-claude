@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useState } from 'react'
-import { ChevronRight, Pencil, Plus } from 'lucide-react'
+import { ChevronRight, Pencil, Play, Plus } from 'lucide-react'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import { getAppNow } from '@/lib/dev-clock'
 import { useActiveSession } from '@/hooks/useActiveSession'
@@ -10,10 +10,14 @@ import { type OwnWorkout, ownWorkoutsOn, subscribeOwnWorkouts, newOwnWorkout, ow
 import {
   type OwnPlan, type PlansSync, ownPlans, subscribeOwnPlans, newOwnPlan, planSummary, setPlanOnDate, syncOwnPlans, workoutFromPlan,
 } from '@/lib/own-workout-plans'
+import { useRecording } from '@/lib/recording-store'
+import { cardioKindsFor, customCardioName } from '@/lib/cardio-kinds'
 
 // The workout screen and the builder are their own downloads: most days nobody opens them.
 const OwnWorkoutSheet = lazyWithReload(() => import('./OwnWorkoutSheet'))
 const OwnPlanEditor = lazyWithReload(() => import('./OwnPlanEditor'))
+// The cardio workout once it has begun: its clock, End and summary (RecordActivityCard). Its own download.
+const RecordActivityCard = lazyWithReload(() => import('@/components/RecordActivityCard'))
 
 /** Read once a session per person: the table where phones meet (own-workout-plans.ts). */
 const synced = new Map<string, Promise<PlansSync>>()
@@ -21,8 +25,14 @@ const synced = new Map<string, Promise<PlansSync>>()
 /**
  * A DAY'S OWN WORKOUTS, AND THE WAY TO START, LOG OR PLAN ONE (his request 25 Nov 2026; own-workout.ts and
  * own-workout-plans.ts). Under the day's card: every workout of his own done on that date, every saved workout he put on
- * it, then "Start your own workout" today ("Start a separate workout" beside the plan's), "Log a workout you did" on a
+ * it, then "Start a workout" today ("Start a separate workout" beside the plan's), "Log a workout you did" on a
  * past day, or "Plan a workout" on a day ahead. Start opens a choice: an empty workout, or one of his saved ones.
+ *
+ * AND CARDIO, FROM THE SAME START (his words 27 Nov 2026: "going to exercise, clicking start workout, choosing a
+ * workout, i.e. walk, jog, run, hill sprints, assault bike etc. and pressing start"). Today's chooser opens with the
+ * cardio he can do (cardio-kinds.ts); he picks one and presses Start, and the workout is recorded from that moment:
+ * time always, heart rate and calories from his watch or strap, steps and distance when it is on foot. It is drawn
+ * here, on the day, until he ends and logs it. It used to live on Tools as a separate thing.
  */
 export function OwnWorkoutDay({ profileId, date, today, weekNumber, planHasSession, equipmentAccess, profile, exclusions }: {
   profileId: string | undefined
@@ -42,6 +52,11 @@ export function OwnWorkoutDay({ profileId, date, today, weekNumber, planHasSessi
   const [open, setOpen] = useState<OwnWorkout | null>(null)
   const [choosing, setChoosing] = useState(false)
   const [editing, setEditing] = useState<{ plan: OwnPlan; isNew: boolean } | null>(null)
+  // CARDIO: what he has picked on the chooser (a listed kind's name, or 'other' with what he typed). The workout
+  // itself, once started, is drawn at the top of Exercise (ActiveCardio, below).
+  const recording = useRecording()
+  const [cardioPick, setCardioPick] = useState<string | null>(null)
+  const [cardioTyped, setCardioTyped] = useState('')
   useEffect(() => {
     if (!profileId) return
     const read = () => { setDone(ownWorkoutsOn(profileId, date)); setPlans(ownPlans(profileId)) }
@@ -86,7 +101,16 @@ export function OwnWorkoutDay({ profileId, date, today, weekNumber, planHasSessi
     void startPlan(p)
   }
 
-  const startLabel = ahead ? 'Plan a workout' : !isToday ? 'Log a workout you did' : planHasSession ? 'Start a separate workout' : 'Start your own workout'
+  const cardioName = cardioPick === 'other' ? customCardioName(cardioTyped) : cardioPick
+  const startCardio = () => {
+    if (!cardioName) return
+    setChoosing(false); setCardioPick(null); setCardioTyped('')
+    // The recorder is its own download, fetched on this press (recording-store.ts holds only whether one is open).
+    const name = cardioName
+    void import('@/lib/activity-recording').then(m => m.startRecording(name))
+  }
+
+  const startLabel = ahead ? 'Plan a workout' : !isToday ? 'Log a workout you did' : planHasSession ? 'Start a separate workout' : 'Start a workout'
 
   return (
     <div className="mt-3 flex flex-col gap-2" data-testid="own-day">
@@ -126,6 +150,36 @@ export function OwnWorkoutDay({ profileId, date, today, weekNumber, planHasSessi
       {choosing ? (
         <div className="rounded-2xl bg-[color:var(--surface-deep)] p-3" data-testid="own-chooser">
           <p className="ds-label-compact mb-2">{ahead ? 'Put one of your workouts on this day' : 'Which workout?'}</p>
+          {/* CARDIO FIRST: pick one, press Start. Today only (a recording is now), and never over one already open. */}
+          {isToday && !recording && (
+            <div className="mb-3" data-testid="own-choose-cardio">
+              <p className="mb-1.5 text-[0.75rem] text-muted-foreground">Cardio · timed, with your heart rate, and your steps when it’s on foot</p>
+              <div role="radiogroup" aria-label="Cardio workout" className="flex flex-wrap gap-1.5">
+                {[...cardioKindsFor(equipmentAccess), { label: 'Something else', activity: 'other' }].map(k => {
+                  const on = cardioPick === k.activity
+                  return (
+                    <button key={k.activity} type="button" role="radio" aria-checked={on} data-cardio-kind={k.activity} onClick={() => setCardioPick(on ? null : k.activity)}
+                      className={`min-h-11 rounded-full border px-3.5 text-[0.875rem] ${on ? 'border-transparent bg-primary/20 font-semibold text-primary-text' : 'border-[color:var(--hairline)] text-foreground'}`}>
+                      {k.label}
+                    </button>
+                  )
+                })}
+              </div>
+              {cardioPick === 'other' && (
+                <input type="text" value={cardioTyped} onChange={e => setCardioTyped(e.target.value)} maxLength={40} placeholder="What is it? e.g. Football, Boxing"
+                  aria-label="Name of the workout" data-testid="own-cardio-name"
+                  className="mt-2 h-11 w-full rounded-xl border border-[color:var(--hairline)] bg-card px-3 text-[0.9375rem]" />
+              )}
+              {cardioPick && (
+                <button type="button" data-testid="own-cardio-start" disabled={!cardioName} onClick={startCardio}
+                  className="mt-2.5 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl text-[1rem] font-semibold disabled:opacity-50"
+                  style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}>
+                  <Play className="size-4 fill-current" aria-hidden /> {cardioName ? `Start ${cardioName}` : 'Start'}
+                </button>
+              )}
+              <p className="ds-label-compact mb-0 mt-4">Weights</p>
+            </div>
+          )}
           <div className="flex flex-col gap-1.5">
             {!ahead && (
               <button type="button" data-testid="own-choose-empty" onClick={startEmpty} className="flex min-h-[52px] items-center gap-3 rounded-xl bg-card px-3.5 text-left">
@@ -194,6 +248,27 @@ export function OwnWorkoutDay({ profileId, date, today, weekNumber, planHasSessi
         </Suspense>
       )}
     </div>
+  )
+}
+
+/**
+ * THE CARDIO WORKOUT THAT IS OPEN NOW, AT THE TOP OF EXERCISE (27 Nov 2026): recording, ended and waiting for its
+ * effort, or just logged. At the top whatever day is showing, because it is happening now and End must never be a
+ * scroll away under a lifting day's exercises. Nothing at all, and nothing downloaded, when no recording has been
+ * open on this visit.
+ */
+export function ActiveCardio({ profileId, today, profile }: { profileId: string | undefined; today: string; profile?: UserProfile | null }) {
+  const recording = useRecording()
+  // Stays true after it is logged, so the summary of what was saved stays until he taps Done.
+  const [seen, setSeen] = useState(false)
+  useEffect(() => { if (recording) setSeen(true) }, [recording])
+  if (!profileId || !(recording || seen)) return null
+  return (
+    <Suspense fallback={null}>
+      <RecordActivityCard profileId={profileId} date={today}
+        body={{ weightKg: profile?.weight_kg ?? null, age: profile?.age ?? null, gender: profile?.gender === 'male' || profile?.gender === 'female' ? profile.gender : null }}
+        noHeartBands={(profile?.health_conditions ?? []).length > 0} />
+    </Suspense>
   )
 }
 

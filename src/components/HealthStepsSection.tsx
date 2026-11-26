@@ -249,3 +249,72 @@ export function HeartStrapSection() {
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Profile, "Check what your watch shares" (the watch report, step 0 of docs/plans/health-data-next.md, 27 Nov 2026;
+// health-diagnostics.ts). For when something from the watch looks wrong: a short report of what the phone's health
+// store hands the app, as counts and times only, that he copies and sends with the problem. It reads only what his
+// switches above already allow (so no permission sheet), saves nothing and sends nothing. The report stays on screen
+// as text, so a phone that refuses the copy can still be screenshotted or selected by hand.
+// ---------------------------------------------------------------------------
+export function HealthReportSection() {
+  const [report, setReport] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const make = async () => {
+    setBusy(true)
+    setNote(null)
+    setCopied(false)
+    try {
+      const { gatherDiagnostics, diagnosticsText } = await import('@/lib/health-diagnostics')
+      const d = await gatherDiagnostics()
+      if (d) setReport(diagnosticsText(d))
+      else setNote('There is no phone health store to report on here.')
+    } catch {
+      setNote('Couldn’t make the report. Try again in a moment.')
+    }
+    setBusy(false)
+  }
+  const copy = async () => {
+    if (!report) return
+    let ok = false
+    try { await navigator.clipboard.writeText(report); ok = true } catch { /* the older way, below */ }
+    if (!ok) {
+      try {
+        const box = document.createElement('textarea')
+        box.value = report
+        box.setAttribute('readonly', '')
+        box.style.position = 'fixed'
+        box.style.opacity = '0'
+        document.body.appendChild(box)
+        box.select()
+        ok = document.execCommand('copy')
+        box.remove()
+      } catch { ok = false }
+    }
+    setCopied(ok)
+    setNote(ok ? null : 'Couldn’t copy it. Press and hold the text to select it, or take a screenshot.')
+  }
+  return (
+    <div className="space-y-3 text-sm pt-4 border-t border-[color:var(--hairline)]" data-watch-report-section={report ? 'made' : 'none'}>
+      <p className="font-medium text-foreground">Check what your watch shares</p>
+      <p className="text-muted-foreground">
+        If something from your watch looks wrong, this makes a short report of what your phone hands the app: how many records, how far apart, and when. No step counts, heart rates or sleep times are in it. Nothing is saved or sent. Copy it and send it with the problem.
+      </p>
+      {/* THE BUTTONS AND WHAT THEY SAID COME FIRST, the report under them at its full length: a report in a box that
+          scrolls inside the sheet could not be screenshotted in one go, and a "Copied" line under it sat out of sight. */}
+      <div className="flex flex-wrap gap-2">
+        {report && <Button className="min-h-[44px]" onClick={() => void copy()} data-watch-report-copy>{copied ? 'Copied' : 'Copy the report'}</Button>}
+        <Button variant={report ? 'outline' : 'default'} className="min-h-[44px]" onClick={() => void make()} disabled={busy} data-watch-report-make>
+          {busy ? 'Reading your phone…' : report ? 'Make it again' : 'Make the report'}
+        </Button>
+      </div>
+      {copied && <p role="status" className="text-[0.75rem] text-primary-text" data-watch-report-copied>Copied. Paste it into your message.</p>}
+      {note && <p role="alert" className="text-[0.75rem] text-[color:var(--role-warn-text)]" data-watch-report-note>{note}</p>}
+      {report && (
+        <pre className="whitespace-pre-wrap break-words rounded-[12px] bg-muted/40 p-3 text-[0.71875rem] leading-[1.5] text-foreground select-text" data-watch-report tabIndex={0}>{report}</pre>
+      )}
+    </div>
+  )
+}

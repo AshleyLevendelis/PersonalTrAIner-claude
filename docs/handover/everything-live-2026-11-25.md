@@ -1,8 +1,9 @@
 # Everything from main onto production and his phone (25 Nov 2026)
 
 Ashley lost track of which sessions' work reached the live database, the coach's server and his phone app. One prompt
-for Claude Code on his machine brings all three up to `main` as of PR #61 (seven plan fixes and workouts from his
-watch, 26 Nov 2026, merged on top of the walk recorder, own workouts and the one calorie method). The website deploys itself from `main` and was confirmed live in the cloud
+for Claude Code on his machine brings all three up to `main` as of PR #62 (the watch workout summary with heart rate
+zones, sleep, and the coach's wider quick replies, 26 Nov 2026, merged on top of PR #61's plan fixes and watch
+workouts, the walk recorder, own workouts and the one calorie method). The website deploys itself from `main` and was confirmed live in the cloud
 session. Nothing is left on a side branch.
 
 ```
@@ -11,7 +12,7 @@ He has lost track across several Claude Code sessions of which changes reached w
 earlier note: measure each place, bring it up to main, and prove it.
 
 WHY. The app has four places that update separately:
-  - Website: deploys itself from main through Vercel. Already done for main at PR #61, commit 72b5da8 (nothing to do).
+  - Website: deploys itself from main through Vercel. Already done for main at PR #62, commit 970671c (nothing to do).
   - Database (Supabase, TEST vswuurrtbzbrgubddefv and PRODUCTION sdkhuczcfnqqimdgfiks): new tables and columns only
     arrive when migrations are pushed. Main has migrations up to 20261125140000_add_recorded_activity.sql. Features
     that need a missing column quietly fall back ("not switched on yet"), so the website can look fine while a
@@ -22,7 +23,7 @@ WHY. The app has four places that update separately:
   - Phone app (Capacitor, android/ and ios/): the website is BUNDLED inside it, so the phone app only gets any change
     (web or native) when it is rebuilt and reinstalled. Recent native changes: heart rate and walk/run recording
     (Health Connect permissions: steps, heart rate, resting heart rate, distance, active calories, and since 26 Nov
-    workouts), the heart rate strap (Bluetooth), coach notifications through Firebase.
+    workouts and sleep), the heart rate strap (Bluetooth), coach notifications through Firebase.
 Order matters: database first, then server functions (they read the new columns), then the phone app.
 
 You CANNOT run the two production commands (db:push-both, deploy:functions:prod): they refuse without a real terminal
@@ -31,7 +32,7 @@ Never write to the PRODUCTION database any other way. Never print a secret's val
 
 1. Get main.
      git fetch origin && git checkout main && git pull
-     git log --oneline -3          (must include 72b5da8 "Merge pull request #61"; report the lines)
+     git log --oneline -3          (must include 970671c "Merge pull request #62"; report the lines)
      npm ci
      ls supabase/migrations | tail -3   (must end with 20261125140000_add_recorded_activity.sql)
 
@@ -80,8 +81,12 @@ Never write to the PRODUCTION database any other way. Never print a secret's val
 6. Tell Ashley what to check on the phone:
    - Profile > Steps from your phone: switch on "Workouts from your watch" (say Allow to workouts). Then start any
      workout on the watch, end it, let the watch sync, and open the app: Home shows "From your watch" with the
-     workout; one effort tap logs it. Also on that Profile page, with "Heart rate from your watch" on, Home > Progress
-     should show a resting heart rate after a few nights (it is worked out from overnight readings on a Samsung).
+     workout as a summary (figures, a heart rate graph, time in five heart rate zones); one effort tap logs it.
+   - Same page: switch on "Sleep from your watch" (say Allow to sleep). Home then shows last night against his usual
+     with the week as bars (the usual needs five nights in Health Connect).
+   - Same page, with "Heart rate from your watch" on: Home > Progress should show a resting heart rate after a few
+     nights (it is worked out from overnight readings on a Samsung).
+   - Chat: a question from the coach about today's session shows "Open today's session" and four answers under it.
    - Tools tab: "Start walk" / "Start run", then End: steps, distance and calories fill in, one effort tap logs it.
      The first time, the phone asks for distance and calories permission: say Allow.
    - Exercise tab: under any day, "Start your own workout" / "Log a workout you did" / "Plan a workout".
@@ -90,6 +95,6 @@ Never write to the PRODUCTION database any other way. Never print a secret's val
    - Profile > Steps from your phone, and heart rate, ask permission again if new permissions were added.
 
 Done looks like: a short table with four rows (Website, Database TEST and PRODUCTION, Server functions, Phone app),
-each saying "up to date with main 72b5da8 (PR #61)" with the proof from above, or exactly what is missing and why. Plus the
+each saying "up to date with main 970671c (PR #62)" with the proof from above, or exactly what is missing and why. Plus the
 list of missing secrets. Paste that table back to the cloud session.
 ```

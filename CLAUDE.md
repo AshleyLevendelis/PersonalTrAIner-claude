@@ -1848,6 +1848,27 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   secret `inactive_warning_ready` = yes (until then nobody with an email is warned or deleted)
 - **Tester data is kept 90 days (activity) and 1 year (reports): his ruling 26 Nov 2026** (over 30 days and over a year for
   everything): a nightly clean-up only the database can run. `test:rls-local` §12. Needs migration 20261126120000
+### His requests of 27 Nov 2026
+- **Live while a recorded workout runs: his words "While the exercise is running I should be able to see my heart rate
+  and the zone and steps if applicable"**: heart rate with its zone ("♥ 150 · Zone 4", narrowing the strap's "never a
+  zone" for this card), steps on foot from the phone's own step counter (Android, the "Physical activity" permission;
+  the seven health reads unchanged), and the card says where heart rate comes from. A Galaxy Watch's heart rate is never
+  live to a phone app (Samsung's design): a strap, a broadcast app on the watch, or our own watch app. A watch that syncs
+  late now fills heart rate too, never over a strap's. `test:recorded-activity` §8, `verify:record-activity` A10-A10d,
+  B3a-B3b, D0-D5. Needs a phone app rebuild. NOT on a real phone yet
+
+### His requests of 26 Nov 2026
+- **"Check what your watch shares" on Profile (step 0 of `docs/plans/health-data-next.md`, his "Start the planned
+  work")**: on his tap, a plain report of what the phone's health store hands the app, as counts and times only (a
+  record is read with no reading in it), to copy and send with a bug. It reads only what his switches allow, never
+  shows a permission sheet, saves and sends nothing. `test:health-diagnostics`, `verify:watch-report`. Needs a phone
+  app rebuild. A report from his real watch is what steps 1 and 6 of the plan wait on
+- **A recorded workout is on Exercise, not Tools (his words), and with a heart rate it is logged by its zone; with
+  none, Easy / Steady / Hard: his ruling "Keep Easy/Steady/Hard"** (over a zone by feel and over no effort). End says
+  "Mostly zone N" with one Log button; strap first, else the watch. The effort stored is the zone's word (1-2 Easy, 3
+  Steady, 4-5 Hard). A workout too short for any zone to hold half a minute is asked the three words. Where it starts
+  is the 27 Nov line under "His requests of 20 Nov 2026" (Start a workout, pick the cardio), which replaced the "Record
+  a walk or run" card this was first built on. `test:recorded-activity` §6, `verify:record-activity` A18a, B9a-B9e
 
 ### His requests of 20 Nov 2026
 - **Profile has an Account row, "Email & sign-in" (his request 20 Nov 2026, "Build the account row")**: an email can be
@@ -1885,6 +1906,14 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   must stay removed unless the app starts reading that data. Phone-only code loads only in the phone app.
   `test:phone-app`, `verify:health-steps`, `docs/plans/phone-app.md`. NOT BUILT natively yet: his machine
 
+- **Cardio is started from Exercise, like any workout: his words 27 Nov 2026** ("it's under tools and it's different to
+  logging workouts ... choosing a workout, i.e. walk, jog, run, hill sprints, assault bike etc. and pressing start and
+  it picks up the steps or heart rate or both depending on which suits"). Exercise, Start a workout, pick the cardio,
+  Start; the open workout sits at the top of Exercise; End shows the summary and one tap logs it under the name he
+  picked (its heart rate zone when there is one, else one effort tap: his 26 Nov ruling). It REPLACES "Tools, Start walk / Start run" in the next line (the card is off Tools). Mine: steps and
+  distance for work on foot only, never for a bike, rower or swim (the phone is not asked, and a late sync cannot add
+  them); machines for a full gym only; today only. `test:recorded-activity` §7, `verify:record-activity`. Needs a phone
+  app rebuild
 - **Record a walk or run: his request and ruling 25 Nov 2026, "A, build it"**: Tools, Start walk / Start run, End; the
   phone's steps, distance and calories for exactly that window (the watch's own figure), heart rate from the strap
   first; with a strap and no watch, calories are an estimate printed "≈ N kcal (estimate)" (his A, over nothing). One

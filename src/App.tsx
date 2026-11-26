@@ -3784,7 +3784,7 @@ function App() {
           </TabsContent>
 
           <TabsContent value="tools">
-            <ToolsTab profileId={profile.id} body={{ weightKg: profile.weight_kg, age: profile.age, gender: profile.gender }} equipmentAccess={profile.equipment_access} exercisePlan={exercisePlan} mesocycle={mesocycle} liveWeek={getActiveMesocycleWeek(mesocycleCreatedAt ?? profile.created_at, getAppNow(profile.id), mesocycle.length || 4)} planCreatedAt={mesocycleCreatedAt ?? profile.created_at} logsVersion={logsVersion} onLogsUpdated={() => setLogsVersion(v => v + 1)} noHeartBands={(profile.health_conditions ?? []).length > 0} />
+            <ToolsTab profileId={profile.id} equipmentAccess={profile.equipment_access} exercisePlan={exercisePlan} mesocycle={mesocycle} liveWeek={getActiveMesocycleWeek(mesocycleCreatedAt ?? profile.created_at, getAppNow(profile.id), mesocycle.length || 4)} planCreatedAt={mesocycleCreatedAt ?? profile.created_at} logsVersion={logsVersion} onLogsUpdated={() => setLogsVersion(v => v + 1)} />
           </TabsContent>
 
           <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden">

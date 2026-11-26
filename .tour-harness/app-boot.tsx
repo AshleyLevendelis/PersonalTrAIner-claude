@@ -96,6 +96,15 @@ const SETUP_TYPO = new URLSearchParams(location.search).has('setup-typo')
 // page the driver just left cannot write into it afterwards.
 if (new URLSearchParams(location.search).has('clear-storage')) { try { localStorage.clear() } catch { /* none */ } }
 setDevClockOverride(PROFILE_ID, ANCHOR_ISO)
+// THE PAGE OWNS THE CLOCK (test:harness-clock): a driver that must see the NEXT MORNING without a reload (the app
+// re-opened, verify:coach-reopen) asks the page to move it, and reads the day it stands on from the page.
+;(window as unknown as { __harnessToday: string; __nextMorning: (time: string) => string }).__harnessToday = ANCHOR_ISO
+;(window as unknown as { __nextMorning: (time: string) => string }).__nextMorning = (time: string) => {
+  const [y, m, d] = ANCHOR_ISO.split('-').map(Number)
+  const next = isoOf(new Date(y, m - 1, d + 1, 12))
+  setDevClockOverride(PROFILE_ID, next, time)
+  return next
+}
 // ?chat-stale-offer: a LONGER conversation from yesterday (24 messages, more than the chat's first page of 20, so the
 // phone's own copy is what shows) in which an offer of the coach's was left untapped (an INPUT: he tapped neither
 // Apply nor Not now). The phone keeps that card as it last drew it, as every phone does.
