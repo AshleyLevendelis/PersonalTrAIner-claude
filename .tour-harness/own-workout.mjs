@@ -89,7 +89,7 @@ check('0. the fixture has a rest day and a training day today', !!rest?.date && 
 console.log('\n  A. A rest day: start your own workout')
 await load(`&today=${rest?.date}`)
 await until(q('[data-testid="own-start"]'))
-check('A1. the rest day offers "Start your own workout"', (await textOf('[data-testid="own-start"]')) === 'Start your own workout', await textOf('[data-testid="own-start"]'))
+check('A1. the rest day offers "Start a workout"', (await textOf('[data-testid="own-start"]')) === 'Start a workout', await textOf('[data-testid="own-start"]'))
 await tap('[data-testid="own-start"]'); await until(`!!document.querySelector('[data-testid="own-choose-empty"]')`, 3000); await tap('[data-testid="own-choose-empty"]')
 await until(q('[data-testid="own-workout"]'))
 check('A2. it opens a workout of its own, full screen, with the search open', !!(await ev(`!!document.querySelector('[data-testid="own-search"]')`)) && /^Today · /i.test((await textOf('[data-testid="own-kicker"]')) ?? ''), await textOf('[data-testid="own-kicker"]'))

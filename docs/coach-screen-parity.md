@@ -118,8 +118,9 @@ header alone. Count what is below before trusting what is here.
   already exists, logging a workout he tells it about, and one logged from the watch reaches it as an ordinary cardio
   log. NOT BUILT: the coach is not told that a watch workout is waiting to be logged.
 
-- **Recording a walk or run.** `screen only`, added 25 Nov 2026 with the feature (his ruling, "A, build it";
-  `src/lib/activity-recording.ts`): Tools → "Record a walk or run", Start and End. Start and End are physical acts
+- **Recording a walk or run** (any cardio since 27 Nov 2026). `screen only`, added 25 Nov 2026 with the feature (his
+  ruling, "A, build it"; `src/lib/activity-recording.ts`). MOVED 27 Nov 2026 on his words ("it's under tools and it's
+  different to logging workouts"): Exercise → Start a workout → pick the cardio → Start, then End. Start and End are physical acts
   timed by the phone, so the coach cannot be the one to press them; what it CAN do already exists, logging a walk he
   tells it about (its existing extra-cardio logging), and a recorded walk reaches it as an ordinary cardio log. NOT BUILT: the coach is not
   yet told a log's steps and calories burned.

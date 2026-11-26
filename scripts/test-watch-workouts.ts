@@ -172,6 +172,8 @@ console.log('\n6. What the heart rate looked like (the summary\'s graph, time by
   check('a whole session at 179 is zone 4, at 180 zone 5', flat(179) === '0,0,0,40,0' && flat(180) === '0,0,0,0,40', [flat(179), flat(180)])
   const over = heartZones(every(1, m => (m < 20 ? 150 : 200)), start, end, 180)
   check('a session that went over the estimate is measured against its own highest reading (150 is zone 3 of 200, not zone 4 of 180)', over?.maxUsed === 200 && over?.minutes.join(',') === '0,0,20,0,20', over)
+  const shortEnd = new Date(start.getTime() + 20000)
+  check('a session of a few seconds charts no zones (five rows of "0 min" say nothing)', heartZones(Array.from({ length: 6 }, (_, i) => ({ bpm: 140, at: new Date(start.getTime() + i * 4000).toISOString() })), start, shortEnd, 200) === null)
   check('no estimate (no age, or a condition ticked), no zones', heartZones(stepped, start, end, null) === null)
   check('a watch that dropped out for most of the session draws no zones (15 of 40 minutes read)', heartZones(stepped.slice(0, 4), start, end, 200) === null, heartZones(stepped.slice(0, 4), start, end, 200))
   check('...and a gap is not effort: one reading stands for five minutes at most', heartZones([stepped[0], stepped[1], stepped[2], ...stepped.slice(20)], start, end, 200)?.minutes[0] === 7, heartZones([stepped[0], stepped[1], stepped[2], ...stepped.slice(20)], start, end, 200))
@@ -180,6 +182,11 @@ console.log('\n6. What the heart rate looked like (the summary\'s graph, time by
   check('mostly: the zone with the most minutes', mostlyZone(zm([3, 4, 28, 6, 1])) === 3 && mostlyZone(zm([3, 4, 8, 26, 1])) === 4 && mostlyZone(zm([30, 4, 8, 2, 0])) === 1)
   check('...a tie goes to the lower zone, never the higher', mostlyZone(zm([10, 10, 10, 10, 10])) === 1 && mostlyZone(zm([0, 0, 10, 10, 0])) === 3)
   check('...and nothing to say with no zones', mostlyZone(null) === null && mostlyZone(zm([0, 0, 0, 0, 0])) === null)
+  // The unrounded time decides when it is there: two zones that round to the same minute are told apart, and the
+  // lower zone still wins an exact tie.
+  const zms = (minutes: [number, number, number, number, number], ms: [number, number, number, number, number]) => ({ ...zm(minutes), ms })
+  check('...two zones that round to the same minute are told apart by their real time', mostlyZone(zms([0, 5, 5, 0, 0], [0, 290_000, 310_000, 0, 0])) === 3 && mostlyZone(zms([0, 5, 5, 0, 0], [0, 310_000, 290_000, 0, 0])) === 2)
+  check('...and what heartZones hands back carries that time (the zone logged is the zone charted)', (() => { const z = heartZones(stepped, start, end, 200); return !!z?.ms && z.ms.every((x, i) => Math.round(x / 60000) === z.minutes[i]) })())
 
   check('pace: 42 minutes over 5.2 km is 8:05 a kilometre', pacePerKm(42, 5.2) === '8:05', pacePerKm(42, 5.2))
   check('...seconds are two digits (30 min over 5 km is 6:00)', pacePerKm(30, 5) === '6:00')

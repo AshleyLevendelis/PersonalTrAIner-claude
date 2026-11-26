@@ -1825,6 +1825,14 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   choices; the meal writer is asked for plain names. `test:simple-meals`, `measure:simple-meals`. Needs the
   `generate-meals` deploy for the writer's half
 
+### His requests of 26 Nov 2026
+- **A recorded workout is on Exercise, not Tools (his words), and with a heart rate it is logged by its zone; with
+  none, Easy / Steady / Hard: his ruling "Keep Easy/Steady/Hard"** (over a zone by feel and over no effort). End says
+  "Mostly zone N" with one Log button; strap first, else the watch. The effort stored is the zone's word (1-2 Easy, 3
+  Steady, 4-5 Hard). A workout too short for any zone to hold half a minute is asked the three words. Where it starts
+  is the 27 Nov line under "His requests of 20 Nov 2026" (Start a workout, pick the cardio), which replaced the "Record
+  a walk or run" card this was first built on. `test:recorded-activity` §6, `verify:record-activity` A18a, B9a-B9e
+
 ### His requests of 20 Nov 2026
 - **Profile has an Account row, "Email & sign-in" (his request 20 Nov 2026, "Build the account row")**: an email can be
   saved any time, not only from the weekly prompt; it says saved, waiting on the email's link (never "saved"), or not
@@ -1861,6 +1869,14 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   must stay removed unless the app starts reading that data. Phone-only code loads only in the phone app.
   `test:phone-app`, `verify:health-steps`, `docs/plans/phone-app.md`. NOT BUILT natively yet: his machine
 
+- **Cardio is started from Exercise, like any workout: his words 27 Nov 2026** ("it's under tools and it's different to
+  logging workouts ... choosing a workout, i.e. walk, jog, run, hill sprints, assault bike etc. and pressing start and
+  it picks up the steps or heart rate or both depending on which suits"). Exercise, Start a workout, pick the cardio,
+  Start; the open workout sits at the top of Exercise; End shows the summary and one tap logs it under the name he
+  picked (its heart rate zone when there is one, else one effort tap: his 26 Nov ruling). It REPLACES "Tools, Start walk / Start run" in the next line (the card is off Tools). Mine: steps and
+  distance for work on foot only, never for a bike, rower or swim (the phone is not asked, and a late sync cannot add
+  them); machines for a full gym only; today only. `test:recorded-activity` §7, `verify:record-activity`. Needs a phone
+  app rebuild
 - **Record a walk or run: his request and ruling 25 Nov 2026, "A, build it"**: Tools, Start walk / Start run, End; the
   phone's steps, distance and calories for exactly that window (the watch's own figure), heart rate from the strap
   first; with a strap and no watch, calories are an estimate printed "≈ N kcal (estimate)" (his A, over nothing). One
