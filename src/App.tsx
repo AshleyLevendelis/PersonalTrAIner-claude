@@ -4,6 +4,7 @@ import { emptyMealsOf } from '@/lib/empty-meal'
 import { ShowNumbersContext } from '@/lib/show-numbers'
 import { couldNot, targetsMoved, mealsDrifted, type TargetMoveCause } from '@/lib/coach-voice'
 import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react'
+import { isPhoneApp } from '@/lib/steps-store'
 import { lazyWithReload, isChunkLoadError, reloadOnce } from '@/lib/chunk-reload'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -251,6 +252,19 @@ function App() {
   }, [profile?.id])
   // PLAN CHANGES MADE WITH NO SIGNAL are sent when it returns (mesocycle-persistence's kept weeks, 10 Nov 2026).
   useKeptPlanSender(profile?.id)
+  // THE WATCH APP (27 Nov 2026, docs/plans/watch-app.md): what the watch sent while the app was closed is taken on open,
+  // and as it arrives. Phone app only; the module is downloaded only there.
+  const watchCtxRef = useRef<{ profileId: string; body: { weightKg: number | null; age: number | null; gender: 'male' | 'female' | null } } | null>(null)
+  watchCtxRef.current = profile?.id
+    ? { profileId: profile.id, body: { weightKg: profile.weight_kg ?? null, age: profile.age ?? null, gender: profile.gender === 'male' || profile.gender === 'female' ? profile.gender : null } }
+    : null
+  useEffect(() => {
+    if (!profile?.id || !isPhoneApp()) return
+    let stop: (() => void) | null = null
+    let gone = false
+    void import('@/lib/watch-bridge').then(m => { if (!gone) stop = m.startWatchBridge(() => watchCtxRef.current) }).catch(() => {})
+    return () => { gone = true; stop?.() }
+  }, [profile?.id])
   const [macros, setMacros] = useState<MacroTargets | null>(() => boot?.macros ?? null)
   /** Latest daily_metrics weigh-in — DISPLAY only ("your current weight is X"). Null until the user first weighs in. Target computation uses targetWeightAnchorKg instead (see its own doc comment) — the two intentionally diverge: this always shows the real latest reading, the anchor only moves once that reading's 7-day average has shifted enough to matter. */
   const [latestWeightKg, setLatestWeightKg] = useState<number | null>(() => boot?.latestWeightKg ?? null)
@@ -3147,6 +3161,8 @@ function App() {
       localStorage.removeItem('exercise_plan_cache')
       localStorage.removeItem('user_profile_cache')
       localStorage.removeItem('mesocycle_cache')
+      // Sets ticked on the watch for the OLD plan's session: never pressed onto the new plan's rows.
+      localStorage.removeItem('fitplan_watch_sets')
       setProfile(null)
       setMacros(null)
       // Per-profile derived state — leaving this set leaked the previous

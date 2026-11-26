@@ -64,7 +64,7 @@ screen counterpart are in `docs/coach-screen-parity.md`.
 | `propose_style_change` | yes | a card (`propose_style_change`) | never off one occasion |
 | `propose_volume_change` | yes | a card (`propose_volume_change`) | never off one occasion |
 
-## Logging what was done (10)
+## Logging what was done (11)
 
 | Action | On the screen too | Arrives as | His words must... |
 |---|---|---|---|
@@ -77,6 +77,7 @@ screen counterpart are in `docs/coach-screen-parity.md`.
 | `log_workout_set` | yes | an instant save | (no words rule: sets in his words; odd reps are asked about once) |
 | `move_logged_sets` | yes | an instant save | (no words rule: the sets come from today's own log; the exercise he did must be in his words) |
 | `propose_cardio_log` | yes | a card (`propose_cardio_log`) | (no words rule: past-tense cardio in his words (message-evidence)) |
+| `propose_cardio_remove` | yes | a card (`propose_cardio_remove`) | (no words rule: a log already made; the card names the log before Apply) |
 | `propose_circuit_log` | yes | a card (`propose_circuit_log`) | (no words rule: built only from rounds, times and effort in his words (message-evidence)) |
 
 ## What the coach remembers (5)

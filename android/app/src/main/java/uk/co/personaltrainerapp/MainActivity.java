@@ -8,6 +8,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // The app's own plugin (live steps during a recorded workout), registered before the bridge starts.
         registerPlugin(StepCounterPlugin.class);
+        // The watch app's link (27 Nov 2026, docs/plans/watch-app.md).
+        registerPlugin(WatchBridgePlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

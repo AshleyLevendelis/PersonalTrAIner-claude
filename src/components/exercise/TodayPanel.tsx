@@ -118,6 +118,11 @@ import { CircuitOffer } from './CircuitOffer'
 import { describeDayGap, dayGapCanAddPress } from '@/lib/day-gap-note'
 import type { Exercise, WorkoutDay, MesocycleWeek, UserProfile, PlannedActivity } from '@/lib/types'
 import type { LoadSource } from './LoadChip'
+import { isPhoneApp } from '@/lib/steps-store'
+import type { WatchRow } from '@/lib/watch-session'
+// THE WATCH'S PART OF THIS TAB, downloaded only in the phone app (watch-session.ts says what it does).
+// Ambient: nobody tapped for it, so a missing file draws nothing (and reloads onto a new version, as every part does).
+const WatchLink = lazyWithReload(() => import('./WatchLink'), { ambient: true })
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -1550,6 +1555,22 @@ export function TodayPanel({
       carry: carriedWeightFor,
     })
   })()
+  // THE WATCH (27 Nov 2026; his vision: "On a weight workout see 'next exercise 3x10 bench press @100kg' then start rest
+  // from watch, start next set"; docs/plans/watch-app.md W3). The watch is sent the rows this tab draws, today's
+  // weights and all, never the plan's own; WatchLink (phone app only) sends them and saves the watch's sets with this
+  // list's own ticks.
+  const watchRows: WatchRow[] | null = showsTodaysSession && workout && isPhoneApp()
+    ? workout.exercises.map(ex => {
+        const { rowEx } = liveRowExercise(ex, { progressedLoads, progressedAddedLoads, layoff, profile })
+        const id = ex.id ?? getExerciseId(ex.name)
+        return {
+          id, name: rowEx.name, sets: rowEx.sets, reps: rowEx.reps,
+          suggestedLoad: rowEx.suggested_load, addedLoadKg: rowEx.suggested_added_load_kg ?? null,
+          restSeconds: parseRestSeconds(rowEx.rest ?? '60s'), done: setsFor(id, ex.name).length,
+        }
+      })
+    : null
+
   /** The line on screen is the week's note — so the week row must not print it again, and its chevron opens the rest. */
   const lineIsWeekNote = coachLine?.source === 'fallback' && todayNudge?.source === 'week-note'
   const weekPhase = weekPhaseLine(currentMesoWeekObj?.block_number, currentMesoWeekObj?.phase_label, { isDeload: currentMesoWeekObj?.is_deload, isCalibrationWeek: currentMesoWeekObj?.isCalibrationWeek })
@@ -2066,6 +2087,13 @@ export function TodayPanel({
             <span className="text-[0.625rem] font-semibold uppercase tracking-[.12em] text-text-tertiary">Exercises</span>
             <span className="text-[0.6875rem] text-muted-foreground" data-testid="exercises-done">{exercisesDone} of {workout!.exercises.length} done</span>
           </p>
+          {watchRows && (
+            <Suspense fallback={null}>
+              <WatchLink rows={watchRows} listEl={listEl} today={today} logs={logs}
+                title={workout!.focus?.trim() || 'Today\'s session'} age={profile?.age ?? null}
+                noZones={(profile?.health_conditions ?? []).length > 0} />
+            </Suspense>
+          )}
           <div ref={setListEl} data-today-exercises>
           <ExerciseList
             workout={workout!}

@@ -52,7 +52,7 @@ export function AdditionalWorkSection({
   const items = computeOffPlanWork(declaredOffPlan, logs, plannedIds, getExerciseId)
   const cardio = useCardioReceiptsToday(plannedCardio)
 
-  if (items.length === 0 && cardio.receipts.length === 0) return null
+  if (items.length === 0 && cardio.receipts.length === 0 && cardio.removed.length === 0) return null
 
   return (
     <div className="space-y-2" data-testid="additional-work">

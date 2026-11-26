@@ -129,7 +129,7 @@ export async function gatherFigures(r: Recording, body: BodyForEstimate, now: Da
   let phoneRead = false, heartFromStrap = false
   try {
     const strap = await import('./strap-live')
-    if (strap.pairedStrap()) {
+    if (strap.hasOwnReadings()) {
       const s = strap.strapReadingsBetween(start, end)
       if (s) { heart = { avg: s.avg, max: s.max }; heartFromStrap = true }
     }

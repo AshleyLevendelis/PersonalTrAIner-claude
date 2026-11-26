@@ -221,7 +221,7 @@ export async function syncHeartFromHealth(profileId: string, today: string, now:
 export async function fillHeartFromStrap(profileId: string, today: string): Promise<{ cardio: number; workouts: number }> {
   const done = { cardio: 0, workouts: 0 }
   const strap = await import('./strap-live')
-  if (!strap.pairedStrap()) return done
+  if (!strap.hasOwnReadings()) return done
   const yesterday = addDays(today, -1)
   // The earliest moment a session without its figure still needs readings from; nothing before it is kept.
   let keepFrom: number = Date.now()

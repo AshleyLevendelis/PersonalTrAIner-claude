@@ -1182,6 +1182,11 @@ const db: Db = {
           completed_at: new Date(anchorNowMs() - 2 * 86400000).toISOString(),
         }]
       : []),
+    // ?oldwalk=1: a walk logged earlier today, read back from the server (no Undo can reach it), as INPUT, so
+    // verify:cardio-remove can take it off (his report 27 Nov 2026: "I accidentally added a walk today").
+    ...(new URLSearchParams(location.search).get('oldwalk') === '1'
+      ? [{ id: 'c-oldwalk', user_id: PROFILE_ID, date: today, activity_name: 'Walk', duration_minutes: 5, intensity_rpe: 3, notes: null, completed_at: new Date(anchorNowMs() - 3 * 3600000).toISOString() }]
+      : []),
     // ?circuit=1: two timer blocks already logged today, as INPUT (the rows the round timer's sheet
     // writes), so verify:circuit-log can ask what the Today card offers (her circuit ruling A, 8 Oct 2026).
     ...(new URLSearchParams(location.search).get('circuit') === '1'

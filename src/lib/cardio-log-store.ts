@@ -265,6 +265,48 @@ export async function deleteCardioLog(clientId: string): Promise<void> {
 }
 
 /**
+ * TAKE A LOGGED ACTIVITY OFF ITS DAY, at any time (27 Nov 2026, his report from the phone: "I accidentally added a walk
+ * today. Remove it", and the coach could only search the session's exercises). Undo (deleteCardioLog) works for ten
+ * minutes; after that a wrong log had no way off the day on either surface. This is the one road for both: the walk's
+ * row on Exercise and the coach's offer. A log still waiting to sync is dropped from the phone; a saved one is deleted
+ * on the server by its own id and this person's id, and the phone's copy follows. Resolves false when nothing was
+ * removed (a failed delete, or a log with neither), so a caller never says "removed" over a log still counted.
+ */
+export async function removeCardioLog(log: CardioLogView): Promise<boolean> {
+  if (flushPromise) await flushPromise
+  const item = log.clientId ? loadPending().find(i => i.clientId === log.clientId) : undefined
+  if (item && item.status !== 'synced') { await deleteCardioLog(item.clientId); return true }
+  const id = log.id ?? item?.id
+  if (!id) return false
+  const { error } = await supabase.from('cardio_logs').delete().eq('id', id).eq('user_id', log.user_id)
+  if (error) { console.error('removeCardioLog: delete failed', error); return false }
+  recordSynced({ kind: 'delete', id })
+  savePending(loadPending().filter(i => i.id !== id))
+  notify()
+  return true
+}
+
+/** Puts a removed log back as it was (the Undo after removeCardioLog): the same day, name, minutes, effort and figures. */
+export function restoreCardioLog(log: CardioLogView): CardioLogView | null {
+  return saveCardioLog({
+    userId: log.user_id,
+    date: log.date,
+    activityName: log.activity_name,
+    durationMinutes: log.duration_minutes,
+    intensityRpe: log.intensity_rpe,
+    avgHeartRate: log.avg_heart_rate ?? null,
+    maxHeartRate: log.max_heart_rate ?? null,
+    notes: log.notes ?? null,
+    distanceKm: log.distance_km == null ? null : Number(log.distance_km),
+    startedAt: log.started_at ?? null,
+    endedAt: log.started_at ? (log.completed_at ?? null) : null,
+    steps: log.steps ?? null,
+    activeKcal: log.active_kcal ?? null,
+    kcalEstimated: log.kcal_estimated ?? null,
+  })
+}
+
+/**
  * Removes the logs a coach card wrote, by WHAT they are (that person, that day, that name, that
  * note), not by a client id: the coach's Undo can be tapped long after the ten-minute window that
  * holds a client id, and a receipt that said "undone" while the blocks stayed on the week would be
