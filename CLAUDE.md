@@ -1825,6 +1825,15 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   choices; the meal writer is asked for plain names. `test:simple-meals`, `measure:simple-meals`. Needs the
   `generate-meals` deploy for the writer's half
 
+### His requests of 27 Nov 2026
+- **Live while a recorded workout runs: his words "While the exercise is running I should be able to see my heart rate
+  and the zone and steps if applicable"**: heart rate with its zone ("♥ 150 · Zone 4", narrowing the strap's "never a
+  zone" for this card), steps on foot from the phone's own step counter (Android, the "Physical activity" permission;
+  the seven health reads unchanged), and the card says where heart rate comes from. A Galaxy Watch's heart rate is never
+  live to a phone app (Samsung's design): a strap, a broadcast app on the watch, or our own watch app. A watch that syncs
+  late now fills heart rate too, never over a strap's. `test:recorded-activity` §8, `verify:record-activity` A10-A10d,
+  B3a-B3b, D0-D5. Needs a phone app rebuild. NOT on a real phone yet
+
 ### His requests of 26 Nov 2026
 - **"Check what your watch shares" on Profile (step 0 of `docs/plans/health-data-next.md`, his "Start the planned
   work")**: on his tap, a plain report of what the phone's health store hands the app, as counts and times only (a

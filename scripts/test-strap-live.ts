@@ -167,7 +167,11 @@ async function main() {
   console.log('\n5. Nothing judges the number')
   const badge = strip(readFileSync('src/components/LiveHeart.tsx', 'utf8'))
   const section = strip(readFileSync('src/components/HealthStepsSection.tsx', 'utf8'))
-  check('no zone, target or "too high" in the live number or the strap row', !/\b(zone|target|too high|too low|% of)\b/i.test(badge + live + section.slice(section.indexOf('HeartStrapSection'))))
+  // NARROWED 27 Nov 2026, his words on the running workout: "I should be able to see my heart rate and the zone". The
+  // live number may carry its ZONE, the summary's own description, and only where a caller hands it a maximum (the
+  // recorded workout; none with a health condition, pregnancy or no age). Still never a target or "too high".
+  check('no target or "too high" in the live number or the strap row, and no zone in the strap\'s own reader or row', !/\b(target|too high|too low|% of)\b/i.test(badge + live + section.slice(section.indexOf('HeartStrapSection'))) && !/\bzone\b/i.test(live + section.slice(section.indexOf('HeartStrapSection'))))
+  check('...the live number shows a zone ONLY when handed a maximum (the corner, the timers and today\'s workout never are)', /const zone = estimatedMax \? zoneOf\(/.test(badge) && !/<LiveHeart[^>]*estimatedMax/.test(['src/App.tsx', 'src/components/timers/RoundCard.tsx', 'src/components/timers/TimersPanel.tsx', 'src/components/exercise/TodayPanel.tsx'].map(f => readFileSync(f, 'utf8')).join('\n')))
 
   await forgetStrap()
   check('forgetting the strap forgets it, its readings and its link', pairedStrap() === null && !store.has('fitplan_heart_strap_readings') && disconnects.includes('AA:BB') && liveHeartRate() === null && strapState() === 'none', { disconnects })

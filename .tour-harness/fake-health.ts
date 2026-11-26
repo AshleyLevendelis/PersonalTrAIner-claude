@@ -23,6 +23,8 @@ if (platform === 'ios' || platform === 'android') {
     requestHeartAccess: async () => { calls.push({ request: ['heartRate', 'restingHeartRate'] }); return q.get('healthdenied') !== '1' },
     heartRateSamples: async (start, end) => {
       calls.push({ heart: [start.toISOString(), end.toISOString()] })
+      // &healthheart=none: a watch whose heart rate has not reached the phone yet (a Galaxy Watch, 27 Nov 2026).
+      if (q.get('healthheart') === 'none') return []
       const out: { bpm: number; at: string }[] = []
       // THE SHAPE OF A REAL SESSION across whatever window is asked (26 Nov 2026, so the summary's graph has something
       // true to draw): a warm-up climbing from 108, a steady middle near 150, a push to 172 late on, then easing off.
@@ -122,6 +124,25 @@ if (platform === 'ios' || platform === 'android') {
     return out
   }
   ;(globalThis as { __healthAdapterForTest?: HealthAdapter }).__healthAdapterForTest = adapter
+  // THE PHONE'S OWN STEP COUNTER (27 Nov 2026, live-steps.ts). &stepcounter= chooses it:
+  //   on (default)  a counter at 120,000 since the phone started; window.__stepsSend(n) moves it on by n steps
+  //   denied        "Physical activity" refused
+  //   none          a phone with no step counter
+  const sc = q.get('stepcounter') ?? 'on'
+  // The counter outlives a page load, as a phone's does (it counts since the phone started, not since the app did).
+  let total = 120000
+  try { total = Number(localStorage.getItem('fake_step_counter_total') ?? '120000') || 120000 } catch { /* 120,000 */ }
+  const subs = new Set<(t: number) => void>()
+  ;(window as unknown as { __stepsSend: (n: number) => void }).__stepsSend = (n: number) => {
+    total += n
+    try { localStorage.setItem('fake_step_counter_total', String(total)) } catch { /* this page only */ }
+    for (const f of subs) f(total)
+  }
+  ;(globalThis as { __stepCounterForTest?: unknown }).__stepCounterForTest = {
+    start: async () => { calls.push({ stepCounter: 'start' }); return sc === 'denied' ? { started: false, reason: 'denied' } : sc === 'none' ? { started: false, reason: 'unavailable' } : { started: true, total } },
+    stop: async () => { calls.push({ stepCounter: 'stop' }) },
+    onTotal: async (cb: (t: number) => void) => { subs.add(cb); return () => { subs.delete(cb) } },
+  }
   if (q.get('healthon') === '1') { try { localStorage.setItem('fitplan_health_steps_connected', '1') } catch { /* */ } }
   if (q.get('hearton') === '1') { try { localStorage.setItem('fitplan_health_heart_connected', '1') } catch { /* */ } }
   if (q.get('sleepon') === '1') { try { localStorage.setItem('fitplan_health_sleep_connected', '1') } catch { /* */ } }

@@ -20,9 +20,14 @@
 // EFFORT IS ASKED, never chosen for him (his 24 Sep "nothing pre-chooses an effort the app cannot know").
 //
 // A WATCH THAT SYNCS LATE (Garmin, Samsung): the log saves at once with what the phone has, and
-// `fillRecordedFromHealth` fills the missing steps, distance and calories when they arrive (Home's open and the app
-// coming back to the front, beside heart rate). A device's calories replace the app's estimate; nothing else is ever
-// overwritten.
+// `fillRecordedFromHealth` fills the missing steps, distance, calories and HEART RATE when they arrive (Home's open and
+// the app coming back to the front). A device's calories replace the app's estimate; nothing else is ever overwritten.
+// Heart rate joined 27 Nov 2026 (his phone test: a 5-minute walk with a Galaxy Watch logged no heart rate, and nothing
+// ever filled it).
+//
+// LIVE STEPS (27 Nov 2026, live-steps.ts): on foot in the Android app, the phone's own step counter runs from Start to
+// End, so the count shows while he walks. At End the health store's steps win when it has them; otherwise the phone's
+// own count is used.
 // ---------------------------------------------------------------------------
 
 import { readRecording, writeRecording, useRecording, type Recording } from './recording-store'
@@ -32,6 +37,7 @@ import { rpeToStore, type EffortKey } from './cardio-effort'
 import { isPhoneApp } from './steps-store'
 import { addDays } from './session-move'
 import { tracksSteps } from './cardio-kinds'
+import { clearLiveSteps, liveStepsFor, startLiveSteps, stopLiveSteps } from './live-steps'
 
 const ASKED_KEY = 'fitplan_activity_access_asked'
 /** A recording left running longer than this was forgotten, not walked: End says so. */
@@ -65,6 +71,8 @@ export async function startRecording(activity: string, now: Date = new Date()): 
     }
     // A paired strap that dropped is tried again, so the walk has its heart rate.
     try { void (await import('./strap-live')).connectPairedStrap() } catch { /* no strap */ }
+    // On foot: the phone's own step counter, live (asks "Physical activity" the first time).
+    if (tracksSteps(activity)) void startLiveSteps(r.startedAt)
   }
   return r
 }
@@ -74,16 +82,20 @@ export function endRecording(now: Date = new Date()): Recording | null {
   if (!r || r.endedAt) return r
   const ended = { ...r, endedAt: now.toISOString() }
   write(ended)
+  void stopLiveSteps()
   return ended
 }
 
 /** Back to recording, after an End tapped by mistake. */
 export function resumeRecording(): void {
   const r = read()
-  if (r?.endedAt) write({ activity: r.activity, startedAt: r.startedAt })
+  if (r?.endedAt) {
+    write({ activity: r.activity, startedAt: r.startedAt })
+    if (isPhoneApp() && tracksSteps(r.activity)) void startLiveSteps(r.startedAt)
+  }
 }
 
-export function discardRecording(): void { write(null) }
+export function discardRecording(): void { write(null); void stopLiveSteps(); clearLiveSteps() }
 
 /** True when the clock has run so long it was surely forgotten. */
 export function looksForgotten(r: Recording, now: Date = new Date()): boolean {
@@ -97,6 +109,8 @@ export interface GatheredFigures extends RecordingFigures {
   phoneRead: boolean
   /** Heart rate came from the strap's own readings. */
   heartFromStrap: boolean
+  /** The steps are the phone's own count (live-steps.ts), the health store having none yet. */
+  stepsFromPhoneCounter: boolean
 }
 
 /**
@@ -141,7 +155,13 @@ export async function gatherFigures(r: Recording, body: BodyForEstimate, now: Da
       }
     }
   } catch { /* nothing read */ }
-  return { ...recordingFigures({ start, end, steps, distanceM, deviceKcal, heart }, body), phoneRead, heartFromStrap }
+  // THE PHONE'S OWN COUNT when the health store has none yet (a watch that syncs late): what he saw while walking.
+  let stepsFromPhoneCounter = false
+  if (tracksSteps(r.activity) && !(steps != null && steps > 0)) {
+    const counted = liveStepsFor(r.startedAt)
+    if (counted != null) { steps = counted; stepsFromPhoneCounter = true }
+  }
+  return { ...recordingFigures({ start, end, steps, distanceM, deviceKcal, heart }, body), phoneRead, heartFromStrap, stepsFromPhoneCounter }
 }
 
 /** Write the recording down as a cardio log, with the effort he tapped. Null when nothing was saved. */
@@ -162,13 +182,13 @@ export function logRecording(p: { profileId: string; date: string; recording: Re
     activeKcal: p.figures.kcal,
     kcalEstimated: p.figures.kcalEstimated,
   })
-  if (view) write(null)
+  if (view) { write(null); clearLiveSteps() }
   return view
 }
 
 /** The update a late sync may make to a recorded log: only what is missing, and a device's calories over an estimate. */
 export function lateFill(
-  row: { activity_name?: string | null; steps?: number | null; distance_km?: number | null; active_kcal?: number | null; kcal_estimated?: boolean | null },
+  row: { activity_name?: string | null; steps?: number | null; distance_km?: number | null; active_kcal?: number | null; kcal_estimated?: boolean | null; avg_heart_rate?: number | null; max_heart_rate?: number | null },
   fresh: RecordingFigures,
 ): Record<string, unknown> | null {
   const out: Record<string, unknown> = {}
@@ -179,6 +199,11 @@ export function lateFill(
   if (fresh.kcal != null && !fresh.kcalEstimated && (row.active_kcal == null || row.kcal_estimated)) {
     out.active_kcal = fresh.kcal
     out.kcal_estimated = false
+  }
+  // HEART RATE THE WATCH SYNCED LATE (27 Nov 2026): filled when the log has none, never over one it has (a strap's).
+  if (row.avg_heart_rate == null && fresh.avgHeartRate != null && fresh.maxHeartRate != null) {
+    out.avg_heart_rate = fresh.avgHeartRate
+    out.max_heart_rate = fresh.maxHeartRate
   }
   return Object.keys(out).length ? out : null
 }
@@ -196,20 +221,28 @@ export async function fillRecordedFromHealth(profileId: string, today: string): 
     if (!a || !(await a.isAvailable()).available) return 0
     const { supabase } = await import('./supabase')
     const { data } = await supabase.from('cardio_logs').select('*').eq('user_id', profileId).in('date', [addDays(today, -1), today])
-    type Row = { id?: string; activity_name?: string | null; started_at?: string | null; completed_at?: string | null; steps?: number | null; distance_km?: number | null; active_kcal?: number | null; kcal_estimated?: boolean | null }
+    type Row = { id?: string; activity_name?: string | null; started_at?: string | null; completed_at?: string | null; steps?: number | null; distance_km?: number | null; active_kcal?: number | null; kcal_estimated?: boolean | null; avg_heart_rate?: number | null; max_heart_rate?: number | null }
     for (const row of (data ?? []) as Row[]) {
       if (!row.id || !row.started_at || !row.completed_at) continue
       const onFoot = tracksSteps(row.activity_name)
-      if ((!onFoot || (row.steps != null && row.distance_km != null)) && row.active_kcal != null && !row.kcal_estimated) continue
+      if ((!onFoot || (row.steps != null && row.distance_km != null)) && row.active_kcal != null && !row.kcal_estimated && row.avg_heart_rate != null) continue
       const start = new Date(row.started_at), end = new Date(row.completed_at)
       if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) continue
       const read = async (f?: () => Promise<number>) => { if (!f) return null; try { return await f() } catch { return null } }
+      let heart: { avg: number; max: number } | null = null
+      if (row.avg_heart_rate == null && a.heartRateSamples) {
+        try {
+          const samples = await a.heartRateSamples(start, end)
+          const s = (await import('./heart-strap')).summariseHeartRate(samples, start, end)
+          if (s) heart = { avg: s.avg, max: s.max }
+        } catch { /* not synced yet: next time */ }
+      }
       const fresh = recordingFigures({
         start, end,
         steps: await read(() => a.stepsBetween(start, end)),
         distanceM: await read(a.distanceMetersBetween && (() => a.distanceMetersBetween!(start, end))),
         deviceKcal: await read(a.activeKcalBetween && (() => a.activeKcalBetween!(start, end))),
-        heart: null,
+        heart,
       }, {})
       const update = lateFill(row, fresh)
       if (!update) continue

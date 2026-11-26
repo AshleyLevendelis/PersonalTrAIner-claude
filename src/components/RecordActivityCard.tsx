@@ -14,6 +14,8 @@ import { tracksSteps } from '@/lib/cardio-kinds'
 import type { CardioLogView } from '@/lib/cardio-log-store'
 import { estimatedMaxHeartRate, mostlyZone, ZONES, type HeartReading } from '@/lib/heart-series'
 import { isPhoneApp } from '@/lib/steps-store'
+import { pairedStrap, useLiveHeartRate } from '@/lib/strap-live'
+import { startLiveSteps, useLiveSteps, useLiveStepsState } from '@/lib/live-steps'
 import { readWatchHeart } from '@/lib/watch-workouts'
 
 // ---------------------------------------------------------------------------
@@ -66,6 +68,14 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
   const [error, setError] = useState<string | null>(null)
   const [logged, setLogged] = useState<Logged | null>(null)
   const phone = isPhoneApp()
+  const liveBpm = useLiveHeartRate()
+  const recordingStart = rec && !rec.endedAt ? rec.startedAt : null
+  const liveSteps = useLiveSteps(recordingStart)
+  const stepsState = useLiveStepsState()
+  // LIVE STEPS (his 27 Nov "steps if applicable"): counting from the phone's own step counter while a walk or run is
+  // open, also after the app was closed and opened again mid-walk.
+  const stepsWanted = !!(phone && recordingStart && rec && tracksSteps(rec.activity))
+  useEffect(() => { if (stepsWanted && recordingStart) void startLiveSteps(recordingStart) }, [stepsWanted, recordingStart])
   // JUST STARTED: bring the clock into sight (the Start he pressed is further down the page). Only for a recording
   // begun in the last few seconds, so coming back to Exercise mid-walk does not jump the page.
   const top = useRef<HTMLDivElement>(null)
@@ -119,6 +129,9 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
           <Check className="mt-0.5 size-3.5 shrink-0" aria-hidden />
           <span>Logged{logged.zone ? ` · mostly zone ${logged.zone}` : felt ? ` · felt ${effortLabel(felt)}` : ''}. It’s on your week and the coach can see it.</span>
         </p>
+        {phone && logged.view.avg_heart_rate == null && (
+          <p className="text-[0.71875rem] text-muted-foreground" data-record-heart-later>Heart rate fills in when your watch syncs.</p>
+        )}
         <div className="-my-2 flex justify-end">
           <button type="button" className="min-h-11 px-1 text-[0.8125rem] font-semibold text-primary-text" onClick={() => setLogged(null)} data-record-done>Done</button>
         </div>
@@ -132,18 +145,44 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
   if (!rec.endedAt) {
     return (
       <div ref={top} data-record-card="recording" className="rounded-[20px] p-4" style={cardStyle}>
-        <div className="flex items-center justify-between gap-3">
-          <span className={kicker}>Recording</span>
-          <LiveHeart className="text-sm text-foreground" />
-        </div>
+        <span className={kicker}>Recording</span>
         <Title name={name} />
         <div data-record-clock className="tabular-mono mt-3 text-[3rem] font-bold leading-none tracking-[-.03em]">{clockText(now - Date.parse(rec.startedAt))}</div>
+        {/* LIVE, WHILE IT RUNS (his words 27 Nov 2026: "While the exercise is running I should be able to see my heart
+            rate and the zone and steps if applicable"). Heart rate is live only from a strap: a Galaxy Watch hands its
+            readings to the phone late, so the line under it says where heart rate comes from. */}
+        {phone && (
+          <div className={`mt-3 grid gap-2 ${onFoot ? 'grid-cols-2' : 'grid-cols-1'}`} data-record-live>
+            <div className="rounded-[12px] bg-muted/40 px-3 py-2">
+              <p className="text-[0.625rem] font-semibold uppercase tracking-[.12em] text-muted-foreground">Heart rate</p>
+              <div className="mt-0.5 text-[1.125rem] font-semibold" data-record-live-heart>
+                {liveBpm != null ? <LiveHeart className="text-foreground" estimatedMax={estimatedMax} /> : <span className="text-muted-foreground">–</span>}
+              </div>
+            </div>
+            {onFoot && (
+              <div className="rounded-[12px] bg-muted/40 px-3 py-2">
+                <p className="text-[0.625rem] font-semibold uppercase tracking-[.12em] text-muted-foreground">Steps</p>
+                <p className="mt-0.5 tabular-mono text-[1.125rem] font-semibold" data-record-live-steps={liveSteps ?? ''}>
+                  {liveSteps != null ? liveSteps.toLocaleString('en-GB') : <span className="text-muted-foreground">–</span>}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
         <p className="mt-2 text-[0.75rem] leading-[1.45] text-muted-foreground" data-record-what>
-          {phone
-            ? onFoot
-              ? 'Your steps, distance and heart rate are picked up from your phone and watch when you end it.'
-              : 'Your heart rate and calories are picked up from your watch or strap when you end it.'
-            : 'Timed here. In the phone app it also picks up your steps and heart rate.'}
+          {!phone
+            ? 'Timed here. In the phone app it also picks up your steps and heart rate.'
+            : liveBpm != null
+            ? 'Heart rate live from your strap.'
+            : pairedStrap()
+            ? 'Your strap isn’t sending yet: check it’s on and the pads are damp. Your watch’s heart rate fills in when it syncs.'
+            : 'Pair your strap for live heart rate: Profile, Steps from your phone, Heart rate strap. Your watch’s heart rate fills in when it syncs.'}
+          {phone && onFoot && (stepsState === 'denied'
+            ? ' Steps need "Physical activity" allowed for this app in your phone’s settings; they fill in from your watch when it syncs.'
+            : stepsState === 'unavailable'
+            ? ' This phone can’t count steps live; they fill in from your watch when it syncs.'
+            : ' Steps count live while the phone is on you.')}
+          {phone && !onFoot && ' Calories come from your watch or strap when you end it.'}
           {' '}It keeps going with the phone locked.
         </p>
         {confirmCancel ? (
@@ -168,7 +207,9 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
   const forgotten = looksForgotten(rec)
   const start = new Date(rec.startedAt), end = new Date(rec.endedAt)
   const minutes = figures?.minutes ?? Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000))
-  const missing = figures?.phoneRead ? [onFoot && figures.steps == null && 'steps', figures.kcal == null && 'calories'].filter(Boolean) as string[] : []
+  // What is still to come from a watch that syncs late, heart rate included (27 Nov 2026: his Galaxy Watch walk).
+  const missing = figures?.phoneRead ? [onFoot && figures.steps == null && 'steps', figures.avgHeartRate == null && 'heart rate', figures.kcal == null && 'calories'].filter(Boolean) as string[] : []
+  const missingWords = missing.length <= 1 ? missing.join('') : `${missing.slice(0, -1).join(', ')} or ${missing[missing.length - 1]}`
 
   // THE ZONE, when the heart rate gives one: the zone the summary calls "mostly", from the same readings. The effort
   // stored is that zone's own word (zones 1-2 Easy, 3 Steady, 4-5 Hard: heart-series.ts ZONES), so the week and the
@@ -201,11 +242,14 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
               samples={samples} start={start} end={end} estimatedMax={estimatedMax}
             />
           </div>
+          {figures.stepsFromPhoneCounter && (
+            <p className="text-[0.71875rem] text-muted-foreground" data-record-steps-counted>Steps counted by your phone while you moved.</p>
+          )}
           {figures.kcalEstimated && (
             <p className="text-[0.71875rem] text-muted-foreground" data-record-estimate>Calories are an estimate from your heart rate, age and weight. A watch’s own figure replaces it if one arrives.</p>
           )}
           {missing.length > 0 && (
-            <p className="text-[0.71875rem] text-muted-foreground" data-record-waiting>No {missing.join(' or ')} on your phone for this yet. If your watch syncs later, they fill in on their own.</p>
+            <p className="text-[0.71875rem] text-muted-foreground" data-record-waiting>No {missingWords} on your phone for this yet. If your watch syncs later, they fill in on their own.</p>
           )}
           {!phone && <p className="text-[0.71875rem] text-muted-foreground">Steps, heart rate and calories are read in the phone app.</p>}
           {forgotten && <p className="text-[0.71875rem] text-[color:var(--role-warn-text)]" data-record-forgotten>That ran for over 6 hours. If you forgot to end it, throw it away.</p>}
