@@ -59,6 +59,32 @@ export function watchActivityName(type: string): string {
 export function isStrengthWorkout(type: string): boolean {
   return watchActivityName(type) === 'Strength training'
 }
+// ---------------------------------------------------------------------------
+// IS THIS THE SESSION THE PLAN ASKED FOR TODAY? (26 Nov 2026, the summary's "planned versus done".) A run the watch
+// recorded on a day whose plan is an easy jog IS that jog; a swim on that day is something extra. Decided by the kind
+// of movement in the two names, and only ever the DEFAULT of a choice he can flip before he logs: counted as the
+// plan's session it is saved under that session's own name, so the day reads done as if he had started it here.
+// ---------------------------------------------------------------------------
+const FAMILIES: [RegExp, string][] = [
+  [/\b(run|jog|sprint)/i, 'run'], [/\b(walk|hik)/i, 'walk'], [/\b(bik|cycl|spin)/i, 'cycle'], [/\bswim/i, 'swim'],
+  [/\brow/i, 'row'], [/elliptical|cross.?trainer/i, 'elliptical'], [/\bskip|jump rope/i, 'skip'], [/\bstair/i, 'stairs'],
+]
+export function activityFamily(name: string | null | undefined): string | null {
+  const n = (name ?? '').trim()
+  for (const [re, family] of FAMILIES) if (re.test(n)) return family
+  return null
+}
+/**
+ * The watch's workout is the kind of session the plan asked for: the same movement, or any of these movements when the
+ * plan names none ("Steady cardio", "Cardio intervals": his choice of machine or road).
+ */
+export function isPlannedKind(watchType: string, plannedActivity: string | null | undefined): boolean {
+  const mine = activityFamily(watchActivityName(watchType))
+  if (mine == null) return false
+  const planned = activityFamily(plannedActivity)
+  return planned != null ? mine === planned : /\b(cardio|conditioning|intervals)\b/i.test(plannedActivity ?? '')
+}
+
 /** Steps mean something on foot only. */
 export function countsSteps(type: string): boolean {
   return ['Run', 'Walk', 'Hike'].includes(watchActivityName(type))
@@ -205,7 +231,11 @@ export async function readWatchOffers(profileId: string, today: string, at?: Dat
  * it wrote them; the rest (steps on foot, heart rate, calories it did not write) is read for exactly its window, the
  * way a recorded walk is. Null when nothing was saved.
  */
-export async function logWatchWorkout(p: { profileId: string; workout: WatchWorkout; effort: EffortKey; body: BodyForEstimate }): Promise<CardioLogView | null> {
+export async function logWatchWorkout(p: {
+  profileId: string; workout: WatchWorkout; effort: EffortKey; body: BodyForEstimate
+  /** Count it as the plan's own session for that day: saved under the session's name, its target effort kept when he taps the effort it asked for. */
+  asPlanned?: { activity: string; targetRpe?: number | null } | null
+}): Promise<CardioLogView | null> {
   const { gatherFigures } = await import('./activity-recording')
   const { saveCardioLog } = await import('./cardio-log-store')
   const { rpeToStore } = await import('./cardio-effort')
@@ -216,9 +246,9 @@ export async function logWatchWorkout(p: { profileId: string; workout: WatchWork
   return saveCardioLog({
     userId: p.profileId,
     date: localDateOf(w.start),
-    activityName: watchActivityName(w.type),
+    activityName: p.asPlanned?.activity || watchActivityName(w.type),
     durationMinutes: watchWorkoutMinutes(w),
-    intensityRpe: rpeToStore(p.effort),
+    intensityRpe: rpeToStore(p.effort, p.asPlanned?.targetRpe),
     avgHeartRate: f.avgHeartRate,
     maxHeartRate: f.maxHeartRate,
     distanceKm: ownKm ?? (countsSteps(w.type) ? f.distanceKm : null),
@@ -228,4 +258,16 @@ export async function logWatchWorkout(p: { profileId: string; workout: WatchWork
     activeKcal: ownKcal ?? f.kcal,
     kcalEstimated: ownKcal != null ? false : f.kcalEstimated,
   })
+}
+
+/** The heart readings the phone holds for a workout's own time, for its graph. Never throws; nothing read is []. */
+export async function readWatchHeart(w: Pick<WatchWorkout, 'start' | 'end'>): Promise<{ bpm: number; at: string }[]> {
+  try {
+    const { healthAdapter } = await import('./health-steps')
+    const adapter = await healthAdapter()
+    if (!adapter?.heartRateSamples) return []
+    return await adapter.heartRateSamples(new Date(w.start), new Date(w.end))
+  } catch {
+    return []
+  }
 }

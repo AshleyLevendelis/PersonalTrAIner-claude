@@ -95,7 +95,7 @@ export interface NudgeInput {
    * RESTING HEART RATE RAISED (his "2", 25 Nov 2026; heart-trends.ts recoveryFlag): the app's sentence and the run's
    * first morning, which keys it, so one run of raised mornings is raised once. Absent: no watch, or nothing raised.
    */
-  recovery?: { line: string; since: string } | null
+  recovery?: { line: string; since: string; kind?: 'sleep' } | null
 }
 
 export interface CoachNudge {
@@ -242,7 +242,7 @@ export function pickNudge(input: NudgeInput, said: string[]): CoachNudge | null 
     return {
       kind: 'recovery_flag',
       keys: [keys.recovery, ...(keys.due ? [keys.due] : [])],
-      text: recoveryOfferText(input.recovery.line, input.todaySession.focus),
+      text: recoveryOfferText(input.recovery.line, input.todaySession.focus, input.recovery.kind),
       chips: RECOVERY_CHIPS,
     }
   }
@@ -530,6 +530,9 @@ export function openerSkips(keys: ReturnType<typeof nudgeKeys>, said: string[]):
 
 /** The recovery offer's words and replies, one place for the event above and the opener (coach-opener.ts). */
 export const RECOVERY_CHIPS = ['Give me the shortest version today', "I feel fine, keep it as it is"]
-export function recoveryOfferText(line: string, focus: string): string {
+export function recoveryOfferText(line: string, focus: string, kind?: 'sleep'): string {
+  // TWO SHORT NIGHTS (his pick "A", 26 Nov 2026; sleep-nights.ts): the same offer and the same two answers, its own
+  // reason. It says what short sleep does to a session and nothing about his sleep itself.
+  if (kind === 'sleep') return `${line} Short sleep makes hard work feel harder. Want today's ${focus} lighter?`
   return `${line} That can mean you're still carrying some fatigue. Want today's ${focus} lighter?`
 }

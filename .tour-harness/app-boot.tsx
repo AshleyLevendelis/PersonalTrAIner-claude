@@ -49,6 +49,10 @@ const PLAN_SUNDAY = new URLSearchParams(location.search).has('plan-sunday')
 const sundayBefore = (() => { const d = new Date(anchorNowMs()); d.setDate(d.getDate() - d.getDay()); d.setHours(20, 0, 0, 0); return d })()
 const created = PLAN_SUNDAY ? sundayBefore.toISOString() : new Date(anchorNowMs() - (PLAN_TODAY ? 0 : 9) * 86400000).toISOString()
 const TRAIN_TODAY = new URLSearchParams(location.search).has('session-day')
+// ?cardio-day: he trains Sunday, Monday, Wednesday and Friday and asked for two cardio days a week (INPUTS: Profile's
+// days and "Cardio days a week"); the generator then decides which days are cardio. verify:watch-workouts reads the
+// plan beside a workout the watch recorded on such a day.
+const CARDIO_DAY = new URLSearchParams(location.search).has('cardio-day')
 // ?heart-history: six weeks of the same 30-minute easy jog at a falling heart rate, and resting heart rate at 58 for two
 // weeks then 64, 65, 63 on the last three mornings (INPUTS: rows as the strap's fill and the watch's sync write them).
 // verify:heart-uses reads Home's fitness line and the coach's recovery offer off them.
@@ -118,7 +122,8 @@ const profileRow = {
   session_duration_preference: '45-60', workout_split_preference: 'upper_lower',
   // ?session-day makes the anchor's Wednesday a training day (an INPUT: which days she trains), for a driver that
   // needs a session today on the whole app (verify:live-set-count). Without it the page is exactly as before.
-  training_days: DAYS.map((day, i) => ({ day, available: (TRAIN_TODAY ? [1, 3, 4, 5] : [1, 2, 4, 5]).includes(i) })),
+  training_days: DAYS.map((day, i) => ({ day, available: (CARDIO_DAY ? [0, 1, 3, 5] : TRAIN_TODAY ? [1, 3, 4, 5] : [1, 2, 4, 5]).includes(i) })),
+  ...(CARDIO_DAY ? { cardio_days_per_week: 2 } : {}),
   weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [], exercise_exclusions: [],
   macro_calculation_mode: 'STANDARD_STATIC', coaching_persona: 'supportive', recovery_capacity: 'moderate',
   conditioning_preference: NO_CARDIO ? 'avoid' : 'tolerate', created_at: created,

@@ -165,7 +165,7 @@ import { GROCERY_AISLE_LABEL, chatGroceryAmount } from '@/lib/grocery-display'
 import { logWater, undoLog as undoWaterLog, subscribeWaterStore } from '@/lib/water-store'
 import { subscribeCardioLogStore, deleteCardioLog, isPlausibleCardioDuration, isPlausibleDistanceKm } from '@/lib/cardio-log-store'
 import { subscribeMealStore } from '@/lib/meal-store'
-import { getStepsForDate, logStepsManual, restoreStepsForDate, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS } from '@/lib/steps-store'
+import { getStepsForDate, logStepsManual, restoreStepsForDate, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS, isPhoneApp } from '@/lib/steps-store'
 import { buildCoachStepsSummary } from '@/lib/steps-context'
 import { buildCoachInjuriesSummary } from '@/lib/injuries-context'
 import { buildCoachWaterSummary } from '@/lib/water-context'
@@ -927,7 +927,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // HEART RATE (his "Build 1, 2 and 3 now", 25 Nov 2026; health-heart.ts readHeartPicture): what the coach is told, and
   // a raised resting heart rate for the opener. Empty with no watch or strap.
   const [heartContext, setHeartContext] = useState('')
-  const [heartRecovery, setHeartRecovery] = useState<{ line: string; since: string } | null>(null)
+  const [heartRecovery, setHeartRecovery] = useState<{ line: string; since: string; kind?: 'sleep' } | null>(null)
+  // SLEEP (his pick "A", 26 Nov 2026; sleep-nights.ts): what the coach is told. Empty with no watch or the switch off.
+  const [sleepContext, setSleepContext] = useState('')
   // The daily hello waits for this read (a raised resting heart rate is its first-ranked offer on a training day).
   const [heartLoaded, setHeartLoaded] = useState(false)
   const [quickRepliesDismissed, setQuickRepliesDismissed] = useState(false)
@@ -1479,7 +1481,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       noticed: noticedFact(),
       lastOrdinaryKind: readLastOrdinaryKind(profile.id ?? ''),
       // RAISED ONCE PER RUN through the coach's said-once memory: the run's key, once spoken, is skipped (openerSkips).
-      recovery: heartRecovery && !skip.recovery ? { line: heartRecovery.line } : null,
+      recovery: heartRecovery && !skip.recovery ? { line: heartRecovery.line, kind: heartRecovery.kind } : null,
     })
     return opener
   }
@@ -2113,7 +2115,20 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     void import('@/lib/health-heart').then(async m => {
       const picture = await m.readHeartPicture(profile.id!, getLocalDateString(getAppNow(profile.id)))
       setHeartContext(m.heartContextForCoach(picture))
-      setHeartRecovery(picture.recovery ? { line: picture.recovery.line, since: picture.recovery.since } : null)
+      // TWO SHORT NIGHTS make the same offer (sleep-nights.ts). Read on the phone only, and only with its switch on.
+      // A raised resting heart rate comes first where both are true: one offer of a lighter day, never two.
+      let sleepFlag: { line: string; since: string; kind: 'sleep' } | null = null
+      if (isPhoneApp()) {
+        try {
+          const { readSleepPicture } = await import('@/lib/health-sleep')
+          const { sleepContextForCoach } = await import('@/lib/sleep-nights')
+          const now = getAppNow(profile.id)
+          const sleep = await readSleepPicture(getLocalDateString(now), now)
+          setSleepContext(sleep ? sleepContextForCoach(sleep) : '')
+          if (sleep?.flag) sleepFlag = { line: sleep.flag.line, since: `sleep-${sleep.flag.since}`, kind: 'sleep' }
+        } catch { /* the coach is told nothing about sleep */ }
+      }
+      setHeartRecovery(picture.recovery ? { line: picture.recovery.line, since: picture.recovery.since } : sleepFlag)
     }).catch(() => { /* the coach is told nothing about heart rate */ }).finally(() => setHeartLoaded(true))
     try {
       const recent = await getRecentLogsWithWarmups(profile.id, 14, activeSession.date)
@@ -2469,6 +2484,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       workout_log_history: workoutLogHistory,
       cardio_log_history: cardioLogHistory,
       heart_rate_context: heartContext,
+      sleep_context: sleepContext,
       // Proactive material (same Dashboard aggregator, see the
       // `proactiveData` effect above) — specific-or-silent by construction:
       // each field is only ever set when there's something real to report,

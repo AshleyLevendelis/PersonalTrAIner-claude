@@ -120,7 +120,7 @@ export interface OpenerInput {
    * rate has sat 5 or more above his usual for three mornings and this run has not been raised before (the caller asks
    * the coach's said-once memory, coach-nudge.ts openerSkips). Null otherwise.
    */
-  recovery?: { line: string } | null
+  recovery?: { line: string; kind?: 'sleep' } | null
 }
 
 /**
@@ -304,7 +304,7 @@ export function pickOpener(input: OpenerInput): Opener {
   //     before his usual hour), because afterwards there is nothing left to lighten. The words name no cause: a raised
   //     resting heart rate is a sign of carrying fatigue, never a diagnosis (CSCS, mine).
   if (input.recovery && todaySession && !todayLogged && hour < cutoffHour) {
-    const text = recoveryOfferText(input.recovery.line, todaySession.focus)
+    const text = recoveryOfferText(input.recovery.line, todaySession.focus, input.recovery.kind)
     return {
       kind: 'recovery_flag',
       // The opener's sentence follows "Hey Sam — ", so it starts lower-case.

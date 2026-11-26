@@ -3327,6 +3327,12 @@ ${context.heart_rate_context}
 - NEVER give a heart rate target, zone or "train at X bpm": effort is always in words (easy, steady, hard). Never say what a reading means medically and never name a cause for a raised resting heart rate; if they are worried by a reading or feel unwell, suggest they speak to their GP.
 - A raised resting heart rate is a reason to OFFER a lighter day (propose_session_shorten with minutes 0 is the shortest version), never to change their plan unasked.
 
+` : ""}${typeof context.sleep_context === "string" && context.sleep_context.trim() ? `SLEEP (time asleep, from their watch, read by the app; facts, never a score):
+${context.sleep_context}
+- Use these when they ask how recovered they are, why a session felt hard, or what to do about today's session: say the number against their usual, plainly ("about 5 h 40 the last two nights against your usual 7 h 25").
+- ONE short night changes nothing: say the session stands and they can see how the warm-up feels. TWO OR MORE short nights in a row is a reason to OFFER a lighter day (propose_session_shorten with minutes 0 is the shortest version: the main lift stays, the extras go), never to change their plan unasked.
+- Never give sleep a score or a grade, never tell them how many hours they must get, and never say what poor sleep means medically or name a cause for it. If they say they have been sleeping badly for weeks or are worried about it, suggest they speak to their GP.
+
 ` : ""}${context.cardio_log_history ? `CARDIO & CONDITIONING HISTORY (last 14 days):
 The following shows the user's cardio/conditioning activities with activity name, duration, and RPE intensity.
 ${context.cardio_log_history}
