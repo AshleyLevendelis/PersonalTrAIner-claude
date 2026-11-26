@@ -842,6 +842,28 @@ export function hasBetterLoadingPeer(entry: ExerciseEntry, pool: ExerciseEntry[]
 }
 
 /**
+ * IS THIS BAND OR IMPROVISED MOVE THE WRONG PICK FOR THIS SESSION (26 Nov 2026, CSCS, mine)? Two cases, and one that is
+ * not. A COPY of a loadable move in the kit is always wrong: a Backpack Front Raise beside Front Raises is the same
+ * movement on kit that cannot be stepped up. A DIFFERENT movement is wrong while a loadable equivalent is still off
+ * the session, because that one should go in first (Chair Dips taken while three dumbbell triceps moves sat unused).
+ * And it is RIGHT once every loadable equivalent is already on the session: a sore shoulder leaves one weighted
+ * triceps move, the kickback, and a band pushdown is then a real second movement, which the dumbbell pack's "two
+ * triceps movements of different families" (3 Nov) relies on. One predicate, asked by the generator and the scorer.
+ */
+export function worseKitOnSession(entry: ExerciseEntry, pool: ExerciseEntry[], namesOnSession: ReadonlyArray<string>): boolean {
+  if (isEquipmentQualityExempt(entry) || bestEquipmentRank(entry) !== 'low') return false
+  const peers = pool.filter(o =>
+    o.substitution_group === entry.substitution_group &&
+    o.mechanics_tier === entry.mechanics_tier &&
+    bestEquipmentRank(o) === 'high' &&
+    carriesExternalLoad(o))
+  if (peers.length === 0) return false
+  const family = getMovementFamily(entry)
+  if (peers.some(o => getMovementFamily(o) === family)) return true
+  return peers.some(o => !namesOnSession.includes(o.name))
+}
+
+/**
  * Apparatus you move your body ON, as opposed to resistance you add TO it.
  *
  * `bestEquipmentRank` answers "is this a real tool", and a pull-up bar truly
@@ -2846,7 +2868,8 @@ function selectExercisesForTrack(
   // the second time on kit that cannot be loaded a notch at a time. A coach repeats the dumbbell move on another day
   // (twice a week is the frequency the muscle wants) or writes nothing. So it is filtered out, the slot's own
   // "reuse is fine" fallback does the rest, and only a REQUIRED slot with nothing else may still take it.
-  const worseKit = (e: ExerciseEntry): boolean => !!implementPeerPool && hasBetterLoadingPeer(e, implementPeerPool)
+  // ...unless it is a different movement and every loadable equivalent is already on this session (worseKitOnSession).
+  const worseKit = (e: ExerciseEntry): boolean => !!implementPeerPool && worseKitOnSession(e, implementPeerPool, selected.map(s => s.name))
 
   // Every primer's own movement_pattern is 'activation' (see exercise-db.ts's
   // MovementPattern comment), so matching against it was a no-op — every
@@ -4671,7 +4694,7 @@ function balanceWeeklyStructure(
   // at a time, so it cannot carry progressive overload where a loadable equivalent exists. The pool is put in
   // "equivalents with real kit first" order once, so each find below keeps its own rule and gains this one; the
   // band is still found when it is the only thing that fits.
-  const pool = realKitFirst(poolAsGiven, profile.equipment_access)
+  const pool = realKitFirst(poolAsGiven, equipmentTierFor(profile))
   const dayFamilies = (dayIdx: number): Set<string> =>
     new Set(
       days[dayIdx].exercises
@@ -10226,7 +10249,7 @@ export function generateMesocycle(
         // squat at 2. Neither side over 2.5x the other (single-leg work counts half to each, as both sides work): a set
         // moves from the heavy side's largest exercise to the light side's smallest, within role limits, or with no room
         // on the light side the heavy side just gives one (do less). Only with eight or more leg sets a week to weigh.
-        const balanceThigh = (setCap: number) => {
+        const balanceThigh = (setCap: number, shortSession = false) => {
           const QUAD = ['knee_dominant', 'isolation_quad'], HAM = ['hip_hinge', 'isolation_hamstring']
           const rows = days.flatMap(d => d.exercises.filter(ex => { const x = findEntry(ex.name); return !!x && x.mechanics_tier !== 'primer' && [...QUAD, ...HAM, 'single_leg'].includes(x.movement_pattern) }))
           const side = (ps: string[]) => rows.filter(ex => ps.includes(findEntry(ex.name)!.movement_pattern))
@@ -10238,7 +10261,9 @@ export function generateMesocycle(
             const roleOf = (ex: Exercise) => getVolumeRole(findEntry(ex.name)!)
             // Never from a day already light (ten working sets or fewer): the thin-day rule fills those, this must not empty them.
             const dayOf = (ex: Exercise) => days.find(d => d.exercises.includes(ex))
-            const canGive = (ex: Exercise) => { const r = roleOf(ex); const d = dayOf(ex); return !!r && ex.sets > getRoleSetFloor(r) && !!d && beginnerWorkingSets(d) > 10 }
+            // After the 20-30 minute trim the floor is that trim's own (two sets, any lift, any day): every lift there is
+            // already at its role's floor, so the ordinary rule had nothing left to give.
+            const canGive = (ex: Exercise) => { const r = roleOf(ex); const d = dayOf(ex); return !!r && !!d && (shortSession ? ex.sets > 2 : ex.sets > getRoleSetFloor(r) && beginnerWorkingSets(d) > 10) }
             const donor = side(heavy).filter(ex => canGive(ex) && !blockRequired.has(ex.name)).sort((a, b) => b.sets - a.sets)[0]
               ?? side(heavy).filter(canGive).sort((a, b) => b.sets - a.sets)[0]
             const receiver = side(light).filter(ex => { const r = roleOf(ex); const d = dayOf(ex); return !!r && ex.sets < getRoleSetCeiling(r, true) && underItsMainLift(ex) && !!d && beginnerWorkingSets(d) + 1 <= setCap }).sort((a, b) => a.sets - b.sets)[0]
@@ -10383,6 +10408,12 @@ export function generateMesocycle(
         )
         if (profile.session_duration_preference === '20-30') {
           trimShortSessionSets(days, getSessionMaximumSeconds('20-30'), trimLog, getFlaggedJoints(profile.injuries ?? []))
+          // ...AND THE THIGH IS WEIGHED AGAIN AFTER IT (26 Nov 2026, CSCS, mine). This trim runs last and may take the
+          // main lift's set when nothing else on the day has one to give; on a two-day knee week that was the glute
+          // bridge, and the week went from quads 9 to hamstrings 4 (inside the 2.5x band) to 9 to 3 with nothing
+          // looking again. Nothing may be ADDED here (the day was just cut to fit), so the heavy side gives a set, down to
+          // the trim's own floor of two: the week's knee work went 9 to 3 -> 7 to 3. Do less.
+          balanceThigh(0, true)
         }
       }
 

@@ -12,7 +12,7 @@
 // code named, not one picked as plausible. Constructed inputs prove the mechanism; the measured offenders prove it
 // matters in a real plan. One exit, at the bottom.
 import {
-  generateMesocycle, setRandomSource, resetRandomSource, getConstrainedPool, hasBetterLoadingPeer, sessionSetCap,
+  generateMesocycle, setRandomSource, resetRandomSource, getConstrainedPool, hasBetterLoadingPeer, worseKitOnSession, sessionSetCap,
   slotAfterCompounds, realKitFirst, capBeginnerSets, beginnerWorkingSets, BEGINNER_MAX_WORKING_SETS, LOWER_BACK_MAX_WORKING_SETS,
 } from '../src/lib/exercise-plan'
 import { EXERCISE_DATABASE, getVolumeRole } from '../src/lib/exercise-db'
@@ -147,10 +147,23 @@ console.log('\n4. Real kit before a band or a backpack')
   let slots = 0
   for (const c of offenders) {
     const p = getConstrainedPool(buildProfile(c), [])
-    for (const w of planFor(c)) for (const d of w.days) for (const ex of d.exercises) { slots++; const e = p.find(x => x.name === ex.name); if (e && hasBetterLoadingPeer(e, p)) held.push(`wk${w.week_number} ${d.day} ${ex.name}`) }
+    for (const w of planFor(c)) for (const d of w.days) for (const ex of d.exercises) { slots++; const e = p.find(x => x.name === ex.name); if (e && worseKitOnSession(e, p, d.exercises.map(x => x.name))) held.push(`wk${w.week_number} ${d.day} ${ex.name}`) }
   }
   check(`the walk looked at real slots (${slots})`, slots > 1500, slots)
-  check('in five measured offenders no week holds a band or improvised move whose loadable equivalent is in the pool', held.length === 0, held.slice(0, 5))
+  check('in five measured offenders no week holds a band or improvised move that copies a loadable one, or was taken ahead of one', held.length === 0, held.slice(0, 5))
+  // The rule itself, on constructed sessions (the names are the catalogue's own).
+  const e = (n: string) => pool.find(x => x.name === n)!
+  check('fixture: the four exercises the rule is asked about are in a home pool', ['Backpack Front Raise', 'Front Raises', 'Band Tricep Pushdown', 'Dumbbell Tricep Kickback'].every(n => !!pool.find(x => x.name === n)))
+  check('a COPY of a loadable move is wrong whatever the session holds (a Backpack Front Raise beside Front Raises)', worseKitOnSession(e('Backpack Front Raise'), pool, ['Front Raises']) && worseKitOnSession(e('Backpack Front Raise'), pool, []))
+  check('a different movement is wrong while a loadable equivalent is still off the session', worseKitOnSession(e('Band Tricep Pushdown'), pool, ['Dumbbell Tricep Kickback']))
+  const sore = getConstrainedPool(buildProfile(combo('home_gym', ['shoulders'], '60-90', 'bodybuilding', 'intermediate', 'hypertrophy', 'moderate', 'tolerate')), [])
+  const weighted = sore.filter(x => x.movement_pattern === 'isolation_tricep' && !hasBetterLoadingPeer(x, sore)).map(x => x.name)
+  check('the fixture binds: a sore shoulder leaves one weighted triceps move, the kickback', weighted.length === 1 && weighted[0] === 'Dumbbell Tricep Kickback', weighted)
+  check('...and once it is on the session, the band pushdown is a real second movement (the dumbbell pack\'s two triceps moves)', !worseKitOnSession(sore.find(x => x.name === 'Band Tricep Pushdown')!, sore, ['Dumbbell Tricep Kickback']))
+  check('...but not before it is', worseKitOnSession(sore.find(x => x.name === 'Band Tricep Pushdown')!, sore, []))
+  check('...and the band KICKBACK, a copy of it, never is', worseKitOnSession(sore.find(x => x.name === 'Band Tricep Kickback')!, sore, ['Dumbbell Tricep Kickback']))
+  const dipsTogether = offenders.flatMap(c => planFor(c).flatMap(w => w.days.filter(d => d.exercises.some(x => x.name === 'Chair Dips') && d.exercises.some(x => /^(Tricep|Chest) Dips$/.test(x.name))).map(d => `wk${w.week_number} ${d.day}`)))
+  check('no day holds a dip and a chair dip (one movement family)', dipsTogether.length === 0, dipsTogether.slice(0, 3))
   check('...and the scorer agrees', offenders.every(c => !rulesOf(c).includes('worse_implement_than_available')))
   // The promise that it costs nothing in time: none of them now runs short of the session asked for.
   check('...and none of them now runs under the time asked for', offenders.every(c => !rulesOf(c).includes('time_fit')))

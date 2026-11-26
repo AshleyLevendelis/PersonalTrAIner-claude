@@ -49,7 +49,7 @@ The full 9,216 grid, main (45ed71c) to after, from `quality-report.txt` (regener
    four later passes (chest's four sets, back's four, the thigh balance, the light day taking sets) each added a set
    and asked only the role's ceiling. Seven plans shipped a row or front squat at 4 sets beside a main lift at 3. A set
    those passes want now goes to an exercise still under its main lift, or is not added.
-4. **Real kit before a band or a backpack.** The ranker only docked a band eight points, and the filters in front of
+4. **Real kit before a band or a backpack** (refined the same day, see "What the sweep changed"). The ranker only docked a band eight points, and the filters in front of
    it remove whatever was used earlier in the week, so once the dumbbell versions were taken the band was the only
    candidate and won unopposed. 71 of 201 home and minimalist plans held one in week 1, and the days read "Lateral
    Raises, Front Raises, Backpack Front Raise". A band cannot be loaded a notch at a time; a coach repeats the
@@ -69,6 +69,22 @@ The full 9,216 grid, main (45ed71c) to after, from `quality-report.txt` (regener
 
 **These change what three rules measure**: `recovery_volume_not_reduced`, `conditioning_frequency_mismatch` and
 `load_incoherent` counts before 26 Nov 2026 are not comparable.
+
+## What the sweep changed
+
+The full sweep found nine knock-ons. Seven were checks pinned to what a generated plan happened to hold (a day, a word,
+a lift, which way a kit change goes); each now finds its subject by the property it needs. Two changed the work:
+
+- **The kit rule was too blunt.** A sore shoulder leaves one weighted triceps move, the kickback, and a band pushdown
+  beside it is a real second movement (the dumbbell pack's "two triceps movements of different families"). The rule is
+  now one predicate, `worseKitOnSession`, asked by the generator and the scorer: a **copy** of a loadable move is
+  always wrong; a **different** movement is wrong only while a loadable equivalent is still off the session. Chair
+  Dips joined the dip family, so a day cannot hold Tricep Dips and Chair Dips.
+- **The 20-30 minute trim ran after the thigh balance and could undo it.** A knee trainee's two-day week went from
+  quads 9 to hamstrings 4 to 9 to 3. The thigh is weighed again after that trim and may only give (7 to 3).
+
+Tried and removed: a fallback that repeated a loadable move where a band would have gone (it changed 11 of 301 plans
+and swapped a fresh exercise for a repeat), and letting the thigh balance exceed the main lift (it changed nothing).
 
 ## The five-question review
 
@@ -92,5 +108,5 @@ The full 9,216 grid, main (45ed71c) to after, from `quality-report.txt` (regener
 
 ## Checks
 
-`test:plan-faults-nov26` (37 checks; mutations in BACKLOG). Fixtures are the profiles the broken code named, seeded
+`test:plan-faults-nov26` (58 checks; 26 mutations across two rounds, 25 caught, the 26th deleted the mechanism it missed). Fixtures are the profiles the broken code named, seeded
 with the measurement's own key, plus constructed inputs for each mechanism.

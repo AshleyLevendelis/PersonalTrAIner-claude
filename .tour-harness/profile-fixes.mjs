@@ -109,12 +109,20 @@ await pointAt(q('[data-testid="ban-done"]'))
 await wait(500)
 // The other door into the same list: a word that names several exercises asks which, and the one picked, if the plan
 // holds it, goes through the same sheet.
-const word = await ev(`(() => { const names = new Set(); for (const w of window.__meso) for (const d of w.days) for (const e of d.exercises) names.add(e.name); for (const cand of ['press', 'row', 'curl', 'squat', 'raise']) if ([...names].some(n => n.toLowerCase().includes(cand))) return cand; return null })()`)
-await openRow('Exercises to avoid')
-await typeInto(q('[data-testid="exercise-avoid-input"]'), word ?? 'NONE')
-await pointAt(addButton)
-await until(() => has('[data-testid="exercise-avoid-choice"]'))
-const choice = await ev(`(() => { const names = new Set(); for (const w of window.__meso) for (const d of w.days) for (const e of d.exercises) names.add(e.name); return [...document.querySelectorAll('[data-testid="exercise-avoid-choice"]')].map(b => b.textContent.trim()).find(t => names.has(t)) ?? null })()`)
+// THE WORD IS FOUND, NOT ASSUMED (26 Nov 2026). This took the first of five words the plan's names contain ("press")
+// and expected the short list of matches to hold one of the plan's own presses. Which presses a plan holds moved (it
+// stopped taking band and improvised moves ahead of loadable ones), and the list for "press" no longer showed one. So
+// each word the plan contains is tried in turn until the list offers an exercise the plan holds.
+const words = await ev(`(() => { const names = new Set(); for (const w of window.__meso) for (const d of w.days) for (const e of d.exercises) names.add(e.name); return ['press', 'row', 'curl', 'squat', 'raise', 'deadlift', 'plank', 'lunge', 'fly'].filter(cand => [...names].some(n => n.toLowerCase().includes(cand))) })()`)
+let word = null, choice = null
+for (const cand of words ?? []) {
+  await openRow('Exercises to avoid')
+  await typeInto(q('[data-testid="exercise-avoid-input"]'), cand)
+  await pointAt(addButton)
+  if (!(await until(() => has('[data-testid="exercise-avoid-choice"]')))) continue
+  const offered = await ev(`(() => { const names = new Set(); for (const w of window.__meso) for (const d of w.days) for (const e of d.exercises) names.add(e.name); return [...document.querySelectorAll('[data-testid="exercise-avoid-choice"]')].map(b => b.textContent.trim()).find(t => names.has(t)) ?? null })()`)
+  if (offered) { word = cand; choice = offered; break }
+}
 check('2f. a word naming several asks which, and offers one the plan holds (the fixture binds)', !!word && !!choice, { word, choice })
 await pointAt(`[...document.querySelectorAll('[data-testid="exercise-avoid-choice"]')].find(b => b.textContent.trim() === ${JSON.stringify(choice ?? 'NONE')})`)
 const sheet2 = await until(() => has('[data-testid="ban-exercise-sheet"]'))

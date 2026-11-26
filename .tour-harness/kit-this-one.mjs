@@ -14,6 +14,7 @@ import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
+import { anchorDate } from './anchor.mjs'
 
 const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
@@ -78,11 +79,20 @@ console.log('\n"I HAVEN\'T GOT THE KIT", FOR GOOD\n')
 // "I HAVEN'T GOT THE KIT" ON A BAND EXERCISE IS ONE TAP (his report 17 Nov 2026: "I wanted to swap out an exercise
 // because I dont have bands. But I didnt have the option to"). The ticks opened all ticked, and Save only appears once
 // something changes. Now the kit step names the kit this exercise needs, and that tap opens the ticks with it unticked.
-await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&sam=1&kit=1#/tab/exercise` })
-await wait(4500)
-const rows = await order()
-const bandOnes = await ev(`window.__needsFromToday ? window.__needsFromToday(['resistance band']) : []`)
-const victim = (rows ?? []).find(r => bandOnes.includes(r)) ?? null
+// THE DAY IS FOUND, NOT ASSUMED (26 Nov 2026). The harness's Wednesday held a band exercise only while the plan took a
+// band move where a dumbbell one was in the kit; it no longer does, so his week holds bands on fewer days. The driver
+// walks the week from the fixed anchor (the page's own ?today= input, never the machine's calendar) to the first day
+// whose card holds one, and keeps the check that such a day exists.
+let rows = [], bandOnes = [], victim = null
+for (let n = 0; n < 7 && !victim; n++) {
+  const day = new Date(anchorDate().getTime()); day.setDate(day.getDate() + n)
+  const iso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&sam=1&kit=1&today=${iso}&n=${n}#/tab/exercise` })
+  await wait(4500)
+  rows = await order()
+  bandOnes = await ev(`window.__needsFromToday ? window.__needsFromToday(['resistance band']) : []`)
+  victim = (rows ?? []).find(r => bandOnes.includes(r)) ?? null
+}
 checkCounted('0. today holds a band exercise (the case he hit)', !!victim, { rows, bandOnes })
 
 checkCounted('1a. swap it, "I haven\'t got the kit"', (await openRowMenu(victim ?? '')) === 'open' && await tap('[data-testid="swap-exercise"]')

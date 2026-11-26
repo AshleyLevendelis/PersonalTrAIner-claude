@@ -1,6 +1,6 @@
 import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from './types'
 import { getMovementFamily, isGenuineDuplicate, getVolumeRole, isIndicatedFor, type ExerciseEntry, getExerciseEntry } from './exercise-db'
-import { getConstrainedPool, generateMesocycle, beginnerWorkingSets, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, isEquipmentQualityExempt, hasBetterLoadingPeer, TRACKS, dayHoldsDefiningWork, pullHeavyIsPrescribed } from './exercise-plan'
+import { getConstrainedPool, generateMesocycle, beginnerWorkingSets, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, isEquipmentQualityExempt, worseKitOnSession, TRACKS, dayHoldsDefiningWork, pullHeavyIsPrescribed } from './exercise-plan'
 import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS } from './goal-policies'
 import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
@@ -1026,7 +1026,11 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclus
         // CHANGE. *** It now counts a narrower thing, so a drop is partly a
         // change of definition and not only better plans. Any before/after
         // quoting this rule must say which side of 21 Sep 2026 it came from.
-        if (!entry || !hasBetterLoadingPeer(entry, equipmentPool)) continue
+        // AND NARROWED AGAIN, 26 Nov 2026 (not comparable across this date either): a band move that is a DIFFERENT
+        // movement is right once every loadable equivalent is already on the same session (a sore shoulder leaves one
+        // weighted triceps move; the band pushdown is then a real second movement). A copy of a loadable move, or one
+        // taken while a loadable equivalent sat off the session, still fires. worseKitOnSession holds the rule.
+        if (!entry || !worseKitOnSession(entry, equipmentPool, day.exercises.map(e => e.name))) continue
         violatedRules.add('worse_implement_than_available')
         deductions.push({
           rule: 'worse_implement_than_available', day: day.day, weekNumber: week.week_number,

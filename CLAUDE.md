@@ -210,7 +210,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `test:move-logged-sets`, `verify:wrong-exercise`. Needs the `chat-gemini` deploy
 - **Recovery, kit and order survive the late passes** (CSCS, mine, 26 Nov 2026, the scorer read as a coach): on low
   recovery the session cap is three quarters (a beginner's 14, a bad back's 17); a band or improvised move is never
-  picked while its loadable equivalent is in the kit; a lift added to balance the week follows the day's compounds,
+  picked as a copy of a loadable move, or ahead of one still off the session; a lift added to balance the week follows the day's compounds,
   never ahead of a rehab drill; no accessory holds more sets than its day's main lift; the cap keeps a press a
   pull-heavy week needs. **`recovery_volume_not_reduced`, `conditioning_frequency_mismatch` and `load_incoherent`
   counts before 26 Nov are not comparable** (the scorer learnt the beginner conditioning dose, counts working sets,
@@ -3306,6 +3306,10 @@ old — the commands were right and the context was missing.
   NEVER READ.** 26 Nov 2026: `test:quality` stayed green from 15 to 25 Nov while one rule went from 0 to 520 plans and
   another from 684 to 1,613. It now prints every rule's move against the report in git and fails on a large rise.
   **And a sample of "every Nth" must not share a factor with the grid**: every 32nd plan was all beginners; 37 is not.
+- **A CHECK PINNED TO WHAT A GENERATED PLAN HAPPENS TO HOLD FLIPS WHEN THE GENERATOR IMPROVES.** 26 Nov 2026: seven of
+  nine sweep failures after a selection fix were checks that assumed a day held a band move, a list showed a press, or
+  a kit change went one way; one flipped twice in a day. Find the subject by the property (walk the week for a day that
+  holds one), or reach each branch by a wide margin, and keep the check that one exists.
 - **A KNOWN, ACCEPTED DRIFT IS A DEFECT WITH A NOTE ON IT.** 18 Nov 2026: "a couple of minutes under, understood" had
   sat beside a 3-6% ceiling since September. A change elsewhere pushed more days into it and the ceiling failed; the
   cause was one line in the wrong order, and fixing it took the count to zero. When a ceiling exists to tolerate a
