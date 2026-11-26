@@ -44,6 +44,24 @@ export interface HealthAdapter {
   distanceMetersBetween?(start: Date, end: Date): Promise<number>
   /** Active calories burned between two instants (the watch's or phone's own figure), summed by the phone. */
   activeKcalBetween?(start: Date, end: Date): Promise<number>
+  /** WORKOUTS THE WATCH RECORDED (watch-workouts.ts, 26 Nov 2026): the phone's sheet for workouts, and with them the
+   *  distance, calories and heart rate that fill one in. */
+  requestWorkoutAccess?(): Promise<boolean>
+  /** Workouts recorded by a watch or another app between two instants, as the phone's health store holds them. */
+  workoutsBetween?(start: Date, end: Date): Promise<WatchWorkout[]>
+}
+
+/** One workout as the phone's health store holds it. `type` is the store's own word ('running', 'strengthTraining'). */
+export interface WatchWorkout {
+  id: string
+  type: string
+  start: string
+  end: string
+  /** The recorder's own calories and distance, when it wrote them. */
+  kcal: number | null
+  distanceM: number | null
+  /** The app that recorded it ('Samsung Health'), when the store says. */
+  source: string | null
 }
 
 /** Tests and the browser test pages hand in a pretend health store on this global; `null` means "no phone app". */
@@ -102,6 +120,23 @@ export function healthAdapter(): Promise<HealthAdapter | null> {
           restingHeartRateSamples: async (start, end) => {
             const res = await Health.readSamples({ dataType: 'restingHeartRate', startDate: start.toISOString(), endDate: end.toISOString(), limit: 200, ascending: true })
             return res.samples.map(s => ({ bpm: s.value, at: s.startDate }))
+          },
+          requestWorkoutAccess: async () => {
+            const status = await Health.requestAuthorization({ read: ['workouts', 'distance', 'calories', 'heartRate', 'steps'] })
+            return status.readAuthorized.includes('workouts')
+          },
+          workoutsBetween: async (start, end) => {
+            const res = await Health.queryWorkouts({ startDate: start.toISOString(), endDate: end.toISOString(), limit: 50, ascending: false })
+            return res.workouts.map(w => ({
+              // The store's own id; where it gives none, the start and type name the workout just as well.
+              id: w.platformId ?? `${w.workoutType}@${w.startDate}`,
+              type: String(w.workoutType),
+              start: w.startDate,
+              end: w.endDate,
+              kcal: typeof w.totalEnergyBurned === 'number' && Number.isFinite(w.totalEnergyBurned) ? w.totalEnergyBurned : null,
+              distanceM: typeof w.totalDistance === 'number' && Number.isFinite(w.totalDistance) ? w.totalDistance : null,
+              source: w.sourceName ?? null,
+            }))
           },
         }
       } catch {

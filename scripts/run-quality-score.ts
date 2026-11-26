@@ -1,6 +1,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { execFile } from 'child_process'
+import { execFile, execFileSync } from 'child_process'
+import { parseRuleFrequency, ruleMoves, isLargeRise, RISE_PLANS, RISE_SHARE } from './quality-rule-moves'
 import { cpus } from 'os'
 import * as os from 'os'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
@@ -279,12 +280,26 @@ async function main() {
   console.log(formatted)
 
   const outputPath = path.join(process.cwd(), 'quality-report.txt')
+  // Against the report IN GIT, read before this run overwrites the file: the copy on disk may be an earlier run's.
+  let committed = ''
+  try { committed = execFileSync('git', ['show', 'HEAD:quality-report.txt'], { cwd: process.cwd(), encoding: 'utf-8', maxBuffer: 16 * 1024 * 1024 }) } catch { committed = '' }
   fs.writeFileSync(outputPath, formatted, 'utf-8')
   console.log(`\nReport saved to: ${outputPath}`)
 
-  const failed = belowFloor.length > 0 || dimensionsBelowFloor.length > 0
+  const moves = committed ? ruleMoves(parseRuleFrequency(committed), new Map([...ruleCounts])) : []
+  const rises = moves.filter(isLargeRise)
+  console.log('')
+  if (!committed) console.log('RULES MOVED: no committed report to compare with.')
+  else if (moves.length === 0) console.log('RULES MOVED since the committed report: none.')
+  else {
+    console.log('RULES MOVED since the committed report (plans tripping each rule):')
+    for (const m of moves) console.log(`  ${m.rule.padEnd(46)} ${String(m.was).padStart(6)} -> ${String(m.now).padStart(6)}${isLargeRise(m) ? '   LARGE RISE' : ''}`)
+  }
+
+  const failed = belowFloor.length > 0 || dimensionsBelowFloor.length > 0 || rises.length > 0
   if (failed) {
     console.log('')
+    if (rises.length > 0) console.log(`FAIL: ${rises.length} rule(s) rose by more than ${RISE_PLANS} plans and ${RISE_SHARE * 100}% since the committed report: ${rises.map(m => m.rule).join(', ')}. Fix the cause, or commit quality-report.txt with the reason in BACKLOG.`)
     if (belowFloor.length > 0) console.log(`FAIL: ${belowFloor.length} plan(s) scored below ${OVERALL_FLOOR}`)
     if (dimensionsBelowFloor.length > 0) console.log(`FAIL: dimension(s) below 1.2 average: ${dimensionsBelowFloor.join(', ')}`)
   }

@@ -88,12 +88,12 @@ it is wrong.
 
 ## Things the screen can do that the coach cannot
 
-**Twelve screen-only, as of 25 Nov 2026** (the macro MODE was taken out that day, his "Take it out": one method,
-the split's choices kept) — the pre-session tightness check,
+**Thirteen screen-only, as of 26 Nov 2026** (picking up a workout the watch recorded joined that day; the macro MODE
+was taken out on 25 Nov, his "Take it out": one method, the split's choices kept) — the pre-session tightness check,
 macro split, logging a build-up set, logging a drop set,
 "Train anyway" on a rest day, saying how a lift felt on a set already
 logged, which meals are cooked for him on which days, a freestyle day, "Show
-numbers", "Meal variety", cardio days a week, and recording a walk or run
+numbers", "Meal variety", cardio days a week, recording a walk or run, and picking up a workout the watch recorded
 (re-derived from the bullets on 25 Nov 2026: the freestyle three and cardio days
 had been added as bullets without the count moving, the failure the note below
 names, a third time). The calorie target below is a seventh entry but
@@ -111,6 +111,12 @@ count is one of the numbers that answer rests on.
 been wrong twice — "None" while tightness shipped, then "One" while three more
 sat listed underneath it. Both times somebody edited a bullet and left the
 header alone. Count what is below before trusting what is here.
+
+- **Picking up a workout the watch recorded.** `screen only`, added 26 Nov 2026 with the feature (his brief that day;
+  `src/lib/watch-workouts.ts`): Home → "From your watch", in the phone app with Profile's switch on. The offer is made
+  from the phone's own health store, which the coach's server cannot read, so the coach cannot make it; what it CAN do
+  already exists, logging a workout he tells it about, and one logged from the watch reaches it as an ordinary cardio
+  log. NOT BUILT: the coach is not told that a watch workout is waiting to be logged.
 
 - **Recording a walk or run.** `screen only`, added 25 Nov 2026 with the feature (his ruling, "A, build it";
   `src/lib/activity-recording.ts`): Tools → "Record a walk or run", Start and End. Start and End are physical acts

@@ -39,6 +39,7 @@ import { isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG } from '../s
 import { getPhaseTempo, formatTempo, parseTempo, describeTempo, describeExerciseTempo, tempoSecondsPerRep } from '../src/lib/periodization'
 import { estimateSlotsSeconds } from '../src/lib/session-duration'
 import { seededRngFromKey } from '../src/lib/seeded-random'
+import { profileWithKit } from '../src/lib/kit-list'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -72,7 +73,11 @@ function buildProfile(o: Partial<UserProfile>): UserProfile {
   } as UserProfile
 }
 
-const EQUIP: EquipmentAccess[] = ['bodyweight', 'minimalist', 'home_gym', 'full_gym']
+// A BAG AND NO WEIGHTS (26 Nov 2026). A backpack move is no longer picked where a dumbbell version is in the kit, so
+// the four tiers alone hold no backpack at its ceiling and the check for it stopped binding. The case it exists for is
+// the kit where the bag IS the weight, stated the way a person states it (the kit list), on the minimalist tier.
+const BAG_ONLY = 'minimalist, a bag and a bar' as EquipmentAccess
+const EQUIP: EquipmentAccess[] = ['bodyweight', 'minimalist', 'home_gym', 'full_gym', BAG_ONLY]
 const GOALS: FitnessGoal[] = ['hypertrophy', 'fat_loss', 'conditioning', 'functional']
 const EXP: TrainingExperience[] = ['beginner', 'intermediate', 'advanced']
 const SPLITS = ['upper_lower', 'full_body', 'push_pull_legs'] as const
@@ -103,7 +108,9 @@ const byEquip = new Map<string, { working: number; tempoed: number }>()
 for (const equipment_access of EQUIP) {
   byEquip.set(equipment_access, { working: 0, tempoed: 0 })
   for (const fitness_goal of GOALS) for (const training_experience of EXP) for (const workout_split_preference of SPLITS) {
-    const profile = buildProfile({ equipment_access, fitness_goal, training_experience, workout_split_preference } as Partial<UserProfile>)
+    const profile = equipment_access === BAG_ONLY
+      ? profileWithKit(buildProfile({ equipment_access: 'minimalist', fitness_goal, training_experience, workout_split_preference } as Partial<UserProfile>), [{ mode: 'only', items: ['weighted_bag', 'pull_up_bar'] }])
+      : buildProfile({ equipment_access, fitness_goal, training_experience, workout_split_preference } as Partial<UserProfile>)
     setRandomSource(seededRngFromKey(`tg:${equipment_access}:${fitness_goal}:${training_experience}:${workout_split_preference}`))
     const d = console.debug, w = console.warn
     console.debug = () => {}; console.warn = () => {}

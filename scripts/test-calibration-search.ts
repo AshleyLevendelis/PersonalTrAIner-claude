@@ -450,13 +450,20 @@ console.log('\n6. The sentence and the plan agree, when the person has said what
   const limitPlan = generateMesocycle(atLimit)
   console.log = quiet
   resetRandomSource()
-  const lDay = limitPlan[0].days.find(d => d.exercises.some(e => e.name === 'Romanian Deadlifts'))?.day ?? 'none'
-  const lIndex = limitPlan[0].days.find(d => d.day === lDay)?.exercises.findIndex(e => e.name === 'Romanian Deadlifts') ?? -1
-  const lKg = (w: typeof week1) => w.days.find(d => d.day === lDay)?.exercises[lIndex]?.suggested_load_kg
+  // THE LIFT IS FOUND, NOT ASSUMED (26 Nov 2026). This looked for the Romanian deadlift again in the second plan. A
+  // plan made at a lower dumbbell limit picks its lifts afresh, and it stopped holding one, so the rows read back were
+  // nothing at all ([null, null]). What the case needs is ANY lift in this plan whose later loading weeks are already
+  // printed at his limit: found by that property, and the check that one exists is kept.
   const block = limitPlan.filter(w => w.block_number === limitPlan[0].block_number && (w.week_in_block ?? 1) > 1 && !w.is_deload)
-  check(`the second fixture's later loading weeks already sit at his ${limit}kg limit`, lIndex >= 0 && block.length >= 2 && block.every(w => lKg(w) === limit), block.map(w => lKg(w)))
-  const none = planCalibrationAnchors(limitPlan, atLimit, 1, lDay, [log(1, limit + 6, {}, 'Romanian Deadlifts')])
-  const rdlApplied = none.applied.filter(a => a.exerciseName === 'Romanian Deadlifts')
+  let lDay = 'none', lIndex = -1, lName = 'none'
+  for (const d of limitPlan[0].days) d.exercises.forEach((e, i) => {
+    if (lIndex >= 0 || block.length < 2) return
+    if (block.every(w => { const x = w.days.find(dd => dd.day === d.day)?.exercises[i]; return x?.name === e.name && x.suggested_load_kg === limit })) { lDay = d.day; lIndex = i; lName = e.name }
+  })
+  const lKg = (w: typeof week1) => w.days.find(d => d.day === lDay)?.exercises[lIndex]?.suggested_load_kg
+  check(`the second fixture holds a lift whose later loading weeks already sit at his ${limit}kg limit (${lName})`, lIndex >= 0 && block.length >= 2 && block.every(w => lKg(w) === limit), block.map(w => lKg(w)))
+  const none = planCalibrationAnchors(limitPlan, atLimit, 1, lDay, [log(1, limit + 6, {}, lName)])
+  const rdlApplied = none.applied.filter(a => a.exerciseName === lName)
   check('a lift that cannot move the plan is not reported as applied', rdlApplied.length === 0, none.applied)
   check('...no week is rewritten for it', movedWeeks(none).length === 0 && none.next.every((w, i) => printed(w) === printed(limitPlan[i])), none.changedWeeks.map(w => w.week_number))
   check('...and there is no sentence at all', calibrationAnchorMessage(2, none.applied) === null, calibrationAnchorMessage(2, none.applied))

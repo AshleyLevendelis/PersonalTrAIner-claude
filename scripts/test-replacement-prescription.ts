@@ -29,7 +29,7 @@
  *       swapped for a hold keeps this week's figures; an ADD still copies its
  *       peer; an unreadable phase is said out loud, not guessed at.
  */
-import { generateExercisePlan, generateMesocycle, repRangeForIncomingExercise, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
+import { generateExercisePlan, generateMesocycle, repRangeForIncomingExercise, setRandomSource, resetRandomSource, resistanceCanRise } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { readFileSync } from 'fs'
 import { join } from 'path'
@@ -78,7 +78,11 @@ function build(p: UserProfile, seed: string, exclusions: string[] = []): Mesocyc
 const silenced = <T>(fn: () => T): T => { const w = console.warn; console.warn = () => {}; try { return fn() } finally { console.warn = w } }
 const lever = (name: string) => {
   const e = getExerciseEntry(name)!
-  return e.mechanics_tier === 'primer' ? 'primer' : (isExternallyLoaded(e) && categorize(e) != null) ? 'loaded' : 'bodyweight'
+  // THREE KINDS, NOT TWO (26 Nov 2026): a cable crunch has no price category, so this called it "bodyweight" and then
+  // held it to its weightless neighbours' rep range. The engine caps the reps of anything whose resistance can be
+  // raised (a stack, a band), priced or not, so a cable crunch at 10-15 beside planks at 18-23 is the rule working.
+  // It surfaced when a session rebuild first picked one; nothing about the rebuild had changed.
+  return e.mechanics_tier === 'primer' ? 'primer' : (isExternallyLoaded(e) && categorize(e) != null) ? 'loaded' : resistanceCanRise(e) ? 'raisable' : 'bodyweight'
 }
 
 async function main() {

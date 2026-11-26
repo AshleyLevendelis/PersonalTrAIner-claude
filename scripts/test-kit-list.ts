@@ -615,9 +615,18 @@ async function main() {
   check('never a write to the profile row: the tier the person picked stays', calls.every(c => c.table !== 'fitness_profiles'), calls.filter(c => c.table === 'fitness_profiles'))
   check('what it returns is what the trial showed', hash(applied.mesocycle) === hash(trial.mesocycle) && JSON.stringify(applied.changedDays) === JSON.stringify(trial.changedDays) && changed.length >= 3)
 
-  // A WHOLE-PLAN REBUILD when slot by slot would hollow it out: his shoulder
-  // flag already removed most pressing, so the list leaves patterns empty.
-  check('his list with a shoulder flag rebuilds the days from today rather than patching them', trial.mode === 'rebuild' && trial.touchedSlots.length === 0, trial.mode)
+  // A WHOLE-PLAN REBUILD when slot by slot would hollow it out.
+  // RE-ANCHORED 26 Nov 2026: this asserted that HIS list (dumbbells and a bench) rebuilds. Whether it does depends on
+  // how many band and backpack moves his tier plan happens to hold, and that moved twice in one day as the "real kit
+  // first" rule was built and then refined (59 slots and a patch, then 75 and a rebuild). A check pinned to it was
+  // testing the plan's contents, not the decision. So his list is held to what must be true in EITHER mode, and each
+  // branch has a list that reaches it by a wide margin: a kettlebell and nothing else hollows the plan (rebuild);
+  // dumbbells and bands leaves most of it standing (patch).
+  check('his list: whichever way it goes, the slots it names agree with the mode', trial.conflicts >= 3 && (trial.mode === 'rebuild' ? trial.touchedSlots.length === 0 : trial.mode === 'substitute' && trial.touchedSlots.length === trial.conflicts), { mode: trial.mode, conflicts: trial.conflicts, touched: trial.touchedSlots.length })
+  const light = await hush(() => planKitChange({ ...params, statements: [{ mode: 'only', items: ['dumbbells', 'bands'] }] as Statement[] }))
+  check('a list that leaves most of the plan standing (dumbbells and bands) patches slot by slot and says which slots', light.mode === 'substitute' && light.conflicts >= 3 && light.touchedSlots.length === light.conflicts, { mode: light.mode, conflicts: light.conflicts })
+  const hollow = await hush(() => planKitChange({ ...params, statements: [{ mode: 'only', items: ['kettlebell'] }] as Statement[] }))
+  check('a list that would hollow the plan (only a kettlebell) rebuilds the days from today rather than patching them', hollow.mode === 'rebuild' && hollow.touchedSlots.length === 0 && hollow.conflicts > light.conflicts * 3, { mode: hollow.mode, conflicts: hollow.conflicts })
 
   // SLOT BY SLOT: "I don't own bands" on an uninjured Minimalist's plan.
   calls.length = 0

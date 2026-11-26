@@ -865,7 +865,11 @@ console.log('\n3. Nothing has crept back up')
   // (0 kB of room left at 3466); 9 kB over today.
   // MOVED 25 Nov 2026: 3475 -> 3500, the tester toolkit merged onto main. MEASURED 3495: +20 kB is the report sheet and
   // the screenshot library, both fetched only by a tester on the tap (TesterButtons.tsx), never by anyone else.
-  const TOTAL_BUDGET_KB = 3500
+  // MOVED 26 Nov 2026: 3475 -> 3493, workouts the watch recorded (its card and its reader are their own lazy chunks,
+  // loaded only in the phone app with the switch on). MEASURED 3484; 9 kB over today.
+  // MOVED 26 Nov 2026: 3500 -> 3523, the two above merged together (tester toolkit + watch workouts, both lazy chunks).
+  // MEASURED 3514 on the merged tree; 9 kB over today.
+  const TOTAL_BUDGET_KB = 3523
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)

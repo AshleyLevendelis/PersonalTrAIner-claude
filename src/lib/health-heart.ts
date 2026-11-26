@@ -120,6 +120,37 @@ export function workoutWindow(s: { started_at?: string | null; finished_at?: str
   return { start, end }
 }
 
+/**
+ * RESTING HEART RATE FROM THE NIGHT'S READINGS (26 Nov 2026, mine, measurement). Some watches write heart rate to the
+ * phone's health store and no resting figure (Samsung Health is widely reported to: Health Connect gets its heart rate,
+ * steps, sleep and workouts, not resting heart rate), so Home's resting line and the "raised three mornings" check had
+ * nothing to read on them. A resting figure is a low, settled heart rate, and the night is where one is: for each
+ * local date, the readings between midnight and 6 am, and the figure is the one a tenth of the way up from the lowest
+ * (the single lowest reading is as likely a sensor dropout as a heartbeat). It needs 8 readings or the night has no
+ * figure. It reads a few beats under a daytime resting figure; every use of it compares him with his own earlier
+ * nights, and it is only ever used when the store holds no resting figure at all, so the two are never mixed.
+ */
+const OVERNIGHT_FROM_HOUR = 0
+export const OVERNIGHT_TO_HOUR = 6
+export const OVERNIGHT_MIN_READINGS = 8
+export function restingFromOvernight(samples: { bpm: number; at: string }[]): Map<string, number> {
+  const nights = new Map<string, number[]>()
+  for (const x of samples) {
+    if (!isPlausibleResting(x.bpm)) continue
+    const d = new Date(x.at)
+    if (Number.isNaN(d.getTime()) || d.getHours() < OVERNIGHT_FROM_HOUR || d.getHours() >= OVERNIGHT_TO_HOUR) continue
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    nights.set(key, [...(nights.get(key) ?? []), x.bpm])
+  }
+  const out = new Map<string, number>()
+  for (const [date, bpms] of nights) {
+    if (bpms.length < OVERNIGHT_MIN_READINGS) continue
+    const sorted = [...bpms].sort((a, b) => a - b)
+    out.set(date, Math.round(sorted[Math.floor(sorted.length * 0.1)]))
+  }
+  return out
+}
+
 export interface HeartSyncResult { cardio: number; workouts: number; restingDays: number }
 
 /**
@@ -155,7 +186,21 @@ export async function syncHeartFromHealth(profileId: string, today: string, now:
       if (!error) done.workouts++
     }
     const from = new Date(now.getTime() - 14 * 86400000)
-    const byDay = restingByDay(await adapter.restingHeartRateSamples(from, now))
+    let byDay = restingByDay(await adapter.restingHeartRateSamples(from, now))
+    // A WATCH THAT SHARES NO RESTING FIGURE (restingFromOvernight says why): worked out from the night's own readings.
+    // Only when the store holds none at all for the fortnight, so two methods are never mixed in one trend.
+    // One read a night, not one for the fortnight: a watch writes a reading every few seconds and the store hands
+    // back a capped number of them, so one long read would hold the first days only.
+    if (byDay.size === 0) {
+      const nights: { bpm: number; at: string }[] = []
+      for (let i = 0; i < 14; i++) {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i, OVERNIGHT_FROM_HOUR, 0, 0)
+        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i, OVERNIGHT_TO_HOUR, 0, 0)
+        if (start.getTime() > now.getTime()) continue
+        nights.push(...await adapter.heartRateSamples(start, end.getTime() > now.getTime() ? now : end))
+      }
+      byDay = restingFromOvernight(nights)
+    }
     const rows = [...byDay].map(([date, bpm]) => ({ profile_id: profileId, date, bpm, source: sourceFor(adapter.platform), updated_at: new Date().toISOString() }))
     if (rows.length) {
       const { error } = await supabase.from('daily_resting_heart_rate').upsert(rows, { onConflict: 'profile_id,date' })
