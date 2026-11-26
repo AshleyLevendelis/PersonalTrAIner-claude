@@ -116,6 +116,9 @@ const KEYS: Record<string, { clear: boolean; why: string }> = {
   fitplan_tester_on: { clear: true, why: 'whether the person being left agreed to be recorded' },
   fitplan_tester_queue: { clear: true, why: "that person's record still waiting to be sent" },
   fitplan_health_heart_connected: { clear: false, why: "this phone's Health permission switch for heart rate, as steps" },
+  // WORKOUTS THE WATCH RECORDED (26 Nov 2026, merged from main): the same kind as the two switches above.
+  fitplan_health_workouts_connected: { clear: false, why: "this phone's Health permission switch for workouts, as steps" },
+  fitplan_watch_workouts_dismissed: { clear: false, why: "watch workouts he said no to; a new plan must not offer them again" },
   fitplan_heart_strap: { clear: false, why: "the strap paired to this phone's Bluetooth — the phone's, not the plan's" },
   fitplan_heart_strap_readings: { clear: false, why: 'raw strap readings, matched to a session by its own times only and gone after four hours' },
   fitplan_activity_recording: { clear: false, why: 'a walk or run being recorded right now (25 Nov 2026) — a New Plan mid-walk must not lose the walk' },
