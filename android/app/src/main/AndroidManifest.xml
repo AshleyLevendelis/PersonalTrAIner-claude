@@ -57,6 +57,9 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:targetApi="s" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" tools:node="replace" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="30" tools:node="replace" />
+    <!-- A COUNTED WALK (26 Nov 2026; src/lib/walk-session.ts): the phone's own step counter, read only while a walk he
+         started is running. Asked only when he starts a walk. -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />
     <uses-permission android:name="android.permission.health.WRITE_STEPS" tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_DISTANCE" tools:node="remove" />

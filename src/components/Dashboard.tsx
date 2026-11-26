@@ -421,6 +421,8 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     const id = profile.id, date = activeSession.date
     let live = true
     const pull = () => {
+      // A COUNTED WALK's steps are read again here: the phone's health app can land them minutes after Finish.
+      void import('@/lib/walk-session').then(m => m.topUpWalkSteps(id, date)).catch(() => { /* kept as saved */ })
       void import('@/lib/health-heart')
         .then(async m => {
           // A PAIRED STRAP (option 3, strap-live.ts) fills first, so its figure is the one kept where both exist.

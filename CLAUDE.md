@@ -668,6 +668,12 @@ workouts in a list AND optionally on a day; BUILT (Start opens Empty or a saved 
 first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workout`, `test:rls-local` §11,
 `docs/plans/own-workouts.md`. Needs the `own_workouts` migration
 
+**A counted walk: his request 26 Nov 2026, and his ruling "Both"** for its steps: "Walk" in today's "Which workout?"
+starts at once (clock, the phone's step counter live, the strap's heart rate); Finish says "Congratulations, you completed
+3,120 steps in 30 minutes. Your average heart rate was 122, and your highest was 141." and the effort tap saves it; the
+phone's health store is read at Finish and again when Home opens, the larger count kept. `screen only`. `test:walk-session`,
+`verify:walk`, `test:phone-app` §7. Needs the `walk_steps` migration and an Android rebuild
+
 **Changing one workout**
 - Move it to another day; it leaves today on every screen — both surfaces
   since 10 Sep 2026 ("What happened?" on the day menu); `session-move`,

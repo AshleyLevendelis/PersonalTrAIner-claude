@@ -146,6 +146,7 @@ export function CardioReadback({
     rpe: log.intensity_rpe,
     distanceKm: log.distance_km == null ? null : Number(log.distance_km),
     shape: roundShapeOf(log.notes),
+    steps: log.steps ?? null,
   })
   const heart = heartLine(log.avg_heart_rate, log.max_heart_rate)
 

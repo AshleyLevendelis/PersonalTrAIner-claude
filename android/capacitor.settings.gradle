@@ -10,3 +10,6 @@ project(':capacitor-push-notifications').projectDir = new File('../node_modules/
 
 include ':capgo-capacitor-health'
 project(':capgo-capacitor-health').projectDir = new File('../node_modules/@capgo/capacitor-health/android')
+
+include ':capgo-capacitor-pedometer'
+project(':capgo-capacitor-pedometer').projectDir = new File('../node_modules/@capgo/capacitor-pedometer/android')

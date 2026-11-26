@@ -760,7 +760,9 @@
     "verify:wrong-exercise": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/wrong-exercise.mjs",
     "measure:meal-protein-spread": "tsx scripts/measure-meal-protein-spread.ts",
     "test:meal-protein-spread": "tsx scripts/test-meal-protein-spread.ts",
-    "test:peek-recovery": "tsx scripts/test-peek-recovery.ts"
+    "test:peek-recovery": "tsx scripts/test-peek-recovery.ts",
+    "test:walk-session": "tsx scripts/test-walk-session.ts",
+    "verify:walk": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/counted-walk.mjs"
   },
   "dependencies": {
     "@capacitor-community/bluetooth-le": "8.3.0",
@@ -769,6 +771,7 @@
     "@capacitor/ios": "8.6.2",
     "@capacitor/push-notifications": "8.1.3",
     "@capgo/capacitor-health": "8.13.0",
+    "@capgo/capacitor-pedometer": "8.0.57",
     "@radix-ui/react-label": "^2.1.4",
     "@radix-ui/react-progress": "^1.1.4",
     "@radix-ui/react-select": "^2.2.2",

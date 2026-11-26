@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useState } from 'react'
-import { ChevronRight, Pencil, Plus } from 'lucide-react'
+import { ChevronRight, Footprints, Pencil, Plus } from 'lucide-react'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import { getAppNow } from '@/lib/dev-clock'
 import { useActiveSession } from '@/hooks/useActiveSession'
@@ -10,10 +10,12 @@ import { type OwnWorkout, ownWorkoutsOn, subscribeOwnWorkouts, newOwnWorkout, ow
 import {
   type OwnPlan, type PlansSync, ownPlans, subscribeOwnPlans, newOwnPlan, planSummary, setPlanOnDate, syncOwnPlans, workoutFromPlan,
 } from '@/lib/own-workout-plans'
+import { activeWalk, subscribeWalk, type WalkState } from '@/lib/walk-store'
 
 // The workout screen and the builder are their own downloads: most days nobody opens them.
 const OwnWorkoutSheet = lazyWithReload(() => import('./OwnWorkoutSheet'))
 const OwnPlanEditor = lazyWithReload(() => import('./OwnPlanEditor'))
+const WalkSheet = lazyWithReload(() => import('./WalkSheet'))
 
 /** Read once a session per person: the table where phones meet (own-workout-plans.ts). */
 const synced = new Map<string, Promise<PlansSync>>()
@@ -42,6 +44,11 @@ export function OwnWorkoutDay({ profileId, date, today, weekNumber, planHasSessi
   const [open, setOpen] = useState<OwnWorkout | null>(null)
   const [choosing, setChoosing] = useState(false)
   const [editing, setEditing] = useState<{ plan: OwnPlan; isNew: boolean } | null>(null)
+  // A COUNTED WALK (walk-session.ts, his request 26 Nov 2026): one running or waiting for its effort tap is shown on its
+  // own day with a Continue, so closing the walk screen never loses it.
+  const [walk, setWalk] = useState<WalkState | null>(null)
+  const [walkOpen, setWalkOpen] = useState(false)
+  useEffect(() => { const read = () => setWalk(activeWalk()); read(); return subscribeWalk(read) }, [])
   useEffect(() => {
     if (!profileId) return
     const read = () => { setDone(ownWorkoutsOn(profileId, date)); setPlans(ownPlans(profileId)) }
@@ -86,6 +93,9 @@ export function OwnWorkoutDay({ profileId, date, today, weekNumber, planHasSessi
     void startPlan(p)
   }
 
+  const walkHere = walk && walk.userId === profileId && walk.date === date ? walk : null
+  const startWalkNow = () => { setChoosing(false); setWalkOpen(true) }
+
   const startLabel = ahead ? 'Plan a workout' : !isToday ? 'Log a workout you did' : planHasSession ? 'Start a separate workout' : 'Start your own workout'
 
   return (
@@ -104,6 +114,21 @@ export function OwnWorkoutDay({ profileId, date, today, weekNumber, planHasSessi
           <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
         </button>
       ))}
+
+      {walkHere && (
+        <button type="button" data-testid="own-day-walk" onClick={() => setWalkOpen(true)}
+          className="flex min-h-[60px] items-center gap-3 rounded-2xl bg-card px-4 py-3 text-left">
+          <Footprints className="size-5 shrink-0 text-primary-text" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[0.65625rem] font-semibold uppercase tracking-[.18em] text-primary-text">
+              {walkHere.result ? 'Walk · finished' : 'Walk · in progress'}
+            </span>
+            <span className="block text-[0.8125rem] text-muted-foreground">{walkHere.result ? 'Tap to say how it felt and save it' : 'Counting your steps'}</span>
+          </span>
+          <span className="shrink-0 text-[0.8125rem] font-semibold text-primary-text">{walkHere.result ? 'Save' : 'Continue'}</span>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        </button>
+      )}
 
       {/* HIS SAVED WORKOUTS PUT ON THIS DAY: Start today, Log it on a past day, take it off a day ahead. */}
       {onThisDay.map(p => (
@@ -131,6 +156,12 @@ export function OwnWorkoutDay({ profileId, date, today, weekNumber, planHasSessi
               <button type="button" data-testid="own-choose-empty" onClick={startEmpty} className="flex min-h-[52px] items-center gap-3 rounded-xl bg-card px-3.5 text-left">
                 <Plus className="size-4 shrink-0" aria-hidden />
                 <span className="flex-1"><span className="block text-[0.9375rem] font-semibold">Empty workout</span><span className="block text-[0.75rem] text-muted-foreground">Add exercises as you go</span></span>
+              </button>
+            )}
+            {isToday && !walkHere && (
+              <button type="button" data-testid="own-choose-walk" onClick={startWalkNow} className="flex min-h-[52px] items-center gap-3 rounded-xl bg-card px-3.5 text-left">
+                <Footprints className="size-4 shrink-0" aria-hidden />
+                <span className="flex-1"><span className="block text-[0.9375rem] font-semibold">Walk</span><span className="block text-[0.75rem] text-muted-foreground">Starts now, counts your steps and heart rate</span></span>
               </button>
             )}
             {plans.map(p => (
@@ -176,6 +207,11 @@ export function OwnWorkoutDay({ profileId, date, today, weekNumber, planHasSessi
             exclusions={exclusions}
             onClose={() => setOpen(null)}
           />
+        </Suspense>
+      )}
+      {walkOpen && (
+        <Suspense fallback={null}>
+          <WalkSheet profileId={profileId} date={date} dayLabel={dayLabelFor(date, isToday)} onClose={() => setWalkOpen(false)} />
         </Suspense>
       )}
       {editing && (

@@ -2,6 +2,45 @@
 
 Newest first. One line each.
 
+- [x] **A COUNTED WALK: ONE TAP STARTS IT, STEPS AND HEART RATE LIVE, HIS CONGRATULATIONS AT THE END (his request 26 Nov
+  2026: "hit Start Workout or Start Walk ... it just immediately starts recording my heart rate and recording my steps. At
+  the end ... 'Congratulations, you completed 3,000 steps. Your average heart rate was this.'").** Before: a walk could be
+  logged as cardio in your own workout, with the strap's live heart rate, but no walk counted its own steps (only the
+  day's total on Home) and nothing said what it was at the end. HIS RULING, asked the same day from three options, for
+  where the steps come from: **"Both"** (over the health store alone, which needed no rebuild, and the phone's sensor
+  alone): the phone's own step counter live (`@capgo/capacitor-pedometer` 8.0.57, the health plugin's maker; Android's
+  step counter, iPhone's motion chip; it counts from the tap), and the phone's health store (Health Connect / Apple
+  Health) for the walk's minutes at the end, read again when Home opens because it can land minutes late, raised and
+  never lowered. BUILT: "Walk" in today's "Which workout?" ("Starts now, counts your steps and heart rate"); one tap
+  opens it already running (clock, steps, the strap's live heart rate); closing the screen keeps it counting, the day
+  shows "Walk · in progress" with Continue, and a walk survives the app being closed (kept on the phone; a restarted
+  sensor adds to what it had counted); Finish shows "Nice walk" and his sentence with the walk's own numbers
+  ("Congratulations, you completed 3,120 steps in 30 minutes. Your average heart rate was 122, and your highest was
+  141."), four figures, and "How did it feel?" Easy / Steady / Hard, which SAVES it (nothing pre-chooses an effort,
+  24 Sep 2026; the round timer's one-tap shape); "End without saving" asks first. Saved as a cardio log "Walk" with its
+  steps (new column) and average and highest heart rate; its line reads "Walk · 30 min · Easy · 3,120 steps".
+  DECISIONS, mine, mechanical: the LARGER of the two counts is kept (neither over-counts: the sensor counts only the
+  phone's own steps and the store removes the phone + watch double count; each under-counts its own way, the store by
+  lagging and the sensor by a phone left on the bench); a count over 250 a minute (plus a minute's grace) is a sensor
+  fault and refused; neither count is no count, never 0; heart rate is the strap's for the walk's minutes, else the
+  watch's through the health store, else the existing Home sync fills it later. Words mine, his to change: "Nice walk",
+  "How did it feel? Tap to save", the no-steps note. CSCS review: nothing prescribed changes (1-4 no effect; a logged walk
+  is extra cardio, as every cardio log is); 5 in scope (heart rate shown, never judged: no zone, no target). NEW
+  PERMISSION: Android "physical activity" (ACTIVITY_RECOGNITION) and iPhone "Motion & Fitness", asked only when he starts
+  a walk; declared in the manifest, the iPhone sentence and the privacy page (wording his to approve), held by
+  `test:phone-app` §7 (7 checks, derived from the plugin's own manifest). Found by the browser driver, fixed: the
+  plausibility ceiling read the live count against ROUNDED minutes, so a real 270 steps at 90 seconds would have shown
+  nothing; the live screen now uses exact minutes plus a minute's grace. `test:walk-session` (39 checks, 22 mutations,
+  all caught), `verify:walk` (22 checks; mutations below). NOT PROVEN: a real phone (the plugin, the permission sheet,
+  Android killing the app in the background, Samsung Health's lag into Health Connect); the coach is not told a walk's
+  steps yet; no walk from Tools or Home, only Exercise's "Which workout?"; `screen only` (the coach can log a walk he
+  describes, not start a live one). NEEDS: the `walk_steps` migration (`db:push-both`; until then a walk saves without
+  its steps), and an Android rebuild on his machine (`npx cap sync android`, a new version for the Play Store); no edge
+  function deploy. MY SLIP, caught before commit: I first wrote the walk's screen check to `.tour-harness/walk.mjs`,
+  which already existed as `verify:screens` (every screen at phone width), and overwrote it; `git status` showed it as
+  modified rather than new. Restored from the branch, the walk check moved to `counted-walk.mjs`, both run green. Check
+  for an existing file before naming a new driver.
+
 - [x] **THE COACH-VOICE WORK WAS NEVER ON MAIN, AND THE HEART-RATE MIGRATION NEVER APPLIED (25 Nov 2026)**. The 24 Nov
   coach-voice branch (`ccr-74a169c3-gto5y6`: training-partner voice, days ahead, the Saturday review, rest-day cardio)
   was deployed to production FROM ITS BRANCH and never merged. Every chat-gemini deploy from main after it (the why

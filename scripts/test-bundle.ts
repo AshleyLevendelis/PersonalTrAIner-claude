@@ -860,7 +860,9 @@ console.log('\n3. Nothing has crept back up')
   // into the heart-rate work. MEASURED 3418 on the merged tree; 9 kB over today.
   // MOVED 25 Nov 2026: 3427 -> 3466, main's own workout (its own budget was 3451, measured 3445) merged on top.
   // MEASURED 3457 on the merged tree; 9 kB over today.
-  const TOTAL_BUDGET_KB = 3466
+  // MOVED 26 Nov 2026: 3466 -> 3482, a counted walk (his request that day): the walk screen, its engine and the step
+  // counter's web stub, each its own download fetched only when a walk opens (about 14 kB). MEASURED 3473; 9 kB over.
+  const TOTAL_BUDGET_KB = 3482
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)

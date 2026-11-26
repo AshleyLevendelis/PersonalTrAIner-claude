@@ -13,6 +13,7 @@
 import { readFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { execSync } from 'child_process'
 import { stepsToKeep, dayBounds, stepsSourceLine, healthStoreName } from '../src/lib/health-steps'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -115,6 +116,26 @@ console.log('\n6. Store icons and the upload key (store work, 20 Nov 2026)')
   check('the store icon is a 1024 square with no see-through pixels allowed (Apple refuses an icon with transparency)', only.w === 1024 && only.h === 1024 && !only.alpha, only)
 }
 
+console.log('\n7. A counted walk (26 Nov 2026): the step counter asks for steps and nothing else')
+{
+  // Derived from the plugin's OWN manifest, as section 1 is, so an update that brings a new permission fails here.
+  const plugin = read('node_modules/@capgo/capacitor-pedometer/android/src/main/AndroidManifest.xml')
+  const brings = [...plugin.matchAll(/android\.permission\.([A-Z_]+)/g)].map(m => m[1])
+  check('the step counter brings exactly one Android permission, physical activity', JSON.stringify(brings) === JSON.stringify(['ACTIVITY_RECOGNITION']), brings)
+  const app = read('android/app/src/main/AndroidManifest.xml')
+  check('...and the app declares it, said where it is declared', /<uses-permission android:name="android\.permission\.ACTIVITY_RECOGNITION" \/>/.test(app) && /COUNTED WALK/.test(app))
+  const plist = read('ios/App/App/Info.plist')
+  const motion = (plist.match(/<key>NSMotionUsageDescription<\/key>\s*<string>([^<]+)<\/string>/) ?? [])[1] ?? ''
+  check('iPhone\'s motion sentence says steps only, and only during a walk', /steps only/i.test(motion) && /walk/i.test(motion), motion)
+  const page = read('public/privacy.html')
+  check('the privacy page says the walk counts steps with the phone\'s own counter', /start a <strong>walk<\/strong>/.test(page) && /step counter/.test(page))
+  const src = strip(read('src/lib/walk-session.ts'))
+  check('the step counter is loaded by a dynamic import only (the website\'s download does not grow)', /await import\('@capgo\/capacitor-pedometer'\)/.test(src))
+  const statics = execSync("grep -rl \"from '@capgo/capacitor-pedometer'\" src || true", { encoding: 'utf8' }).trim()
+  check('no file imports it statically', statics === '', statics)
+  check('it is registered with the Android build', /capgo-capacitor-pedometer/.test(read('android/capacitor.settings.gradle')) && /capgo-capacitor-pedometer/.test(read('android/app/capacitor.build.gradle')))
+}
+
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.log(`${failures} check(s) failed`); process.exit(1) }
-console.log('The phone app asks for steps and nothing else, and says so everywhere it is asked.')
+console.log('The phone app asks for steps and heart rate, read only, and says so everywhere it is asked.')

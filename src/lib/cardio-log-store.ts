@@ -42,6 +42,10 @@ export interface CardioLogInput {
   notes?: string | null
   /** Kilometres, only when she gave a distance. */
   distanceKm?: number | null
+  /** The highest heart rate, when the session's own readings gave one (a counted walk). */
+  maxHeartRate?: number | null
+  /** A counted walk's steps (walk-session.ts). */
+  steps?: number | null
 }
 
 interface PendingCardioLog extends CardioLogInput {
@@ -112,6 +116,8 @@ function pendingToView(p: PendingCardioLog): CardioLogView {
     avg_heart_rate: p.avgHeartRate ?? null,
     notes: p.notes ?? null,
     ...(p.distanceKm != null ? { distance_km: p.distanceKm } : {}),
+    ...(p.maxHeartRate != null ? { max_heart_rate: p.maxHeartRate } : {}),
+    ...(p.steps != null ? { steps: p.steps } : {}),
     completed_at: p.completedAt,
     syncStatus: p.status,
   }
@@ -351,10 +357,17 @@ async function syncPass(items: PendingCardioLog[]): Promise<void> {
       // THE DISTANCE IS NAMED ONLY WHEN THERE IS ONE, and a database that has not run its migration yet
       // (20261022120000) is retried without it: the session saves, the distance is the one thing lost.
       if (item.distanceKm != null) row.distance_km = item.distanceKm
+      // A counted walk's highest heart rate and steps (20261124180000, 20261126120000), the same way: named only when
+      // there, and each stripped on its own missing-column error so the walk itself still saves. Newest column first:
+      // PostgREST's PGRST204 does not always name the column, and the newest is the likeliest to be missing.
+      if (item.maxHeartRate != null) row.max_heart_rate = item.maxHeartRate
+      if (item.steps != null) row.steps = item.steps
       let { data, error } = await supabase.from('cardio_logs').insert(row).select('id').single()
-      if (error && 'distance_km' in row && isMissingColumnError(error, 'distance_km')) {
-        delete row.distance_km
-        ;({ data, error } = await supabase.from('cardio_logs').insert(row).select('id').single())
+      for (const col of ['steps', 'max_heart_rate', 'distance_km']) {
+        if (error && col in row && isMissingColumnError(error, col)) {
+          delete row[col]
+          ;({ data, error } = await supabase.from('cardio_logs').insert(row).select('id').single())
+        }
       }
       if (error) throw error
       const insertedId = (data as { id: string } | null)?.id
@@ -462,6 +475,8 @@ function serverShape(p: PendingCardioLog): CardioLog {
     avg_heart_rate: p.avgHeartRate ?? null,
     notes: p.notes ?? null,
     ...(p.distanceKm != null ? { distance_km: p.distanceKm } : {}),
+    ...(p.maxHeartRate != null ? { max_heart_rate: p.maxHeartRate } : {}),
+    ...(p.steps != null ? { steps: p.steps } : {}),
     completed_at: p.completedAt,
   }
 }

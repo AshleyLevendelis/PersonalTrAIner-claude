@@ -1133,5 +1133,7 @@ export interface CardioLog {
   notes?: string | null
   /** How far, in km, only when she gave it (Sam, 20 Oct 2026). Absent on a database without the column yet. */
   distance_km?: number | null
+  /** A counted walk's steps (walk-session.ts, 26 Nov 2026). Absent before its migration, null on any other log. */
+  steps?: number | null
   completed_at?: string
 }

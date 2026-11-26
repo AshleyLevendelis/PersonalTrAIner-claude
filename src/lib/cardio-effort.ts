@@ -72,11 +72,13 @@ export function rpeToStore(chosen: EffortKey, prescribedRpe?: number | null): nu
  * The effort clause disappears rather than printing a word the app does not
  * have, the same rule prescriptionLine keeps for an unstated target.
  */
-export function cardioReadback(p: { activity: string; minutes: number; rpe?: number | null; distanceKm?: number | null; shape?: string | null }): string {
+export function cardioReadback(p: { activity: string; minutes: number; rpe?: number | null; distanceKm?: number | null; shape?: string | null; steps?: number | null }): string {
   const key = effortForRpe(p.rpe)
   const km = p.distanceKm != null && p.distanceKm > 0 ? ` · ${distanceText(p.distanceKm)}` : ''
+  // A COUNTED WALK's steps (walk-session.ts, 26 Nov 2026), only when it has them.
+  const steps = p.steps != null && p.steps > 0 ? ` · ${p.steps.toLocaleString('en-GB')} steps` : ''
   const length = p.shape?.trim() || `${p.minutes} min`
-  return `${p.activity} · ${length}${key ? ` · ${effortLabel(key)}` : ''}${km}`
+  return `${p.activity} · ${length}${key ? ` · ${effortLabel(key)}` : ''}${km}${steps}`
 }
 
 /**

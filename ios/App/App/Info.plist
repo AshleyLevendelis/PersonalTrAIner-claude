@@ -4,6 +4,8 @@
 <dict>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Personal TrAIner connects to your heart rate strap so the timer and your workout can show your heart rate while you train. It reads heart rate only.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Personal TrAIner counts your steps during a walk you start in the app, to show them as you go and when you finish. It counts steps only, and only while that walk is running.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Personal TrAIner reads your step count so your daily steps fill in on Home without typing them. It reads steps only and never writes to Health.</string>
   <key>CAPACITOR_DEBUG</key>
