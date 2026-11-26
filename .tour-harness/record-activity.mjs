@@ -94,6 +94,7 @@ check('A16. ...and the watch\'s calories, not an estimate: 300 kcal', /^300 kcal
 const windows = JSON.parse((await ev(`JSON.stringify((window.__healthCalls ?? []).filter(c => c && c.kcal))`)) ?? '[]')
 check('A17. the phone was asked for the window from Start to End', windows.length >= 1 && Date.parse(windows[0].kcal[1]) - Date.parse(windows[0].kcal[0]) >= 2000, windows)
 check('A18. effort is asked, nothing picked for him', /How hard was it\?/.test((await cardText()) ?? '') && (await ev(`[...document.querySelectorAll('[data-record-card] [role="radiogroup"] button')].filter(b => b.getAttribute('aria-checked') === 'true').length`)) === 0)
+check('A18a. ...because this walk has no heart rate: no zone is offered in its place (his 26 Nov "Keep Easy/Steady/Hard")', (await ev(`!!document.querySelector('[data-record-zone]')`)) === false && (await ev(`!!document.querySelector('[data-record-log]')`)) === false)
 check('A19. nothing is logged by ending it', (await rows()).filter(r => r.name === 'Walk').length === 0)
 await ev(`document.querySelector('[data-record-card]').scrollIntoView({ block: 'start' })`)
 await shoot('record-activity-3-ended')
@@ -123,8 +124,9 @@ check('B1. he picks Assault bike: "Start Assault Bike"', (await startBtn())?.tex
 await clickAt(`document.querySelector('[data-testid="own-cardio-start"]')`)
 await until(card, v => v === 'recording', 30)
 check('B2. it says what suits a bike: heart rate and calories, and nothing of steps', /heart rate and calories are picked up/.test((await ev(`document.querySelector('[data-record-what]')?.textContent ?? ''`)) ?? '') && !/steps/.test((await ev(`document.querySelector('[data-record-what]')?.textContent ?? ''`)) ?? ''))
-// A strap's readings are kept one a second at most (heart-strap.ts), so they go 1.1s apart, as a real strap's do.
-for (const bpm of [128, 134, 140, 146, 150]) { await ev(`window.__strapSend(${bpm})`); await wait(1100) }
+// Ten readings about four seconds apart, averaging 140 and peaking at 150. Long enough for a zone to hold half a
+// minute (heartZones charts nothing for a session of a few seconds), which is what the zone and its Log button need.
+for (const bpm of [128, 134, 136, 138, 140, 142, 144, 146, 142, 150]) { await ev(`window.__strapSend(${bpm})`); await wait(4200) }
 check('B3. the strap\'s live heart rate shows on the recording card', (await ev(`document.querySelector('[data-record-card] [data-live-heart]')?.getAttribute('data-live-heart') ?? null`)) === '150')
 await ev(`document.querySelector('[data-record-end]').scrollIntoView({ block: 'center' })`)
 await clickAt(`document.querySelector('[data-record-end]')`)
@@ -139,11 +141,24 @@ check('B8. NO steps, distance or pace on a bike, though the phone holds 6,400 st
 check('B9. ...and it does not say steps are still to come', !/steps/.test((await ev(`document.querySelector('[data-record-waiting]')?.textContent ?? ''`)) ?? ''))
 await ev(`document.querySelector('[data-record-card]').scrollIntoView({ block: 'start' })`)
 await shoot('record-activity-5-bike')
-await ev(`document.querySelector('[data-record-card] [role="radiogroup"]').scrollIntoView({ block: 'center' })`)
-await clickAt(`[...document.querySelectorAll('[data-record-card] [role="radiogroup"] button')].find(b => /Hard/.test(b.textContent))`)
+// HIS 26 NOV "why is it still easy steady or hard, it should be 5 heart rate zones": with a heart rate, End names the
+// zone he spent longest in and asks no effort; one Log tap saves it.
+await until(() => ev(`!!document.querySelector('[data-record-log]')`), v => v === true, 40)
+const zoneShown = await ev(`(() => { const z = document.querySelector('[data-record-zone]'); return z ? { zone: z.getAttribute('data-record-zone'), text: z.innerText.replace(/\\s+/g, ' ').trim() } : null })()`)
+const summaryMostly = await ev(`document.querySelector('[data-record-card] [data-heart-zones]')?.getAttribute('data-heart-zones') ?? null`)
+check('B9a. with the strap\'s heart rate, End says "Mostly zone N" and N is the zone the summary\'s chart says', /^Mostly zone [1-5] · /.test(zoneShown?.text ?? '') && zoneShown?.zone != null && zoneShown.zone === summaryMostly, { zoneShown, summaryMostly })
+check('B9b. ...with one button, "Log assault bike", and no Easy / Steady / Hard', /Log assault bike$/.test(zoneShown?.text ?? '') && !/How hard was it\?/.test((await cardText()) ?? '') && (await ev(`document.querySelectorAll('[data-record-card] [role="radiogroup"]').length`)) === 0, zoneShown)
+check('B9c. nothing is logged until he taps it', (await rows()).filter(r => r.name === 'Assault Bike').length === 0)
+await ev(`document.querySelector('[data-record-log]').scrollIntoView({ block: 'center' })`)
+await shoot('record-activity-5b-zone')
+await clickAt(`document.querySelector('[data-record-log]')`)
 await until(card, v => v === 'logged', 20)
 const bike = (await rows()).filter(r => r.name === 'Assault Bike')
-check('B10. logged under the name he picked, with NO steps and NO distance saved, calories marked an estimate', bike.length === 1 && bike[0].steps === null && bike[0].km === null && bike[0].est === true && bike[0].kcal > 0 && bike[0].rpe === 7, bike)
+const ez = zoneShown?.zone ?? null
+check('B9d. the effort kept is the zone\'s own word (zones 1-2 Easy, 3 Steady, 4-5 Hard)', ez != null && bike.length === 1 && bike[0].rpe === ({ 1: 3, 2: 3, 3: 5, 4: 7, 5: 7 })[ez], { ez, rpe: bike[0]?.rpe })
+const zLine = await ev(`document.querySelector('[data-record-logged]')?.textContent ?? null`)
+check('B9e. ...and the logged line names the zone, not a word: "Logged · mostly zone N"', ez != null && (zLine ?? '').match(/Logged · mostly zone ([1-5])\./)?.[1] === ez && !/felt/.test(zLine ?? ''), { ez, zLine })
+check('B10. logged under the name he picked, with NO steps and NO distance saved, calories marked an estimate', bike.length === 1 && bike[0].steps === null && bike[0].km === null && bike[0].est === true && bike[0].kcal > 0, bike)
 await clickAt(`document.querySelector('[data-record-done]')`)
 await wait(300)
 

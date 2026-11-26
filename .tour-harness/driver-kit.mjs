@@ -20,8 +20,9 @@ import { readFileSync, existsSync, writeFileSync, mkdtempSync, rmSync } from 'fs
 import { tmpdir } from 'os'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
+import { fileURLToPath } from 'url'
 
-const DIST = new URL('./dist/', import.meta.url).pathname
+const DIST = fileURLToPath(new URL('./dist/', import.meta.url))
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' }
 
 /**
@@ -63,7 +64,8 @@ export async function startDriver(o) {
   // A desktop window draws real scrollbars that take up room (15px here). No
   // phone-size driver can see anything that depends on them.
   if (!mobile) flags.push(`--window-size=${width},${height}`, '--disable-features=OverlayScrollbar')
-  const chrome = spawn('/opt/pw-browsers/chromium', [...flags, 'about:blank'], { stdio: 'ignore' })
+  // HARNESS_CHROMIUM names another Chromium (26 Nov 2026: Ashley's Windows machine has Edge, not the cloud's path).
+  const chrome = spawn(process.env.HARNESS_CHROMIUM || '/opt/pw-browsers/chromium', [...flags, 'about:blank'], { stdio: 'ignore' })
   const giveUp = why => { console.error(`    ✗ ${why}`); try { chrome.kill('SIGKILL') } catch {} ; process.exit(1) }
   const watchdog = setTimeout(() => giveUp(`the driver did not finish in ${Math.round(timeoutMs / 1000)} seconds`), timeoutMs)
   let finishing = false
@@ -85,7 +87,7 @@ export async function startDriver(o) {
   const ev = async x => (await send('Runtime.evaluate', { expression: x, returnByValue: true, awaitPromise: true })).result?.result?.value
   const shoot = async file => {
     const s = await send('Page.captureScreenshot', { format: 'png' })
-    writeFileSync(new URL(`./${file}.png`, import.meta.url).pathname, Buffer.from(s.result.data, 'base64'))
+    writeFileSync(fileURLToPath(new URL(`./${file}.png`, import.meta.url)), Buffer.from(s.result.data, 'base64'))
   }
   await send('Page.enable'); await send('Runtime.enable')
   // OFFER DETAILS OPENED, for a driver whose subject is what an offer SAYS (17 Nov 2026, his "One line, numbers on

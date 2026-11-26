@@ -97,6 +97,9 @@ export interface HeartZones {
   floors: [number, number, number, number, number]
   /** The maximum the zones were drawn from. */
   maxUsed: number
+  /** The same time in milliseconds, unrounded: which zone was "mostly" is read from this when it is there, so a walk
+   *  of under a minute in each zone still has one, and two zones that round to the same minute are told apart. */
+  ms?: [number, number, number, number, number]
 }
 
 /**
@@ -123,14 +126,17 @@ export function heartZones(samples: readonly HeartReading[], start: Date, end: D
     minutes: [mins(ms[0]), mins(ms[1]), mins(ms[2]), mins(ms[3]), mins(ms[4])],
     floors: [0, Math.ceil(maxUsed * 0.6), Math.ceil(maxUsed * 0.7), Math.ceil(maxUsed * 0.8), Math.ceil(maxUsed * 0.9)],
     maxUsed,
+    ms: [ms[0], ms[1], ms[2], ms[3], ms[4]],
   }
 }
 
 /** The zone the heart spent longest in, or null with none. A tie goes to the lower zone (never overstated). */
 export function mostlyZone(z: HeartZones | null): 1 | 2 | 3 | 4 | 5 | null {
-  if (!z || z.minutes.every(m => m <= 0)) return null
+  if (!z) return null
+  const t = z.ms ?? z.minutes
+  if (t.every(m => m <= 0)) return null
   let best = 0
-  z.minutes.forEach((m, i) => { if (m > z.minutes[best]) best = i })
+  t.forEach((m, i) => { if (m > t[best]) best = i })
   return (best + 1) as 1 | 2 | 3 | 4 | 5
 }
 

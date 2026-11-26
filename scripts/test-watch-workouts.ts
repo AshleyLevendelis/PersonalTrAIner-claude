@@ -182,6 +182,11 @@ console.log('\n6. What the heart rate looked like (the summary\'s graph, time by
   check('mostly: the zone with the most minutes', mostlyZone(zm([3, 4, 28, 6, 1])) === 3 && mostlyZone(zm([3, 4, 8, 26, 1])) === 4 && mostlyZone(zm([30, 4, 8, 2, 0])) === 1)
   check('...a tie goes to the lower zone, never the higher', mostlyZone(zm([10, 10, 10, 10, 10])) === 1 && mostlyZone(zm([0, 0, 10, 10, 0])) === 3)
   check('...and nothing to say with no zones', mostlyZone(null) === null && mostlyZone(zm([0, 0, 0, 0, 0])) === null)
+  // The unrounded time decides when it is there: two zones that round to the same minute are told apart, and the
+  // lower zone still wins an exact tie.
+  const zms = (minutes: [number, number, number, number, number], ms: [number, number, number, number, number]) => ({ ...zm(minutes), ms })
+  check('...two zones that round to the same minute are told apart by their real time', mostlyZone(zms([0, 5, 5, 0, 0], [0, 290_000, 310_000, 0, 0])) === 3 && mostlyZone(zms([0, 5, 5, 0, 0], [0, 310_000, 290_000, 0, 0])) === 2)
+  check('...and what heartZones hands back carries that time (the zone logged is the zone charted)', (() => { const z = heartZones(stepped, start, end, 200); return !!z?.ms && z.ms.every((x, i) => Math.round(x / 60000) === z.minutes[i]) })())
 
   check('pace: 42 minutes over 5.2 km is 8:05 a kilometre', pacePerKm(42, 5.2) === '8:05', pacePerKm(42, 5.2))
   check('...seconds are two digits (30 min over 5 km is 6:00)', pacePerKm(30, 5) === '6:00')

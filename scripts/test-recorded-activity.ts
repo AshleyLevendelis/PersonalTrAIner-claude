@@ -147,6 +147,11 @@ async function main() {
   check('nothing that works out the targets reads a log\'s calories burned', !/active_kcal|activeKcal/.test(food))
   const card = readFileSync('src/components/RecordActivityCard.tsx', 'utf8')
   check('the card never picks an effort for him (EffortBox starts empty)', /<EffortBox effort=\{null\}/.test(card))
+  // HIS 26 NOV RULING: with a heart rate the zone logs it; with none, Easy / Steady / Hard ("Keep Easy/Steady/Hard").
+  const cardCode = card.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  check('with a heart rate zone, one Log button saves the zone\'s own effort word', /\{zone \? \([\s\S]*?onClick=\{\(\) => log\(ZONES\[zone - 1\]\.effort, zone\)\}[\s\S]*?\) : \([\s\S]*?<EffortBox effort=\{null\}/.test(cardCode))
+  check('...the zone is the one the summary charts (same readings, same estimate), and none with a condition ticked', /const zone = samples \? mostlyZone\(zonesFor\(\{ samples, start, end, estimatedMax \}\)\) : null/.test(cardCode) && /const estimatedMax = noHeartBands \? null : estimatedMaxHeartRate\(body\.age\)/.test(cardCode))
+  check('...and the effort question waits for the heart readings (never Easy / Steady / Hard for a moment before the zone)', /\{reading \|\| !figures \|\| !samples \? \(/.test(cardCode) && /useState<HeartReading\[\] \| null>\(null\)/.test(cardCode))
 
   console.log('\n7. Any cardio, started from Exercise; steps and distance only on foot (his words, 27 Nov 2026)')
   {

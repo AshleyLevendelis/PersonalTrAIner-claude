@@ -3,16 +3,16 @@ import { Check, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LiveHeart } from '@/components/LiveHeart'
 import { EffortBox } from '@/components/exercise/CardioSetRow'
-import { WorkoutFigures } from '@/components/WorkoutFigures'
+import { WorkoutFigures, zonesFor } from '@/components/WorkoutFigures'
 import { clockText, type BodyForEstimate } from '@/lib/activity-figures'
 import {
   discardRecording, endRecording, gatherFigures, logRecording, looksForgotten, resumeRecording,
   useRecording, type GatheredFigures,
 } from '@/lib/activity-recording'
-import { effortForRpe, effortLabel } from '@/lib/cardio-effort'
+import { effortForRpe, effortLabel, type EffortKey } from '@/lib/cardio-effort'
 import { tracksSteps } from '@/lib/cardio-kinds'
 import type { CardioLogView } from '@/lib/cardio-log-store'
-import { estimatedMaxHeartRate, type HeartReading } from '@/lib/heart-series'
+import { estimatedMaxHeartRate, mostlyZone, ZONES, type HeartReading } from '@/lib/heart-series'
 import { isPhoneApp } from '@/lib/steps-store'
 import { readWatchHeart } from '@/lib/watch-workouts'
 
@@ -22,8 +22,11 @@ import { readWatchHeart } from '@/lib/watch-workouts'
 // and pressing start"). It is started from the Exercise day's own Start chooser (OwnWorkoutDay) and drawn there; this
 // card is the workout once it has begun. Three states, and nothing at all when no recording is open:
 //   recording  the name, a running clock, the live heart rate when a strap sends, End, and Cancel (which asks once)
-//   ended      THE SUMMARY (WorkoutFigures: tiles, the heart rate graph, time in zones), "How hard was it?" (one tap
-//              logs it), Keep going, Throw it away
+//   ended      THE SUMMARY (WorkoutFigures: tiles, the heart rate graph, time in zones), then the effort. WITH A HEART
+//              RATE (strap first, else the watch: readWatchHeart) the zone he spent longest in and one Log tap (his
+//              26 Nov 2026 "why is it still easy steady or hard, it should be 5 heart rate zones"). WITHOUT ONE (no
+//              reading, no age, or a health condition ticked) "How hard was it?" Easy / Steady / Hard, his ruling the
+//              same day ("Keep Easy/Steady/Hard": nobody can tell a zone by feel). Keep going, Throw it away
 //   logged     the same summary of what was saved, until he taps Done
 // The figures are read once at End; a watch that has not synced yet is said, and filled in later on its own.
 // ---------------------------------------------------------------------------
@@ -31,7 +34,7 @@ import { readWatchHeart } from '@/lib/watch-workouts'
 const cardStyle = { background: 'var(--surface-raised)', border: '1px solid rgba(var(--glow-rgb), .35)' }
 const kicker = 'text-[0.625rem] font-semibold uppercase tracking-[.12em] text-primary-text'
 
-interface Logged { view: CardioLogView; samples: HeartReading[]; start: Date; end: Date; name: string }
+interface Logged { view: CardioLogView; samples: HeartReading[]; start: Date; end: Date; name: string; zone: number | null }
 
 function Title({ name }: { name: string }) {
   const words = name.split(/\s+/)
@@ -56,7 +59,9 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
   const [now, setNow] = useState(() => Date.now())
   const [figures, setFigures] = useState<GatheredFigures | null>(null)
   const [reading, setReading] = useState(false)
-  const [samples, setSamples] = useState<HeartReading[]>([])
+  // Null until the heart readings have been read: the effort question waits for them, so a workout with a heart rate
+  // is never shown Easy / Steady / Hard for the moment before its zone arrives.
+  const [samples, setSamples] = useState<HeartReading[] | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [logged, setLogged] = useState<Logged | null>(null)
@@ -80,11 +85,12 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
   // ENDED: read the phone for the window, once per End (also after an app restart with an ended recording waiting).
   const endedAt = rec?.endedAt ?? null
   useEffect(() => {
-    if (!rec || !rec.endedAt) { setFigures(null); setSamples([]); return }
+    if (!rec || !rec.endedAt) { setFigures(null); setSamples(null); return }
     let live = true
     setReading(true)
+    setSamples(null)
     void gatherFigures(rec, body).then(f => { if (live) { setFigures(f); setReading(false) } })
-    void readWatchHeart({ start: rec.startedAt, end: rec.endedAt }).then(s => { if (live) setSamples(s) })
+    void readWatchHeart({ start: rec.startedAt, end: rec.endedAt }).then(s => { if (live) setSamples(s) }, () => { if (live) setSamples([]) })
     return () => { live = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rec?.startedAt, endedAt])
@@ -111,7 +117,7 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
         />
         <p className="flex items-start gap-1.5 rounded-[12px] bg-primary/10 px-3 py-2.5 text-[0.8125rem] leading-[1.45] text-primary-text" data-record-logged role="status">
           <Check className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-          <span>Logged{felt ? ` · felt ${effortLabel(felt)}` : ''}. It’s on your week and the coach can see it.</span>
+          <span>Logged{logged.zone ? ` · mostly zone ${logged.zone}` : felt ? ` · felt ${effortLabel(felt)}` : ''}. It’s on your week and the coach can see it.</span>
         </p>
         <div className="-my-2 flex justify-end">
           <button type="button" className="min-h-11 px-1 text-[0.8125rem] font-semibold text-primary-text" onClick={() => setLogged(null)} data-record-done>Done</button>
@@ -164,11 +170,16 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
   const minutes = figures?.minutes ?? Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000))
   const missing = figures?.phoneRead ? [onFoot && figures.steps == null && 'steps', figures.kcal == null && 'calories'].filter(Boolean) as string[] : []
 
-  const log = (effort: Parameters<typeof logRecording>[0]['effort']) => {
+  // THE ZONE, when the heart rate gives one: the zone the summary calls "mostly", from the same readings. The effort
+  // stored is that zone's own word (zones 1-2 Easy, 3 Steady, 4-5 Hard: heart-series.ts ZONES), so the week and the
+  // coach read it exactly as they read a tapped effort.
+  const zone = samples ? mostlyZone(zonesFor({ samples, start, end, estimatedMax })) : null
+
+  const log = (effort: EffortKey, byZone: number | null = null) => {
     if (!figures) return
     const view = logRecording({ profileId, date, recording: rec, figures, effort })
     if (!view) { setError("That didn't save. Try again in a moment."); return }
-    setLogged({ view, samples, start, end, name })
+    setLogged({ view, samples: samples ?? [], start, end, name, zone: byZone })
     onLogged?.(view)
   }
 
@@ -179,7 +190,7 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
         <Title name={name} />
       </div>
       {/* Until the phone has answered, "Reading": never a half-empty card that looks like no steps were taken. */}
-      {reading || !figures ? (
+      {reading || !figures || !samples ? (
         <p className="text-sm text-muted-foreground" data-record-reading>Reading your phone…</p>
       ) : (
         <>
@@ -198,11 +209,20 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
           )}
           {!phone && <p className="text-[0.71875rem] text-muted-foreground">Steps, heart rate and calories are read in the phone app.</p>}
           {forgotten && <p className="text-[0.71875rem] text-[color:var(--role-warn-text)]" data-record-forgotten>That ran for over 6 hours. If you forgot to end it, throw it away.</p>}
-          <div>
-            <p className="mb-2 text-[0.9375rem] font-semibold">How hard was it?</p>
-            <EffortBox effort={null} onEffort={log} subject={`the ${name.toLowerCase()}`} />
-            <p className="mt-1.5 text-[0.71875rem] text-text-tertiary">One tap logs it.</p>
-          </div>
+          {zone ? (
+            <div data-record-zone={zone}>
+              <p className="mb-2 text-[0.9375rem] font-semibold">Mostly zone {zone} · {ZONES[zone - 1].word}</p>
+              <Button className="min-h-12 w-full gap-1.5 text-[0.9375rem]" onClick={() => log(ZONES[zone - 1].effort, zone)} data-record-log>
+                <Check className="size-3.5" aria-hidden />Log {name.toLowerCase()}
+              </Button>
+            </div>
+          ) : (
+            <div>
+              <p className="mb-2 text-[0.9375rem] font-semibold">How hard was it?</p>
+              <EffortBox effort={null} onEffort={e => log(e)} subject={`the ${name.toLowerCase()}`} />
+              <p className="mt-1.5 text-[0.71875rem] text-text-tertiary">One tap logs it.</p>
+            </div>
+          )}
         </>
       )}
       {error && <p className="text-[0.75rem] text-destructive" role="alert">{error}</p>}
