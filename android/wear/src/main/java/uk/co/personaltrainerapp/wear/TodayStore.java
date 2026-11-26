@@ -92,7 +92,18 @@ final class TodayStore {
         prefs(c).edit().putInt(watchKey(x), done(c, x) + 1).apply();
     }
 
+    /**
+     * "Next exercise" moved on from this one today with sets left (his 27 Nov 2026 flow: "Log set, Next set, Start rest
+     * timer, Next exercise"). Kept on the watch only: nothing is sent, so the phone's list keeps those sets open and
+     * they can still be done there. Today only.
+     */
+    static boolean skipped(Context c, Exercise x) { return prefs(c).getBoolean(skipKey(x), false); }
+
+    static void skip(Context c, Exercise x) { prefs(c).edit().putBoolean(skipKey(x), true).apply(); }
+
     private static String watchKey(Exercise x) { return "done:" + today() + ":" + x.id; }
+
+    private static String skipKey(Exercise x) { return "skip:" + today() + ":" + x.id; }
 
     private static SharedPreferences prefs(Context c) { return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE); }
 }

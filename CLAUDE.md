@@ -1826,6 +1826,10 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   `generate-meals` deploy for the writer's half
 
 ### His requests of 27 Nov 2026
+- **The watch's lifting flow: his words "next exercise up is ..., Log set, Next set, Start rest timer, Next set, Next
+  exercise", and his ruling "One tap, with options"**: Log set saves the set and starts the rest; the rest offers Next
+  set, or Next exercise after an exercise's last set; Next exercise moves on early (kept on the watch, the phone keeps
+  those sets open). `LiftFlow.java`, `test:watch-flow` (runs it with the JDK), `test:watch-app`. Needs a watch rebuild
 - **Nightshift plus four violet themes: his words "keep the nightshift theme ... replace the current themes with the
   purplish background with red ... purple ... blue or green", and his pick "B: each leans"**: Ruby, Amethyst, Sapphire and
   Emerald, each on Nightshift's violet nudged toward its colour; the other eight themes, the three light ones among them,

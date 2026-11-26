@@ -150,8 +150,16 @@ async function main() {
   check('the watch sends no weight with a set', !/"weight/i.test(strip(read(`${W}MainActivity.java`))))
   check('steps and distance only on foot (walk, run), as the phone records them', /onFoot = "cardio"\.equals\(kind\) && \("Walk"\.equals\(activity\) \|\| "Run"\.equals\(activity\)\)/.test(service))
   const main = strip(read(`${W}MainActivity.java`))
-  check('the lift screen says "Next", the exercise, "sets × reps @ load" and the set', /"NEXT"/.test(main) && /x\.sets \+ " × " \+ x\.reps/.test(main) && /" @ " \+ x\.load/.test(main) && /"Set " \+ setNumber \+ " of " \+ x\.sets/.test(main))
-  check('Set done starts the rest; Start next set ends it', /button\("Set done" \+ rest/.test(main) && /restEndsAt = SystemClock\.elapsedRealtime\(\) \+ x\.restSeconds \* 1000L/.test(main) && /button\("Start next set"/.test(main))
+  // HIS FLOW, 27 Nov 2026 ("One tap, with options"): the words and the order come from LiftFlow, which
+  // test:watch-flow RUNS; these hold that the screens draw what it decides rather than words of their own.
+  check('the lift screen draws LiftFlow\'s kicker, the exercise, "sets × reps @ load" and the set', /kicker\(LiftFlow\.liftKicker\(setNumber\)/.test(main) && /prescriptionRow\(x, /.test(main) && /"Set " \+ setNumber \+ " of " \+ x\.sets/.test(main))
+  check('Log set is ONE tap: it ticks the set and starts the rest', /button\(LiftFlow\.logLabel\(x\), true, R\.drawable\.ic_check, v -> setDone\(s, x\)\)/.test(main) && /restEndsAt = SystemClock\.elapsedRealtime\(\) \+ x\.restSeconds \* 1000L/.test(main))
+  check('the rest\'s button is LiftFlow\'s "Next set" / "Next exercise", and ends the rest', /button\(LiftFlow\.restButton\(same\), true, 0, v -> \{ restEndsAt = 0; showLift\(\); \}\)/.test(main) && /nextLine = text\(LiftFlow\.restLine\(x, setNumber, same\)/.test(main))
+  check('"Next exercise" is offered on the lift screen and, mid-exercise, on the rest', /if \(exerciseAfter\(s, x\) != null\) quiet\("Next exercise", v -> moveOn\(x\)\)/.test(main) && /if \(same && exerciseAfter\(s, x\) != null\) quiet\("Next exercise", v -> moveOn\(x\)\)/.test(main))
+  const moveOn = /private void moveOn\([\s\S]*?\n    \}/.exec(main)?.[0] ?? ''
+  check('moving on is kept on the watch only: nothing is sent, so the phone keeps those sets open', /TodayStore\.skip\(this, x\)/.test(moveOn) && !/PhoneLink/.test(moveOn), moveOn)
+  check('the watch decides "what next" through LiftFlow, with its own counts', /LiftFlow\.next\(s\.exercises, state\)/.test(main) && /TodayStore\.skipped\(MainActivity\.this, x\)/.test(main) && /prefs\(c\)\.getBoolean\(skipKey\(x\), false\)/.test(todayStore) && /"skip:" \+ today\(\)/.test(todayStore))
+  check('...and a move-on is saved, so it holds when the watch screen is reopened', /static void skip\(Context c, Exercise x\) \{ prefs\(c\)\.edit\(\)\.putBoolean\(skipKey\(x\), true\)\.apply\(\); \}/.test(todayStore))
   check('the rest ends with a buzz, once', /if \(!restBuzzed\) \{ restBuzzed = true; buzz\(\); \}/.test(main))
   check('End is tapped twice, so a sleeve does not end a run', /now - endArmedAt < 3000/.test(main))
 

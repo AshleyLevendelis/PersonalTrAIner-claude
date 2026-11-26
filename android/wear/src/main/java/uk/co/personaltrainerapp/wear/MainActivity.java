@@ -67,6 +67,8 @@ public class MainActivity extends Activity {
 
     // Rest, held here: the deadline on the watch's clock that elapses, never the wall clock.
     private long restEndsAt;
+    /** The exercise whose set was logged last: the rest screen says whether the next set is more of it or a new one. */
+    private String restAfterId;
     private boolean restBuzzed;
     private long endArmedAt;
 
@@ -266,15 +268,21 @@ public class MainActivity extends Activity {
         showLift();
     }
 
-    private TodayStore.Exercise nextExercise(TodayStore.Session s) {
-        for (TodayStore.Exercise x : s.exercises) if (TodayStore.done(this, x) < x.sets) return x;
-        return null;
-    }
+    /** Today's sets done and moved on from, as this watch keeps them: what LiftFlow decides with. */
+    private final LiftFlow.State state = new LiftFlow.State() {
+        @Override public int done(TodayStore.Exercise x) { return TodayStore.done(MainActivity.this, x); }
+        @Override public boolean skipped(TodayStore.Exercise x) { return TodayStore.skipped(MainActivity.this, x); }
+    };
 
-    /** "3 × 10 @ 100 kg", "3 × 8-12", "3 × 30s" — the phone's prescription, as the Exercise tab prints it. */
-    static String prescription(TodayStore.Exercise x) {
-        String base = x.sets + " × " + x.reps;
-        return x.load == null || x.load.isEmpty() ? base : base + " @ " + x.load;
+    private TodayStore.Exercise nextExercise(TodayStore.Session s) { return LiftFlow.next(s.exercises, state); }
+
+    private TodayStore.Exercise exerciseAfter(TodayStore.Session s, TodayStore.Exercise x) { return LiftFlow.after(s.exercises, x, state); }
+
+    /** "Next exercise": leave x's remaining sets (the phone keeps them open) and go straight to what comes after. */
+    private void moveOn(TodayStore.Exercise x) {
+        TodayStore.skip(this, x);
+        restEndsAt = 0;
+        showLift();
     }
 
     /** Sets done today, of all the session's sets: the ring on the lifting screens. */
@@ -295,19 +303,22 @@ public class MainActivity extends Activity {
         if (x == null) { showSessionDone(); return; }
         ring.set(sessionFraction(s), MINT);
         int setNumber = TodayStore.done(this, x) + 1;
-        kicker("NEXT", MINT, 0);
+        // "Next exercise up is ..." on a new exercise's first set; "Next set" on the rest of it.
+        kicker(LiftFlow.liftKicker(setNumber), MINT, 0);
         title(x.name, 20, false, 2);
         prescriptionRow(x, 6);
         setDots(x, setNumber, 8);
         heartRow(8);
-        String rest = x.restSeconds > 0 ? " · rest " + duration(x.restSeconds * 1000L) : "";
-        button("Set done" + rest, true, R.drawable.ic_check, v -> setDone(s, x));
+        // ONE TAP logs the set AND starts the rest (his ruling 27 Nov 2026, "One tap, with options").
+        button(LiftFlow.logLabel(x), true, R.drawable.ic_check, v -> setDone(s, x));
+        if (exerciseAfter(s, x) != null) quiet("Next exercise", v -> moveOn(x));
         quiet("End workout", v -> endLift());
         redrawLive();
     }
 
     private void setDone(TodayStore.Session s, TodayStore.Exercise x) {
         int setNumber = TodayStore.done(this, x) + 1;
+        restAfterId = x.id;
         TodayStore.tick(this, x);
         try {
             JSONObject e = new JSONObject();
@@ -336,12 +347,16 @@ public class MainActivity extends Activity {
         restClock = mono("", 60, WatchStyle.NUM, 2);
         TodayStore.Session s = TodayStore.read(this);
         TodayStore.Exercise x = s == null ? null : nextExercise(s);
+        // More of the same exercise, or a new one: the line and the button say which (his "Next set", "Next exercise").
+        boolean same = x != null && x.id.equals(restAfterId);
         if (x != null) {
             int setNumber = TodayStore.done(this, x) + 1;
-            nextLine = text(setNumber == 1 ? "Next: " + x.name + " · " + prescription(x) : "Then set " + setNumber + " of " + x.sets + " · " + x.name, 13, MUTED, 4);
+            nextLine = text(LiftFlow.restLine(x, setNumber, same), 13, MUTED, 4);
         }
         heartRow(8);
-        button("Start next set", true, 0, v -> { restEndsAt = 0; showLift(); });
+        button(LiftFlow.restButton(same), true, 0, v -> { restEndsAt = 0; showLift(); });
+        // Moving on early, mid-exercise: skips the rest AND this exercise's remaining sets.
+        if (same && exerciseAfter(s, x) != null) quiet("Next exercise", v -> moveOn(x));
         redrawLive();
         tick();
     }
@@ -353,7 +368,11 @@ public class MainActivity extends Activity {
         ring.set(1f, MINT);
         badge(R.drawable.ic_check);
         title("Session done", 21, false, 10);
-        text("Every set is ticked. Your phone saves them as its own ticks.", 13, MUTED, 4);
+        TodayStore.Session s = TodayStore.read(this);
+        boolean movedOn = false;
+        if (s != null) for (TodayStore.Exercise e : s.exercises) if (TodayStore.skipped(this, e) && TodayStore.done(this, e) < e.sets) movedOn = true;
+        text(movedOn ? "Sets you moved on from stay open on your phone. Your phone saves the rest as its own ticks."
+            : "Every set is ticked. Your phone saves them as its own ticks.", 13, MUTED, 4);
         button("End workout", true, 0, v -> endLift());
     }
 
@@ -666,11 +685,7 @@ public class MainActivity extends Activity {
 
     private int dp(float v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 
-    static String duration(long ms) {
-        long s = Math.max(0, ms / 1000);
-        long h = s / 3600, m = (s % 3600) / 60, sec = s % 60;
-        return h > 0 ? String.format(Locale.UK, "%d:%02d:%02d", h, m, sec) : String.format(Locale.UK, "%d:%02d", m, sec);
-    }
+    static String duration(long ms) { return LiftFlow.duration(ms); }
 
     private static String word(String effort) {
         return "easy".equals(effort) ? "Easy" : "steady".equals(effort) ? "Steady" : "Hard";
