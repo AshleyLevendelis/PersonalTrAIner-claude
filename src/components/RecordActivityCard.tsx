@@ -14,7 +14,7 @@ import { tracksSteps } from '@/lib/cardio-kinds'
 import type { CardioLogView } from '@/lib/cardio-log-store'
 import { estimatedMaxHeartRate, mostlyZone, ZONES, type HeartReading } from '@/lib/heart-series'
 import { isPhoneApp } from '@/lib/steps-store'
-import { pairedStrap, useLiveHeartRate } from '@/lib/strap-live'
+import { pairedStrap, liveHeartSource, useLiveHeartRate } from '@/lib/strap-live'
 import { startLiveSteps, useLiveSteps, useLiveStepsState } from '@/lib/live-steps'
 import { readWatchHeart } from '@/lib/watch-workouts'
 
@@ -173,7 +173,7 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
           {!phone
             ? 'Timed here. In the phone app it also picks up your steps and heart rate.'
             : liveBpm != null
-            ? 'Heart rate live from your strap.'
+            ? (liveHeartSource() === 'watch' ? 'Heart rate live from your watch.' : 'Heart rate live from your strap.')
             : pairedStrap()
             ? 'Your strap isn’t sending yet: check it’s on and the pads are damp. Your watch’s heart rate fills in when it syncs.'
             : 'Pair your strap for live heart rate: Profile, Steps from your phone, Heart rate strap. Your watch’s heart rate fills in when it syncs.'}

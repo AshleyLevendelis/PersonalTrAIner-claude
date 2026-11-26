@@ -268,7 +268,7 @@ export async function logWatchWorkout(p: {
 export async function readWatchHeart(w: { start: string; end: string }): Promise<{ bpm: number; at: string }[]> {
   try {
     const strap = await import('./strap-live')
-    if (strap.pairedStrap()) {
+    if (strap.hasOwnReadings()) {
       const own = strap.strapSamplesBetween(new Date(w.start), new Date(w.end))
       if (own.length >= 3) return own
     }

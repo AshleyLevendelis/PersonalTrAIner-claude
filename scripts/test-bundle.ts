@@ -259,10 +259,10 @@ console.log('\n1. The libraries are cached separately from the app')
   // with main's moved-sets, testing-week and warm-up work. MEASURED 481 on the merged tree; 9 kB over today.
   // MOVED 25 Nov 2026 again: 490 -> 496. His own workout and "My workouts" merged with main's live heart rate. MEASURED
   // 490 on the merged tree; 6 kB over it.
-  // MOVED 26 Nov 2026: 496 -> 505, the tester-toolkit branch merged with main's watch report, zones and sleep. MEASURED
-  // 497 on the merged tree; 8 kB over today.
-  headroom('a deploy re-downloads', appGzip, 505, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, under 505`, appGzip < 505, appGzip)
+  // MOVED 27 Nov 2026: taking a logged activity off (the row's Remove, the coach's card) and the watch app's phone half (its Exercise part, WatchLink, and the link itself are their own lazy chunks, phone app only). 496 -> 500. MEASURED 495 before them on a clean copy, 496 with them.
+  // MOVED 27 Nov 2026: 500 -> 508, the tester-toolkit branch merged with the watch app. MEASURED 499 on the merged tree.
+  headroom('a deploy re-downloads', appGzip, 508, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, under 508`, appGzip < 508, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -374,11 +374,12 @@ console.log('\n2b. The coach is not on the path to first paint')
   // MOVED 25 Nov 2026: 637 -> 646. Crossed by the cardio-timer, cardio-days and Android-notification branch merged
   // with main's moved-sets, testing-week and warm-up work. MEASURED 637 on the merged tree; 9 kB over today.
   // MOVED 25 Nov 2026 again: 646 -> 652, the same merge (his own workout and the live heart rate). MEASURED 646; 6 over.
-  // MOVED 26 Nov 2026: 652 -> 661, the tester-toolkit branch (consent, the 16+ stop, the last-used day) merged with main's
-  // watch workouts, sleep and heart-rate zones; each passed alone. MEASURED 652 on the merged tree; 9 kB over today.
-  headroom('first paint fetches', firstLoadGzip, 661, 'kB gzipped')
+  // MOVED 27 Nov 2026: 652 -> 656, taking a logged activity off and the watch app's phone half (the watch's own parts
+  // are lazy, phone app only). MEASURED 651 before them on a clean copy, 652 with them.
+  // MOVED 27 Nov 2026: 656 -> 664, the same merge. MEASURED 655 on the merged tree.
+  headroom('first paint fetches', firstLoadGzip, 664, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 661, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 664, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -535,9 +536,11 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 25 Nov 2026, the merge of his own workout with main's live heart rate: 1692. MEASURED 1686 on the merged
   // tree; 6 kB over it.
   // MOVED 25 Nov 2026: 1692 -> 1701, that tree merged with the coach-voice branch. MEASURED 1692; 9 kB over it.
-  // MOVED 26 Nov 2026: 1701 -> 1711, the same merge (tester toolkit with watch workouts, sleep and zones). MEASURED 1702
-  // on the merged tree; 9 kB over it.
-  const APP_CHUNK_BUDGET_KB = 1711
+  // MOVED 27 Nov 2026: 1701 -> 1713, taking a logged activity off (the store's remove and put-back, the row's Remove
+  // line) and the watch app's phone half (its Exercise part is its own lazy chunk). MEASURED 1699 before them on a
+  // clean copy and 1704 with them; 9 kB over today.
+  // MOVED 27 Nov 2026: 1713 -> 1721, the same merge. MEASURED 1712 on the merged tree.
+  const APP_CHUNK_BUDGET_KB = 1721
   // 23 Nov 2026, main merged on top: MEASURED 1635, under the line, so it did not move.
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
@@ -879,8 +882,11 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 26 Nov 2026: 3518 -> 3537, the watch report (its rules are their own lazy chunk, fetched on his tap of
   // "Make the report"; its section rides in the phone health sheet's chunk, phone app only). MEASURED 3517 before it on
   // a clean copy of the branch and 3528 with it; 9 kB over today. First paint and the app chunk did not move (650, 1697).
-  // MOVED 26 Nov 2026: 3537 -> 3572, the tester toolkit merged on top of the above. MEASURED 3563; 9 kB over today.
-  const TOTAL_BUDGET_KB = 3572
+  // MOVED 27 Nov 2026: 3537 -> 3560, the same two changes: the coach's removal card, the matcher, and the watch link
+  // and its Exercise part (lazy chunks, phone app only). MEASURED 3533 before them on a clean copy, 3551 with them; 9 kB
+  // over today.
+  // MOVED 27 Nov 2026: 3560 -> 3590, the same merge. MEASURED 3581 on the merged tree.
+  const TOTAL_BUDGET_KB = 3590
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)

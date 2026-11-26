@@ -89,6 +89,9 @@ export const COACH_ACTIONS: Record<string, CoachAction> = {
   propose_injury_recovered: { family: 'plan', screen: 'screen', card: 'propose_injury_recovered', rule: none('ends a change he has; nothing new is added') },
   propose_equipment_adaptation: { family: 'plan', screen: 'screen', card: 'propose_equipment_adaptation', rule: { words: ['kit'] } },
   propose_missed_session: { family: 'day', screen: 'screen', card: 'propose_missed_session', rule: none('a past day only; offer-still-holds refuses a trained day') },
+  // A LOGGED ACTIVITY TAKEN OFF ITS DAY (27 Nov 2026, his "I accidentally added a walk today. Remove it"): a log
+  // already made, named on the card before Apply; the screen's Remove on the same row does the same.
+  propose_cardio_remove: { family: 'logging', screen: 'screen', card: 'propose_cardio_remove', rule: none('a log already made; the card names the log before Apply') },
   propose_circuit_log: { family: 'logging', screen: 'screen', card: 'propose_circuit_log', rule: none('built only from rounds, times and effort in his words (message-evidence)') },
   propose_cardio_log: { family: 'logging', screen: 'screen', card: 'propose_cardio_log', rule: none('past-tense cardio in his words (message-evidence)') },
   log_workout_session: { family: 'logging', screen: 'screen', rule: none('a session he says he did; written with an Undo') },

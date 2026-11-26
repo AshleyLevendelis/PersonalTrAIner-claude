@@ -1,0 +1,58 @@
+apply plugin: 'com.android.application'
+
+// THE WATCH APP (27 Nov 2026; docs/plans/watch-app.md, his "Go in the watch with your recommendations"). Google pairs a
+// watch app with its phone app only when both carry the SAME application id and are signed with the SAME key, so this
+// reads the phone's keystore.properties exactly as app/build.gradle does. It goes in the same Play listing as a Wear OS
+// version. Java and plain views, no Kotlin: the project has no Kotlin set up, and one language is one less thing to
+// break on his machine.
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+android {
+    namespace = "uk.co.personaltrainerapp.wear"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "uk.co.personaltrainerapp"
+        // Wear OS 3 is Android 11 (API 30); the Galaxy Watch 7 runs Wear OS 5 (API 34).
+        minSdkVersion 30
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        // Its own number range, so a phone build and a watch build never share a version code in the one listing.
+        versionCode 1001
+        versionName "1.0-watch"
+    }
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled false
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // Live heart rate, steps, distance and calories during a workout (Health Services on Wear OS).
+    implementation "androidx.health:health-services-client:1.0.0"
+    // The watch's own Bluetooth link to the phone app (the Data Layer).
+    implementation "com.google.android.gms:play-services-wearable:19.0.0"
+    // ListenableFuture, which Health Services returns.
+    implementation "com.google.guava:guava:33.3.1-android"
+    implementation "androidx.core:core:$androidxCoreVersion"
+}

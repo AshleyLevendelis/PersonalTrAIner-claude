@@ -288,7 +288,7 @@ async function main() {
     const plugin = readFileSync('android/app/src/main/java/uk/co/personaltrainerapp/StepCounterPlugin.java', 'utf8')
     const js = readFileSync('src/lib/live-steps.ts', 'utf8')
     const pluginName = (plugin.match(/name = "([A-Za-z]+)"/) ?? [])[1]
-    check('the step counter is registered before the app starts, under the name the app asks for', /registerPlugin\(StepCounterPlugin\.class\);\s*super\.onCreate/.test(main) && !!pluginName && js.includes(`registerPlugin<Plugin>('${pluginName}')`), pluginName)
+    check('the step counter is registered before the app starts, under the name the app asks for', main.indexOf('registerPlugin(StepCounterPlugin.class)') >= 0 && main.indexOf('registerPlugin(StepCounterPlugin.class)') < main.indexOf('super.onCreate') && !!pluginName && js.includes(`registerPlugin<Plugin>('${pluginName}')`), pluginName)
     check('...it reads the phone\'s own counter, sends "step" events, and asks only for Physical activity', /Sensor\.TYPE_STEP_COUNTER/.test(plugin) && /notifyListeners\("step"/.test(plugin) && /addListener\(e: 'step'/.test(js) && (plugin.match(/Manifest\.permission\.[A-Z_]+/g) ?? []).every(p => p === 'Manifest.permission.ACTIVITY_RECOGNITION'))
   }
 

@@ -163,7 +163,8 @@ import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
 import { getAllItems as getAllGroceryItems, addItemLocal, setCheckedLocal, undoAddLocal, deleteItemLocal, restoreRowsLocal, type GroceryItemRow, type GroceryCategory } from '@/lib/grocery-store'
 import { GROCERY_AISLE_LABEL, chatGroceryAmount } from '@/lib/grocery-display'
 import { logWater, undoLog as undoWaterLog, subscribeWaterStore } from '@/lib/water-store'
-import { subscribeCardioLogStore, deleteCardioLog, isPlausibleCardioDuration, isPlausibleDistanceKm } from '@/lib/cardio-log-store'
+import { subscribeCardioLogStore, deleteCardioLog, isPlausibleCardioDuration, isPlausibleDistanceKm, getCardioLogsForDateMerged, removeCardioLog, restoreCardioLog, type CardioLogView } from '@/lib/cardio-log-store'
+import { matchLoggedActivity } from '@/lib/cardio-remove'
 import { subscribeMealStore } from '@/lib/meal-store'
 import { easyRanHard } from '@/lib/heart-trends'
 import { estimatedMaxHeartRate } from '@/lib/heart-series'
@@ -323,6 +324,9 @@ const UNTAGGED_ALLERGEN_HIDDEN_FORMS: Record<string, string> = {
   sulphite: 'dried fruit, wine, and wine vinegar',
   sulphites: 'dried fruit, wine, and wine vinegar',
 }
+
+/** What propose_cardio_remove's card carries to Apply and Undo: the log as it was, so Undo can put it back. */
+interface CardioRemovePayload { date: string; dayWord: string; line: string; log: CardioLogView }
 
 interface FavoriteMeal {
   name: string
@@ -4726,6 +4730,47 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * cannot have been missed — that is a move or a rest, and the refusal
    * says so.
    */
+  /**
+   * Builds propose_cardio_remove's card — "take today's Walk · 5 min · Easy off your log" (27 Nov 2026, his report:
+   * "I accidentally added a walk today. Remove it", and the coach could only search the session's exercises). The
+   * log is found on the day by his words (matchLoggedActivity); the card names it before Apply, and Apply removes it
+   * through the same function as the row's Remove on Exercise. The last two weeks only; nothing else changes.
+   */
+  const buildCardioRemoveProposal = async (rawArgs: Record<string, unknown>): Promise<{
+    ok: true
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: CardioRemovePayload
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | { ok: false; reason: string }> => {
+    const date = typeof rawArgs.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawArgs.date) ? rawArgs.date : activeSession.date
+    const delta = (new Date(`${date}T00:00:00`).getTime() - new Date(`${activeSession.date}T00:00:00`).getTime()) / 86_400_000
+    if (!Number.isFinite(delta) || delta > 0 || delta < -14) return { ok: false, reason: 'I can only take off something logged in the last two weeks.' }
+    const dayWord = delta === 0 ? 'today' : new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long' })
+    const said = String(rawArgs.activity ?? '').trim()
+    let logs: CardioLogView[] = []
+    try { if (profile.id) logs = await getCardioLogsForDateMerged(profile.id, date) } catch { /* said below */ }
+    const lineOf = (l: CardioLogView) => cardioReadback({ activity: l.activity_name ?? 'Activity', minutes: l.duration_minutes, rpe: l.intensity_rpe, distanceKm: l.distance_km == null ? null : Number(l.distance_km) })
+    if (logs.length === 0) return { ok: false, reason: `There's nothing logged ${delta === 0 ? 'today' : `on ${dayWord}`} to take off.` }
+    const hits = matchLoggedActivity(said, logs)
+    if (hits.length === 0) return { ok: false, reason: `I couldn't find "${said || 'that'}" logged ${delta === 0 ? 'today' : `on ${dayWord}`}. It has: ${logs.map(lineOf).join(', ')}.` }
+    if (hits.length > 1) return { ok: false, reason: `${delta === 0 ? 'Today' : dayWord} has ${hits.length} of those: ${hits.map(lineOf).join(' and ')}. Which one?` }
+    const log = hits[0]
+    const line = lineOf(log)
+    return {
+      ok: true,
+      scopeKey: `${profile.id}:propose_cardio_remove:${date}:${log.id ?? log.clientId ?? line}`,
+      preconditions: { date, logId: log.id ?? null, clientId: log.clientId ?? null },
+      payload: { date, dayWord, line, log },
+      diff: {
+        lead: ask(`take **${line}** off ${delta === 0 ? "today's" : `${dayWord}'s`} log`),
+        rows: [{ field: delta === 0 ? 'Today' : dayWord, before: line, after: 'Removed' }],
+        implications: [{ severity: 'info', text: 'Nothing else changes: your plan and your sessions stay as they are.' }],
+        reversible: true,
+      },
+    }
+  }
+
   const buildMissedSessionProposal = (rawArgs: Record<string, unknown>): {
     scopeKey: string
     preconditions: Record<string, unknown>
@@ -7046,10 +7091,25 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           advice = banAdvice(String((bn.payload as { exerciseName?: unknown }).exerciseName ?? result.proposal.rawArgs.item ?? ''))
         }
         else refusal = bn.reason
+      } else if (result.proposal.kind === 'propose_cardio_remove' && result.proposal.rawArgs) {
+        const cr = await buildCardioRemoveProposal(result.proposal.rawArgs)
+        if (cr.ok) built = { scopeKey: cr.scopeKey, preconditions: cr.preconditions, payload: cr.payload as unknown as Record<string, unknown>, diff: cr.diff }
+        else refusal = cr.reason
       } else if (result.proposal.kind === 'propose_exercise_remove' && result.proposal.rawArgs) {
         const rm = buildExerciseRemoveProposal(result.proposal.rawArgs)
         if (rm.ok) { built = { scopeKey: rm.scopeKey, preconditions: rm.preconditions, payload: rm.payload as unknown as Record<string, unknown>, preImage: rm.preImage, diff: rm.diff }; advice = rm.advice }
-        else refusal = rm.reason
+        else {
+          // A LOGGED ACTIVITY IS NOT ON THE PLAN (27 Nov 2026, his "I accidentally added a walk today. Remove it",
+          // answered "I couldn't match Walk to anything on Thursday"): when the named thing is not in the session
+          // but IS logged on that day, the card offers to take the log off. Only for today, the day a log is made.
+          const rawDay = String(result.proposal.rawArgs.day ?? '').trim().toLowerCase()
+          const today = !rawDay || rawDay === 'today' || rawDay === new Date(`${activeSession.date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
+          const logged = today ? await buildCardioRemoveProposal({ date: activeSession.date, activity: result.proposal.rawArgs.item }) : null
+          if (logged?.ok) {
+            built = { scopeKey: logged.scopeKey, preconditions: logged.preconditions, payload: logged.payload as unknown as Record<string, unknown>, diff: logged.diff }
+            kindOverride = 'propose_cardio_remove'
+          } else refusal = rm.reason
+        }
       } else if (result.proposal.kind === 'propose_exercise_reorder' && result.proposal.rawArgs) {
         const ro = buildExerciseReorderProposal(result.proposal.rawArgs)
         if (ro.ok) { built = { scopeKey: ro.scopeKey, preconditions: ro.preconditions, payload: ro.payload as unknown as Record<string, unknown>, preImage: ro.preImage, diff: ro.diff }; advice = ro.advice }
@@ -8627,6 +8687,15 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
       undoToken = ok ? row.id : undefined
       if (ok) onMesocycleUpdated(result.mesocycle)
+    } else if (row.kind === 'propose_cardio_remove') {
+      // THE ROW'S OWN REMOVE (CardioSetRow): one road for the screen and the coach.
+      const payload = row.payload as unknown as CardioRemovePayload
+      const ok = await removeCardioLog(payload.log).catch(() => false)
+      receipt = ok ? { landed: [payload.line], failed: [] } : { landed: [], failed: [{ op: 'propose_cardio_remove', error: "it didn't come off" }] }
+      title = ok ? RECEIPTS['propose_cardio_remove'].done : RECEIPTS['propose_cardio_remove'].failed
+      rows = ok ? [{ label: payload.line, detail: payload.dayWord === 'today' ? 'Today' : payload.dayWord }] : []
+      undoToken = ok ? row.id : undefined
+      if (ok) onLogsUpdated?.()
     } else if (row.kind === 'propose_missed_session') {
       const payload = row.payload as unknown as MissedSessionPayload
       const result = await executeMissedSession(profile, payload)
@@ -9084,6 +9153,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         if (!preImage) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
         await undoSessionEdit(profile.id, preImage, payload.weekNumber, (row.result?.scope as SwapScope | undefined) ?? payload.scope, planCreatedAt ?? profile.created_at ?? new Date().toISOString())
         onMesocycleUpdated(preImage)
+      } else if (row.kind === 'propose_cardio_remove') {
+        // Puts the log back as it was. AN UNDO IS A WRITE: one that did not save says so and keeps its button.
+        const back = restoreCardioLog((row.payload as unknown as CardioRemovePayload).log)
+        onLogsUpdated?.()
+        if (!back) return { refused: RECEIPTS_UNDONE.failed, keep: true }
       } else if (row.kind === 'propose_missed_session') {
         // AN UNDO IS A WRITE (27 Oct 2026): one that did not save says so and keeps its button, never "undone".
         const undone = await undoMissedSession(profile.id, row.payload as unknown as MissedSessionPayload)
