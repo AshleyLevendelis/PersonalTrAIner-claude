@@ -1831,6 +1831,13 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   an age under 16, however setup gets it, replaces setup with a stop screen and no account is made; "I entered my
   birthday wrong" asks again (`minimum-age.ts`). **And the birthday must be answered: his ruling the same day, "Must
   answer"** (no Skip). `verify:under-age`, `test:onboarding-slots`
+- **An account unused for two years is deleted, with an email a month before: his ruling 26 Nov 2026, "Delete after 2
+  years, email first"** (over 1 year and over keeping it): the app marks each day it is opened; a nightly job warns at
+  23 months ONLY when the email can be sent (no warning queued, no deletion of anyone with an address), deletes at two
+  years 28+ days after the warning, deletes an account with no email unwarned, and quietly drops an old plan left by
+  "New Plan" while its owner is active. `test:rls-local` §13, `test:report-email` §9, `verify:app-boot`. Needs migration
+  20261126130000, the `report-email` deploy, Resend allowed to send to any address (a verified domain), then the Vault
+  secret `inactive_warning_ready` = yes (until then nobody with an email is warned or deleted)
 - **Tester data is kept 90 days (activity) and 1 year (reports): his ruling 26 Nov 2026** (over 30 days and over a year for
   everything): a nightly clean-up only the database can run. `test:rls-local` §12. Needs migration 20261126120000
 

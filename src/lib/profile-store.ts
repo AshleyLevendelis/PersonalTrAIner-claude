@@ -56,3 +56,17 @@ export async function saveTesterConsent(profileId: string, on: boolean): Promise
   if (isMissingColumnError(error, 'tester_since')) return { result: 'not-yet', since: null }
   throw error
 }
+
+/**
+ * TODAY IS A DAY THE APP WAS USED (his ruling 26 Nov 2026: an account unused for two years is deleted, with an email a
+ * month before; migration 20261126130000). Written once a day, on the first open, and never waited on. A failure
+ * costs nothing today (the next open writes it again), and before the migration the column is simply not there.
+ */
+export async function markProfileActive(profileId: string, today: string, lastActiveOn: string | null): Promise<void> {
+  if (lastActiveOn === today) return
+  try {
+    await supabase.from('fitness_profiles').update({ last_active_on: today }).eq('id', profileId)
+  } catch {
+    // Best effort: see above.
+  }
+}

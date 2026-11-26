@@ -73,7 +73,7 @@ import { readBootSnapshot, saveBootSnapshot, clearBootSnapshot, type BootSnapsho
 import { ensureSignedIn, claimProfile, hasClaimedOnThisPhone, markClaimedOnThisPhone, shouldAskForEmail, findOwnedProfileId, describeSignInFailure, AUTH_LINK_AT_LOAD, reloadApp } from '@/lib/auth'
 import { SetNewPasswordScreen } from '@/components/SetNewPasswordScreen'
 import { rebuildFromCurrentWeek, detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
-import { updateProfileField, savePlanPause } from '@/lib/profile-store'
+import { updateProfileField, savePlanPause, markProfileActive } from '@/lib/profile-store'
 import { setPlanPausedSince, PAUSE_WORDS, setPlanPauseHandler } from '@/lib/plan-pause'
 import { SignInScreen } from '@/components/SignInScreen'
 import { WelcomeScreen } from '@/components/WelcomeScreen'
@@ -1158,6 +1158,8 @@ function App() {
     // ASKED for an email next time they open the app, dismissibly — not
     // walled behind a login screen mid-training-block.
     void shouldAskForEmail().then(setAskForEmail)
+    // TODAY IS A DAY IT WAS USED (his ruling 26 Nov 2026): an account unused for two years is deleted, warned first.
+    void markProfileActive(profileRow.id, todayLocal(), typeof profileRow.last_active_on === 'string' ? profileRow.last_active_on : null)
 
     const savedProfile: UserProfile = {
       id: profileRow.id,

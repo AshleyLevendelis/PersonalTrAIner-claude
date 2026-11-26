@@ -192,6 +192,32 @@ export function buildDigestEmail(events: DigestEvent[], now: Date): { subject: s
   return { subject, text }
 }
 
+// THE WARNING BEFORE AN UNUSED ACCOUNT IS DELETED (his ruling 26 Nov 2026, "Delete after 2 years, email first";
+// migration 20261126130000). Sent to the PERSON, not to Ashley. It names the day and the one thing that stops it.
+const APP_ADDRESS = 'https://personal-tr-a-iner-claude-yco8.vercel.app'
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const DATE_SHAPE = /^\d{4}-\d{2}-\d{2}$/
+
+export function buildInactiveWarningEmail(w: { email?: string; name?: string | null; delete_on?: string }): { to: string; subject: string; text: string } | null {
+  const to = (w.email ?? '').trim()
+  if (!EMAIL_SHAPE.test(to) || !w.delete_on || !DATE_SHAPE.test(w.delete_on)) return null
+  const day = new Date(`${w.delete_on}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+  const name = (w.name ?? '').trim().slice(0, 30)
+  return {
+    to,
+    subject: `Your Personal TrAIner account will be deleted on ${day}`,
+    text: [
+      `${name ? `Hi ${name},` : 'Hi,'}`,
+      ``,
+      `You haven't opened Personal TrAIner for nearly two years, so on ${day} your account and everything in it (your plan, logs, meals and chat) will be deleted.`,
+      ``,
+      `To keep it, just open the app before then: ${APP_ADDRESS}`,
+      ``,
+      `If you're happy for it to go, you don't need to do anything.`,
+    ].join('\n'),
+  }
+}
+
 export interface ReportEmailDeps {
   secret: string
   apiKey: string
@@ -220,6 +246,18 @@ export async function handleReportEmail(
     if (events == null) return { status: 502, result: 'could not read events' }
     mail = buildDigestEmail(events, now)
     if (!mail) return { status: 200, result: 'nothing to send' }
+  } else if (kind === 'inactive_warning') {
+    const warning = buildInactiveWarningEmail(body as { email?: string; name?: string | null; delete_on?: string })
+    if (!warning) return { status: 400, result: 'not a warning' }
+    const res = await deps.send({
+      url: 'https://api.resend.com/emails',
+      init: {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${deps.apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: deps.from, to: [warning.to], subject: warning.subject, text: warning.text }),
+      },
+    })
+    return res.ok ? { status: 200, result: 'sent' } : { status: 502, result: `mail service said ${res.status}` }
   } else if (kind === 'tester_report') {
     const record = (body as { record?: TesterReportRow } | null)?.record
     mail = record ? buildTesterReportEmail(record) : null

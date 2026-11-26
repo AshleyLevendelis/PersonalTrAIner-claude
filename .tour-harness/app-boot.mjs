@@ -67,6 +67,11 @@ const open = async (label, extra = '') => {
 console.log(`\nOPENING THE APP, every database answer ${SLOW} ms\n`)
 await ev(`(() => { try { localStorage.clear() } catch {} })()`)
 const first = await open('first open on this phone')
+// TODAY IS A DAY IT WAS USED (his ruling 26 Nov 2026: an account unused for two years is deleted, warned first). The
+// stored profile carries no last-used day; opening the app writes one. Its value is the app's own today, so only its
+// shape is read here (no harness file reads the calendar).
+for (let i = 0; i < 30 && !(await ev(`!!(window.__fakeDb?.fitness_profiles ?? [])[0]?.last_active_on`)); i++) await wait(100)
+const lastActive = await ev(`(window.__fakeDb?.fitness_profiles ?? [])[0]?.last_active_on ?? null`)
 const again = await open('re-open                 ')
 // THE FIRST OPEN OF A NEW DAY: everything kept from before, except Home's snapshot of TODAY (it is keyed by date).
 await ev(`(() => { for (const k of Object.keys(localStorage)) if (/dashboard/i.test(k)) localStorage.removeItem(k) })()`)
@@ -96,6 +101,7 @@ check('a re-open with no signal still draws Home, from the copy kept on the phon
 check('...and the phone still knows whose profile it holds', offlineKeptId === '00000000-0000-4000-8000-00000000b007', { offlineKeptId, offlineText })
 check('no signal and nothing kept: it says so and offers Try again, never setup', !!bare.error && /Nothing is lost/.test(bare.error) && !bare.setup, bare)
 check('...and the phone still knows whose profile it holds', bare.id === '00000000-0000-4000-8000-00000000b007', bare)
+check('opening the app records today as a day it was used', typeof lastActive === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(lastActive), lastActive)
 check('no uncaught error on the page', pageErrors.length === 0, pageErrors)
 
 console.log(`\n${ran} checks ran. ${failures === 0 ? 'The app opens straight onto Home.' : `${failures} check(s) FAILED.`}\n`)

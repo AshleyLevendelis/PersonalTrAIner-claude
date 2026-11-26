@@ -2,6 +2,26 @@
 
 Newest first. One line each.
 
+- [x] **AN UNUSED ACCOUNT IS DELETED AFTER TWO YEARS, WITH AN EMAIL A MONTH BEFORE (26 Nov 2026).** His ruling, from
+  three options: "Delete after 2 years, email first" (over one year, and over keeping it until they delete it). The
+  privacy draft now has every time limit; its open items are only his address and email, the storage region, and a
+  qualified review. Built: the app writes "last used" once a day on open (`last_active_on`, every existing row starts
+  on the day the migration runs, so nobody is counted idle for time before it existed); a nightly database job
+  (`prune_inactive_accounts`, 03:41 UTC) emails a warning at 23 months idle, naming the day (two years from last use,
+  never sooner than 28 days away), and deletes at two years once the warning is 28+ days old; coming back cancels a
+  warning. Decided by me, recorded here: (1) a warning is recorded ONLY when the email is actually queued, so with email
+  not set up nobody who has an address is ever deleted; (2) an account with no email (an anonymous one) is deleted at
+  two years with no warning, as his option said; (3) an old plan left behind by "New Plan" while its owner uses a newer
+  one is deleted at two years with no email, because their account is not going and "your account will be deleted"
+  would be false; (4) the sign-in goes only once its owner has no profile left. The email goes to the PERSON (the
+  report function had only ever written to Ashley). Checks: `test:rls-local` §13 (eleven people, each on one side of
+  one rule, run with and without email; 13 mutations, all caught), `test:report-email` §9 (7 checks, 4 mutations),
+  `verify:app-boot` (the open writes the day; 2 mutations). The email's words are mine and are his to change. NEEDS:
+  migration 20261126130000 via db:push-both, the `report-email` deploy, and Resend set up to send to any address
+  (today it may only send to his own: a domain verified in Resend, and its sender in REPORT_EMAIL_FROM). THEN, and only
+  then, the Vault secret `inactive_warning_ready` = yes: until it exists no warning is sent, because Resend's test sender
+  would refuse it AFTER the job had recorded it, and the account would be deleted unwarned (found writing the handover;
+  `test:rls-local` §13 holds it, 1 more mutation, caught).
 - [x] **THE APP IS FOR 16 AND OVER, AND SETUP NOW SAYS SO (26 Nov 2026).** His ruling, from four options: "16+, setup
   stops younger" (over 18+, over 13+, and over the privacy policy stating an age that nothing checks). Before this
   setup took a date of birth and let any age through (the floor was 13, the card's own limit). Now an age under 16,

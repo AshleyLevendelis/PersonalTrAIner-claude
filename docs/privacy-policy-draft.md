@@ -63,7 +63,8 @@ We do not collect your location. We do not sell your data, and the app shows no 
 ## How long we keep it
 
 Until you delete it or your account, except: tester recording is deleted after 90 days, and reports you send after one
-year. [Decide: a time limit for inactive accounts.]
+year. If you don't open the app for two years, your account and everything in it are deleted; if we have your email
+address, we email you a month before.
 
 ## Children
 
@@ -89,7 +90,7 @@ Last updated: [date].
 2. ~~Gemini training~~: paid, billing on (your answer, 26 Nov 2026); the policy says messages are not used for
    training. Check AI Studio shows billing on before publishing.
 3. ~~Tester data~~: activity 90 days, reports 1 year (your ruling, 26 Nov 2026); a nightly clean-up deletes older
-   rows. Still open: inactive accounts.
+   rows. ~~Inactive accounts~~: deleted after 2 years unused, with an email a month before (your ruling, 26 Nov 2026).
 4. ~~Minimum age~~: 16, and setup stops younger (your ruling, 26 Nov 2026). The birthday can't be skipped (your
    ruling, the same day).
 5. A qualified review: health data plus an AI coach is the part a reviewer will look at hardest.

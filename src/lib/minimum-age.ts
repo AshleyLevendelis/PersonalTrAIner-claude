@@ -6,7 +6,7 @@
 // One rule, read by setup (and by any later check), so the number lives in one place.
 // ---------------------------------------------------------------------------
 
-export const MINIMUM_AGE = 16
+const MINIMUM_AGE = 16
 
 /** True when an age has been given and it is under the minimum. A blank or unreadable age is not under it. */
 export function isUnderMinimumAge(age: unknown): boolean {
