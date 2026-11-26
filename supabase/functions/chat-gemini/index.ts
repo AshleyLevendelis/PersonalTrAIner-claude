@@ -1553,6 +1553,29 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_cardio_remove",
+    description:
+      "PROPOSES taking a LOGGED activity (a walk, run, ride, swim, class or any cardio already logged) off a day, when they say it was logged by mistake or should not be there ('I accidentally added a walk today, remove it', 'delete the run I logged yesterday'). This does NOT apply anything: the app finds the log on that day, names it on a card and they tap Apply, with an Undo after. It is NEVER propose_exercise_remove: that takes an exercise out of the PLAN's session, and a logged walk is not on the plan.",
+    parameters: {
+      type: "object",
+      properties: {
+        date: {
+          type: "string",
+          description: "The day it was logged on, as YYYY-MM-DD, worked out from today's date in the context ('yesterday' is today minus one). Today when they do not say.",
+        },
+        activity: {
+          type: "string",
+          description: "The activity in their words ('walk', 'the run'). The app matches it against that day's logged activities.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for it to be removed. Copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["activity", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_missed_session",
     description:
       "PROPOSES recording a prescribed training day as MISSED — the session did not happen and nothing replaced it — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they tell you they skipped or missed a session and are not calling it a rest ('I missed yesterday', 'didn't train Monday', 'skipped it', 'mark it missed'). It is NOT propose_rest_day: that records a rest they chose, this records a miss, and the week keeps counting it — Ashley's ruling, a missed day stays missed. It is NOT propose_session_activity_swap: if they name something they did instead, use that. It is NOT propose_session_move: if the session is still happening later this week, use that. Do not call it for a day with no session prescribed, for a session they already logged, for a day that has not happened yet, or for a question ('does that count as missed?' — answer it).",
@@ -2996,6 +3019,7 @@ SESSION-WINDOW REASONING (do this yourself, every turn): read the current time f
 - WHEN YOU ARE THE ONE PICKING THE REPLACEMENT — suggesting alternatives for a pain swap (§3), or when they ask for "something different" without naming what — prefer whichever same-pattern, same-tier option keeps genuine external load (barbell, dumbbell, cable, machine) over a resistance band or a bodyweight-only variation, when both are realistic for their Equipment Access above: a band or unloaded variation cannot be progressively overloaded the way a loaded one can. Three things this does NOT override: if they name the replacement themselves, that is theirs to choose and you give it to them, loaded or not; if pain calls for LESS load, that governs and you say so; and never suggest anything on PERMANENTLY EXCLUDED EXERCISES above or anything their Equipment Access could not plausibly supply.
 - When calling propose_exercise_swap, put the reasoning in the "reason" field (movement pattern, why it preserves stimulus, trade-offs) — the app shows the user a confirm card with the exact before/after, so do NOT also ask "Shall I make this change?" in your own text; the card IS the confirmation step, asking again is redundant and the card can be confirmed without you being told.
 - Trigger propose_exercise_add when they want to DO something the session does not contain ("add some face pulls", "can I put curls in on Thursday", "I want more calf work"). ADDING IS NOT LOGGING and the distinction matters: log_workout records something already done and it never joins the plan, while this puts the exercise IN the session so it is prescribed and progressed. Adding takes nothing out — if they name something to drop in exchange, that is propose_exercise_swap. The session gets longer and the card says the new length; never offer to cut something else to make room, and never say by how much yourself — the card does the arithmetic.
+- Trigger propose_cardio_remove when they want a LOGGED activity off a day ("I accidentally added a walk today, remove it", "delete the run I logged"). A logged walk, run or class is not on the plan, so it is never propose_exercise_remove.
 - Trigger propose_exercise_remove when they want ONE exercise out of ONE session and name nothing to replace it ("drop the leg press", "take the calf raises out today"). Removing is not banning — a ban is every week of every block, and that is ban_exercise. If they name a replacement, that is propose_exercise_swap.
 - Trigger propose_exercise_reorder when they want a different ORDER ("do the rows before the bench press", "curls last"). Always pass before_item or after_item naming ANOTHER exercise in that session; never a count of positions. If you cannot pin the destination to a named exercise, ask which one it should sit next to — do not guess.
 - For ban_exercise: the app shows a card stating how many sessions the ban reaches, and they tap Confirm. Never say it is done before that — and never quote a number of sessions yourself; the card carries the app's own count.
@@ -4069,6 +4093,20 @@ Keep this context in mind to ensure your greetings and questions naturally align
             proposal: {
               kind: "propose_rest_day",
               rawArgs: { date: args.date, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_cardio_remove") {
+        // Proposal, not a write: the app finds the log on that day, names it on the card and removes it on Apply.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_cardio_remove",
+              rawArgs: { date: args.date, activity: args.activity },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

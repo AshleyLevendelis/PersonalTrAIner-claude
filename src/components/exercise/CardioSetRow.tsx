@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Check } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import {
-  saveCardioLog, deleteCardioLog, isCardioLogUndoable, isPlausibleCardioDuration,
+  saveCardioLog, deleteCardioLog, isCardioLogUndoable, isPlausibleCardioDuration, removeCardioLog, restoreCardioLog,
   MAX_PLAUSIBLE_CARDIO_MINUTES, isPlausibleDistanceKm, MAX_PLAUSIBLE_DISTANCE_KM, getCardioLogsForDateMerged, subscribeCardioLogStore,
   type CardioLogView,
 } from '@/lib/cardio-log-store'
@@ -103,21 +103,57 @@ const sameLog = (a: CardioLogView, b: CardioLogView) =>
 export function useCardioReceiptsToday(claimed: readonly (string | null | undefined)[]): {
   receipts: CardioLogView[]
   hide: (log: CardioLogView) => void
+  /** Logs taken off with Remove, each kept for its "removed · Undo" line. Here, not in CardioReceipts, so a screen
+   *  that hides itself when nothing is logged still draws the line (the Exercise tab's Additional work does). */
+  removed: RemovedCardio[]
+  setRemoved: (f: (r: RemovedCardio[]) => RemovedCardio[]) => void
 } {
   const logs = useCardioLogsToday()
   const [undone, setUndone] = useState<CardioLogView[]>([])
+  const [removed, setRemoved] = useState<RemovedCardio[]>([])
   return {
     receipts: unclaimedCardio(logs.filter(l => !undone.some(u => sameLog(u, l))), claimed),
     hide: log => setUndone(u => [...u, log]),
+    removed,
+    setRemoved,
   }
 }
 
-/** The receipts as rows — "✓ skipping rope · 12 min · Steady" with Undo. Draws nothing when there are none. */
-export function CardioReceipts({ receipts, hide, testid }: ReturnType<typeof useCardioReceiptsToday> & { testid: string }) {
-  if (receipts.length === 0) return null
+type RemovedCardio = { log: CardioLogView; line: string }
+
+/**
+ * The receipts as rows — "✓ skipping rope · 12 min · Steady" with Undo. Draws nothing when there are none.
+ *
+ * AND REMOVE, ONCE UNDO HAS GONE (27 Nov 2026, his report: "I accidentally added a walk today. Remove it", ten minutes
+ * too late for Undo, and nothing on screen or in the chat could take it off). The row then offers Remove; a removed
+ * log leaves one line, "Walk · 5 min removed", with Undo, which puts it back as it was (his 8 Nov "Undo line" for a
+ * logged meal taken off, applied to a logged activity).
+ */
+export function CardioReceipts({ receipts, hide, removed, setRemoved, testid }: ReturnType<typeof useCardioReceiptsToday> & { testid: string }) {
+  const [error, setError] = useState<string | null>(null)
+  if (receipts.length === 0 && removed.length === 0) return null
+  const putBack = (entry: RemovedCardio) => {
+    setError(null)
+    if (!restoreCardioLog(entry.log)) { setError("That didn't go back. Try again in a moment."); return }
+    setRemoved(r => r.filter(x => x !== entry))
+  }
   return (
     <div className="space-y-1" data-testid={testid}>
-      {receipts.map(r => <CardioReadback key={r.clientId ?? r.id} log={r} onUndone={() => hide(r)} />)}
+      {receipts.map(r => (
+        <CardioReadback
+          key={r.clientId ?? r.id}
+          log={r}
+          onUndone={() => hide(r)}
+          onRemoved={line => { hide(r); setRemoved(x => [...x, { log: r, line }]) }}
+        />
+      ))}
+      {removed.map(entry => (
+        <div key={entry.log.id ?? entry.log.clientId} className="flex min-h-11 items-center justify-between gap-2 pl-2.5 pr-1 text-[0.8125rem] text-muted-foreground" data-testid="cardio-removed" role="status">
+          <span className="min-w-0">{entry.line} removed</span>
+          <button type="button" className="shrink-0 min-h-11 px-2 text-xs font-semibold text-primary-text" onClick={() => putBack(entry)} data-testid="cardio-removed-undo">Undo</button>
+        </div>
+      ))}
+      {error && <p className="text-[0.625rem] text-destructive px-1" role="alert">{error}</p>}
     </div>
   )
 }
@@ -132,11 +168,14 @@ export function CardioReadback({
   log,
   displayName,
   onUndone,
+  onRemoved,
 }: {
   log: CardioLogView
   /** The short name to read back — "Rowing Intervals", not the whole protocol. */
   displayName?: string
   onUndone?: () => void
+  /** Given, the row offers Remove once Undo has gone, and is told the line it read back when the log is removed. */
+  onRemoved?: (line: string) => void
 }) {
   const [undoing, setUndoing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -173,6 +212,16 @@ export function CardioReadback({
     }
   }
 
+  const [removing, setRemoving] = useState(false)
+  const handleRemove = async () => {
+    setRemoving(true)
+    setError(null)
+    const ok = await removeCardioLog(log).catch(() => false)
+    setRemoving(false)
+    if (ok) onRemoved?.(line)
+    else setError("That didn't come off — try again in a moment.")
+  }
+
   return (
     <div>
       <div
@@ -193,6 +242,18 @@ export function CardioReadback({
             aria-label={`Undo ${line}`}
           >
             {undoing ? 'Undoing…' : 'Undo'}
+          </button>
+        )}
+        {!undoable && onRemoved && (log.id || log.clientId) && (
+          <button
+            type="button"
+            onClick={() => void handleRemove()}
+            disabled={removing}
+            className="shrink-0 min-h-11 px-2 text-xs font-semibold text-muted-foreground disabled:opacity-50"
+            aria-label={`Remove ${line}`}
+            data-testid="cardio-remove"
+          >
+            {removing ? 'Removing…' : 'Remove'}
           </button>
         )}
       </div>

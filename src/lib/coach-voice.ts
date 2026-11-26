@@ -1435,6 +1435,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_goal_change: { done: 'Goal changed', failed: "I couldn't change your goal" },
   propose_rest_day: { done: 'Marked as rest', failed: "I couldn't mark that day" },
   propose_missed_session: { done: 'Marked as missed', failed: "I couldn't mark that day" },
+  propose_cardio_remove: { done: 'Taken off', failed: "I couldn't take that off" },
   propose_session_move: { done: 'Moved', failed: "I couldn't move that session" },
   propose_session_activity_swap: { done: 'Swapped', failed: "I couldn't swap that day" },
   propose_weigh_in: { done: 'Weigh-in saved', failed: "I couldn't save that weigh-in" },

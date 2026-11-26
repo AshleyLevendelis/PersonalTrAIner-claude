@@ -760,7 +760,7 @@ const dayStateSeed = (() => {
 
 const db: Db = {
   fitness_profiles: [{ ...profile, id: PROFILE_ID }],
-  daily_metrics: [], exercise_set_logs: [...dayStateSeed.sets, ...finishedSets, ...earlierSets], workout_sessions: [...(TRAINED_BEFORE ? [{ id: 'ws-lastweek', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 6 * 86400000)), is_completed: true, felt: null }] : []), ...finishedSession, ...movedInSession, ...movedAwaySession, ...dayStateSeed.sessions], cardio_logs: [],
+  daily_metrics: [], exercise_set_logs: [...dayStateSeed.sets, ...finishedSets, ...earlierSets], workout_sessions: [...(TRAINED_BEFORE ? [{ id: 'ws-lastweek', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 6 * 86400000)), is_completed: true, felt: null }] : []), ...finishedSession, ...movedInSession, ...movedAwaySession, ...dayStateSeed.sessions], cardio_logs: new URLSearchParams(location.search).get('oldwalk') === '1' ? [{ id: 'c-oldwalk', user_id: PROFILE_ID, date: isoOf(anchorDate()), activity_name: 'Walk', duration_minutes: 5, intensity_rpe: 3, notes: null, completed_at: new Date(anchorNowMs() - 3 * 3600000).toISOString() }] : [],
   daily_steps: [], meal_events: [...dayStateSeed.meals, ...mealYesterday], meal_plan_picks: [], meal_plan_slots: topUpSeed.slots,
   favorite_meals: [], grocery_items: topUpSeed.list, load_suggestions: [], pending_actions: [],
   plan_adaptations: KNEE_EASE ? [kneeEaseRow(PROFILE_ID)] : [], user_facts: [], user_context_facts: [], user_goals: [],

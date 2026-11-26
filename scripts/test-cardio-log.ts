@@ -64,6 +64,8 @@ function fakeFrom(table: string) {
     insert: (rows: Row | Row[]) => { op = 'insert'; payload = Array.isArray(rows) ? rows : [rows]; return api },
     delete: () => { op = 'delete'; return api },
     eq: (c: string, v: unknown) => { filters.push(r => r[c] === v); return api },
+    gte: (c: string, v: unknown) => { filters.push(r => cmp(r[c], v) >= 0); return api },
+    lte: (c: string, v: unknown) => { filters.push(r => cmp(r[c], v) <= 0); return api },
     order: (c: string, opts?: { ascending?: boolean }) => { orders.push([c, opts?.ascending !== false]); return api },
     single: () => { single = true; return api },
     then: (resolve: (v: unknown) => void, reject?: (e: unknown) => void) => Promise.resolve().then(() => resolve(exec()), reject),
@@ -126,6 +128,37 @@ async function main() {
   check('a second undo call for an already-undone clientId is a harmless no-op', true) // exercised implicitly by re-running deleteCardioLog below
   await deleteCardioLog(kept.clientId!) // cleanup
   await deleteCardioLog(kept.clientId!) // repeat call — must not throw
+
+  // ---- 4. Remove after the Undo window (27 Nov 2026, his walk logged by mistake) -----
+  console.log('\n[4] a log read back from the server, long past Undo, can be removed and put back')
+  const { removeCardioLog, restoreCardioLog } = await import('../src/lib/cardio-log-store')
+  const day2 = '2026-08-09'
+  const oldId = crypto.randomUUID()
+  db.cardio_logs.push({ id: oldId, user_id: userId, date: day2, activity_name: 'Walk', duration_minutes: 5, intensity_rpe: 3, distance_km: 0.4, notes: null, completed_at: '2026-08-09T10:00:00Z' })
+  const read = (await getCardioLogsForDateMerged(userId, day2)).find(r => r.activity_name === 'Walk')
+  check('the old walk reads back with no clientId (no Undo can reach it)', !!read && !read.clientId, read)
+  const otherUser = { ...read!, user_id: crypto.randomUUID() }
+  const refused = await removeCardioLog(otherUser)
+  check("a remove naming someone else's account takes nothing off", db.cardio_logs.some(r => r.id === oldId))
+  const ok = await removeCardioLog(read!)
+  check('remove says it worked', ok === true)
+  check('the server row is gone', !db.cardio_logs.some(r => r.id === oldId), db.cardio_logs)
+  check('the merged read no longer shows it', !(await getCardioLogsForDateMerged(userId, day2)).some(r => r.activity_name === 'Walk'))
+  const back = restoreCardioLog(read!)
+  await flushPending()
+  const again = (await getCardioLogsForDateMerged(userId, day2)).filter(r => r.activity_name === 'Walk')
+  check('Undo puts the walk back once', !!back && again.length === 1, again)
+  check('as it was: minutes, effort and distance', again[0]?.duration_minutes === 5 && again[0]?.intensity_rpe === 3 && Number(again[0]?.distance_km) === 0.4, again[0])
+
+  console.log('\n[5] a log not yet sent is removed from the phone and never reaches the server')
+  const before = db.cardio_logs.length
+  ;(navigator as { onLine: boolean }).onLine = false
+  const unsent = saveCardioLog({ userId, date: day2, activityName: 'Bike', durationMinutes: 10, intensityRpe: 5 })
+  const ok2 = await removeCardioLog(unsent)
+  ;(navigator as { onLine: boolean }).onLine = true
+  await flushPending()
+  check('remove says it worked', ok2 === true)
+  check('no server row was ever made', db.cardio_logs.length === before && !db.cardio_logs.some(r => r.activity_name === 'Bike'), db.cardio_logs)
 
   // ---- Summary -------------------------------------------------------------
   if (failures > 0) {
