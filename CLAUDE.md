@@ -208,6 +208,14 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 - **Sets logged under the wrong exercise move to the one he did** (24 Nov 2026, his live report): chat
   (`move_logged_sets`, names from his words and today's log, never numbers) and the ⋮ menu, one planner, with Undo.
   `test:move-logged-sets`, `verify:wrong-exercise`. Needs the `chat-gemini` deploy
+- **Recovery, kit and order survive the late passes** (CSCS, mine, 26 Nov 2026, the scorer read as a coach): on low
+  recovery the session cap is three quarters (a beginner's 14, a bad back's 17); a band or improvised move is never
+  picked while its loadable equivalent is in the kit; a lift added to balance the week follows the day's compounds,
+  never ahead of a rehab drill; no accessory holds more sets than its day's main lift; the cap keeps a press a
+  pull-heavy week needs. **`recovery_volume_not_reduced`, `conditioning_frequency_mismatch` and `load_incoherent`
+  counts before 26 Nov are not comparable** (the scorer learnt the beginner conditioning dose, counts working sets,
+  and exempts a lift at its implement's floor). `test:quality` now prints which rules moved since the committed
+  report and fails on a large rise. `test:plan-faults-nov26`, `docs/plans/plan-faults-nov26.md`
 - **A beginner's session holds at most 18 working sets — his ruling 21 Nov 2026, "yes cap beginners at 18 sets"** (over
   filling the time with lifting): the spare minutes go to optional mobility. It narrows his session-length rulings for
   beginners only. `test:older-beginner` §14
@@ -3294,6 +3302,10 @@ old — the commands were right and the context was missing.
   inert on 9,216 profiles because no check looked at what it limits; comparing what the run PRODUCED with and without
   it showed it binding on five days. First ask whether any check could see the difference; only then whether there is
   one. (It then turned out to guard one of two lists.)
+- **A GATE THAT FAILS ONLY ON A FLOOR HIDES EVERY RULE THAT MOVES ABOVE IT, AND A REPORT THAT IS ALWAYS REVERTED IS
+  NEVER READ.** 26 Nov 2026: `test:quality` stayed green from 15 to 25 Nov while one rule went from 0 to 520 plans and
+  another from 684 to 1,613. It now prints every rule's move against the report in git and fails on a large rise.
+  **And a sample of "every Nth" must not share a factor with the grid**: every 32nd plan was all beginners; 37 is not.
 - **A KNOWN, ACCEPTED DRIFT IS A DEFECT WITH A NOTE ON IT.** 18 Nov 2026: "a couple of minutes under, understood" had
   sat beside a 3-6% ceiling since September. A change elsewhere pushed more days into it and the ceiling failed; the
   cause was one line in the wrong order, and fixing it took the count to zero. When a ceiling exists to tolerate a

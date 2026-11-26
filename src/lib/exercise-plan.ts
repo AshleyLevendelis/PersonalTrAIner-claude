@@ -799,6 +799,14 @@ export const EQUIPMENT_QUALITY_TIERS = new Set<EquipmentAccess>(['full_gym', 'ho
  * backpack keeps it. Exempt entries (core work, rehab-indicated) are left
  * alone for the reasons isEquipmentQualityExempt records.
  */
+/** The same pool, with every entry that has a better-loading equivalent in it moved to the end (order otherwise kept). */
+export function realKitFirst(pool: ExerciseEntry[], equipmentAccess?: EquipmentAccess): ExerciseEntry[] {
+  if (!equipmentAccess || !EQUIPMENT_QUALITY_TIERS.has(equipmentAccess)) return pool
+  const worse = new Set(pool.filter(e => hasBetterLoadingPeer(e, pool)).map(e => e.name))
+  if (worse.size === 0) return pool
+  return [...pool.filter(e => !worse.has(e.name)), ...pool.filter(e => worse.has(e.name))]
+}
+
 export function poolForRotation(pool: ExerciseEntry[], equipmentAccess?: EquipmentAccess): ExerciseEntry[] {
   if (!equipmentAccess || !EQUIPMENT_QUALITY_TIERS.has(equipmentAccess)) return pool
   return pool.filter(e => !hasBetterLoadingPeer(e, pool))
@@ -2830,6 +2838,15 @@ function selectExercisesForTrack(
   // better tool for this movement" is a question about their gym, not about
   // what this track happens to cover.
   const implementPeerPool = equipmentAccess && POOL_WIDE_IMPLEMENT_TIERS.has(equipmentAccess) ? pool : undefined
+  // A BAND OR IMPROVISED MOVE IS NOT A CANDIDATE WHILE ITS LOADABLE EQUIVALENT IS IN THE POOL (26 Nov 2026, CSCS, mine).
+  // The ranker only ever DOCKED it eight points, and the filters in front of the ranker remove whatever was used
+  // earlier in the week, so once the dumbbell versions were taken the band was the only candidate left and won with
+  // nothing to beat. Measured on 201 home and minimalist plans: 71 held one in week 1, and the days read "Lateral
+  // Raises, Front Raises, Backpack Front Raise" and "Dumbbell Tricep Kickback, Chair Dips": the same movement twice,
+  // the second time on kit that cannot be loaded a notch at a time. A coach repeats the dumbbell move on another day
+  // (twice a week is the frequency the muscle wants) or writes nothing. So it is filtered out, the slot's own
+  // "reuse is fine" fallback does the rest, and only a REQUIRED slot with nothing else may still take it.
+  const worseKit = (e: ExerciseEntry): boolean => !!implementPeerPool && hasBetterLoadingPeer(e, implementPeerPool)
 
   // Every primer's own movement_pattern is 'activation' (see exercise-db.ts's
   // MovementPattern comment), so matching against it was a no-op — every
@@ -2926,9 +2943,10 @@ function selectExercisesForTrack(
     legSupportSlot.patterns.includes(e.movement_pattern) && e.mechanics_tier !== 'primer' && e.mechanics_tier !== 'tier1_compound')
   const fillTarget = exerciseTarget - (legSupportPending ? 1 : 0)
 
-  function findForSlot(patterns: MovementPattern[], tier: TrackSlot['tier'] | null, respectWeeklyUsed: boolean, groups?: string[]): ExerciseEntry | null {
+  function findForSlot(patterns: MovementPattern[], tier: TrackSlot['tier'] | null, respectWeeklyUsed: boolean, groups?: string[], allowWorseKit = false): ExerciseEntry | null {
     const candidates = orderCandidates(
       pool.filter(e =>
+        (allowWorseKit || !worseKit(e)) &&
         // A slot filled by GROUP is admitted whatever its pattern — that is
         // the point of it (see TrackSlot.groups). A slot filled by pattern
         // still answers to the track's forbidden list.
@@ -3078,7 +3096,8 @@ function selectExercisesForTrack(
       // The preference holds when the slot drops a tier too (a bodyweight week's main lift is a tier-2 squat or hinge).
       (preferredLowerMain ? findForSlot([preferredLowerMain], null, true) ?? findForSlot([preferredLowerMain], null, false) : null) ??
       findForSlot(slot.patterns, null, true, slot.groups) ??
-      findForSlot(slot.patterns, null, false, slot.groups)
+      findForSlot(slot.patterns, null, false, slot.groups) ??
+      (slot.required ? findForSlot(slot.patterns, null, false, slot.groups, true) : null)
     if (pick && !wouldBeSecondMainLift(pick)) {
       selected.push(pick)
       usedGroups.add(getMovementFamily(pick))
@@ -3171,6 +3190,7 @@ function selectExercisesForTrack(
     const candidates = orderCandidates(
       trackPool.filter(e =>
         e.mechanics_tier === tier &&
+        !worseKit(e) &&
         !wouldBeSecondMainLift(e) &&
         !isSecondFloorPull(e) &&
         patterns.includes(e.movement_pattern) &&
@@ -3327,6 +3347,7 @@ function selectExercisesForTrack(
         trackPool.filter(e =>
           e.mechanics_tier !== 'primer' &&
           e.mechanics_tier !== 'cardio' &&
+          !worseKit(e) &&
           !wouldBeSecondMainLift(e) &&
           !isSecondFloorPull(e) &&
           !selected.some(s => s.name === e.name) &&
@@ -3507,6 +3528,7 @@ function selectExercisesForTrack(
       orderCandidates(
         pool.filter(e =>
           legSupportSlot.patterns.includes(e.movement_pattern) &&
+          !worseKit(e) &&
           !slotForbidden.has(e.movement_pattern) &&
           e.mechanics_tier !== 'tier1_compound' && e.mechanics_tier !== 'primer' &&
           (tier === null || e.mechanics_tier === tier) &&
@@ -4623,7 +4645,7 @@ function rebuildExerciseForSwap(
 
 function balanceWeeklyStructure(
   days: WorkoutDay[],
-  pool: ExerciseEntry[],
+  poolAsGiven: ExerciseEntry[],
   weeklyUsed: Set<string>,
   allSelectedNames: Set<string>,
   experience: ExperienceConfig,
@@ -4641,6 +4663,15 @@ function balanceWeeklyStructure(
    */
   protectedNames: Set<string> = new Set(),
 ): void {
+  // REAL KIT FIRST, IN EVERY PICK THIS PASS MAKES (26 Nov 2026, CSCS, mine). The ranker that fills a day prefers a
+  // loadable implement over a band or a backpack, but every pick below is "the first entry in catalogue order that
+  // fits", with no such preference. Measured on 999 plans: a band or improvised move was prescribed while a dumbbell,
+  // cable or machine equivalent sat in the same pool on 188 of them, the Band Tricep Pushdown alone on 1,352 slots
+  // (it is written before the dumbbell kickback in the catalogue). A band's resistance cannot be stepped up a notch
+  // at a time, so it cannot carry progressive overload where a loadable equivalent exists. The pool is put in
+  // "equivalents with real kit first" order once, so each find below keeps its own rule and gains this one; the
+  // band is still found when it is the only thing that fits.
+  const pool = realKitFirst(poolAsGiven, profile.equipment_access)
   const dayFamilies = (dayIdx: number): Set<string> =>
     new Set(
       days[dayIdx].exercises
@@ -4778,11 +4809,7 @@ function balanceWeeklyStructure(
     // trunk or carry move, never between a superset's two halves.
     if (isPlacedWithCompounds(entry)) {
       const at = list.findIndex(e => e.name === entry.name)
-      const firstLater = list.findIndex((e, i) => {
-        if (i === at) return false
-        const en = findEntry(e.name)
-        return !!en && en.mechanics_tier !== 'primer' && !isPlacedWithCompounds(en)
-      })
+      const firstLater = slotAfterCompounds(list, at)
       if (at !== -1 && firstLater !== -1 && firstLater < at) {
         let to = firstLater
         while (to > 0 && list[to - 1].superset_label && list[to - 1].superset_label === list[to].superset_label) to--
@@ -4790,11 +4817,6 @@ function balanceWeeklyStructure(
         list.splice(to, 0, added)
       }
     }
-  }
-  /** A multi-joint lift of the session's main work: not isolation, a finisher, trunk work, a carry or cardio. */
-  function isPlacedWithCompounds(e: ExerciseEntry): boolean {
-    return (e.mechanics_tier === 'tier1_compound' || e.mechanics_tier === 'tier2_compound')
-      && e.movement_pattern !== 'core' && e.movement_pattern !== 'carry'
   }
 
   // Mirror of addExercise — removes the weakest excess-pattern accessory
@@ -8076,6 +8098,46 @@ export const BEGINNER_MAX_WORKING_SETS = 18
  */
 export const LOWER_BACK_MAX_WORKING_SETS = 22
 
+/** A multi-joint lift of the session's main work: not isolation, a finisher, trunk work, a carry or cardio. */
+function isPlacedWithCompounds(e: ExerciseEntry): boolean {
+  return (e.mechanics_tier === 'tier1_compound' || e.mechanics_tier === 'tier2_compound')
+    && e.movement_pattern !== 'core' && e.movement_pattern !== 'carry'
+}
+
+/**
+ * WHERE A COMPOUND ADDED LATE GOES: the first isolation, finisher, trunk or carry move AFTER the day's own compounds,
+ * or -1 when there is none. The prep at the front of a day is not that slot (26 Nov 2026, CSCS, mine): an injury's
+ * rehab drill sits straight after the warm-up, so "the first move that is not a compound" was the drill, and a press
+ * added to balance the week landed ahead of the Bird Dog AND the bench press it was meant to follow (measured: 101 of
+ * 9,216 plans, every one with a back or hip on the injuries list). Counted from the day's first compound instead, so
+ * the added lift follows the main lift; a day with no other compound keeps the old answer.
+ */
+export function slotAfterCompounds(list: ReadonlyArray<{ name: string }>, addedAt: number): number {
+  const compound = (i: number) => { const en = i === addedAt ? undefined : findEntry(list[i].name); return !!en && isPlacedWithCompounds(en) }
+  const firstCompound = list.findIndex((_, i) => compound(i))
+  return list.findIndex((e, i) => {
+    if (i === addedAt || i < firstCompound) return false
+    const en = findEntry(e.name)
+    return !!en && en.mechanics_tier !== 'primer' && !isPlacedWithCompounds(en)
+  })
+}
+
+/**
+ * THE SESSION SET CAP FOLLOWS RECOVERY (CSCS, mine, 26 Nov 2026). Low recovery is built at three quarters of the volume
+ * (RECOVERY_SET_MULTIPLIER), but the two caps above were absolute, so on a long session they erased it: measured on 72
+ * plans a level, a low-recovery beginner asking for 90+ minutes trained 16.2 working sets a day against a high-recovery
+ * beginner's 17.4 (93%, where 30-45 minutes gave 78%). Poor sleep, high stress or a physical job is exactly when the
+ * long session's tail costs most, so the cap takes the same three quarters: a beginner's 18 becomes 14 and a bad back's
+ * 22 becomes 17. Moderate and high keep the cap as ruled. His "at most 18" (21 Nov) still holds: this only lowers.
+ */
+export function sessionSetCap(profile: Pick<UserProfile, 'injuries' | 'recovery_capacity' | 'concurrent_activities'>, experience: string | undefined): number | null {
+  const base = experience === 'beginner' ? BEGINNER_MAX_WORKING_SETS
+    : (profile.injuries ?? []).includes('lower_back') ? LOWER_BACK_MAX_WORKING_SETS : null
+  if (base == null) return null
+  return effectiveRecoveryCapacity(profile as UserProfile) === 'low'
+    ? Math.round(base * RECOVERY_SET_MULTIPLIER.low / RECOVERY_SET_MULTIPLIER.high) : base
+}
+
 export function beginnerWorkingSets(day: WorkoutDay): number {
   return day.exercises.reduce((n, ex) => {
     const entry = findEntry(ex.name)
@@ -8097,6 +8159,11 @@ export function capBeginnerSets(day: WorkoutDay, protectedNames: ReadonlySet<str
     const push = balanceElsewhere.push + onDay(PUSH), pull = balanceElsewhere.pull + onDay(PULL)
     if (PUSH.includes(e.movement_pattern) && push > pull) return 0
     if (PULL.includes(e.movement_pattern) && push > pull - sets) return 2
+    // ...AND THE OTHER WAY ROUND (26 Nov 2026, CSCS, mine): the rule above only knew a week that presses too much. A bad
+    // back's week is the opposite (pressing is what its injury limits), and the cap took a press from a week already
+    // pulling 16 sets to 7. Past the same 1.5x band, a pull goes first and a press the week needs goes last.
+    if (PULL.includes(e.movement_pattern) && pull > push * 1.5) return 0
+    if (PUSH.includes(e.movement_pattern) && pull > (push - sets) * 1.5) return 2
     // ...and the week's four chest sets (the persona audit's C17: a beginner's only press, a floor press for a sore
     // shoulder, raised to four and capped back to three).
     const CHEST = ['horizontal_push', 'isolation_chest']
@@ -10081,8 +10148,7 @@ export function generateMesocycle(
       // block's own exercises, before the loading weeks' cap had trimmed one away, so a pregnant beginner's deload Monday
       // held 20 working sets where her loading Mondays held 18, and a bad back's 24. The same cap, in deload weeks too.
       if (isDeload) {
-        const cap = experience === 'beginner' ? BEGINNER_MAX_WORKING_SETS
-          : (profile.injuries ?? []).includes('lower_back') ? LOWER_BACK_MAX_WORKING_SETS : null
+        const cap = sessionSetCap(profile, experience)
         if (cap != null) for (let i = 0; i < days.length; i++) if (days[i].exercises.length > 0) days[i] = capBeginnerSets(days[i], blockRequired, cap, true)
       }
       // Deload weeks are SUPPOSED to run short (half volume, by design) — a
@@ -10113,6 +10179,20 @@ export function generateMesocycle(
           }
         }
         enforceWeeklyPatternBalance(days, { keepPulling: keepPullingThisPlan })
+        // NO LATE PASS LIFTS AN ACCESSORY OVER ITS DAY'S MAIN LIFT (26 Nov 2026, CSCS, mine). The set hierarchy is
+        // enforced once, as each day is built; the four passes below (chest's four, back's four, the thigh balance, the
+        // light day taking sets) each add a set after it and asked only the role's ceiling, which for an accessory is
+        // four. Measured on the 9,216-plan grid: 7 plans shipped a row or front squat at 4 sets beside a main lift at
+        // 3. The main lift is the day's heaviest, most technical work and holds the most sets; a set these passes want
+        // goes to an exercise still under it, or is not added.
+        const underItsMainLift = (ex: Exercise): boolean => {
+          const x = findEntry(ex.name)
+          const role = x ? getVolumeRole(x) : null
+          if (role === 'main' || role === 'conditioning') return true
+          const d = days.find(dd => dd.exercises.includes(ex))
+          const mains = (d?.exercises ?? []).filter(e => { const y = findEntry(e.name); return !!y && getVolumeRole(y) === 'main' }).map(e => e.sets)
+          return mains.length === 0 || ex.sets < Math.max(...mains)
+        }
         // FOUR CHEST SETS A WEEK AT LEAST (22 Nov 2026, the persona audit's C17; CSCS, mine): a split with one chest slot
         // (the four-day hybrid's Upper Pull & Core forbids horizontal pressing) shipped two or three chest sets a week. Below
         // four is under any maintenance dose. The week's own chest exercises take the sets, up to their role's ceiling,
@@ -10124,7 +10204,7 @@ export function generateMesocycle(
           const chestRows = days.flatMap(d => d.exercises.filter(ex => { const x = findEntry(ex.name); return !!x && isChest(x) }))
           let chestSets = chestRows.reduce((n, ex) => n + (ex.sets ?? 0), 0)
           for (let guard = 0; chestRows.length > 0 && chestSets < 4 && guard < 8; guard++) {
-            const room = chestRows.filter(ex => { const x = findEntry(ex.name)!; const role = getVolumeRole(x); return !!role && ex.sets < getRoleSetCeiling(role, true) }).sort((a, b) => a.sets - b.sets)[0]
+            const room = chestRows.filter(ex => { const x = findEntry(ex.name)!; const role = getVolumeRole(x); return !!role && ex.sets < getRoleSetCeiling(role, true) && underItsMainLift(ex) }).sort((a, b) => a.sets - b.sets)[0]
             if (!room) break
             room.sets += 1
             chestSets += 1
@@ -10135,7 +10215,7 @@ export function generateMesocycle(
           const backRows = days.flatMap(d => d.exercises.filter(ex => { const x = findEntry(ex.name); return !!x && isBack(x) }))
           let backSets = backRows.reduce((n, ex) => n + (ex.sets ?? 0), 0)
           for (let guard = 0; backRows.length > 0 && backSets < 4 && guard < 8; guard++) {
-            const room = backRows.filter(ex => { const x = findEntry(ex.name)!; const role = getVolumeRole(x); return !!role && ex.sets < getRoleSetCeiling(role, true) }).sort((a, b) => a.sets - b.sets)[0]
+            const room = backRows.filter(ex => { const x = findEntry(ex.name)!; const role = getVolumeRole(x); return !!role && ex.sets < getRoleSetCeiling(role, true) && underItsMainLift(ex) }).sort((a, b) => a.sets - b.sets)[0]
             if (!room) break
             room.sets += 1
             backSets += 1
@@ -10161,7 +10241,7 @@ export function generateMesocycle(
             const canGive = (ex: Exercise) => { const r = roleOf(ex); const d = dayOf(ex); return !!r && ex.sets > getRoleSetFloor(r) && !!d && beginnerWorkingSets(d) > 10 }
             const donor = side(heavy).filter(ex => canGive(ex) && !blockRequired.has(ex.name)).sort((a, b) => b.sets - a.sets)[0]
               ?? side(heavy).filter(canGive).sort((a, b) => b.sets - a.sets)[0]
-            const receiver = side(light).filter(ex => { const r = roleOf(ex); const d = dayOf(ex); return !!r && ex.sets < getRoleSetCeiling(r, true) && !!d && beginnerWorkingSets(d) + 1 <= setCap }).sort((a, b) => a.sets - b.sets)[0]
+            const receiver = side(light).filter(ex => { const r = roleOf(ex); const d = dayOf(ex); return !!r && ex.sets < getRoleSetCeiling(r, true) && underItsMainLift(ex) && !!d && beginnerWorkingSets(d) + 1 <= setCap }).sort((a, b) => a.sets - b.sets)[0]
             if (!donor && !receiver) {
               // Every set at its floor and nothing to move (23 Nov 2026, the persona audit's C13): a pregnant beginner's
               // week held two kettlebell deadlifts and a band leg curl against one box squat, every exercise at two sets.
@@ -10183,8 +10263,7 @@ export function generateMesocycle(
         // A BEGINNER'S CAP, after the balance pass (so nothing adds a set back) and before the filler (so the time it
         // frees goes to optional mobility). capBeginnerSets says why.
         {
-          const cap = experience === 'beginner' ? BEGINNER_MAX_WORKING_SETS
-            : (profile.injuries ?? []).includes('lower_back') ? LOWER_BACK_MAX_WORKING_SETS : null
+          const cap = sessionSetCap(profile, experience)
           // ...and a pull the week's push:pull needs goes last (the persona audit's C18: a beginner's Monday lost the two
           // pulldowns the balance pass had added, the last exercises on the day, and the week pressed 13 sets to 6).
           const setsOn = (d: WorkoutDay, ps: string[]) => d.exercises.reduce((n, ex) => { const x = findEntry(ex.name); return n + (x && x.mechanics_tier !== 'primer' && ps.includes(x.movement_pattern) ? ex.sets : 0) }, 0)
@@ -10208,7 +10287,7 @@ export function generateMesocycle(
         // a conditioning day (its circuit is its work).
         {
           const sessionMax = getSessionMaximumSeconds(profile.session_duration_preference || '45-60')
-          const cap = experience === 'beginner' ? BEGINNER_MAX_WORKING_SETS : (profile.injuries ?? []).includes('lower_back') ? LOWER_BACK_MAX_WORKING_SETS : Infinity
+          const cap = sessionSetCap(profile, experience) ?? Infinity
           const lifting = (d: WorkoutDay) => d.exercises.length > 0 && d.focus !== 'Conditioning & Core'
             && !d.exercises.some(e => { const x = findEntry(e.name); return x?.mechanics_tier === 'cardio' || x?.movement_pattern === 'cardio' })
           const PUSH = ['horizontal_push', 'vertical_push'], PULL = ['horizontal_pull', 'vertical_pull']
@@ -10224,7 +10303,7 @@ export function generateMesocycle(
               .map(ex => ({ ex, x: findEntry(ex.name) }))
               .filter(t => { const role = t.x ? getVolumeRole(t.x) : null
                 return !!t.x && !!role && role !== 'conditioning' && t.x.mechanics_tier !== 'primer' && t.ex.sets < getRoleSetCeiling(role, true)
-                  && !(pushHeavy && PUSH.includes(t.x.movement_pattern)) })
+                  && underItsMainLift(t.ex) && !(pushHeavy && PUSH.includes(t.x.movement_pattern)) })
               .sort((a, b) => a.ex.sets - b.ex.sets)
             // ...and never a set that tips the thigh past 2.5x one way (a knee trainee's light day took its knee drill and
             // Spanish squat to three sets each: quads 9, hamstrings 3).
@@ -10378,7 +10457,7 @@ export function generateMesocycle(
             if (!/Full Body/.test(d.focus) && d.focus !== 'Chest & Triceps' && d.focus !== 'Shoulders & Abs') continue
             // Never past a session's set cap (the beginner's 18, a bad back's 22): the persona audit's S9 caught this adding
             // two sets to an 18-set beginner day.
-            const setCap = experience === 'beginner' ? BEGINNER_MAX_WORKING_SETS : (profile.injuries ?? []).includes('lower_back') ? LOWER_BACK_MAX_WORKING_SETS : Infinity
+            const setCap = sessionSetCap(profile, experience) ?? Infinity
             if (beginnerWorkingSets(d) + 2 > setCap) continue
             days[i] = { ...d, exercises: [...d.exercises, { ...weekPull, sets: 2, superset_label: undefined, rest: weekPull.rest === 'alternate' ? '60s' : weekPull.rest }] }
             pullAddedOn.set(d.day, weekPull.name)
