@@ -119,6 +119,9 @@ const KEYS: Record<string, { clear: boolean; why: string }> = {
   fitplan_watch_workouts_dismissed: { clear: false, why: "watch workouts he said were not his: about this phone's watch, not the plan, and only the last two days are ever read" },
   fitplan_heart_strap: { clear: false, why: "the strap paired to this phone's Bluetooth — the phone's, not the plan's" },
   fitplan_heart_strap_readings: { clear: false, why: 'raw strap readings, matched to a session by its own times only and gone after four hours' },
+  fitplan_live_steps: { clear: false, why: "the phone's own step count at the start of a walk being recorded (27 Nov 2026), kept with that walk" },
+  fitplan_watch_heart_seen: { clear: false, why: "when the watch app last sent heart rate to this phone (27 Nov 2026): about this phone's watch, not the plan" },
+  fitplan_watch_sets: { clear: true, why: "sets ticked on the watch for the old plan's session (27 Nov 2026): they must never tick the new plan's rows" },
   fitplan_activity_recording: { clear: false, why: 'a walk or run being recorded right now (25 Nov 2026) — a New Plan mid-walk must not lose the walk' },
   fitplan_activity_access_asked: { clear: false, why: 'this phone was asked once for steps, distance and calories — the phone\'s, not the plan\'s' },
 

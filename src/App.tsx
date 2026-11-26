@@ -3161,6 +3161,8 @@ function App() {
       localStorage.removeItem('exercise_plan_cache')
       localStorage.removeItem('user_profile_cache')
       localStorage.removeItem('mesocycle_cache')
+      // Sets ticked on the watch for the OLD plan's session: never pressed onto the new plan's rows.
+      localStorage.removeItem('fitplan_watch_sets')
       setProfile(null)
       setMacros(null)
       // Per-profile derived state — leaving this set leaked the previous

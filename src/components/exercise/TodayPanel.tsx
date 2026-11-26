@@ -2,7 +2,7 @@ import { PAUSE_WORDS, isPausedOn, planPausedSince, pausedForDueDateOf } from '@/
 import { noteForProfile, lateInPregnancy, PREGNANCY_HOLD_NOTE, isPregnant } from '@/lib/health-conditions'
 import { LiveHeart } from '@/components/LiveHeart'
 import { isStartingOut } from '@/lib/starting-out'
-import { useEffect, useMemo, useRef, useState, Suspense, lazy } from 'react'
+import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { takeRequestedExerciseDate } from '@/lib/app-route'
 import { prescribedRepsHigh } from '@/lib/set-plausibility'
 import { lazyWithReload } from '@/lib/chunk-reload'
@@ -121,7 +121,8 @@ import type { LoadSource } from './LoadChip'
 import { isPhoneApp } from '@/lib/steps-store'
 import type { WatchRow } from '@/lib/watch-session'
 // THE WATCH'S PART OF THIS TAB, downloaded only in the phone app (watch-session.ts says what it does).
-const WatchLink = lazy(() => import('./WatchLink'))
+// Ambient: nobody tapped for it, so a missing file draws nothing (and reloads onto a new version, as every part does).
+const WatchLink = lazyWithReload(() => import('./WatchLink'), { ambient: true })
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
