@@ -21,7 +21,18 @@ The plan-quality scorer ran on `main` (45ed71c) during the walk-recorder merge. 
 | pull-heavy week | 3 | 2 |
 | average score, of 12 | 11.59 | 11.79 |
 
-The full 9,216 grid is in `quality-report.txt` (regenerated with this work; the numbers are in BACKLOG).
+The full 9,216 grid, main (45ed71c) to after, from `quality-report.txt` (regenerated and committed with this work):
+
+| Rule (plans tripping it, of 9,216) | main | after |
+| --- | --- | --- |
+| a band or improvised move where a loadable one was in the kit | 1,764 | 5 |
+| low recovery not given clearly less work | 1,613 | 759 |
+| conditioning days not matching the goal | 520 | 0 |
+| a lighter lift priced against the main lift | 298 | 19 |
+| trunk work ahead of the main lift | 101 | 0 |
+| pull-heavy week | 70 | 40 |
+| an accessory with more sets than the main lift | 7 | 0 |
+| average score, of 12 | 11.59 | 11.79 |
 
 ## What changed, and the coaching reason for each
 
