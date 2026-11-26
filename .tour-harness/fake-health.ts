@@ -18,13 +18,21 @@ if (platform === 'ios' || platform === 'android') {
     isAvailable: async () => { calls.push('isAvailable'); return q.get('healthmissing') === '1' ? { available: false, reason: 'not installed' } : { available: true } },
     requestStepsAccess: async () => { calls.push({ request: ['steps'] }); return q.get('healthdenied') !== '1' },
     stepsBetween: async (start, end) => { calls.push({ steps: [start.toISOString(), end.toISOString()] }); return w.__healthSteps ?? 0 },
-    // HEART RATE (24 Nov 2026, health-heart.ts): a working session's readings across any window asked (about 140, peaks
-    // near 170), and a resting figure each night for 14 nights: 58 this week, 60 the week before.
+    // HEART RATE (24 Nov 2026, health-heart.ts): a working session's readings across any window asked (about 150, peaking
+    // at 172), and a resting figure each night for 14 nights: 58 this week, 60 the week before.
     requestHeartAccess: async () => { calls.push({ request: ['heartRate', 'restingHeartRate'] }); return q.get('healthdenied') !== '1' },
     heartRateSamples: async (start, end) => {
       calls.push({ heart: [start.toISOString(), end.toISOString()] })
       const out: { bpm: number; at: string }[] = []
-      for (let t = start.getTime(), i = 0; t <= end.getTime(); t += 60000, i++) out.push({ bpm: 132 + (i % 10) * 4, at: new Date(t).toISOString() })
+      // THE SHAPE OF A REAL SESSION across whatever window is asked (26 Nov 2026, so the summary's graph has something
+      // true to draw): a warm-up climbing from 108, a steady middle near 150, a push to 172 late on, then easing off.
+      const span = Math.max(1, end.getTime() - start.getTime())
+      const shape = (f: number) => f < 0.12 ? 108 + (f / 0.12) * 40
+        : f < 0.7 ? 148 + 6 * Math.sin(f * 18)
+        : f < 0.85 ? 150 + ((f - 0.7) / 0.15) * 22
+        : f < 0.93 ? 172 - ((f - 0.85) / 0.08) * 4
+        : 168 - ((f - 0.93) / 0.07) * 30
+      for (let t = start.getTime(); t <= end.getTime(); t += 30000) out.push({ bpm: Math.round(shape((t - start.getTime()) / span)), at: new Date(t).toISOString() })
       return out
     },
     // A RECORDED WALK OR RUN (25 Nov 2026, activity-recording.ts): what the watch wrote for the window.
@@ -58,8 +66,35 @@ if (platform === 'ios' || platform === 'android') {
       return kind === 'two' ? [run, blip, lift] : [run, blip]
     },
   }
+  // SLEEP (26 Nov 2026, sleep-nights.ts). &healthsleep= chooses what the watch holds for the last 16 nights, each a
+  // session from about 23:15 to the morning with stages (light, deep, REM and one 20 minute spell awake):
+  //   usual (default)  about 7 h 25 asleep every night
+  //   short1           the same, but last night 5 h 40
+  //   short2           the same, but the last TWO nights 5 h 40 and 5 h 50
+  //   gap              the same, but the watch was off last night
+  //   none             nothing
+  adapter.requestSleepAccess = async () => { calls.push({ request: ['sleep'] }); return q.get('healthdenied') !== '1' }
+  adapter.sleepSessions = async (start, end) => {
+    calls.push({ sleep: [start.toISOString(), end.toISOString()] })
+    const kind = q.get('healthsleep') ?? 'usual'
+    if (kind === 'none') return []
+    const out: { start: string; end: string; stages: { start: string; end: string; stage: string }[] }[] = []
+    for (let back = 0; back < 16; back++) {
+      if (kind === 'gap' && back === 0) continue
+      // Minutes asleep that night: a little wobble around 7 h 25, the short nights as asked.
+      const asleep = (kind === 'short1' || kind === 'short2') && back === 0 ? 340 : kind === 'short2' && back === 1 ? 350 : 445 + ((back * 7) % 5) * 4 - 8
+      const bed = new Date(end.getFullYear(), end.getMonth(), end.getDate() - back - 1, 23, 15, 0)
+      const t = (mins: number) => new Date(bed.getTime() + mins * 60000).toISOString()
+      // light, deep, light, awake 20, REM, light: the sleep stages add up to `asleep`.
+      const cuts = [0, 90, 170, asleep - 150, asleep - 130, asleep - 50, asleep + 20]
+      const names = ['light', 'deep', 'light', 'awake', 'rem', 'light']
+      out.push({ start: t(0), end: t(asleep + 20), stages: names.map((stage, i) => ({ start: t(cuts[i]), end: t(cuts[i + 1]), stage })) })
+    }
+    return out.filter(s => Date.parse(s.end) <= end.getTime() && Date.parse(s.end) >= start.getTime())
+  }
   ;(globalThis as { __healthAdapterForTest?: HealthAdapter }).__healthAdapterForTest = adapter
   if (q.get('healthon') === '1') { try { localStorage.setItem('fitplan_health_steps_connected', '1') } catch { /* */ } }
   if (q.get('hearton') === '1') { try { localStorage.setItem('fitplan_health_heart_connected', '1') } catch { /* */ } }
+  if (q.get('sleepon') === '1') { try { localStorage.setItem('fitplan_health_sleep_connected', '1') } catch { /* */ } }
   if (q.get('workoutson') === '1') { try { localStorage.setItem('fitplan_health_workouts_connected', '1') } catch { /* */ } }
 }

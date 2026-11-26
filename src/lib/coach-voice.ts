@@ -1729,8 +1729,22 @@ export function effortLine(effort: 'easy' | 'right' | 'hard'): string {
  * something carries the yes and the no as one-tap answers in the chat. A tap is his reply to the coach, so the yes
  * reaches a tool the coach already has (trim today: propose_session_shorten) and the no is simply heard.
  */
+/**
+ * THE ANSWERS TO "READY FOR IT?" (his words 26 Nov 2026, with a screenshot of one button under each question: "Quick
+ * reply buttons dont give enough choice"). A question about today's session gets the answers a person would really
+ * give, each a whole sentence because a tap is SENT as his message: he is short on time, tired, something hurts, or
+ * he cannot train today. Each reaches something the coach already does: a trimmed session, a lighter one, the pain
+ * questions, moving the day. THE YES IS NOT A SENTENCE, IT IS THE BUTTON THAT DOES IT: "Open today's session" sits
+ * above them on every message that asks. Four, the most the chat draws under one message. One list for the phone's
+ * reminder, the chat's event and the opener.
+ */
+export const SESSION_READY_CHIPS: readonly string[] = [
+  "I'm short on time today", "I'm tired today", 'Something hurts today', "I can't train today",
+]
+
 export function coachMessageChips(key: string, d: { pattern?: { kind: string } | null } = {}): string[] {
   switch (key) {
+    case 'workout_today': return [...SESSION_READY_CHIPS]
     case 'load_clash': return ["Trim today's session", 'Keep it as is']
     case 'pattern_spotted': {
       const k = d.pattern?.kind

@@ -49,6 +49,10 @@ export interface HealthAdapter {
   requestWorkoutAccess?(): Promise<boolean>
   /** Workouts recorded by a watch or another app between two instants, as the phone's health store holds them. */
   workoutsBetween?(start: Date, end: Date): Promise<WatchWorkout[]>
+  /** SLEEP (sleep-nights.ts, his pick "A", 26 Nov 2026): the phone's sheet for sleep, read only, asked on his tap. */
+  requestSleepAccess?(): Promise<boolean>
+  /** Sleep sessions between two instants, each with its stages where the watch wrote them. */
+  sleepSessions?(start: Date, end: Date): Promise<{ start: string; end: string; stages?: { start: string; end: string; stage: string }[] | null }[]>
 }
 
 /** One workout as the phone's health store holds it. `type` is the store's own word ('running', 'strengthTraining'). */
@@ -136,6 +140,20 @@ export function healthAdapter(): Promise<HealthAdapter | null> {
               kcal: typeof w.totalEnergyBurned === 'number' && Number.isFinite(w.totalEnergyBurned) ? w.totalEnergyBurned : null,
               distanceM: typeof w.totalDistance === 'number' && Number.isFinite(w.totalDistance) ? w.totalDistance : null,
               source: w.sourceName ?? null,
+            }))
+          },
+          requestSleepAccess: async () => {
+            const status = await Health.requestAuthorization({ read: ['sleep'] })
+            return status.readAuthorized.includes('sleep')
+          },
+          // Android gives a session with its stages inside; Apple gives one sample per stage (its own state on it).
+          // Both become sessions with stages, so one rule reads them (sleep-nights.ts).
+          sleepSessions: async (start, end) => {
+            const res = await Health.readSamples({ dataType: 'sleep', startDate: start.toISOString(), endDate: end.toISOString(), limit: 2000, ascending: true })
+            return res.samples.map(x => ({
+              start: x.startDate, end: x.endDate,
+              stages: x.stages && x.stages.length > 0 ? x.stages.map(st => ({ start: st.startDate, end: st.endDate, stage: st.stage }))
+                : x.sleepState ? [{ start: x.startDate, end: x.endDate, stage: x.sleepState }] : null,
             }))
           },
         }

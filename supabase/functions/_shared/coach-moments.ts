@@ -309,8 +309,14 @@ export function coachMessageShortcut(key: string): 'exercise' | 'nutrition' | nu
  * something carries the yes and the no as one-tap answers in the chat. A tap is his reply to the coach, so the yes
  * reaches a tool the coach already has (trim today: propose_session_shorten) and the no is simply heard.
  */
+/** A copy of coach-voice.ts `SESSION_READY_CHIPS`: the answers to "ready for it?" (his words 26 Nov 2026: one button was not enough choice). */
+export const SESSION_READY_CHIPS: readonly string[] = [
+  "I'm short on time today", "I'm tired today", 'Something hurts today', "I can't train today",
+]
+
 export function coachMessageChips(key: string, d: { pattern?: { kind: string } | null } = {}): string[] {
   switch (key) {
+    case 'workout_today': return [...SESSION_READY_CHIPS]
     case 'load_clash': return ["Trim today's session", 'Keep it as is']
     case 'pattern_spotted': {
       const k = d.pattern?.kind

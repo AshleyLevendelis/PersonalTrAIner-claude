@@ -10,8 +10,9 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import {
   watchActivityName, isStrengthWorkout, countsSteps, watchWorkoutMinutes, watchOffers, watchWhenLine, localDateOf,
-  MIN_OFFER_MINUTES, LOOK_BACK_HOURS,
+  MIN_OFFER_MINUTES, LOOK_BACK_HOURS, activityFamily, isPlannedKind,
 } from '../src/lib/watch-workouts'
+import { heartSeries, heartRange, heartZones, mostlyZone, zoneOf, ZONES, pacePerKm, estimatedMaxHeartRate, rowSpans } from '../src/lib/heart-series'
 import { restingFromOvernight, restingByDay, OVERNIGHT_MIN_READINGS, OVERNIGHT_TO_HOUR } from '../src/lib/health-heart'
 import type { WatchWorkout } from '../src/lib/health-steps'
 
@@ -136,6 +137,87 @@ console.log('\n5. The switch, the tap and the blind read')
   const log = lib.slice(lib.indexOf('export async function logWatchWorkout'))
   check('a logged workout keeps the watch\'s own start and end', /startedAt: w\.start/.test(log) && /endedAt: w\.end/.test(log) && /date: localDateOf\(w\.start\)/.test(log))
   check('the watch\'s own calories are never marked an estimate', /kcalEstimated: ownKcal != null \? false : f\.kcalEstimated/.test(log))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n6. What the heart rate looked like (the summary\'s graph, time by effort and pace)')
+// ---------------------------------------------------------------------------
+{
+  const start = new Date(2026, 8, 16, 10, 0, 0), end = new Date(2026, 8, 16, 10, 40, 0)
+  const every = (mins: number, bpm: (minute: number) => number) => Array.from({ length: Math.floor(40 / mins) + 1 }, (_, i) => ({ bpm: bpm(i * mins), at: new Date(start.getTime() + i * mins * 60000).toISOString() }))
+  // 40 minutes, a reading a minute: 10 minutes at 110, 20 at 140, 10 at 170 (the last reading, at 40:00, holds no time).
+  const stepped = every(1, m => (m < 10 ? 110 : m < 30 ? 140 : 170))
+
+  const series = heartSeries(stepped, start, end, 8)
+  check('the graph is at most the points asked for, in order, each inside the session', series.length === 8 && series.every((p, i) => p.t > 0 && p.t < 1 && (i === 0 || p.t > series[i - 1].t)), series)
+  check('...each point the average of its slice (the first two are 110, the last two 170)', series[0].bpm === 110 && series[1].bpm === 110 && series[6].bpm === 170 && series[7].bpm === 170, series.map(p => p.bpm))
+  check('a watch that wrote a reading every second and one every minute draw the same shape', JSON.stringify(heartSeries(every(1, m => 100 + m), start, end, 8).map(p => p.bpm)) === JSON.stringify(heartSeries(Array.from({ length: 2401 }, (_, i) => ({ bpm: 100 + i / 60, at: new Date(start.getTime() + i * 1000).toISOString() })), start, end, 8).map(p => Math.round(p.bpm))))
+  check('fewer than three readings is no graph', heartSeries(stepped.slice(0, 2), start, end).length === 0)
+  check('readings outside the session are not on it', heartSeries([...stepped, { bpm: 200, at: new Date(end.getTime() + 60000).toISOString() }], start, end, 8).every(p => p.bpm <= 170))
+  check('a reading no heart makes (0, 260) is dropped, not drawn', heartRange([...stepped, { bpm: 0, at: new Date(start.getTime() + 90000).toISOString() }, { bpm: 260, at: new Date(start.getTime() + 150000).toISOString() }], start, end)?.low === 110 && heartRange([...stepped, { bpm: 260, at: new Date(start.getTime() + 150000).toISOString() }], start, end)?.high === 170)
+  check('the range is the true lowest and highest reading', JSON.stringify(heartRange(stepped, start, end)) === '{"low":110,"high":170}')
+
+  check('the estimated maximum is 208 minus 0.7 x age: 187 at 30, 173 at 50', estimatedMaxHeartRate(30) === 187 && estimatedMaxHeartRate(50) === 173)
+  check('...and there is none without an age', estimatedMaxHeartRate(null) === null && estimatedMaxHeartRate(undefined) === null && estimatedMaxHeartRate(0) === null && estimatedMaxHeartRate(140) === null)
+
+  // FIVE ZONES, each a tenth of the maximum (his ruling 26 Nov 2026). At a maximum of 200: zone 2 from 120, zone 3
+  // from 140, zone 4 from 160, zone 5 from 180.
+  check('the lines are 60, 70, 80 and 90% of the maximum', zoneOf(119, 200) === 1 && zoneOf(120, 200) === 2 && zoneOf(139, 200) === 2 && zoneOf(140, 200) === 3 && zoneOf(159, 200) === 3 && zoneOf(160, 200) === 4 && zoneOf(179, 200) === 4 && zoneOf(180, 200) === 5 && zoneOf(200, 200) === 5)
+  check('each zone carries the app\'s effort word: 1 and 2 are easy, 3 is steady, 4 and 5 are hard', ZONES.map(z => z.effort).join(',') === 'easy,easy,steady,hard,hard' && ZONES.map(z => z.word).join(',') === 'Very easy,Easy,Steady,Hard,All out')
+  // The stepped session at a maximum of 200: 10 minutes at 110 (zone 1), 20 at 140 (zone 3), 10 at 170 (zone 4).
+  const z = heartZones(stepped, start, end, 200)
+  check('time in zones: 10 minutes in zone 1 (110), 20 in zone 3 (140), 10 in zone 4 (170)', z !== null && JSON.stringify(z.minutes) === '[10,0,20,10,0]', z)
+  check('...each zone\'s floor in beats, for the range the screen prints (120, 140, 160, 180)', z !== null && JSON.stringify(z.floors) === '[0,120,140,160,180]' && z.maxUsed === 200, z)
+  const flat = (bpm: number) => heartZones(every(1, () => bpm), start, end, 200)?.minutes.join(',')
+  check('a whole session at 179 is zone 4, at 180 zone 5', flat(179) === '0,0,0,40,0' && flat(180) === '0,0,0,0,40', [flat(179), flat(180)])
+  const over = heartZones(every(1, m => (m < 20 ? 150 : 200)), start, end, 180)
+  check('a session that went over the estimate is measured against its own highest reading (150 is zone 3 of 200, not zone 4 of 180)', over?.maxUsed === 200 && over?.minutes.join(',') === '0,0,20,0,20', over)
+  check('no estimate (no age, or a condition ticked), no zones', heartZones(stepped, start, end, null) === null)
+  check('a watch that dropped out for most of the session draws no zones (15 of 40 minutes read)', heartZones(stepped.slice(0, 4), start, end, 200) === null, heartZones(stepped.slice(0, 4), start, end, 200))
+  check('...and a gap is not effort: one reading stands for five minutes at most', heartZones([stepped[0], stepped[1], stepped[2], ...stepped.slice(20)], start, end, 200)?.minutes[0] === 7, heartZones([stepped[0], stepped[1], stepped[2], ...stepped.slice(20)], start, end, 200))
+
+  const zm = (minutes: [number, number, number, number, number]) => ({ minutes, floors: [0, 120, 140, 160, 180] as [number, number, number, number, number], maxUsed: 200 })
+  check('mostly: the zone with the most minutes', mostlyZone(zm([3, 4, 28, 6, 1])) === 3 && mostlyZone(zm([3, 4, 8, 26, 1])) === 4 && mostlyZone(zm([30, 4, 8, 2, 0])) === 1)
+  check('...a tie goes to the lower zone, never the higher', mostlyZone(zm([10, 10, 10, 10, 10])) === 1 && mostlyZone(zm([0, 0, 10, 10, 0])) === 3)
+  check('...and nothing to say with no zones', mostlyZone(null) === null && mostlyZone(zm([0, 0, 0, 0, 0])) === null)
+
+  check('pace: 42 minutes over 5.2 km is 8:05 a kilometre', pacePerKm(42, 5.2) === '8:05', pacePerKm(42, 5.2))
+  check('...seconds are two digits (30 min over 5 km is 6:00)', pacePerKm(30, 5) === '6:00')
+  check('no distance, no pace', pacePerKm(42, null) === null && pacePerKm(42, 0) === null && pacePerKm(0, 5) === null)
+  check('a distance that makes no pace (90 seconds a km, 40 minutes a km) shows none', pacePerKm(15, 10) === null && pacePerKm(40, 1) === null)
+
+  check('tiles fill their rows: 3 is one row, 4 is two and two, 5 is three and two', JSON.stringify(rowSpans(3)) === '[2,2,2]' && JSON.stringify(rowSpans(4)) === '[3,3,3,3]' && JSON.stringify(rowSpans(5)) === '[2,2,2,3,3]')
+  check('...7 is three, two, two (never one alone beside two gaps)', JSON.stringify(rowSpans(7)) === '[2,2,2,3,3,3,3]', rowSpans(7))
+  check('...and every row adds up to the full width, for 1 to 9 tiles', [1, 2, 3, 4, 5, 6, 7, 8, 9].every(n => rowSpans(n).length === n && rowSpans(n).reduce((a, x) => a + x, 0) % 6 === 0))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n7. The plan beside it, and who sees effort bands')
+// ---------------------------------------------------------------------------
+{
+  check('a run and a jog are one kind; a walk and a hike another', activityFamily('Run') === 'run' && activityFamily('Easy jog') === 'run' && activityFamily('Walk') === 'walk' && activityFamily('Hike') === 'walk' && activityFamily('Run') !== activityFamily('Walk'))
+  check('a bike by any name is cycling', activityFamily('Assault Bike — 4 × 3 min') === 'cycle' && activityFamily('Cycling') === 'cycle' && activityFamily('Spin class') === 'cycle')
+  check('a name with no movement in it has no kind', activityFamily('Steady cardio') === null && activityFamily('') === null && activityFamily(null) === null)
+  check('the watch\'s run IS the plan\'s easy jog', isPlannedKind('running', 'Easy jog'))
+  check('...and is not the plan\'s swim or bike', !isPlannedKind('running', 'Swim') && !isPlannedKind('running', 'Assault Bike — 4 × 3 min'))
+  check('a plan that names no movement ("Steady cardio", "Cardio intervals") is met by any cardio the watch names', isPlannedKind('running', 'Steady cardio') && isPlannedKind('cycling', 'Cardio intervals') && isPlannedKind('rowing', 'Steady cardio'))
+  check('...but never by strength training, yoga or a workout the app has no word for', !isPlannedKind('strengthTraining', 'Steady cardio') && !isPlannedKind('yoga', 'Steady cardio') && !isPlannedKind('paddleSports', 'Cardio intervals'))
+  check('a plan that is not cardio at all is met by nothing', !isPlannedKind('running', 'Mobility') && !isPlannedKind('running', null))
+
+  const lib = strip(read('src/lib/watch-workouts.ts'))
+  const log = lib.slice(lib.indexOf('export async function logWatchWorkout'), lib.indexOf('export async function readWatchHeart'))
+  check('counted as the plan\'s session, it is saved under the session\'s own name (so the day reads done)', /activityName: p\.asPlanned\?\.activity \|\| watchActivityName\(w\.type\)/.test(log))
+  check('...keeping the plan\'s exact effort number when he taps the effort it asked for', /intensityRpe: rpeToStore\(p\.effort, p\.asPlanned\?\.targetRpe\)/.test(log))
+  const card = strip(read('src/components/WatchWorkoutsCard.tsx'))
+  check('the plan is put beside a workout only for TODAY\'s session, still to do, and never a strength workout', /const plan = planned && !planned\.done && !strength && localDateOf\(w\.start\) === today \? planned : null/.test(card))
+  check('what it counts as is his choice when made, the kind of movement otherwise', /countAs\?\.id === w\.id \? countAs\.plan : isPlannedKind\(w\.type, plan\.activity\)/.test(card))
+  check('a strength session, a health condition or pregnancy: no zones', /const estimatedMax = noHeartBands \|\| isStrengthWorkout\(shown\.type\) \? null : estimatedMaxHeartRate\(body\.age\)/.test(card))
+  const home = strip(read('src/components/Dashboard.tsx'))
+  check('...and Home says so from the profile\'s own ticks', /noHeartBands=\{\(profile\.health_conditions \?\? \[\]\)\.length > 0\}/.test(home))
+  const figs = strip(read('src/components/WorkoutFigures.tsx'))
+  check('each zone is its number, its word, its range and its minutes, never colour alone', /Z\{ZONES\[i\]\.zone\}/.test(figs) && /\{ZONES\[i\]\.word\}/.test(figs) && /\{range\(i\)\}/.test(figs) && /\{zones\.minutes\[i\]\}/.test(figs))
+  check('...and the screen says the zones come from an ESTIMATED top heart rate', /Zones are tenths of an estimated top heart rate of \{zones\.maxUsed\}/.test(figs))
+  check('the heart rate graph carries a spoken label with its average and highest', /aria-label=\{`Heart rate over the session/.test(figs))
 }
 
 console.log(`\n${ran} checks ran, ${failures} failed`)

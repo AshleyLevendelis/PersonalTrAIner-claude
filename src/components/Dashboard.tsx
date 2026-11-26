@@ -48,6 +48,7 @@ const SessionSummaryDialog = lazyWithReload(() => import('@/components/exercise/
 // AMBIENT: it appears on its own day, nobody taps to open it, so with its file missing Home draws nothing in its place.
 const WeightHistory = lazyWithReload(() => import('@/components/WeightHistory').then(m => ({ default: m.WeightHistory })))
 const WatchWorkoutsCard = lazyWithReload(() => import('@/components/WatchWorkoutsCard').then(m => ({ default: m.WatchWorkoutsCard })))
+const SleepRow = lazyWithReload(() => import('@/components/SleepRow').then(m => ({ default: m.SleepRow })), { ambient: true })
 const ShopDayCard = lazyWithReload(() => import('@/components/ShopDayCard').then(m => ({ default: m.ShopDayCard })), { ambient: true })
 import { personalBest, bestReadingOf, weeksOnPlanPill, weeksOnPlanSentence } from '@/lib/coach-voice'
 import { useCardioLogsToday } from '@/components/exercise/CardioSetRow'
@@ -421,6 +422,15 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     return () => { live = false }
   }, [profile.id])
 
+  // SLEEP FROM THE WATCH (his pick "A", 26 Nov 2026; sleep-nights.ts): the same shape, its own switch.
+  const [sleepOn, setSleepOn] = useState(false)
+  useEffect(() => {
+    if (!isPhoneApp()) return
+    let live = true
+    void import('@/lib/health-sleep').then(m => { if (live) setSleepOn(m.isHealthSleepConnected()) }).catch(() => { /* no row */ })
+    return () => { live = false }
+  }, [profile.id])
+
   // HEART RATE FROM THE PHONE (his 24 Nov 2026 "1 + 2"; health-heart.ts): the same moments as steps. Today's and
   // yesterday's finished sessions get their heart rate, and Progress shows the resting figure's week. Loaded only in the
   // phone app with the switch on; nothing in a browser.
@@ -678,7 +688,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           offered under today's card. Mounted only in the phone app with its switch on; draws nothing with no offer. */}
       {watchOn && profile.id && (
         <Suspense fallback={null}>
-          <WatchWorkoutsCard profileId={profile.id} today={activeSession.date} body={{ weightKg: profile.weight_kg, age: profile.age, gender: profile.gender === 'male' || profile.gender === 'female' ? profile.gender : null }} onLogged={() => { /* the cardio store tells Home's lines */ }} />
+          <WatchWorkoutsCard profileId={profile.id} today={activeSession.date} body={{ weightKg: profile.weight_kg, age: profile.age, gender: profile.gender === 'male' || profile.gender === 'female' ? profile.gender : null }} planned={data.session.activity && data.session.focus ? { activity: data.session.focus, minutes: data.session.activity.minutes, rpe: data.session.activity.rpe ?? null, done: data.session.status === 'done' } : null}
+            noHeartBands={(profile.health_conditions ?? []).length > 0}
+            onLogged={() => { /* the cardio store tells Home's lines */ }} />
         </Suspense>
       )}
 
@@ -776,6 +788,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             </span>
           </div>
         </div>
+        {/* SLEEP (his pick "A", 26 Nov 2026: "show it on Home against his usual"): its own row, in sight without a tap,
+            and only for someone who switched it on, so Home is no longer for anyone else. */}
+        {sleepOn && profile.id && <Suspense fallback={null}><SleepRow profileId={profile.id} today={activeSession.date} /></Suspense>}
         {/* THE TOUR'S PROGRESS STOP POINTS AT THIS, opened (22 Nov 2026, tour-stage.ts): the toggle and what it shows. */}
         <div data-tour="progresspanel">
         <button

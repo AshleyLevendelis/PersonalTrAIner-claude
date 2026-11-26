@@ -40,7 +40,7 @@
 // caller's app clock, exactly as coach-opener.ts takes them.
 // ---------------------------------------------------------------------------
 
-import { recordPhrase, whenSaid, type RecordFact } from './coach-voice'
+import { recordPhrase, whenSaid, SESSION_READY_CHIPS, type RecordFact } from './coach-voice'
 
 export type NudgeKind =
   | 'birthday'
@@ -50,6 +50,7 @@ export type NudgeKind =
   | 'consistency_milestone'
   | 'session_due'
   | 'recovery_flag'
+  | 'effort_gap'
 
 /**
  * WEEKS ON PLAN WORTH A WORD (his 13 Nov 2026 ruling: weekly consistency in place of the streak). Counted over the last
@@ -95,7 +96,12 @@ export interface NudgeInput {
    * RESTING HEART RATE RAISED (his "2", 25 Nov 2026; heart-trends.ts recoveryFlag): the app's sentence and the run's
    * first morning, which keys it, so one run of raised mornings is raised once. Absent: no watch, or nothing raised.
    */
-  recovery?: { line: string; since: string } | null
+  recovery?: { line: string; since: string; kind?: 'sleep' } | null
+  /**
+   * AN EASY SESSION THAT RAN HARD (his pick 26 Nov 2026, "A"; heart-trends.ts easyRanHard): the app's sentence and the
+   * session's key. Raised once per session, as an offer; null otherwise.
+   */
+  effortGap?: { line: string; key: string } | null
 }
 
 export interface CoachNudge {
@@ -124,6 +130,7 @@ export function nudgeKeys(input: NudgeInput): {
   consistency: string | null
   due: string | null
   recovery: string | null
+  effortGap: string | null
 } {
   const milestone = CONSISTENCY_MILESTONES.includes(input.weeksOnPlan) ? input.weeksOnPlan : null
   return {
@@ -146,6 +153,7 @@ export function nudgeKeys(input: NudgeInput): {
     recovery: input.recovery && input.planKnown && input.todaySession && !input.todayLogged && input.hour < input.cutoffHour
       ? `recovery:${input.recovery.since}`
       : null,
+    effortGap: input.effortGap ? input.effortGap.key : null,
   }
 }
 
@@ -242,9 +250,16 @@ export function pickNudge(input: NudgeInput, said: string[]): CoachNudge | null 
     return {
       kind: 'recovery_flag',
       keys: [keys.recovery, ...(keys.due ? [keys.due] : [])],
-      text: recoveryOfferText(input.recovery.line, input.todaySession.focus),
+      text: recoveryOfferText(input.recovery.line, input.todaySession.focus, input.recovery.kind),
       chips: RECOVERY_CHIPS,
     }
+  }
+
+  // 2c. AN EASY SESSION THAT RAN HARD (his pick 26 Nov 2026, "A": "Mention it and offer ... Nothing changes without a
+  //     yes"). About something that happened, so above a best and the day's session; below the recovery offer, which
+  //     changes what he does today. The first answer asks the coach for help; the second is simply heard.
+  if (unsaid(keys.effortGap) && input.effortGap) {
+    return { kind: 'effort_gap', keys: [keys.effortGap], text: effortGapText(input.effortGap.line), chips: [...EFFORT_GAP_CHIPS] }
   }
 
   // 3. A personal best that has not been mentioned. The one event here that is
@@ -281,7 +296,7 @@ export function pickNudge(input: NudgeInput, said: string[]): CoachNudge | null 
       kind: 'session_due',
       keys: [keys.due],
       text: `Today's ${input.todaySession.focus}: ${input.todaySession.movements}. Feeling good for it?`,
-      chips: ["I'm short on time today — can you trim the session?"],
+      chips: [...SESSION_READY_CHIPS],
     }
   }
 
@@ -394,6 +409,7 @@ const NUDGE_MOMENT: Record<NudgeKind, string> = {
   consistency_milestone: 'consistency_milestone',
   session_due: 'workout_today',
   recovery_flag: 'recovery_flag',
+  effort_gap: 'effort_gap',
 }
 
 /** The marker the day's hello carries in the chat. */
@@ -478,7 +494,8 @@ export function pickUnprompted(input: UnpromptedInput): Unprompted | null {
       text: helloDue ? greeted(input.greeting, input.event.text) : input.event.text,
       chips: input.event.chips,
       keys: [...input.event.keys, ...(helloDue ? [hello] : [])],
-      moment, shortcut: null, fromOpener: false,
+      // "Feeling good for it?" carries the yes as the button that does it (26 Nov 2026): open today's session.
+      moment, shortcut: input.event.kind === 'session_due' ? 'exercise' : null, fromOpener: false,
     }
   }
 
@@ -492,7 +509,7 @@ export function pickUnprompted(input: UnpromptedInput): Unprompted | null {
 
   if (helloDue) {
     const h = input.hello()
-    if (h) return { text: h.text, chips: h.chips, keys: [hello], moment: HELLO_MOMENT, shortcut: null, fromOpener: true, openerKind: h.kind }
+    if (h) return { text: h.text, chips: h.chips, keys: [hello], moment: HELLO_MOMENT, shortcut: h.kind === 'training_today' ? 'exercise' : null, fromOpener: true, openerKind: h.kind }
   }
 
   if (since < MOMENT_MIN_GAP_MS) return null
@@ -528,8 +545,17 @@ export function openerSkips(keys: ReturnType<typeof nudgeKeys>, said: string[]):
   }
 }
 
+/** An easy session that ran hard: the question after the app's sentence, and its two answers. */
+export const EFFORT_GAP_CHIPS: readonly string[] = ['Yes, help me keep the next one easy', 'It was on purpose']
+export function effortGapText(line: string): string {
+  return `${line} Want the next one slower, or was that on purpose?`
+}
+
 /** The recovery offer's words and replies, one place for the event above and the opener (coach-opener.ts). */
 export const RECOVERY_CHIPS = ['Give me the shortest version today', "I feel fine, keep it as it is"]
-export function recoveryOfferText(line: string, focus: string): string {
+export function recoveryOfferText(line: string, focus: string, kind?: 'sleep'): string {
+  // TWO SHORT NIGHTS (his pick "A", 26 Nov 2026; sleep-nights.ts): the same offer and the same two answers, its own
+  // reason. It says what short sleep does to a session and nothing about his sleep itself.
+  if (kind === 'sleep') return `${line} Short sleep makes hard work feel harder. Want today's ${focus} lighter?`
   return `${line} That can mean you're still carrying some fatigue. Want today's ${focus} lighter?`
 }

@@ -109,3 +109,58 @@ export function recoveryFlag(rows: { date: string; bpm: number }[], today: strin
   const since = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   return { usual, above, since, line: `Your resting heart rate has been about ${above} above your usual (${usual}) for ${RAISED_DAYS} mornings.` }
 }
+
+// ---------------------------------------------------------------------------
+// 3. AN EASY SESSION THAT RAN HARD (his pick 26 Nov 2026, "A": the coach mentions it and offers; nothing changes
+//    without a yes). The plan asked for Easy and the heart rate says otherwise: its AVERAGE over the session sat in
+//    zone 4 or 5 (80% or more of his estimated maximum). The one gap the app speaks about, because it is the commonest
+//    real fault and the one with a clear cost: an easy day run hard stops being recovery or base work and borrows from
+//    the hard days. A hard session that ran easy is not raised (intervals rest between efforts, so their average says
+//    little), nor is a Steady one. By the average, which every logged session keeps whatever recorded it, so a strap,
+//    a watch that synced late and a phone restart all reach the same answer. Looked for on today and yesterday only:
+//    older than that it is not news. CSCS, mine; the maximum is an estimate (heart-series.ts), so the words say what
+//    was seen and ask, and never tell him he got it wrong. Not for anyone with a health condition or pregnancy
+//    ticked, and not without an age: the caller passes no maximum for them.
+// ---------------------------------------------------------------------------
+export interface EffortGap {
+  /** One per session, so it is raised once. */
+  key: string
+  line: string
+}
+const EASY_RPE_MAX = 4
+const HARD_FROM_SHARE = 0.8
+const MIN_MINUTES = 10
+
+export function easyRanHard(p: {
+  /** Logged cardio with a heart figure, any order. */
+  logs: { date: string; activity_name: string; duration_minutes: number; avg_heart_rate?: number | null; max_heart_rate?: number | null }[]
+  /** The plan's session on a date: its activity name and target effort, or null. */
+  plannedOn: (date: string) => { activity: string; targetRpe?: number | null } | null
+  /** His estimated maximum heart rate, or null when heart rate is not to be judged for him. */
+  estimatedMax: number | null
+  today: string
+}): EffortGap | null {
+  if (p.estimatedMax == null) return null
+  const t = dayNum(p.today)
+  const recent = p.logs
+    .filter(l => { const ago = t - dayNum(l.date); return ago === 0 || ago === 1 })
+    .sort((a, b) => b.date.localeCompare(a.date))
+  for (const l of recent) {
+    const avg = Number(l.avg_heart_rate)
+    if (!(avg > 0) || !(l.duration_minutes >= MIN_MINUTES)) continue
+    const plan = p.plannedOn(l.date)
+    if (!plan || plan.targetRpe == null || plan.targetRpe > EASY_RPE_MAX) continue
+    if (keyOf(plan.activity) !== keyOf(l.activity_name)) continue
+    const max = Math.max(p.estimatedMax, Number(l.max_heart_rate) || 0)
+    const share = avg / max
+    if (share < HARD_FROM_SHARE) continue
+    const zone = share >= 0.9 ? 5 : 4
+    const name = l.activity_name.split(/\s+[—–-]\s+/)[0].trim()
+    const when = l.date === p.today ? "Today's" : "Yesterday's"
+    return {
+      key: `effort-gap:${l.date}:${keyOf(l.activity_name)}`,
+      line: `${when} ${name} was planned easy, and your heart rate averaged ${Math.round(avg)}, which is zone ${zone} for you.`,
+    }
+  }
+  return null
+}
