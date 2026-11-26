@@ -3,7 +3,7 @@ PLAN QUALITY SCORE REPORT
 ================================================================================
 
 Combinations scored: 9216
-Runtime: 1403.0s
+Runtime: 1600.7s
 Overall average: 11.79 / 12
 
 Per-dimension averages (max 2.0 each):
@@ -25,18 +25,18 @@ Score distribution (out of 12):
   [7-8)     0
   [8-9)     0
   [9-10)    0
-  [10-11)  # 141
-  [11-12]  ########################################################### 9075
+  [10-11)  # 138
+  [11-12]  ########################################################### 9078
 
 Plans below the 7.2 floor: 0 / 9216
 
 --------------------------------------------------------------------------------
 RULE FREQUENCY — combinations tripping each rule (of 9216)
 --------------------------------------------------------------------------------
-  progression/frozen_week                          3169  34.4%
-  goalAlignment/recovery_volume_not_reduced         759  8.2%
+  progression/frozen_week                          3170  34.4%
+  goalAlignment/recovery_volume_not_reduced         754  8.2%
+  selection/push_pull_imbalance                      54  0.6%
   timeFit/conditioning_share_over_budget             51  0.6%
-  selection/push_pull_imbalance                      40  0.4%
   goalAlignment/fat_loss_load_too_low                20  0.2%
   selection/load_incoherent                          19  0.2%
   goalAlignment/fat_loss_structure_reduced           16  0.2%
@@ -102,12 +102,11 @@ Score 10.6/12 — full_gym / none / 30-45 / functional / beginner / hypertrophy 
     [frozen_week] wk10 Friday: Barbell Squats: load and reps both unchanged from week 10 to week 11 (11-13 @ 42.5) — only the RPE label differs
     [frozen_week] wk13 Monday: Barbell Squats: load and reps both unchanged from week 13 to week 14 (11-13 @ 42.5) — only the RPE label differs
     [frozen_week] wk13 Tuesday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (11-13 @ 30) — only the RPE label differs
-    [frozen_week] wk13 Thursday: Deadlifts: load and reps both unchanged from week 13 to week 14 (11-13 @ 57.5) — only the RPE label differs
+    [frozen_week] wk13 Thursday: Sumo Deadlift: load and reps both unchanged from week 13 to week 14 (11-13 @ 57.5) — only the RPE label differs
     [frozen_week] wk13 Friday: Barbell Squats: load and reps both unchanged from week 13 to week 14 (11-13 @ 42.5) — only the RPE label differs
     [frozen_week] wk14 Monday: Barbell Squats: load and reps both unchanged from week 14 to week 15 (11-13 @ 42.5) — only the RPE label differs
     [frozen_week] wk14 Tuesday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (11-13 @ 30) — only the RPE label differs
-    [frozen_week] wk14 Thursday: Deadlifts: load and reps both unchanged from week 14 to week 15 (11-13 @ 57.5) — only the RPE label differs
-    [frozen_week] wk14 Thursday: Lat Pulldown: load and reps both unchanged from week 14 to week 15 (11-13 @ 30) — only the RPE label differs
+    [frozen_week] wk14 Thursday: Sumo Deadlift: load and reps both unchanged from week 14 to week 15 (11-13 @ 57.5) — only the RPE label differs
     [frozen_week] wk14 Friday: Barbell Squats: load and reps both unchanged from week 14 to week 15 (11-13 @ 42.5) — only the RPE label differs
   Goal alignment (1.0/2):
     [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (45) not >=23% below high (58)
@@ -119,11 +118,11 @@ Score 10.6/12 — full_gym / none / 30-45 / functional / beginner / functional /
     [frozen_week] wk10 Friday: Barbell Squats: load and reps both unchanged from week 10 to week 11 (11-13 @ 42.5) — only the RPE label differs
     [frozen_week] wk13 Monday: Barbell Squats: load and reps both unchanged from week 13 to week 14 (11-13 @ 42.5) — only the RPE label differs
     [frozen_week] wk13 Tuesday: Barbell Bench Press: load and reps both unchanged from week 13 to week 14 (11-13 @ 30) — only the RPE label differs
-    [frozen_week] wk13 Thursday: Trap Bar Deadlift: load and reps both unchanged from week 13 to week 14 (11-13 @ 57.5) — only the RPE label differs
+    [frozen_week] wk13 Thursday: Deadlifts: load and reps both unchanged from week 13 to week 14 (11-13 @ 57.5) — only the RPE label differs
     [frozen_week] wk13 Friday: Barbell Squats: load and reps both unchanged from week 13 to week 14 (11-13 @ 42.5) — only the RPE label differs
     [frozen_week] wk14 Monday: Barbell Squats: load and reps both unchanged from week 14 to week 15 (11-13 @ 42.5) — only the RPE label differs
     [frozen_week] wk14 Tuesday: Barbell Bench Press: load and reps both unchanged from week 14 to week 15 (11-13 @ 30) — only the RPE label differs
-    [frozen_week] wk14 Thursday: Trap Bar Deadlift: load and reps both unchanged from week 14 to week 15 (11-13 @ 57.5) — only the RPE label differs
+    [frozen_week] wk14 Thursday: Deadlifts: load and reps both unchanged from week 14 to week 15 (11-13 @ 57.5) — only the RPE label differs
     [frozen_week] wk14 Friday: Barbell Squats: load and reps both unchanged from week 14 to week 15 (11-13 @ 42.5) — only the RPE label differs
   Goal alignment (1.0/2):
     [recovery_volume_not_reduced] wk1: low recovery_capacity weekly sets (47) not >=23% below high (60)
