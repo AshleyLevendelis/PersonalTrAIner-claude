@@ -84,8 +84,9 @@ Never write to the PRODUCTION database any other way. Never print a secret's val
      workout as a summary (figures, a heart rate graph, time in five heart rate zones); one effort tap logs it.
    - Same page: switch on "Sleep from your watch" (say Allow to sleep). Home then shows last night against his usual
      with the week as bars (the usual needs five nights in Health Connect).
-   - Chat: a question from the coach about today's session shows "Open today's session" and four answers under it. Also on that Profile page, with "Heart rate from your watch" on, Home > Progress
-     should show a resting heart rate after a few nights (it is worked out from overnight readings on a Samsung).
+   - Same page, with "Heart rate from your watch" on: Home > Progress should show a resting heart rate after a few
+     nights (it is worked out from overnight readings on a Samsung).
+   - Chat: a question from the coach about today's session shows "Open today's session" and four answers under it.
    - Tools tab: "Start walk" / "Start run", then End: steps, distance and calories fill in, one effort tap logs it.
      The first time, the phone asks for distance and calories permission: say Allow.
    - Exercise tab: under any day, "Start your own workout" / "Log a workout you did" / "Plan a workout".
