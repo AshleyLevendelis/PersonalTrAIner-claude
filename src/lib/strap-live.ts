@@ -146,6 +146,13 @@ export function strapReadingsBetween(start: Date, end: Date) {
   return readings.summary(start, end)
 }
 
+/** The readings themselves for a window, oldest first: a session's graph (heart-series.ts). */
+export function strapSamplesBetween(start: Date, end: Date): { bpm: number; at: string }[] {
+  loadReadings()
+  const a = start.getTime(), b = end.getTime()
+  return readings.all().filter(r => { const t = Date.parse(r.at); return t >= a && t <= b })
+}
+
 /** Once every session that could use them has its figure, the readings go. */
 export function forgetStrapReadingsBefore(t: Date): void {
   loadReadings()

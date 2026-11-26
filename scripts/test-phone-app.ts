@@ -37,8 +37,9 @@ console.log('\n1. Android declares READ_STEPS and removes every other health per
   // health permission joins only by a decision, and Google reviews every one.
   // + READ_DISTANCE and READ_ACTIVE_CALORIES_BURNED, his "A, build it" 25 Nov 2026 (a recorded walk or run, activity-recording.ts).
   // + READ_EXERCISE, his brief 26 Nov 2026 (workouts the watch recorded, watch-workouts.ts).
-  const allowed = ['READ_ACTIVE_CALORIES_BURNED', 'READ_DISTANCE', 'READ_EXERCISE', 'READ_HEART_RATE', 'READ_RESTING_HEART_RATE', 'READ_STEPS']
-  check('READ_STEPS, heart rate, distance, active calories and workouts are declared, and nothing else', JSON.stringify([...declared].sort()) === JSON.stringify(allowed), declared)
+  // + READ_SLEEP, his pick "A" 26 Nov 2026 (sleep against his usual, sleep-nights.ts).
+  const allowed = ['READ_ACTIVE_CALORIES_BURNED', 'READ_DISTANCE', 'READ_EXERCISE', 'READ_HEART_RATE', 'READ_RESTING_HEART_RATE', 'READ_SLEEP', 'READ_STEPS']
+  check('READ_STEPS, heart rate, distance, active calories, workouts and sleep are declared, and nothing else', JSON.stringify([...declared].sort()) === JSON.stringify(allowed), declared)
   const kept = pluginPerms.filter(p => !allowed.includes(p) && !removed.has(p))
   check('every other health permission the plugin declares is removed', kept.length === 0, kept)
   check('the tools namespace the removals need is on the manifest', /xmlns:tools="http:\/\/schemas\.android\.com\/tools"/.test(app))
@@ -54,7 +55,7 @@ console.log('\n2. iPhone: the sentence on the permission sheet, and the HealthKi
   const share = (plist.match(/<key>NSHealthShareUsageDescription<\/key>\s*<string>([^<]+)<\/string>/) ?? [])[1] ?? ''
   // Since 25 Nov 2026 (a recorded walk or run) the app reads more than steps, and the sentence must name every kind it
   // asks for. It said "steps only" from 24 Nov while the heart rate switch was already asking for heart rate.
-  check('the read sentence names every kind the app reads: steps, distance, calories, heart rate', ['step', 'distance', 'calories', 'heart rate'].every(w => share.toLowerCase().includes(w)) && !/steps only/i.test(share), share)
+  check('the read sentence names every kind the app reads: steps, distance, calories, heart rate, sleep', ['step', 'distance', 'calories', 'heart rate', 'sleep'].every(w => share.toLowerCase().includes(w)) && !/steps only/i.test(share), share)
   check('...and says it never writes to Health', /never writes/i.test(share), share)
   check('no write sentence: the app asks to write nothing', !/NSHealthUpdateUsageDescription/.test(plist))
   const ent = read('ios/App/App/App.entitlements')
@@ -71,7 +72,8 @@ console.log('\n3. The code asks for what the settings say, and the website never
   // asked only from its own switch. Read only, both.
   // A third since 25 Nov 2026: the first Start of a recorded walk or run (activity-recording.ts).
   // A fourth since 26 Nov 2026: the watch's workouts, from their own switch (watch-workouts.ts).
-  check('four permission requests, steps, heart rate, a recording and the workouts from a watch, read only and nothing else', JSON.stringify(asks) === JSON.stringify(["read:['steps']", "read:['heartRate','restingHeartRate']", "read:['steps','distance','calories','heartRate']", "read:['workouts','distance','calories','heartRate','steps']"]), asks)
+  // A fifth the same day: sleep, from its own switch (health-sleep.ts).
+  check('five permission requests, steps, heart rate, a recording, the workouts from a watch and sleep, read only and nothing else', JSON.stringify(asks) === JSON.stringify(["read:['steps']", "read:['heartRate','restingHeartRate']", "read:['steps','distance','calories','heartRate']", "read:['workouts','distance','calories','heartRate','steps']", "read:['sleep']"]), asks)
   check('nothing is ever written to Health', !/saveSample|write:/.test(src))
   check('the plugin is loaded by a dynamic import only (the website\'s download does not grow)', /await import\('@capgo\/capacitor-health'\)/.test(src))
   const statics = ['src/components/Dashboard.tsx', 'src/components/ProfileScreen.tsx', 'src/components/HealthStepsSection.tsx', 'src/lib/health-steps.ts', 'src/main.tsx', 'src/App.tsx']

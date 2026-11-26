@@ -24,7 +24,7 @@
 // day" fact come in from the caller's app clock.
 // ---------------------------------------------------------------------------
 
-import { welcomeBackOpener } from './coach-voice'
+import { welcomeBackOpener, SESSION_READY_CHIPS } from './coach-voice'
 import { RECOVERY_CHIPS, recoveryOfferText } from './coach-nudge'
 
 export type OpenerKind =
@@ -120,7 +120,7 @@ export interface OpenerInput {
    * rate has sat 5 or more above his usual for three mornings and this run has not been raised before (the caller asks
    * the coach's said-once memory, coach-nudge.ts openerSkips). Null otherwise.
    */
-  recovery?: { line: string } | null
+  recovery?: { line: string; kind?: 'sleep' } | null
 }
 
 /**
@@ -275,6 +275,7 @@ export function pickOpener(input: OpenerInput): Opener {
       kind: 'plan_unknown',
       text: PLAN_UNKNOWN_TEXT,
       chips: [
+        "All good today", "It's been a rough one",
         "What's on for today?",
         'How am I doing so far?',
       ],
@@ -304,7 +305,7 @@ export function pickOpener(input: OpenerInput): Opener {
   //     before his usual hour), because afterwards there is nothing left to lighten. The words name no cause: a raised
   //     resting heart rate is a sign of carrying fatigue, never a diagnosis (CSCS, mine).
   if (input.recovery && todaySession && !todayLogged && hour < cutoffHour) {
-    const text = recoveryOfferText(input.recovery.line, todaySession.focus)
+    const text = recoveryOfferText(input.recovery.line, todaySession.focus, input.recovery.kind)
     return {
       kind: 'recovery_flag',
       // The opener's sentence follows "Hey Sam — ", so it starts lower-case.
@@ -330,7 +331,9 @@ export function pickOpener(input: OpenerInput): Opener {
       text: todayLogged
         ? `today was ${todaySession.focus} (${todaySession.movements}). How'd it go?`
         : `did today's ${todaySession.focus} happen?`,
-      chips: [],
+      // A yes-or-no question with no button was the one-button problem at its worst (26 Nov 2026). How it WENT stays
+      // open (no buttons: his own words are the point); whether it HAPPENED has three honest answers.
+      chips: todayLogged ? [] : ['Yes, I trained', 'Not yet, later today', "It didn't happen"],
       attention: false,
     }
   }
@@ -358,7 +361,7 @@ export function pickOpener(input: OpenerInput): Opener {
       return {
         kind: 'training_today',
         text: `today's ${todaySession.focus}: ${todaySession.movements}. Feeling good for it?`,
-        chips: todayLogged ? [] : ["I'm short on time today — can you trim the session?"],
+        chips: todayLogged ? [] : [...SESSION_READY_CHIPS],
         attention: false,
       }
     }
@@ -368,7 +371,9 @@ export function pickOpener(input: OpenerInput): Opener {
     return {
       kind: 'rest_day',
       text: `it's a rest day on your plan. How's the recovery going?${ahead}`,
+      // The first two ANSWER the question asked; the other two are where he might go next (26 Nov 2026).
       chips: [
+        'Feeling fresh', "I'm still sore",
         tomorrowSession ? `What's ${tomorrowSession.dayName === 'tomorrow' ? 'tomorrow' : tomorrowSession.dayName} looking like?` : "What's my next session?",
         'Any mobility work worth doing today?',
       ],
@@ -382,7 +387,8 @@ export function pickOpener(input: OpenerInput): Opener {
     // CHIPS THAT ARE NOT THE SESSION. The point of this opener is that the
     // plan is not the headline; three buttons about the plan underneath it
     // would put it straight back.
-    chips: ['How am I doing so far?', 'I could do with some advice'],
+    // The first two answer "how's it going?"; the others are where he might go next (26 Nov 2026).
+    chips: ["All good today", "It's been a rough one", 'How am I doing so far?', 'I could do with some advice'],
     attention: false,
   })
 

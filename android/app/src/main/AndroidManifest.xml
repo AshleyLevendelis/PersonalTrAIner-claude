@@ -49,7 +49,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- STEPS ONLY (20 Nov 2026). The health plugin declares read AND write for every kind of health data it supports;
          Google Play refuses an app that declares health permissions it does not use, so every one but READ_STEPS, READ_HEART_RATE and READ_RESTING_HEART_RATE (24 Nov 2026), READ_DISTANCE and
-         READ_ACTIVE_CALORIES_BURNED (a recorded walk or run, 25 Nov 2026) and READ_EXERCISE (workouts the watch recorded, 26 Nov 2026) is
+         READ_ACTIVE_CALORIES_BURNED (a recorded walk or run, 25 Nov 2026), READ_EXERCISE (workouts the watch recorded, 26 Nov 2026) and READ_SLEEP (his pick "A", 26 Nov 2026) is
          removed here. Add a line back only when the app starts reading that kind of data. -->
     <!-- HEART RATE STRAP (option 3, 25 Nov 2026; src/lib/strap-live.ts). Android 12+: scan and connect, the scan
          declared never to work out where he is. The Bluetooth plugin also declares location for every Android version;
@@ -69,7 +69,6 @@
     <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_WEIGHT" tools:node="remove" />
     <uses-permission android:name="android.permission.health.WRITE_WEIGHT" tools:node="remove" />
-    <uses-permission android:name="android.permission.health.READ_SLEEP" tools:node="remove" />
     <uses-permission android:name="android.permission.health.WRITE_SLEEP" tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_RESPIRATORY_RATE" tools:node="remove" />
     <uses-permission android:name="android.permission.health.WRITE_RESPIRATORY_RATE" tools:node="remove" />
@@ -108,5 +107,8 @@
     <!-- WORKOUTS THE WATCH RECORDED, READ ONLY (his brief 26 Nov 2026; src/lib/watch-workouts.ts): a workout started on
          the watch is offered on Home. Asked only when he taps "Read my watch's workouts" on Profile. -->
     <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+    <!-- SLEEP, READ ONLY (his pick "A", 26 Nov 2026; src/lib/sleep-nights.ts): how long he slept, shown on Home against
+         his usual. Asked only when he taps "Read my sleep" on Profile. Nothing about it is saved off the phone. -->
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
 
 </manifest>

@@ -188,7 +188,8 @@ async function main() {
     check('Home: the latest PR is on the card\'s face; the weight, recent PRs and volume sit behind its Progress row', cardAt !== -1 && prAt > cardAt && toggleAt > prAt && openAt > toggleAt && weightAt > openAt && recentAt > openAt && volAt > openAt, { cardAt, prAt, toggleAt, openAt, weightAt, recentAt, volAt })
     check('...which says the weight and the PR state while closed', /lastWeighIn \? `\$\{lastWeighIn\.kg\.toFixed\(1\)\} kg`/.test(homeCode.slice(toggleAt, openAt)))
     const rings = [...homeCode.matchAll(/<RingCell k="(\w+)"/g)].map(m => m[1])
-    check('Home: the rings are one row of four (calories, protein, water, steps), and no sleep ring: the app records none', (/grid grid-cols-4[^"]*" data-home-today data-home-rings/.test(homeCode) || /grid \$\{showNumbers \? 'grid-cols-4' : 'grid-cols-2'\}[^`]*`\} data-home-today data-home-rings/.test(homeCode)) && rings.join(',') === 'calories,protein,water,steps' && !/sleep/i.test(homeCode), rings)
+    // RE-ANCHORED 26 Nov 2026 (sleep option A is a row, not a ring): the property is "no sleep RING", not "no word sleep".
+    check('Home: the rings are one row of four (calories, protein, water, steps), and no sleep ring: sleep is a row, never a target', (/grid grid-cols-4[^"]*" data-home-today data-home-rings/.test(homeCode) || /grid \$\{showNumbers \? 'grid-cols-4' : 'grid-cols-2'\}[^`]*`\} data-home-today data-home-rings/.test(homeCode)) && rings.join(',') === 'calories,protein,water,steps' && !/<RingCell k="sleep/i.test(homeCode), rings)
   }
   const nudge = read('src/components/TrainerNudge.tsx')
   {

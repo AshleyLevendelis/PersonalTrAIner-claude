@@ -1898,6 +1898,34 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   rate is worked out from the night's readings when the watch shares none (never mixed with a shared figure). Step 1 of
   `docs/plans/watch-data.md`; sleep (step 2) waits on his pick. `test:watch-workouts`, `verify:watch-workouts`. Needs a
   phone app rebuild. NOT on a real watch yet
+- **The watch workout card is a summary: his words 26 Nov 2026** ("too simple, doesnt add any real value and doesnt for
+  the aesthetic", with Garmin's and Apple's summaries): figures as tiles, the heart rate as a graph, and **time in five
+  heart rate zones: his ruling the same day, "heart rate zones is better than the 3 options for effort"** (tenths of an
+  estimated maximum, zone 5 at the top, each with the app's effort word; "a guide"; none for strength, a health
+  condition, pregnancy or no age). It NARROWS "never a zone": zones describe a finished session, nothing is prescribed
+  by one. On a planned cardio day the plan sits beside what he did, and a matching workout starts as "Today's session"
+  (mine, his to overturn; a lifting day is unchanged: extra work). The walk-and-run recorder's End shows the same
+  summary. `test:watch-workouts`, `verify:watch-workouts`, `verify:record-activity`. Needs a phone app rebuild
+- **An easy session that ran hard is mentioned, as an offer: his pick 26 Nov 2026, "A"** (over adjusting the next session
+  unasked, and over leaving it): planned Easy, logged under the plan's name, heart rate averaging zone 4 or 5: the coach
+  says what was seen and asks "Want the next one slower, or was that on purpose?", once, today's or yesterday's only.
+  Mine (CSCS): only this gap is raised; a yes gets the talk test, never a number to hold. `test:heart-trends` §6,
+  `verify:heart-uses` D. Needs the `chat-gemini` deploy
+- **A question never has just one button: his words 26 Nov 2026, "Quick reply buttons dont give enough choice"**: "Ready
+  for it?" carries four real answers (short on time, tired, something hurts, can't train) and "Open today's session" as
+  the yes, on the phone's reminder, the chat's event and the hello; a yes-or-no question has its answers; the coach is
+  told the same for its own replies. Four is the most the chat draws. `test:coach-opener` §11, `test:coach-nudge`,
+  `test:coach-moments`. Needs the `chat-gemini` and `coach-reach-out` deploys
+- **The coach does not speak while the chat is being re-read** (26 Nov 2026, his screenshot: the 8:00 reminder and the
+  same question at 8:05): coming back to the app, the decision waits for the server's rows. Held by source checks; the
+  driver could not reproduce the double message on the old code (BACKLOG). `test:coach-nudge` §9, `verify:coach-reopen`
+- **Sleep: his pick 26 Nov 2026, "A"** (from three options: read it, show it on Home against his usual, tell the coach;
+  after two or more short nights the coach OFFERS a lighter session, main lift kept; never changes the plan unasked, no
+  score). Its own Profile switch, read only; Home's row in sight without a tap; NOTHING about his sleep is saved (read
+  from the phone each time, no migration). CSCS, mine: a night is time asleep, its longest sleep, two hours at least;
+  short is an hour or more under his usual (median of nights 3-16 back) and under seven hours; one short night changes
+  nothing; a raised resting heart rate comes first where both are true. `test:sleep`, `verify:sleep`,
+  `docs/plans/watch-data.md`. Needs the `chat-gemini` deploy and a phone app rebuild. NOT on a real watch yet
 - **Heart rate from a watch: his "1 + 2, build it", 24 Nov 2026**: after each session its average and highest heart rate
   (from Health Connect, which the watch writes to) show under it, and Progress shows resting heart rate against last
   week. Read only, its own switch, phone app only; never a target or zone. `test:health-heart`, `verify:health-steps`

@@ -27,6 +27,7 @@ import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { pickOpener, missedYesterdayFrom, movementList, sessionMovements, type OpenerInput } from '../src/lib/coach-opener'
+import { SESSION_READY_CHIPS } from '../src/lib/coach-voice'
 import { pickAccountabilityCheckIn, type AccountabilityInput } from '../src/lib/accountability'
 import type { ChatMessage } from '../src/lib/types'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, loadSeenAttention, saveSeenAttention } from '../src/lib/chat-unread'
@@ -594,6 +595,48 @@ console.log('\n10. A session\'s exercises read as a phrase, never as four dots (
   check('a session is named by its lifts, not by its warm-up drill', sessionMovements(day) === 'Front Squat, Overhead Carry, Pallof Press and more', sessionMovements(day))
   check('...a session that is only warm-up drills still names them', sessionMovements([{ name: 'Clamshell', tier: 'tier_0_primer' }, { name: 'Leg Swings', tier: 'tier_0_primer' }]) === 'Clamshell, Leg Swings')
   check('...and one with no tiers recorded (a logged day) is listed as it stands', sessionMovements([{ name: 'Squat' }, { name: 'Lunge' }]) === 'Squat, Lunge')
+}
+
+// ---------------------------------------------------------------------------
+// A QUESTION NEVER HAS JUST ONE BUTTON (his words 26 Nov 2026, with a screenshot of "Feeling good for it?" over a single
+// button: "Quick reply buttons dont give enough choice"). One button under a question reads as the only answer allowed.
+// Every opener that ends on a question carries none (a question that wants his own words) or at least two.
+// ---------------------------------------------------------------------------
+console.log('\n11. A question never has just one button')
+{
+  const feel = { date: '2026-09-15', day: 'Tuesday', isToday: false }
+  const every: [string, OpenerInput][] = [
+    ['welcome_back', { ...base, breakDays: 14 }],
+    ['session_feel', { ...base, awaitingFeel: feel }],
+    ['missed_yesterday', { ...base, missedYesterday: { focus: 'Legs' } as never }],
+    ['plan_unknown', planLoading],
+    ['session_moved', { ...restDay, movedTo: { dayName: 'Friday' } }],
+    ['recovery_flag', { ...base, recovery: { line: 'X.' } }],
+    ['training_done_today', { ...base, hour: 20 }],
+    ['training_done_today', { ...base, hour: 20, todayLogged: true }],
+    ['training_today', { ...base, lastOrdinaryKind: 'noticed' }],
+    ['rest_day', { ...restDay, lastOrdinaryKind: 'noticed' }],
+    ['check_in', { ...base, lastOrdinaryKind: 'session' }],
+    ['noticed', { ...base, lastOrdinaryKind: 'check_in', noticed: { text: 'your squat went up 5kg this week.' } }],
+  ]
+  const picked = every.map(([kind, input]) => ({ want: kind, o: pickOpener(input) }))
+  check('every kind of opener was reached (the fixture binds)', picked.every(p => p.o.kind === p.want), picked.filter(p => p.o.kind !== p.want).map(p => `${p.want} -> ${p.o.kind}`))
+  const lone = picked.filter(p => /\?\s*$/.test(p.o.text) && p.o.chips.length === 1).map(p => `${p.o.kind}: ${p.o.text}`)
+  check('no opener that ends on a question has exactly one button', lone.length === 0, lone)
+  check('...and the detector fires on the old shape (a question over one button)', /\?\s*$/.test('Feeling good for it?') && ["I'm short on time today"].length === 1)
+  const today = pickOpener({ ...base, lastOrdinaryKind: 'noticed' })
+  check('"Feeling good for it?" carries the four real answers: short on time, tired, something hurts, cannot train', JSON.stringify(today.chips) === JSON.stringify(SESSION_READY_CHIPS) && today.chips.length === 4, today.chips)
+  check('...each a whole sentence of his own (it is SENT as his message), three words at least', SESSION_READY_CHIPS.every(c => c.trim().split(/\s+/).length >= 3 && /^[A-Z]/.test(c)))
+  check('...all four different, and no more than the chat draws under one message (four)', new Set(SESSION_READY_CHIPS).size === 4)
+  const happened = pickOpener({ ...base, hour: 20 })
+  check('"did today\'s session happen?" has its three honest answers (it had none)', /happen\?$/.test(happened.text) && happened.chips.length === 3 && /trained/.test(happened.chips[0]) && /later/.test(happened.chips[1]) && /didn't happen/.test(happened.chips[2]), happened)
+  check('how a finished session WENT still has no buttons: his own words are the point', pickOpener({ ...base, hour: 20, todayLogged: true }).chips.length === 0 && pickOpener({ ...base, awaitingFeel: feel }).chips.length === 0)
+  const rest = pickOpener({ ...restDay, lastOrdinaryKind: 'noticed' })
+  check('a rest day\'s "how\'s the recovery going?" leads with two answers to that question', rest.chips.length === 4 && rest.chips[0] === 'Feeling fresh' && rest.chips[1] === "I'm still sore", rest.chips)
+  const checkIn = pickOpener({ ...base, lastOrdinaryKind: 'session' })
+  check('a check-in leads with two answers to "how\'s it going?"', checkIn.chips.length === 4 && checkIn.chips[0] === 'All good today' && checkIn.chips[1] === "It's been a rough one", checkIn.chips)
+  const coach = readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8')
+  check('the coach is told the same rule for its own replies', /A QUESTION NEVER HAS JUST ONE BUTTON/.test(coach) && /Never a lone "Yes"/.test(coach))
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }

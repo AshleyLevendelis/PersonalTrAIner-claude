@@ -76,6 +76,32 @@ check('C3. a tap opens the strap\'s row on Profile', (await ev(`!!document.query
 await wait(6000)
 check('C4. no reading for over 5 seconds: the corner heart goes', (await ev(`!!document.querySelector('[data-live-heart-corner]')`)) === false)
 
+console.log('\n  D. AN EASY SESSION THAT RAN HARD: THE COACH MENTIONS IT AND OFFERS (his pick 26 Nov 2026, "A")')
+// INPUTS (app-boot.tsx): a 5 km running goal, so today's plan is an easy walk-run; and today's log of it, under the
+// session's own name, with a heart rate that averaged 162 (highest 174). At 30 his estimated maximum is 187.
+await ev(`localStorage.clear()`)
+await go('&slow=0&chat-yesterday&running-goal&easy-ran-hard')
+const nGap = await until(() => ev(`${hellos}.length`), v => v > 0, 150)
+await wait(600)
+const gap = JSON.parse((await ev(`JSON.stringify(${hellos}.map(m => ({ c: m.content, chips: m.action_data?.chips ?? null, moment: m.action_data?.moment ?? null })))`)) ?? '[]')
+check('D1. the coach said its one message of the day, and it is about the session he just did', nGap === 1 && gap.length === 1 && gap[0]?.moment === 'effort_gap', gap)
+check('D2. what was planned, what the heart rate did, then the offer: "... was planned easy, and your heart rate averaged 162, which is zone 4 for you. Want the next one slower, or was that on purpose?"',
+  /^Hey Sam — today's Walk-run was planned easy, and your heart rate averaged 162, which is zone 4 for you\. Want the next one slower, or was that on purpose\?$/.test(gap[0]?.c ?? ''), gap[0]?.c)
+check('D3. it does not tell him he got it wrong, and gives no heart rate to hold', !/too hard|too fast|wrong|should|must|under \d+|below \d+/i.test(gap[0]?.c ?? ''), gap[0]?.c)
+const planBeforeGap = await ev(`JSON.stringify(window.__fakeDb?.mesocycle_weeks ?? null)`)
+await ev(`[...document.querySelectorAll('button')].find(b => (b.textContent || '').trim() === 'Not now')?.click()`)
+await wait(400)
+await ev(`location.hash = '#/tab/chat'`)
+await until(() => ev(`[...document.querySelectorAll('button')].some(b => /Yes, help me keep the next one easy/.test(b.textContent || ''))`), v => v === true, 60)
+const gapChips = await ev(`[...document.querySelectorAll('button')].map(b => (b.textContent || '').trim()).filter(t => /keep the next one easy|It was on purpose/.test(t))`)
+check('D4. two answers as buttons: help keeping the next one easy, or it was on purpose', Array.isArray(gapChips) && gapChips.includes('Yes, help me keep the next one easy') && gapChips.includes('It was on purpose'), gapChips)
+check('D5. NOTHING CHANGED: the plan is exactly as it was', (await ev(`JSON.stringify(window.__fakeDb?.mesocycle_weeks ?? null)`)) === planBeforeGap)
+await ev(`[...document.querySelectorAll('button')].find(b => /Yes, help me keep the next one easy/.test(b.textContent || ''))?.scrollIntoView({ block: 'center' })`)
+await wait(300)
+await shoot('heart-uses-5-easy-ran-hard')
+const saidGap = await ev(`Object.keys(localStorage).filter(k => k.startsWith('coach_nudge_')).map(k => localStorage.getItem(k)).join(' ')`)
+check('D6. said once: the coach remembers this session', /"effort-gap:\d{4}-\d\d-\d\d:walk-run"/.test(saidGap ?? ''), saidGap)
+
 const txt = await ev('document.body.innerText')
 check('Z. nothing leaked onto the page', !/undefined|NaN|\[object Object\]/.test(txt ?? ''))
 await finish('verify:heart-uses passed: the coach offers a lighter day, Home shows the fitness line, and the corner heart says the strap is live.')

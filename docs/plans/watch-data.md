@@ -42,9 +42,16 @@ of our own.
    exercises. **And resting heart rate works on a watch that shares none**: worked out from the night's readings
    (midnight to 6 am, the reading a tenth of the way up from the lowest, 8 readings or no figure), only when the store
    holds no resting figure at all.
-2. **Sleep** (his decision pending, three options put to him 26 Nov): read last night's sleep, show it on Home against
-   his usual, tell the coach; after two or more short nights the coach offers a lighter session (keep the main lift,
-   trim the extras). Needs READ_SLEEP, a migration for a nightly row, and the `chat-gemini` deploy.
+2. **BUILT 26 Nov 2026 (his pick "A"): sleep.** Its own switch on Profile ("Sleep from your watch", read only). Home
+   shows last night against his usual with the week as seven bars. The coach is told last night, his usual and the
+   week with each message, and after two short nights in a row its first message of the day offers the shortest
+   version of today's session (main lift kept, extras trimmed). Never automatic, no score. Nothing about his sleep is
+   saved: the nights are read from the phone each time, so there is no migration. Needs READ_SLEEP (declared) and the
+   `chat-gemini` deploy. Rules and basis: `src/lib/sleep-nights.ts`.
+   **And the watch workout card was redrawn the same day** on his word that the first one was too simple: tiles, a
+   heart-rate graph, time in five heart rate zones (his ruling the same day, over my three effort bands), the plan
+   beside what he did on a planned cardio day. And his pick "A": when a session planned easy averaged zone 4 or 5,
+   the coach says so once and asks whether he wants the next one slower; nothing changes without a yes. `src/lib/heart-series.ts`, `src/components/WorkoutFigures.tsx`.
 3. **Smarter steps**: a weekly trend, and an OFFER to correct the activity level when a fortnight of steps disagrees
    with it. Calories burned still never change the food target.
 4. **A Wear OS app**: start on the wrist, live heart rate in the app, tick sets from the watch. Native, his machine.

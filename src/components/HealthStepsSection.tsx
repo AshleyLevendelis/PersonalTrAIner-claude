@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { connectHealthHeart, disconnectHealthHeart, isHealthHeartConnected } from '@/lib/health-heart'
 import { connectWatchWorkouts, disconnectWatchWorkouts, isWatchWorkoutsConnected } from '@/lib/watch-workouts'
+import { connectHealthSleep, disconnectHealthSleep, isHealthSleepConnected } from '@/lib/health-sleep'
 import { connectPairedStrap, forgetStrap, pairStrap, pairedStrap, useLiveHeartRate, useStrapState, type PairedStrap } from '@/lib/strap-live'
 import {
   connectHealthSteps, disconnectHealthSteps, healthStoreName, isHealthStepsConnected,
@@ -147,6 +148,49 @@ export function HealthWorkoutsSection({ platform }: { platform: HealthPlatform }
         </Button>
       )}
       {note && <p role="alert" className="text-[0.75rem] text-[color:var(--role-warn-text)]" data-workouts-note>{note}</p>}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Profile, "Sleep from your watch" (his pick "A", 26 Nov 2026; sleep-nights.ts). The same shape as the three above:
+// drawn only in the phone app, nothing asked until he taps, read only. The words promise only what is built: last
+// night against his usual on Home, the coach told, a lighter session OFFERED after two short nights, and nothing
+// about his sleep saved.
+// ---------------------------------------------------------------------------
+export function HealthSleepSection({ platform }: { platform: HealthPlatform }) {
+  const store = healthStoreName(platform)
+  const [connected, setConnected] = useState(isHealthSleepConnected())
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+  const connect = async () => {
+    setBusy(true)
+    setNote(null)
+    const r = await connectHealthSleep()
+    setBusy(false)
+    if (r.ok) { setConnected(true); return }
+    setNote(r.reason === 'denied'
+      ? `Sleep wasn’t allowed. You can allow it in ${store}, then tap again.`
+      : r.reason === 'unavailable'
+      ? `${store} isn’t available on this phone.`
+      : `Couldn’t reach ${store}. Nothing was changed. Try again in a moment.`)
+  }
+  return (
+    <div className="space-y-3 text-sm pt-4 border-t border-[color:var(--hairline)]" data-health-sleep={connected ? 'on' : 'off'}>
+      <p className="font-medium text-foreground">Sleep from your watch</p>
+      <p className="text-muted-foreground">
+        {connected
+          ? `Home shows how long you slept last night against your usual, from ${store}. Your coach is told too, and after two short nights in a row offers a lighter session. Your plan never changes unless you say yes, and your sleep is read on this phone, not saved.`
+          : `If your watch tracks sleep, the app can read how long you slept from ${store}: last night against your usual on Home, and a lighter session offered after two short nights in a row. It reads sleep and writes nothing.`}
+      </p>
+      {connected ? (
+        <Button variant="outline" className="min-h-[44px]" onClick={() => { disconnectHealthSleep(); setConnected(false) }} data-sleep-off>Stop reading sleep</Button>
+      ) : (
+        <Button className="min-h-[44px]" onClick={() => void connect()} disabled={busy} data-sleep-connect>
+          {busy ? 'Asking your phone…' : 'Read my sleep'}
+        </Button>
+      )}
+      {note && <p role="alert" className="text-[0.75rem] text-[color:var(--role-warn-text)]" data-sleep-note>{note}</p>}
     </div>
   )
 }

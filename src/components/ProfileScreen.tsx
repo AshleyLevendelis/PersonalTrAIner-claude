@@ -99,6 +99,7 @@ import { accountRowValue, readAccountStatus, type AccountStatus } from '@/lib/au
 const HealthStepsSection = lazyWithReload(() => import('@/components/HealthStepsSection').then(m => ({ default: m.HealthStepsSection })))
 const HealthHeartSection = lazyWithReload(() => import('@/components/HealthStepsSection').then(m => ({ default: m.HealthHeartSection })))
 const HealthWorkoutsSection = lazyWithReload(() => import('@/components/HealthStepsSection').then(m => ({ default: m.HealthWorkoutsSection })))
+const HealthSleepSection = lazyWithReload(() => import('@/components/HealthStepsSection').then(m => ({ default: m.HealthSleepSection })))
 const HeartStrapSection = lazyWithReload(() => import('@/components/HealthStepsSection').then(m => ({ default: m.HeartStrapSection })))
 const RemindersSection = lazyWithReload(() => import('@/components/RemindersSection').then(m => ({ default: m.RemindersSection })))
 
@@ -2113,7 +2114,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         </>
       )
       case 'health': return (
-        <>{healthPlatform && <Suspense fallback={null}><HealthStepsSection platform={healthPlatform} onChanged={setHealthOn} /><HealthHeartSection platform={healthPlatform} /><HealthWorkoutsSection platform={healthPlatform} /><HeartStrapSection /></Suspense>}</>
+        <>{healthPlatform && <Suspense fallback={null}><HealthStepsSection platform={healthPlatform} onChanged={setHealthOn} /><HealthHeartSection platform={healthPlatform} /><HealthWorkoutsSection platform={healthPlatform} /><HealthSleepSection platform={healthPlatform} /><HeartStrapSection /></Suspense>}</>
       )
       case 'testing': return (
         <>{profile.id && <TesterSection profileId={profile.id} since={profile.tester_since} onChanged={since => onProfileChanged({ tester_since: since })} />}</>

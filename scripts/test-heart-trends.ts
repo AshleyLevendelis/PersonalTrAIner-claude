@@ -12,9 +12,9 @@ const store = new Map<string, string>()
   getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k),
 }
 
-import { fitnessTrends, recoveryFlag, type CardioHeartRow } from '../src/lib/heart-trends'
+import { fitnessTrends, recoveryFlag, easyRanHard, type CardioHeartRow } from '../src/lib/heart-trends'
 import { pickOpener, type OpenerInput } from '../src/lib/coach-opener'
-import { pickNudge, nudgeKeys, openerSkips, keysCoveredByOpener, type NudgeInput } from '../src/lib/coach-nudge'
+import { pickNudge, nudgeKeys, openerSkips, keysCoveredByOpener, effortGapText, EFFORT_GAP_CHIPS, type NudgeInput } from '../src/lib/coach-nudge'
 import { readHeartPicture, heartContextForCoach } from '../src/lib/health-heart'
 import { setSupabaseClient } from '../src/lib/supabase'
 
@@ -137,6 +137,45 @@ async function main() {
   check('Home shows the fitness line from the picture, a strap alone being enough', /setFitnessLine\(picture\.fitness\[0\]\?\.line \?\? null\)/.test(dash) && /data-home-fitness-hr/.test(dash) && /pairedStrap\(\)/.test(dash))
   const app = strip(readFileSync('src/App.tsx', 'utf8'))
   check('the corner heart sits beside the gear and opens the strap\'s row on Profile', /<LiveHeart[\s\S]{0,200}onOpen=\{\(\) => \{ setProfileInfoSection\('health'\); setProfileInfoOpen\(true\) \}\}/.test(app))
+
+  console.log('\n6. An easy session that ran hard (his pick 26 Nov 2026, "A": mention it and offer)')
+  {
+    // At 30 his estimated maximum is 187: zone 4 starts at 80% of it, 150.
+    const MAX = 187
+    const planned = (activity: string, targetRpe: number | null) => (date: string) => (date === T || date === day(T, -1) ? { activity, targetRpe } : null)
+    const log = (over: Partial<{ date: string; activity_name: string; duration_minutes: number; avg_heart_rate: number | null; max_heart_rate: number | null }> = {}) =>
+      ({ date: T, activity_name: 'Easy jog', duration_minutes: 30, avg_heart_rate: 158, max_heart_rate: 171, ...over })
+    const gap = easyRanHard({ logs: [log()], plannedOn: planned('Easy jog', 4), estimatedMax: MAX, today: T })
+    check('planned easy, heart rate averaged 158 of a 187 maximum (84%): it is raised', gap !== null, gap)
+    check('...in the app\'s words, saying what was seen: "Today\'s Easy jog was planned easy, and your heart rate averaged 158, which is zone 4 for you."', gap?.line === "Today's Easy jog was planned easy, and your heart rate averaged 158, which is zone 4 for you.", gap?.line)
+    check('...keyed by the session, so it is said once', gap?.key === `effort-gap:${T}:easy jog`, gap?.key)
+    check('the line is 80% of the maximum: 149 is not raised, 150 is', easyRanHard({ logs: [log({ avg_heart_rate: 149, max_heart_rate: 160 })], plannedOn: planned('Easy jog', 4), estimatedMax: MAX, today: T }) === null && easyRanHard({ logs: [log({ avg_heart_rate: 150, max_heart_rate: 160 })], plannedOn: planned('Easy jog', 4), estimatedMax: MAX, today: T }) !== null)
+    check('90% and over reads zone 5', /zone 5/.test(easyRanHard({ logs: [log({ avg_heart_rate: 170, max_heart_rate: 180 })], plannedOn: planned('Easy jog', 4), estimatedMax: MAX, today: T })?.line ?? ''))
+    check('a session that went over the estimate is measured against its own highest reading (158 of 200 is 79%: not raised)', easyRanHard({ logs: [log({ max_heart_rate: 200 })], plannedOn: planned('Easy jog', 4), estimatedMax: MAX, today: T }) === null)
+    check('a session planned Steady or Hard is never raised, however high it ran', easyRanHard({ logs: [log({ avg_heart_rate: 175 })], plannedOn: planned('Easy jog', 5), estimatedMax: MAX, today: T }) === null && easyRanHard({ logs: [log({ avg_heart_rate: 175 })], plannedOn: planned('Easy jog', 8), estimatedMax: MAX, today: T }) === null)
+    check('...nor one with no effort on the plan at all (a first walking prescription)', easyRanHard({ logs: [log()], plannedOn: planned('Easy jog', null), estimatedMax: MAX, today: T }) === null)
+    check('a different activity from the plan\'s (extra work that day) is not the plan\'s session', easyRanHard({ logs: [log({ activity_name: 'Cycling' })], plannedOn: planned('Easy jog', 4), estimatedMax: MAX, today: T }) === null)
+    check('a day with no planned cardio is never raised', easyRanHard({ logs: [log()], plannedOn: () => null, estimatedMax: MAX, today: T }) === null)
+    check('yesterday\'s is raised as "Yesterday\'s"; two days ago is no longer news', /^Yesterday's Easy jog/.test(easyRanHard({ logs: [log({ date: day(T, -1) })], plannedOn: planned('Easy jog', 4), estimatedMax: MAX, today: T })?.line ?? '') && easyRanHard({ logs: [log({ date: day(T, -2) })], plannedOn: () => ({ activity: 'Easy jog', targetRpe: 4 }), estimatedMax: MAX, today: T }) === null)
+    check('under ten minutes, or with no heart figure, says nothing', easyRanHard({ logs: [log({ duration_minutes: 9 })], plannedOn: planned('Easy jog', 4), estimatedMax: MAX, today: T }) === null && easyRanHard({ logs: [log({ avg_heart_rate: null })], plannedOn: planned('Easy jog', 4), estimatedMax: MAX, today: T }) === null)
+    check('NO MAXIMUM, NO JUDGEMENT: a health condition or pregnancy ticked, or no age, is never raised', easyRanHard({ logs: [log({ avg_heart_rate: 180 })], plannedOn: planned('Easy jog', 4), estimatedMax: null, today: T }) === null)
+    check('a session with a protocol in its name is called by its name ("Walk-run", not the protocol)', /^Today's Walk-run was planned easy/.test(easyRanHard({ logs: [log({ activity_name: 'Walk-run — 6 × 3 min' })], plannedOn: planned('Walk-run — 6 × 3 min', 4), estimatedMax: MAX, today: T })?.line ?? ''))
+
+    const nin2: NudgeInput = { today: T, hour: 19, cutoffHour: 18, planKnown: true, awaitingFeel: null, missedYesterday: null,
+      recentPR: { exerciseName: 'Squat', metric: 'weight', value: 100, date: day(T, -1) } as NudgeInput['recentPR'],
+      weeksOnPlan: 4, todaySession: { focus: 'Easy jog', movements: '' }, todayLogged: true, effortGap: gap }
+    const said = pickNudge(nin2, [])
+    check('the coach raises it as an OFFER: the line, then "Want the next one slower, or was that on purpose?"', said?.kind === 'effort_gap' && said.text === effortGapText(gap?.line ?? '') && /Want the next one slower, or was that on purpose\?$/.test(said.text), said)
+    check('...with two answers, one asking for help and one saying it was meant', JSON.stringify(said?.chips) === JSON.stringify(EFFORT_GAP_CHIPS) && EFFORT_GAP_CHIPS.length === 2 && /keep the next one easy/.test(EFFORT_GAP_CHIPS[0]) && /on purpose/.test(EFFORT_GAP_CHIPS[1]))
+    check('...above a personal best and weeks on plan (it is about something that just happened)', said?.kind === 'effort_gap' && nudgeKeys(nin2).pr !== null)
+    check('...once: with its key said it is not raised again, and the best is next', pickNudge(nin2, [gap?.key ?? 'none'])?.kind === 'personal_best')
+    check('an unreviewed session and a missed day still come first', pickNudge({ ...nin2, awaitingFeel: { date: T, isToday: false } }, [])?.kind === 'session_feel')
+    check('it never tells him he got it wrong, and gives no heart rate to hold', !/too hard|too fast|wrong|should|must|keep (it|your heart rate) (under|below)/i.test(said?.text ?? ''))
+    const chatSrc = strip(readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
+    check('the chat asks the rule with the plan\'s own session for the date, and passes no maximum when a condition is ticked', /effortGap: easyRanHard\(\{[\s\S]{0,400}session\?\.plannedActivity[\s\S]{0,300}estimatedMax: \(profile\.health_conditions \?\? \[\]\)\.length > 0 \? null : estimatedMaxHeartRate\(profile\.age\)/.test(chatSrc))
+    const coach = readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
+    check('the coach is told how to answer a yes: the talk test, why easy days are easy, and still no number to hold', /AN EASY SESSION THAT RAN HARD/.test(coach) && /talk test/.test(coach) && /Still never a heart rate number to hold/.test(coach) && /take their word and move on/.test(coach))
+  }
 
   console.log(`\n${ran} checks ran.`)
   if (failures > 0) { console.error(`${failures} check(s) failed`); process.exit(1) }

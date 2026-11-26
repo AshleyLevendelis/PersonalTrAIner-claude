@@ -111,7 +111,7 @@ export interface TodaySession {
    * than exercises. It is a session, not a rest day (user test 8 Oct 2026, finding 19: Home said
    * "Rest day · 0 of 0 sessions done" while the Exercise tab said the walk was today's session).
    */
-  activity?: { minutes: number; effort: string | null } | null
+  activity?: { minutes: number; effort: string | null; /** The plan's own effort number, for a log that counts as this session. */ rpe?: number | null } | null
 }
 
 export interface LeadLift {
@@ -563,7 +563,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     ? { status: activityDoneToday ? 'done' : 'not_started', focus: activityToday.activity, exerciseNames: [],
         setsLogged: 0, setsPlanned: 0, exerciseCount: 0, estimatedMinutes: activityToday.duration, sessionLength: null,
         minutesLeft: null, leadLift: null, movedFrom: todayResolved.movedFrom,
-        activity: { minutes: activityToday.duration, effort: (() => { const k = effortForRpe(activityToday.targetRpe); return k ? effortLabel(k) : null })() } }
+        activity: { minutes: activityToday.duration, rpe: activityToday.targetRpe ?? null, effort: (() => { const k = effortForRpe(activityToday.targetRpe); return k ? effortLabel(k) : null })() } }
     : {
         movedTo: todayResolved.movedTo,
         movedFrom: todayResolved.movedFrom,

@@ -33,6 +33,7 @@ function setHeartConnected(on: boolean): void {
 // timer does not pull this file into the first download. One rule, both sources.
 import { summariseHeartRate, type HeartSummary } from './heart-strap'
 import { fitnessTrends, recoveryFlag, type CardioHeartRow, type FitnessTrend, type RecoveryFlag } from './heart-trends'
+export { easyRanHard, type EffortGap } from './heart-trends'
 export { summariseHeartRate, type HeartSummary }
 
 const isPlausibleResting = (n: number) => Number.isFinite(n) && n >= 25 && n <= 140
@@ -275,10 +276,12 @@ export interface HeartPicture {
   recovery: RecoveryFlag | null
   fitness: FitnessTrend[]
   sessions: { date: string; what: string; avg: number; max: number | null }[]
+  /** Today's and yesterday's cardio with a heart figure, for "an easy session that ran hard" (heart-trends.ts, 3). */
+  recentCardio: { date: string; activity_name: string; duration_minutes: number; avg_heart_rate: number; max_heart_rate: number | null }[]
 }
 
 export async function readHeartPicture(profileId: string, today: string): Promise<HeartPicture> {
-  const empty: HeartPicture = { resting: null, recovery: null, fitness: [], sessions: [] }
+  const empty: HeartPicture = { resting: null, recovery: null, fitness: [], sessions: [], recentCardio: [] }
   try {
     const restingRows = await readRestingHeartRate(profileId, today, 20)
     const { data: cardio } = await supabase.from('cardio_logs').select('*').eq('user_id', profileId).gte('date', addDays(today, -84)).lte('date', today)
@@ -291,7 +294,9 @@ export async function readHeartPicture(profileId: string, today: string): Promis
         .filter(r => Number(r.avg_heart_rate) > 0)
         .map(r => ({ date: r.date, what: `${r.split_type || 'Workout'} session`, avg: Number(r.avg_heart_rate), max: r.max_heart_rate ?? null })),
     ].sort((a, b) => a.date.localeCompare(b.date))
-    return { resting: restingTrend(restingRows, today), recovery: recoveryFlag(restingRows, today), fitness: fitnessTrends(cardioRows), sessions }
+    const recentCardio = cardioRows.filter(r => r.date >= addDays(today, -1) && Number(r.avg_heart_rate) > 0)
+      .map(r => ({ date: r.date, activity_name: r.activity_name, duration_minutes: r.duration_minutes, avg_heart_rate: Number(r.avg_heart_rate), max_heart_rate: r.max_heart_rate ?? null }))
+    return { resting: restingTrend(restingRows, today), recovery: recoveryFlag(restingRows, today), fitness: fitnessTrends(cardioRows), sessions, recentCardio }
   } catch {
     return empty
   }
