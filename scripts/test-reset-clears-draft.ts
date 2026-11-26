@@ -173,7 +173,11 @@ console.log('\n1. Every global localStorage key in src/ is classified above')
 console.log('\n2. handleReset clears exactly the keys marked clear:true')
 {
   const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
-  const body = app.slice(app.indexOf('const handleReset'), app.indexOf('const handleMacroModeChange'))
+  // To the next function at App's own level (25 Nov 2026): the old end marker, handleMacroModeChange, was deleted on
+  // main and the slice ran to the end of the file, so any key cleared ANYWHERE after New Plan counted as cleared by it.
+  const resetStart = app.indexOf('const handleReset')
+  const resetEnd = app.indexOf('\n  const ', resetStart + 20)
+  const body = resetStart >= 0 && resetEnd > resetStart ? app.slice(resetStart, resetEnd) : ''
   check('handleReset was found (sanity check on this gate)', body.length > 200)
 
   const clearedLiterals = [...body.matchAll(/localStorage\.removeItem\(\s*([^)]+)\)/g)]

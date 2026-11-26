@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **TWO DATABASE CHANGES SHARED ONE TIMESTAMP, AND THREE CHECKS HAD LOST THEIR END MARKER (25 Nov 2026, found
+  drafting the privacy policy).** The tester toolkit's migration and main's days_ahead were both 20261125120000;
+  Supabase keys a migration by that number, so db:push-both would have applied one and skipped or refused the other.
+  Restamped to 20261125150000 (every reference updated), the second same-day collision after the walk recorder's. New
+  `test:migration-stamps` (every file has its own 14-digit stamp, and the detector is proven on the real collision;
+  1 mutation, caught). Also: main deleted `handleMacroModeChange`, which three checks used as the end of the code they
+  read, so `test:reset-clears-draft` and `test:weigh-in-targets` silently read to the END OF App.tsx (still green, now
+  vacuous: a key cleared anywhere counted) and `test:tester-toolkit` went red. All three now stop at the next function
+  at App's own level; removing New Plan's call that turns tester recording off fails two of them. Also corrected the
+  walk recorder's entry, which named its pre-merge stamp.
 - [x] **A SUPERSET SAVES TIME IN EVERY WEEK, AT EVERY SESSION LENGTH (25 Nov 2026; CSCS mine; the "OPEN, mine, next
   engine pass" of the 15 Nov short-session entry).** Traced first: one line in the per-week loop read a superset
   partner's shared rest ('alternate') as 20 seconds and raised it to the tier's full rest in every week after the base
@@ -77,7 +87,7 @@ Newest first. One line each.
   than breaking it and one re-anchored after it did not apply), `verify:tester-report` (35 checks on the whole app at
   390px, screenshots read; 8 mutations, 7 caught: the eighth removed the Profile switch's own call to start recording
   and changed nothing, because App already starts it from the saved date, so that call was deleted as inert). NOT VERIFIED: a real email (needs the deploy), the summary's schedule (needs the
-  migration on Supabase), a picture taken on a real phone. NEEDS: migration 20261125120000 and the `report-email`
+  migration on Supabase), a picture taken on a real phone. NEEDS: migration 20261125150000 (restamped from 20261125120000 on merge: days_ahead holds that number) and the `report-email`
   deploy. CSCS review: not applicable, nothing prescribed changes.
   THE FULL SWEEP found two more, fixed the same day: `test:profile-restore` (tester_since read back, and left ABSENT
   before its migration so a read that did not say never switches recording off) and `test:rls-local` (the two tester
@@ -124,7 +134,8 @@ Newest first. One line each.
   `test:phone-app` re-anchored. My first mutation harness read only the standard output and called every catch a crash
   (failures print to the error stream): the house rule "checks RAN is passes plus failures", relearned.
   NOT proven: a real watch or strap on his phone; whether Health Connect returns calories for a window this short on his
-  watch; strap readings while the app is in the background. NEEDS: migration `20261125120000` (db:push-both) and a
+  watch; strap readings while the app is in the background. NEEDS: migration `20261125140000` (db:push-both; this line
+  said 20261125120000, the branch's stamp before the merge restamped it, corrected 25 Nov 2026) and a
   phone app rebuild (new Android permissions). NOT BUILT: GPS, the coach told steps and calories, an indicator outside
   Tools while recording.
 - [x] **A NEW PLAN AND THE HEART RATE SETTINGS (25 Nov 2026, found by the pre-merge sweep)**. `test:reset-clears-draft`

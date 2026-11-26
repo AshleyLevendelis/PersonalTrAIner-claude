@@ -746,6 +746,7 @@
     "measure:superset-rest": "tsx scripts/measure-superset-rest.ts",
     "measure:main-lift-kept": "tsx scripts/measure-main-lift-kept.ts",
     "verify:tester-report": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/tester-report.mjs",
+    "test:migration-stamps": "tsx scripts/test-migration-stamps.ts",
     "test:tester-toolkit": "tsx scripts/test-tester-toolkit.ts",
     "verify:report-reply": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/report-reply.mjs",
     "verify:setup-why": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/setup-why.mjs",

@@ -46,5 +46,5 @@ report bugs with chat, meals, exercises, functions etc."*
 - The picture is of the page as drawn; an inner scrolled list may show from its top.
 - Typing is recorded when the box is left, Enter is pressed or a button is tapped, not keystroke by keystroke.
 - Nothing is shown to Ashley in the app: the database (tester_events, tester_reports) and the emails are the record.
-- Needs migration `20261125120000_tester_toolkit.sql` and the `report-email` deploy; the Resend key and the Vault
+- Needs migration `20261125150000_tester_toolkit.sql` (restamped from 20261125120000: days_ahead holds that number) and the `report-email` deploy; the Resend key and the Vault
   secrets are the ones the coach-reply report already uses.

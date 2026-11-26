@@ -382,7 +382,10 @@ async function main() {
   console.log('\n9. The app actually takes these roads\n')
   {
     const app = strip(raw('src/App.tsx'))
-    const onboarding = app.slice(app.indexOf('const commitPlan = () =>'), app.indexOf('const handleMacroModeChange'))
+    // To the next function at App's own level (its old end marker was deleted on main, 25 Nov 2026).
+    const cpStart = app.indexOf('const commitPlan = () =>')
+    const cpEnd = app.indexOf('\n  const ', cpStart + 20)
+    const onboarding = cpStart >= 0 && cpEnd > cpStart ? app.slice(cpStart, cpEnd) : ''
     check('the onboarding path was found (sanity check on this check)', onboarding.length > 2000, onboarding.length)
     check('signing up writes the first anchor', /anchorTargetsAtSignUp\(data\.id, enrichedProfile, calculatedMacros\)/.test(onboarding))
     check('...and puts it in the session\'s state, so the first weigh-in reads it without a reload', /anchorTargetsAtSignUp\([\s\S]{0,300}setTargetWeightAnchorKg\(anchorKg\)/.test(onboarding))

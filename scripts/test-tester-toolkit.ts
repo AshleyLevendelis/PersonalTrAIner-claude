@@ -119,7 +119,7 @@ async function main() {
 
   console.log('\n4. The database')
   {
-    const sql = strip(read('supabase/migrations/20261125120000_tester_toolkit.sql'))
+    const sql = strip(read('supabase/migrations/20261125150000_tester_toolkit.sql'))
     for (const t of ['tester_events', 'tester_reports']) {
       check(`${t}: row-level security is on`, new RegExp(`ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY`).test(sql))
       check(`${t}: read, write and delete only by the owner, and no update`, ['SELECT', 'INSERT', 'DELETE'].every(op => new RegExp(`CREATE POLICY "owner_${op.toLowerCase()}_${t}" ON ${t} FOR ${op}[\\s\\S]{0,80}owns_profile\\(profile_id\\)`).test(sql)) && !new RegExp(`ON ${t} FOR UPDATE`).test(sql))
@@ -147,7 +147,8 @@ async function main() {
     check('a failed send of the log is never itself recorded', read('src/lib/tester-log.ts').includes('!/\\/tester_events/.test(url)'))
     const app = strip(read('src/App.tsx'))
     check('App follows the profile, and a read that did not say changes nothing', /testerSince === undefined\) return/.test(app) && /setTester\(testerSince \? testerProfileId : null\)/.test(app))
-    check('New Plan turns it off for the person being left', /const handleReset[\s\S]*?setTester\(null\)[\s\S]*?const handleMacroModeChange/.test(app))
+    const rs = app.indexOf('const handleReset'), re = app.indexOf('\n  const ', rs + 20)
+    check('New Plan turns it off for the person being left', rs >= 0 && re > rs && /setTester\(null\)/.test(app.slice(rs, re)))
     const words = TESTER_CONSENT_LINES.join(' ')
     check('every kind recorded is said before the tap: crashes, failed saves, screens, taps, typing, the coach', /Crashes/.test(words) && /fails to save/.test(words) && /screen you open/.test(words) && /button you tap/.test(words) && /What you type/.test(words) && /coach/.test(words), words)
     check('...and the never line names both', /password/.test(TESTER_NEVER_LINE) && /email address/.test(TESTER_NEVER_LINE))

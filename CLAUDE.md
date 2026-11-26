@@ -1826,7 +1826,7 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   each meal sheet; **a picture of the screen "Yes, they can untick"**; **"Email + daily summary"**: each report emailed
   with its picture, one summary a day of the problems grouped. A new screen control that can fail says so in an
   alert or status line, or the log cannot see it. `test:tester-toolkit`, `verify:tester-report`. Needs migration
-  20261125120000 and the `report-email` deploy
+  20261125150000 and the `report-email` deploy
 
 ### His requests of 20 Nov 2026
 - **Profile has an Account row, "Email & sign-in" (his request 20 Nov 2026, "Build the account row")**: an email can be

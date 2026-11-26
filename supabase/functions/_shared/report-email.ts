@@ -55,7 +55,7 @@ export function buildReportEmail(r: ReportRow): { subject: string; text: string 
 
 // ---------------------------------------------------------------------------
 // THE TESTER TOOLKIT (his rulings 25 Nov 2026: "Everything", "Both", screenshot "Yes, they can untick", "Email + daily
-// summary"; migration 20261125120000). Two more things come through the same door, told apart by `kind`:
+// summary"; migration 20261125150000). Two more things come through the same door, told apart by `kind`:
 //   - kind "tester_report": one report a tester sent from the app, emailed as it arrives, its screenshot attached;
 //   - kind "digest": once a day, the last 24 hours of tester errors, GROUPED, so one crash that repeats is one line
 //     with a count, never fifty emails. No problems and no testers active: no email at all.
