@@ -10,7 +10,7 @@ app changes, this changes.
 
 ## Who we are
 
-Personal TrAIner is run by [name or business], [address]. Contact: [email]. We are the controller of the personal data
+Personal TrAIner is run by Ashley Levendelis, as an individual, [address]. Contact: [email]. We are the controller of the personal data
 described here.
 
 ## What the app keeps, and why
@@ -35,7 +35,8 @@ We do not collect your location. We do not sell your data, and the app shows no 
 - **Supabase** stores the data above. [Region: confirm in the Supabase dashboard.]
 - **Google (Gemini)** receives your messages to the coach, with the parts of your plan, meals and logs the coach needs to
   answer, and writes the replies and new meals. A photo you send the coach is sent once to answer you and is not kept.
-  [Check Google's terms for the API tier in use: whether inputs are used for training.]
+  The app uses Google's paid service, under which Google does not use these messages to train its models. [Confirm
+  billing is on for the key in Google AI Studio before publishing.]
 - **Vercel** hosts the app.
 - **Resend** sends emails: reports to us, and sign-in emails to you.
 - **Google Firebase** (Android) and your browser's push service deliver reminders.
@@ -61,8 +62,8 @@ We do not collect your location. We do not sell your data, and the app shows no 
 
 ## How long we keep it
 
-Until you delete it or your account. [Decide: a time limit for tester recording and reports, and for inactive
-accounts.]
+Until you delete it or your account, except: tester recording is deleted after 90 days, and reports you send after one
+year. [Decide: a time limit for inactive accounts.]
 
 ## Children
 
@@ -83,9 +84,10 @@ Last updated: [date].
 
 ## For Ashley: what needs deciding before this goes live
 
-1. Who the controller is (you personally or a business), the contact address, and the region the data is stored in.
-2. Whether Google's terms for your Gemini key allow your users' messages to be used for training (this changes a
-   sentence above).
-3. How long tester recordings and reports are kept (currently: until deleted).
+1. ~~Who the controller is~~: you personally (your ruling, 26 Nov 2026). Still to fill: the contact address and email, and the region the data is stored in.
+2. ~~Gemini training~~: paid, billing on (your answer, 26 Nov 2026); the policy says messages are not used for
+   training. Check AI Studio shows billing on before publishing.
+3. ~~Tester data~~: activity 90 days, reports 1 year (your ruling, 26 Nov 2026); a nightly clean-up deletes older
+   rows. Still open: inactive accounts.
 4. A minimum age, and whether setup should ask for it (it does not today: setup takes a date of birth but no gate).
 5. A qualified review: health data plus an AI coach is the part a reviewer will look at hardest.

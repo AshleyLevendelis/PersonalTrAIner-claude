@@ -41,7 +41,9 @@ const PROFILE_LEGACY = 'cccccccc-0000-4000-8000-000000000003'
 const SESSION_A = 'dddddddd-0000-4000-8000-000000000001'
 
 let failures = 0
+let ran = 0
 const check = (name, ok, detail) => {
+  ran++
   if (ok) console.log(`  ok: ${name}`)
   else { failures++; console.error(`  FAIL: ${name}${detail !== undefined ? ` — ${JSON.stringify(detail)}` : ''}`) }
 }
@@ -424,9 +426,35 @@ try {
     psql(`DELETE FROM own_workouts WHERE id = 'plan-a1';`, asB)
     check('...nor change or delete his', psql(`SELECT name FROM own_workouts WHERE id = 'plan-a1';`, asA) === 'Push')
   }
+
+  // HOW LONG TESTER DATA IS KEPT (his ruling 26 Nov 2026, "Activity 90 days, reports 1 year"). Rows either side of
+  // each limit, so a wrong interval on either table, or the two swapped, fails here.
+  console.log('\n12. Tester data is deleted after its limit, and not before')
+  {
+    psql(`DELETE FROM tester_events; DELETE FROM tester_reports;`)
+    psql(`INSERT INTO tester_events (profile_id, session_id, at, kind, created_at) VALUES
+      ('${PROFILE_A}', 's', now(), 'tap', now() - interval '91 days'),
+      ('${PROFILE_A}', 's', now(), 'tap', now() - interval '89 days'),
+      ('${PROFILE_A}', 's', now(), 'tap', now() - interval '200 days');`)
+    psql(`INSERT INTO tester_reports (profile_id, area, note, created_at) VALUES
+      ('${PROFILE_A}', 'other', 'old', now() - interval '366 days'),
+      ('${PROFILE_A}', 'other', 'recent', now() - interval '200 days');`)
+    const out = psql(`SELECT events_deleted || ' ' || reports_deleted FROM prune_tester_data();`)
+    check('the clean-up deletes 2 old activity rows and 1 old report', out === '2 1', out)
+    const leftE = psql(`SELECT count(*) FROM tester_events WHERE created_at > now() - interval '90 days';`)
+    const allE = psql(`SELECT count(*) FROM tester_events;`)
+    check('...keeps activity from inside 90 days, and only that', leftE === '1' && allE === '1', { leftE, allE })
+    const leftR = psql(`SELECT string_agg(note, ',') FROM tester_reports;`)
+    check('...keeps a report from 200 days ago (a report is kept a year)', leftR === 'recent', leftR)
+    const anonRun = expectRefused(`SELECT * FROM prune_tester_data();`, { role: 'anon' })
+    check('nobody signed out can run it', anonRun !== null && /permission/i.test(anonRun), anonRun)
+    const userRun = expectRefused(`SELECT * FROM prune_tester_data();`, { role: 'authenticated', uid: UID_A })
+    check('...nor anybody signed in', userRun !== null && /permission/i.test(userRun), userRun)
+  }
 } finally {
   stop()
 }
 
+console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }
 console.log('\nAll local RLS checks passed — against a database that actually ran them.')

@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **TESTER DATA NOW HAS A TIME LIMIT, AND THE PRIVACY DRAFT HAS THREE OF ITS FIVE ANSWERS (26 Nov 2026).** His
+  rulings, each from options: the controller is **him personally**; the coach's Gemini key is **paid, billing on**
+  (so the draft says messages are not used for training; check AI Studio before publishing); tester data is kept
+  **activity 90 days, reports 1 year** (over 30 days and over a year for everything). Before this nothing was ever
+  deleted. New migration 20261126120000: `prune_tester_data()` deletes older rows and only the database can run it
+  (anon and signed-in users refused), scheduled nightly at 03:23 UTC where pg_cron exists. `test:rls-local` §12 seeds
+  rows either side of each limit and runs it (5 checks, 5 mutations: each interval, both tables swapped, both revokes,
+  all caught). The gate also now prints how many checks ran, so the mutation harness can score it. Still open for
+  the policy: his address and email, the storage region, inactive accounts, a minimum age, a qualified review.
+  NEEDS: migration 20261126120000 via db:push-both
 - [x] **TWO DATABASE CHANGES SHARED ONE TIMESTAMP, AND THREE CHECKS HAD LOST THEIR END MARKER (25 Nov 2026, found
   drafting the privacy policy).** The tester toolkit's migration and main's days_ahead were both 20261125120000;
   Supabase keys a migration by that number, so db:push-both would have applied one and skipped or refused the other.
