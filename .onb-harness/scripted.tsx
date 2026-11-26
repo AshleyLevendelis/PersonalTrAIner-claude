@@ -100,6 +100,21 @@ if (state === 'activity') {
   ))
 }
 
+// THE APP IS FOR 16 AND OVER (his ruling 26 Nov 2026), verify:under-age. `age-card`: everything up to recovery
+// answered and the age card on screen. `under-16`: an age of 15 already recorded (as the coach would set it).
+if (state === 'age-card' || state === 'under-16') {
+  const before = { ...SAM_SO_FAR, recoveryCapacity: 'moderate', ...(state === 'under-16' ? { age: '15' } : {}) }
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Sam' },
+      { role: 'assistant', content: 'Could you tell me your age, height, and what you weigh right now?', slotCard: 'age' },
+    ],
+    before,
+    Object.keys(before),
+  ))
+}
+
 if (state === 'm2') {
   // The session-length question is on screen WITH its chips, unanswered — the
   // state the tester was in when they typed a creatine question instead.

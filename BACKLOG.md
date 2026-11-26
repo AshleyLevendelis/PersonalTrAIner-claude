@@ -2,6 +2,20 @@
 
 Newest first. One line each.
 
+- [x] **THE APP IS FOR 16 AND OVER, AND SETUP NOW SAYS SO (26 Nov 2026).** His ruling, from four options: "16+, setup
+  stops younger" (over 18+, over 13+, and over the privacy policy stating an age that nothing checks). Before this
+  setup took a date of birth and let any age through (the floor was 13, the card's own limit). Now an age under 16,
+  however setup gets it (the card's birthday, a typed age, or the setup coach), replaces the conversation with "This app
+  is for 16 and over": why (the targets and weights are written for adults), that no account was made, and who can
+  help (a PE teacher, a club coach, a GP); its one button, "I entered my birthday wrong", clears the age and asks it
+  again. Generate refuses too. CSCS basis, mine: an adult calorie deficit and adult loads are not a plan a coach would
+  sign for a growing body. Deliberately NOT claimed: that nothing left the phone (the setup chat goes to the coach's
+  server). `minimum-age.ts` holds the number. `verify:under-age` (11 checks: the stop at 14, its words and button, the
+  way back, 16 carrying on, 15 recorded by the coach; 5 mutations, all caught). AND THE BIRTHDAY MUST BE ANSWERED: his
+  second ruling the same day, "Must answer" (over keeping Skip), because a skippable birthday is a check an under-16
+  steps round. Height, weight and sex stay skippable. 2 more checks (no Skip; a blank Save does not carry on; 1
+  mutation, caught); `test:onboarding-slots` now holds age as not declinable. Under 13 is still refused as an invalid date by the card
+  (its limit), not shown the stop screen. Existing profiles are not checked (no live users).
 - [x] **TESTER DATA NOW HAS A TIME LIMIT, AND THE PRIVACY DRAFT HAS THREE OF ITS FIVE ANSWERS (26 Nov 2026).** His
   rulings, each from options: the controller is **him personally**; the coach's Gemini key is **paid, billing on**
   (so the draft says messages are not used for training; check AI Studio before publishing); tester data is kept

@@ -67,7 +67,8 @@ year. [Decide: a time limit for inactive accounts.]
 
 ## Children
 
-The app is not for anyone under [16]. [Confirm: setup does not currently check age at sign-up.]
+The app is not for anyone under 16. Setup asks for a date of birth, and an answer under 16 stops setup before any
+account is made.
 
 ## Medical note
 
@@ -89,5 +90,6 @@ Last updated: [date].
    training. Check AI Studio shows billing on before publishing.
 3. ~~Tester data~~: activity 90 days, reports 1 year (your ruling, 26 Nov 2026); a nightly clean-up deletes older
    rows. Still open: inactive accounts.
-4. A minimum age, and whether setup should ask for it (it does not today: setup takes a date of birth but no gate).
+4. ~~Minimum age~~: 16, and setup stops younger (your ruling, 26 Nov 2026). The birthday can't be skipped (your
+   ruling, the same day).
 5. A qualified review: health data plus an AI coach is the part a reviewer will look at hardest.

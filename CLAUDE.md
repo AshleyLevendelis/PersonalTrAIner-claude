@@ -1827,6 +1827,10 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   with its picture, one summary a day of the problems grouped. A new screen control that can fail says so in an
   alert or status line, or the log cannot see it. `test:tester-toolkit`, `verify:tester-report`. Needs migration
   20261125150000 and the `report-email` deploy
+- **The app is for 16 and over: his ruling 26 Nov 2026, "16+, setup stops younger"** (over 18+, 13+ and the policy alone):
+  an age under 16, however setup gets it, replaces setup with a stop screen and no account is made; "I entered my
+  birthday wrong" asks again (`minimum-age.ts`). **And the birthday must be answered: his ruling the same day, "Must
+  answer"** (no Skip). `verify:under-age`, `test:onboarding-slots`
 - **Tester data is kept 90 days (activity) and 1 year (reports): his ruling 26 Nov 2026** (over 30 days and over a year for
   everything): a nightly clean-up only the database can run. `test:rls-local` §12. Needs migration 20261126120000
 
