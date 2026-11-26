@@ -110,3 +110,5 @@ End (decision 2); the lifting screen is one exercise at a time, no weight typed 
 - **NOT PROVEN**: none of the watch code has been compiled (Google's Android libraries are blocked from the cloud
   session) or run on a watch. Next: his machine builds it, fixes any compile error, installs it on the Galaxy Watch 7,
   and he tests a walk and a lifting session.
+
+**27 Nov 2026, on his machine (relayed):** both apps compiled first time with no changes, installed on his phone and Galaxy Watch 7 (SM-L310, Wear OS 6); he tested and said "it worked". Still to learn from real use: which screens he tried, and how the watch behaves over a long session with the screen off.
