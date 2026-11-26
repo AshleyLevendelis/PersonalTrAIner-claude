@@ -21,7 +21,8 @@ import {
   WORKOUT_REMINDER_BEFORE_HOUR, FOOD_NUDGE_AFTER_HOUR, MIN_HOURS_BETWEEN, momentsToRaise, dailyCap, REMINDER_FREQUENCIES, DEFAULT_FREQUENCY,
   type MomentFacts, type MomentKey,
 } from '../src/lib/coach-moments'
-import { coachMessage, coachMessageShortcut, coachShortcutLabel } from '../src/lib/coach-voice'
+import { coachMessage, coachMessageShortcut, coachShortcutLabel, coachMessageChips, SESSION_READY_CHIPS } from '../src/lib/coach-voice'
+import * as serverMoments from '../supabase/functions/_shared/coach-moments'
 // The second argument is this week's sessions done, out of one more planned (the weekly review's one number, his
 // 13 Nov 2026 ruling: weekly consistency in place of the streak).
 // A clash and a pattern have no words without their facts (25 Nov 2026), so the helper hands them one of each.
@@ -313,6 +314,14 @@ console.log('\n8. It is pure, so a server can ask it too')
   const f: MomentFacts = { ...QUIET, localHour: 19, plannedToday: true }
   check('the same day answers the same way twice',
     JSON.stringify(momentToRaise(f)) === JSON.stringify(momentToRaise(f)))
+}
+
+console.log('\nThe session reminder carries the answers to its question (26 Nov 2026)')
+{
+  check('today\'s session reminder has the four answers to "ready for it?"', JSON.stringify(coachMessageChips('workout_today')) === JSON.stringify(SESSION_READY_CHIPS) && SESSION_READY_CHIPS.length === 4)
+  check('...and the phone\'s server holds the same four, word for word', JSON.stringify(serverMoments.coachMessageChips('workout_today')) === JSON.stringify(coachMessageChips('workout_today')) && JSON.stringify(serverMoments.SESSION_READY_CHIPS) === JSON.stringify(SESSION_READY_CHIPS))
+  check('...every other message\'s answers are the same on both sides too', ['load_clash', 'missed_yesterday', 'week_review', 'pattern_spotted', 'meal_not_logged'].every(k => JSON.stringify(serverMoments.coachMessageChips(k)) === JSON.stringify(coachMessageChips(k))))
+  check('no message that carries answers carries exactly one', ['workout_today', 'load_clash', 'missed_yesterday', 'week_review'].every(k => coachMessageChips(k).length !== 1))
 }
 
 console.log(failures === 0 ? '\nOne decision, and a server could make it too.\n' : `\n${failures} check(s) FAILED.\n`)

@@ -7,23 +7,17 @@
 //
 //   1. THE LINE: the readings as a short series for a graph (bucketed, so a watch writing every second and one writing
 //      every few minutes draw the same shape).
-//   2. TIME BY EFFORT: how long the heart sat in each of the app's three effort words, Easy / Steady / Hard.
+//   2. TIME IN ZONES: how long the heart sat in each of five heart rate zones (below).
 //   3. PACE: minutes a kilometre, when the watch gave a distance.
 //
-// WHY THREE BANDS AND NOT FIVE ZONES (CSCS, mine). Every effort in this app is Easy, Steady or Hard (his 24 Sep
-// ruling), so the heart rate is sorted into the same three words he taps, not a second vocabulary. The lines are
-// shares of an estimated maximum: under 70% Easy, 70% to under 85% Steady, 85% and over Hard. Those sit on the usual
-// intensity bands (ACSM: moderate to about 76% of maximum, vigorous from 77%, near-maximal from the mid 90s), drawn so
-// that "Easy" is the conversational pace the plan means by it and "Hard" is work he could not hold for long.
-//
 // THE MAXIMUM IS AN ESTIMATE, AND THE SCREEN SAYS SO: 208 minus 0.7 times age (Tanaka, Monahan and Seals 2001), raised
-// to the highest reading in the session when he went above it. Its error is about ten beats either way, so the bands
+// to the highest reading in the session when he went above it. its error is about ten beats either way, so the zones
 // are "about". It is DESCRIPTION, after the fact: nothing here is a target, and no session is prescribed by heart
 // rate (his 24 Nov ruling stands).
 //
-// NOT FOR EVERYONE: medication can hold a heart rate down, so with a health condition ticked, or pregnant, the bands
+// NOT FOR EVERYONE: medication can hold a heart rate down, so with a health condition ticked, or pregnant, the zones
 // are not drawn at all (his 14 Nov ruling: effort in words for them, never a heart rate). The caller decides that;
-// with no age there is no estimate and no bands either.
+// with no age there is no estimate and no zones either.
 // ---------------------------------------------------------------------------
 
 export interface HeartReading { bpm: number; at: string }
@@ -69,35 +63,73 @@ export function estimatedMaxHeartRate(age: number | null | undefined): number | 
   return Math.round(208 - 0.7 * a)
 }
 
-const STEADY_FROM = 0.7
-const HARD_FROM = 0.85
+// ---------------------------------------------------------------------------
+// FIVE HEART RATE ZONES (his ruling 26 Nov 2026, "heart rate zones is better than the 3 options for effort", on the
+// first version's Easy / Steady / Hard bands; it REPLACES them on the summary). Each zone is a tenth of his estimated
+// maximum, the split every watch uses, so the numbers match what his watch shows: zone 1 under 60%, zone 2 60-70%,
+// zone 3 70-80%, zone 4 80-90%, zone 5 90% and over. Each carries the app's own effort word beside its number (CSCS,
+// mine), so a zone reads against the plan, which prescribes effort in words: zones 1 and 2 are Easy, 3 is Steady,
+// 4 and 5 are Hard. Zones DESCRIBE a finished session. Nothing is prescribed by zone or by heart rate (his 24 Nov
+// ruling stands for what the plan and the coach ask of him).
+// ---------------------------------------------------------------------------
+export const ZONES = [
+  { zone: 1, from: 0, word: 'Very easy', effort: 'easy' },
+  { zone: 2, from: 0.6, word: 'Easy', effort: 'easy' },
+  { zone: 3, from: 0.7, word: 'Steady', effort: 'steady' },
+  { zone: 4, from: 0.8, word: 'Hard', effort: 'hard' },
+  { zone: 5, from: 0.9, word: 'All out', effort: 'hard' },
+] as const
 /** A reading stands for the time until the next one, but never for more than this: a gap is not effort. */
 const LONGEST_HOLD_MS = 5 * 60 * 1000
 
-export interface EffortBands { easy: number; steady: number; hard: number; /** The maximum the lines were drawn from. */ maxUsed: number }
+/** Which zone (1 to 5) a heart rate sits in, against a maximum. */
+export function zoneOf(bpm: number, max: number): 1 | 2 | 3 | 4 | 5 {
+  const share = bpm / max
+  let z: 1 | 2 | 3 | 4 | 5 = 1
+  for (const def of ZONES) if (share >= def.from) z = def.zone
+  return z
+}
+
+export interface HeartZones {
+  /** Minutes in zones 1 to 5, in that order. */
+  minutes: [number, number, number, number, number]
+  /** The lowest heart rate of each zone, in beats; zone 1 has none (everything under zone 2). */
+  floors: [number, number, number, number, number]
+  /** The maximum the zones were drawn from. */
+  maxUsed: number
+}
 
 /**
- * Minutes with the heart in each band. Null when it cannot be said honestly: no estimate, too few readings, or
+ * Minutes with the heart in each zone. Null when it cannot be said honestly: no estimate, too few readings, or
  * readings covering under half the session (a watch that dropped out for most of it shows nothing rather than a
- * confident bar built from ten minutes).
+ * confident chart built from ten minutes).
  */
-export function effortBands(samples: readonly HeartReading[], start: Date, end: Date, estimatedMax: number | null): EffortBands | null {
+export function heartZones(samples: readonly HeartReading[], start: Date, end: Date, estimatedMax: number | null): HeartZones | null {
   if (estimatedMax == null) return null
   const rows = inWindow(samples, start, end)
   const span = end.getTime() - start.getTime()
   if (rows.length < 3 || !(span > 0)) return null
   const maxUsed = Math.max(estimatedMax, ...rows.map(r => r.bpm))
-  const ms = { easy: 0, steady: 0, hard: 0 }
+  const ms = [0, 0, 0, 0, 0]
   rows.forEach((r, i) => {
     const until = i + 1 < rows.length ? rows[i + 1].ms : end.getTime()
-    const held = Math.min(Math.max(0, until - r.ms), LONGEST_HOLD_MS)
-    const share = r.bpm / maxUsed
-    ms[share >= HARD_FROM ? 'hard' : share >= STEADY_FROM ? 'steady' : 'easy'] += held
+    ms[zoneOf(r.bpm, maxUsed) - 1] += Math.min(Math.max(0, until - r.ms), LONGEST_HOLD_MS)
   })
-  const covered = ms.easy + ms.steady + ms.hard
-  if (covered < span * 0.5) return null
+  if (ms.reduce((a, b) => a + b, 0) < span * 0.5) return null
   const mins = (x: number) => Math.round(x / 60000)
-  return { easy: mins(ms.easy), steady: mins(ms.steady), hard: mins(ms.hard), maxUsed }
+  return {
+    minutes: [mins(ms[0]), mins(ms[1]), mins(ms[2]), mins(ms[3]), mins(ms[4])],
+    floors: [0, Math.ceil(maxUsed * 0.6), Math.ceil(maxUsed * 0.7), Math.ceil(maxUsed * 0.8), Math.ceil(maxUsed * 0.9)],
+    maxUsed,
+  }
+}
+
+/** The zone the heart spent longest in, or null with none. A tie goes to the lower zone (never overstated). */
+export function mostlyZone(z: HeartZones | null): 1 | 2 | 3 | 4 | 5 | null {
+  if (!z || z.minutes.every(m => m <= 0)) return null
+  let best = 0
+  z.minutes.forEach((m, i) => { if (m > z.minutes[best]) best = i })
+  return (best + 1) as 1 | 2 | 3 | 4 | 5
 }
 
 /** "8:05" for minutes a kilometre, or null when there is no distance to divide by (or the answer is not a pace). */
@@ -107,13 +139,6 @@ export function pacePerKm(minutes: number, km: number | null | undefined): strin
   // Slower than half an hour a kilometre or faster than two minutes is a bad distance, not a pace.
   if (secs < 120 || secs > 1800) return null
   return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
-}
-
-/** The band the heart spent longest in, or null with no bands. A tie goes to the easier word (never overstated). */
-export function mostlyBand(b: EffortBands | null): 'easy' | 'steady' | 'hard' | null {
-  if (!b || b.easy + b.steady + b.hard <= 0) return null
-  if (b.easy >= b.steady && b.easy >= b.hard) return 'easy'
-  return b.steady >= b.hard ? 'steady' : 'hard'
 }
 
 /**

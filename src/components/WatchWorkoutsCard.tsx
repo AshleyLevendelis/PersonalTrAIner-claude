@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Check, Watch } from 'lucide-react'
 import { EffortBox } from '@/components/exercise/CardioSetRow'
-import { bandsFor, WorkoutFigures } from '@/components/WorkoutFigures'
+import { WorkoutFigures, zonesFor } from '@/components/WorkoutFigures'
 import type { BodyForEstimate } from '@/lib/activity-figures'
 import { splitActivity } from '@/lib/cardio-lines'
 import { effortForRpe, effortLabel, type EffortKey } from '@/lib/cardio-effort'
 import type { CardioLogView } from '@/lib/cardio-log-store'
 import { summariseHeartRate } from '@/lib/heart-strap'
-import { estimatedMaxHeartRate, mostlyBand, type HeartReading } from '@/lib/heart-series'
+import { estimatedMaxHeartRate, mostlyZone, type HeartReading } from '@/lib/heart-series'
 import type { WatchWorkout } from '@/lib/health-steps'
 import {
   countsSteps, dismissWatchWorkout, isPlannedKind, isStrengthWorkout, localDateOf, logWatchWorkout, readWatchHeart, readWatchOffers,
@@ -19,7 +19,7 @@ import {
 // app does not hold. REDRAWN the same day on his word ("too simple, doesn't add any real value and doesn't fit the
 // aesthetic of the rest of the app", with Garmin's and Apple's workout summaries beside it): the session hero's
 // header (kicker, when, the name with its last word lit), the workout's figures as tiles, its heart rate as a graph
-// and its time by effort (WorkoutFigures), and, on a day whose plan is a cardio session, THE PLAN BESIDE WHAT HE DID
+// and its time in heart rate zones (WorkoutFigures), and, on a day whose plan is a cardio session, THE PLAN BESIDE WHAT HE DID
 // with a choice of what it counts as. One effort tap logs it; the card then stays as the summary of what was logged.
 // "Not mine" puts it away for good. Loaded only in the phone app with the switch on.
 // ---------------------------------------------------------------------------
@@ -92,8 +92,8 @@ export function WatchWorkoutsCard({ profileId, today, body, planned, noHeartBand
   }, [offerId, offerStart, offerEnd])
 
   if (!offer && !logged) return null
-  // NO EFFORT BANDS FOR LIFTING (CSCS, mine): heart rate between sets says little about how hard a lift was (the work
-  // is short and the pulse lags it), so a strength session shows its heart rate and is never sorted into Easy/Hard.
+  // NO ZONES FOR LIFTING (CSCS, mine): heart rate between sets says little about how hard a lift was (the work is
+  // short and the pulse lags it), so a strength session shows its heart rate and is never sorted into zones.
   const shown = logged?.workout ?? offer!
   const estimatedMax = noHeartBands || isStrengthWorkout(shown.type) ? null : estimatedMaxHeartRate(body.age)
 
@@ -140,7 +140,7 @@ export function WatchWorkoutsCard({ profileId, today, body, planned, noHeartBand
   const planName = plan ? splitActivity(plan.activity).name : null
   const asPlan = plan ? (countAs?.id === w.id ? countAs.plan : isPlannedKind(w.type, plan.activity)) : false
   const planEffort = plan ? effortForRpe(plan.rpe) : null
-  const mostly = mostlyBand(bandsFor({ samples, start, end, estimatedMax }))
+  const mostly = mostlyZone(zonesFor({ samples, start, end, estimatedMax }))
 
   const log = async (effort: EffortKey) => {
     if (busy) return
@@ -183,7 +183,7 @@ export function WatchWorkoutsCard({ profileId, today, body, planned, noHeartBand
             <span className="text-text-tertiary">Planned</span>
             <span className="text-foreground" data-watch-plan-planned>{[planName, `${plan.minutes} min`, planEffort ? effortLabel(planEffort) : null].filter(Boolean).join(' · ')}</span>
             <span className="text-text-tertiary">You did</span>
-            <span className="text-foreground" data-watch-plan-did>{[name, `${minutes} min`, mostly ? `♥ mostly ${effortLabel(mostly)}` : null].filter(Boolean).join(' · ')}</span>
+            <span className="text-foreground" data-watch-plan-did>{[name, `${minutes} min`, mostly ? `♥ mostly zone ${mostly}` : null].filter(Boolean).join(' · ')}</span>
           </div>
           <div role="radiogroup" aria-label="What this workout counts as" className="mt-3 flex gap-1 rounded-[12px] bg-[color:var(--surface-deep)] p-1">
             <button type="button" role="radio" aria-checked={asPlan} className={choice(asPlan)} onClick={() => setCountAs({ id: w.id, plan: true })} data-watch-count="plan">Today’s session</button>

@@ -743,6 +743,7 @@
     "verify:health-steps": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/health-steps.mjs",
     "verify:watch-workouts": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/watch-workouts.mjs",
     "verify:sleep": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/sleep.mjs",
+    "verify:coach-reopen": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-reopen.mjs",
     "test:phone-app": "tsx scripts/test-phone-app.ts",
     "test:native-push": "tsx scripts/test-native-push.ts",
     "test:coach-proactive": "tsx scripts/test-coach-proactive.ts",

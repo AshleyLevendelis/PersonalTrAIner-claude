@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Swatch } from '@/components/exercise/ExerciseBar'
-import { effortBands, heartRange, heartSeries, mostlyBand, pacePerKm, rowSpans, type EffortBands, type HeartReading } from '@/lib/heart-series'
+import { heartRange, heartSeries, heartZones, mostlyZone, pacePerKm, rowSpans, ZONES, type HeartReading, type HeartZones } from '@/lib/heart-series'
 
 // ---------------------------------------------------------------------------
 // A WORKOUT'S FIGURES, DRAWN (his words 26 Nov 2026 on the first watch card: "too simple, doesn't add any real value
@@ -12,18 +12,16 @@ import { effortBands, heartRange, heartSeries, mostlyBand, pacePerKm, rowSpans, 
 //   1. THE NUMBERS: time, distance, pace, calories, average and highest heart rate.
 //   2. THE HEART RATE as a line over the session, its average marked. One series, so one colour and no legend; a
 //      finger on the graph reads the value at that moment.
-//   3. TIME BY EFFORT: how long the heart sat in Easy, Steady and Hard, one hue light to dark (an ordered scale, not
-//      three unrelated things), each band named in words with its minutes so colour never carries it alone.
-// Description after the fact, never a target (heart-series.ts has the basis and who the bands are not shown to).
+//   3. TIME IN HEART RATE ZONES (his ruling 26 Nov 2026, "heart rate zones is better than the 3 options for effort"):
+//      five rows, zone 5 at the top as his watch draws them, each with its number, the app's effort word, its range in
+//      beats, a bar and its minutes. One hue light to dark (an ordered scale), and the words and minutes carry
+//      everything the colour does.
+// Description after the fact, never a target (heart-series.ts has the basis and who the zones are not shown to).
 // ---------------------------------------------------------------------------
 
 const HEART = 'var(--destructive)'
-const BAND_FILL: Record<'easy' | 'steady' | 'hard', string> = {
-  easy: 'color-mix(in srgb, var(--destructive) 36%, transparent)',
-  steady: 'color-mix(in srgb, var(--destructive) 62%, transparent)',
-  hard: 'var(--destructive)',
-}
-const BAND_WORD = { easy: 'Easy', steady: 'Steady', hard: 'Hard' } as const
+/** Zone 1 faintest, zone 5 the full colour. */
+const ZONE_FILL = [22, 38, 56, 76, 100].map(p => (p === 100 ? HEART : `color-mix(in srgb, ${HEART} ${p}%, transparent)`))
 
 function Stat({ value, unit, label, color, id }: { value: string; unit?: string; label: string; color: string; id: string }) {
   return (
@@ -100,29 +98,32 @@ function HeartChart({ samples, start, end, avg, max }: { samples: readonly Heart
   )
 }
 
-function Bands({ bands }: { bands: EffortBands }) {
-  const keys = (['easy', 'steady', 'hard'] as const).filter(k => bands[k] > 0)
-  const total = keys.reduce((s, k) => s + bands[k], 0)
-  if (total <= 0) return null
+function Zones({ zones }: { zones: HeartZones }) {
+  const most = Math.max(...zones.minutes, 1)
+  const mostly = mostlyZone(zones)
+  const range = (i: number) => (i === 0 ? `<${zones.floors[1]}` : i === 4 ? `${zones.floors[4]}+` : `${zones.floors[i]}–${zones.floors[i + 1] - 1}`)
   return (
-    <div data-effort-bands={mostlyBand(bands) ?? ''}>
+    <div data-heart-zones={mostly ?? ''}>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[0.625rem] font-semibold uppercase tracking-[.12em] text-muted-foreground">Time by effort</span>
-        <span className="text-[0.6875rem] text-text-tertiary">by heart rate, about</span>
+        <span className="text-[0.625rem] font-semibold uppercase tracking-[.12em] text-muted-foreground">Time in heart rate zones</span>
+        <span className="text-[0.6875rem] text-text-tertiary" data-heart-zones-note>about</span>
       </div>
-      <div className="mt-2 flex h-2.5 gap-[2px]" aria-hidden>
-        {keys.map(k => <span key={k} className="h-full rounded-[4px]" style={{ flexGrow: bands[k], flexBasis: 0, minWidth: 6, background: BAND_FILL[k] }} data-band={k} />)}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-        {(['easy', 'steady', 'hard'] as const).map(k => (
-          <span key={k} className="flex items-center gap-1.5 whitespace-nowrap" data-band-label={k}>
-            <Swatch color={BAND_FILL[k]} />
-            <span className="text-[0.75rem] text-text-tertiary">{BAND_WORD[k]}</span>
-            <span className="tabular-mono text-[0.8125rem] font-bold text-foreground">{bands[k]}</span>
-            <span className="text-[0.75rem] text-text-tertiary">min</span>
-          </span>
+      <div className="mt-2 space-y-1.5">
+        {[4, 3, 2, 1, 0].map(i => (
+          <div key={i} className="grid grid-cols-[4.75rem_3.6rem_1fr_3rem] items-center gap-x-2" data-zone={ZONES[i].zone} data-zone-minutes={zones.minutes[i]}>
+            <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+              <span className="tabular-mono text-[0.8125rem] font-bold text-foreground">Z{ZONES[i].zone}</span>
+              <span className="text-[0.75rem] text-text-tertiary">{ZONES[i].word}</span>
+            </span>
+            <span className="tabular-mono whitespace-nowrap text-[0.6875rem] text-text-tertiary" data-zone-range>{range(i)}</span>
+            <span className="h-2.5 rounded-[4px] bg-[color:var(--surface-deep)]" aria-hidden>
+              {zones.minutes[i] > 0 && <span className="block h-full rounded-[4px]" style={{ width: `${Math.max(4, (zones.minutes[i] / most) * 100)}%`, background: ZONE_FILL[i] }} data-zone-bar />}
+            </span>
+            <span className="whitespace-nowrap text-right"><span className="tabular-mono text-[0.8125rem] font-bold text-foreground">{zones.minutes[i]}</span> <span className="text-[0.6875rem] text-text-tertiary">min</span></span>
+          </div>
         ))}
       </div>
+      <p className="mt-2 text-[0.6875rem] leading-[1.4] text-text-tertiary">Zones are tenths of an estimated top heart rate of {zones.maxUsed}, so read them as a guide.</p>
     </div>
   )
 }
@@ -140,18 +141,18 @@ export interface WorkoutFiguresProps {
   samples: readonly HeartReading[]
   start: Date
   end: Date
-  /** His estimated maximum heart rate, or null when the bands must not be drawn (no age, or a condition ticked). */
+  /** His estimated maximum heart rate, or null when the zones must not be drawn (no age, or a condition ticked). */
   estimatedMax: number | null
 }
 
-/** The bands this workout would draw, for a caller that words them (the plan-versus-done line). */
-export function bandsFor(p: Pick<WorkoutFiguresProps, 'samples' | 'start' | 'end' | 'estimatedMax'>): EffortBands | null {
-  return effortBands(p.samples, p.start, p.end, p.estimatedMax)
+/** The zones this workout would draw, for a caller that words them (the plan-versus-done line). */
+export function zonesFor(p: Pick<WorkoutFiguresProps, 'samples' | 'start' | 'end' | 'estimatedMax'>): HeartZones | null {
+  return heartZones(p.samples, p.start, p.end, p.estimatedMax)
 }
 
 export function WorkoutFigures(p: WorkoutFiguresProps) {
   const pace = p.showPace ? pacePerKm(p.minutes, p.km) : null
-  const bands = bandsFor(p)
+  const zones = zonesFor(p)
   const stats: { id: string; value: string; unit?: string; label: string; color: string }[] = [
     { id: 'time', value: String(p.minutes), unit: 'min', label: 'Time', color: 'var(--working-track-done)' },
   ]
@@ -171,7 +172,7 @@ export function WorkoutFigures(p: WorkoutFiguresProps) {
         ))}
       </div>
       <HeartChart samples={p.samples} start={p.start} end={p.end} avg={p.avgHeart} max={p.maxHeart} />
-      {bands && <Bands bands={bands} />}
+      {zones && <Zones zones={zones} />}
     </div>
   )
 }

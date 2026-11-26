@@ -112,6 +112,11 @@ const KEYS: Record<string, { clear: boolean; why: string }> = {
   // only ever matched to a session by its start and end times, so a reading from before a New Plan can never land in
   // the new plan's sessions, and they expire on their own.
   fitplan_health_heart_connected: { clear: false, why: "this phone's Health permission switch for heart rate, as steps" },
+  // WORKOUTS FROM THE WATCH AND SLEEP (26 Nov 2026; watch-workouts.ts, health-sleep.ts): two more of this phone's Health
+  // permission switches, and the watch workouts he said were not his (ids on this phone's watch, two days at most).
+  fitplan_health_workouts_connected: { clear: false, why: "this phone's Health permission switch for the watch's workouts, as steps" },
+  fitplan_health_sleep_connected: { clear: false, why: "this phone's Health permission switch for sleep, as steps" },
+  fitplan_watch_workouts_dismissed: { clear: false, why: "watch workouts he said were not his: about this phone's watch, not the plan, and only the last two days are ever read" },
   fitplan_heart_strap: { clear: false, why: "the strap paired to this phone's Bluetooth — the phone's, not the plan's" },
   fitplan_heart_strap_readings: { clear: false, why: 'raw strap readings, matched to a session by its own times only and gone after four hours' },
   fitplan_activity_recording: { clear: false, why: 'a walk or run being recorded right now (25 Nov 2026) — a New Plan mid-walk must not lose the walk' },

@@ -12,7 +12,7 @@ import {
   watchActivityName, isStrengthWorkout, countsSteps, watchWorkoutMinutes, watchOffers, watchWhenLine, localDateOf,
   MIN_OFFER_MINUTES, LOOK_BACK_HOURS, activityFamily, isPlannedKind,
 } from '../src/lib/watch-workouts'
-import { heartSeries, heartRange, effortBands, mostlyBand, pacePerKm, estimatedMaxHeartRate, rowSpans } from '../src/lib/heart-series'
+import { heartSeries, heartRange, heartZones, mostlyZone, zoneOf, ZONES, pacePerKm, estimatedMaxHeartRate, rowSpans } from '../src/lib/heart-series'
 import { restingFromOvernight, restingByDay, OVERNIGHT_MIN_READINGS, OVERNIGHT_TO_HOUR } from '../src/lib/health-heart'
 import type { WatchWorkout } from '../src/lib/health-steps'
 
@@ -160,20 +160,26 @@ console.log('\n6. What the heart rate looked like (the summary\'s graph, time by
   check('the estimated maximum is 208 minus 0.7 x age: 187 at 30, 173 at 50', estimatedMaxHeartRate(30) === 187 && estimatedMaxHeartRate(50) === 173)
   check('...and there is none without an age', estimatedMaxHeartRate(null) === null && estimatedMaxHeartRate(undefined) === null && estimatedMaxHeartRate(0) === null && estimatedMaxHeartRate(140) === null)
 
-  // At a maximum of 187: Steady starts at 131 (70%), Hard at 159 (85%).
-  const b = effortBands(stepped, start, end, 187)
-  check('time by effort: 10 minutes Easy (110), 20 Steady (140), 10 Hard (170)', b !== null && b.easy === 10 && b.steady === 20 && b.hard === 10, b)
-  const edge = (bpm: number) => effortBands(every(1, () => bpm), start, end, 200)
-  check('the lines are 70% and 85% of the maximum: at 200, 139 is Easy and 140 Steady', edge(139)?.easy === 40 && edge(140)?.steady === 40 && edge(140)?.easy === 0, [edge(139), edge(140)])
-  check('...169 is Steady and 170 Hard', edge(169)?.steady === 40 && edge(170)?.hard === 40 && edge(170)?.steady === 0, [edge(169), edge(170)])
-  check('a session that went over the estimate is measured against its own highest reading', effortBands(every(1, m => (m < 20 ? 150 : 200)), start, end, 180)?.maxUsed === 200 && effortBands(every(1, m => (m < 20 ? 150 : 200)), start, end, 180)?.steady === 20)
-  check('no estimate (no age, or a condition ticked), no bands', effortBands(stepped, start, end, null) === null)
-  check('a watch that dropped out for most of the session draws no bands (15 of 40 minutes read)', effortBands(stepped.slice(0, 4), start, end, 187) === null, effortBands(stepped.slice(0, 4), start, end, 187))
-  check('...and a gap is not effort: one reading stands for five minutes at most', effortBands([stepped[0], stepped[1], stepped[2], ...stepped.slice(20)], start, end, 187)?.easy === 7, effortBands([stepped[0], stepped[1], stepped[2], ...stepped.slice(20)], start, end, 187))
+  // FIVE ZONES, each a tenth of the maximum (his ruling 26 Nov 2026). At a maximum of 200: zone 2 from 120, zone 3
+  // from 140, zone 4 from 160, zone 5 from 180.
+  check('the lines are 60, 70, 80 and 90% of the maximum', zoneOf(119, 200) === 1 && zoneOf(120, 200) === 2 && zoneOf(139, 200) === 2 && zoneOf(140, 200) === 3 && zoneOf(159, 200) === 3 && zoneOf(160, 200) === 4 && zoneOf(179, 200) === 4 && zoneOf(180, 200) === 5 && zoneOf(200, 200) === 5)
+  check('each zone carries the app\'s effort word: 1 and 2 are easy, 3 is steady, 4 and 5 are hard', ZONES.map(z => z.effort).join(',') === 'easy,easy,steady,hard,hard' && ZONES.map(z => z.word).join(',') === 'Very easy,Easy,Steady,Hard,All out')
+  // The stepped session at a maximum of 200: 10 minutes at 110 (zone 1), 20 at 140 (zone 3), 10 at 170 (zone 4).
+  const z = heartZones(stepped, start, end, 200)
+  check('time in zones: 10 minutes in zone 1 (110), 20 in zone 3 (140), 10 in zone 4 (170)', z !== null && JSON.stringify(z.minutes) === '[10,0,20,10,0]', z)
+  check('...each zone\'s floor in beats, for the range the screen prints (120, 140, 160, 180)', z !== null && JSON.stringify(z.floors) === '[0,120,140,160,180]' && z.maxUsed === 200, z)
+  const flat = (bpm: number) => heartZones(every(1, () => bpm), start, end, 200)?.minutes.join(',')
+  check('a whole session at 179 is zone 4, at 180 zone 5', flat(179) === '0,0,0,40,0' && flat(180) === '0,0,0,0,40', [flat(179), flat(180)])
+  const over = heartZones(every(1, m => (m < 20 ? 150 : 200)), start, end, 180)
+  check('a session that went over the estimate is measured against its own highest reading (150 is zone 3 of 200, not zone 4 of 180)', over?.maxUsed === 200 && over?.minutes.join(',') === '0,0,20,0,20', over)
+  check('no estimate (no age, or a condition ticked), no zones', heartZones(stepped, start, end, null) === null)
+  check('a watch that dropped out for most of the session draws no zones (15 of 40 minutes read)', heartZones(stepped.slice(0, 4), start, end, 200) === null, heartZones(stepped.slice(0, 4), start, end, 200))
+  check('...and a gap is not effort: one reading stands for five minutes at most', heartZones([stepped[0], stepped[1], stepped[2], ...stepped.slice(20)], start, end, 200)?.minutes[0] === 7, heartZones([stepped[0], stepped[1], stepped[2], ...stepped.slice(20)], start, end, 200))
 
-  check('mostly: the band with the most minutes', mostlyBand({ easy: 3, steady: 31, hard: 8, maxUsed: 187 }) === 'steady' && mostlyBand({ easy: 3, steady: 8, hard: 31, maxUsed: 187 }) === 'hard' && mostlyBand({ easy: 30, steady: 8, hard: 2, maxUsed: 187 }) === 'easy')
-  check('...a tie goes to the easier word, never the harder', mostlyBand({ easy: 10, steady: 10, hard: 10, maxUsed: 187 }) === 'easy' && mostlyBand({ easy: 0, steady: 10, hard: 10, maxUsed: 187 }) === 'steady')
-  check('...and nothing to say with no bands', mostlyBand(null) === null && mostlyBand({ easy: 0, steady: 0, hard: 0, maxUsed: 187 }) === null)
+  const zm = (minutes: [number, number, number, number, number]) => ({ minutes, floors: [0, 120, 140, 160, 180] as [number, number, number, number, number], maxUsed: 200 })
+  check('mostly: the zone with the most minutes', mostlyZone(zm([3, 4, 28, 6, 1])) === 3 && mostlyZone(zm([3, 4, 8, 26, 1])) === 4 && mostlyZone(zm([30, 4, 8, 2, 0])) === 1)
+  check('...a tie goes to the lower zone, never the higher', mostlyZone(zm([10, 10, 10, 10, 10])) === 1 && mostlyZone(zm([0, 0, 10, 10, 0])) === 3)
+  check('...and nothing to say with no zones', mostlyZone(null) === null && mostlyZone(zm([0, 0, 0, 0, 0])) === null)
 
   check('pace: 42 minutes over 5.2 km is 8:05 a kilometre', pacePerKm(42, 5.2) === '8:05', pacePerKm(42, 5.2))
   check('...seconds are two digits (30 min over 5 km is 6:00)', pacePerKm(30, 5) === '6:00')
@@ -205,11 +211,12 @@ console.log('\n7. The plan beside it, and who sees effort bands')
   const card = strip(read('src/components/WatchWorkoutsCard.tsx'))
   check('the plan is put beside a workout only for TODAY\'s session, still to do, and never a strength workout', /const plan = planned && !planned\.done && !strength && localDateOf\(w\.start\) === today \? planned : null/.test(card))
   check('what it counts as is his choice when made, the kind of movement otherwise', /countAs\?\.id === w\.id \? countAs\.plan : isPlannedKind\(w\.type, plan\.activity\)/.test(card))
-  check('a strength session, a health condition or pregnancy: no effort bands', /const estimatedMax = noHeartBands \|\| isStrengthWorkout\(shown\.type\) \? null : estimatedMaxHeartRate\(body\.age\)/.test(card))
+  check('a strength session, a health condition or pregnancy: no zones', /const estimatedMax = noHeartBands \|\| isStrengthWorkout\(shown\.type\) \? null : estimatedMaxHeartRate\(body\.age\)/.test(card))
   const home = strip(read('src/components/Dashboard.tsx'))
   check('...and Home says so from the profile\'s own ticks', /noHeartBands=\{\(profile\.health_conditions \?\? \[\]\)\.length > 0\}/.test(home))
   const figs = strip(read('src/components/WorkoutFigures.tsx'))
-  check('the bands are words with minutes, never colour alone', /BAND_WORD\[k\]/.test(figs) && /\{bands\[k\]\}/.test(figs))
+  check('each zone is its number, its word, its range and its minutes, never colour alone', /Z\{ZONES\[i\]\.zone\}/.test(figs) && /\{ZONES\[i\]\.word\}/.test(figs) && /\{range\(i\)\}/.test(figs) && /\{zones\.minutes\[i\]\}/.test(figs))
+  check('...and the screen says the zones come from an ESTIMATED top heart rate', /Zones are tenths of an estimated top heart rate of \{zones\.maxUsed\}/.test(figs))
   check('the heart rate graph carries a spoken label with its average and highest', /aria-label=\{`Heart rate over the session/.test(figs))
 }
 

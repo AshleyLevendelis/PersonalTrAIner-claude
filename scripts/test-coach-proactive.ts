@@ -146,7 +146,10 @@ check('...a plain "Ashley," does not', !checkReminder("Ashley, Muay Thai yesterd
 check('a message with chips that does not end on a question is refused', (() => { const r = checkReminder("Morning Ashley, Muay Thai yesterday and Lower Body Strength today, so take it steady.", clashMoment, clashFacts); return !r.ok && /question/.test(r.why) })())
 check('a number it was not given is still refused', !checkReminder("Morning Ashley, Muay Thai yesterday and Lower Body Strength today. Want me to cut it to 20 minutes?", clashMoment, clashFacts).ok)
 const plainMoment = server.momentsToRaise({ ...base, todaySession: { name: 'Upper Push', lift: 'Barbell Bench Press', weight: '70kg' } } as never)[0]
-check('a reminder with no chips need not end on a question', checkReminder('Hey Ashley, Upper Push today with Barbell Bench Press at 70kg. Make the first set count.', plainMoment, { ...base } as never).ok)
+// SINCE 26 Nov 2026 the session reminder carries the four answers to "ready for it?" (his "Quick reply buttons dont give
+// enough choice"), so it too must end on the question they answer. A moment with no answers under it still need not.
+check('today\'s session reminder carries four answers, so it must end on a question', (plainMoment.chips ?? []).length === 4 && !checkReminder('Hey Ashley, Upper Push today with Barbell Bench Press at 70kg. Make the first set count.', plainMoment, { ...base } as never).ok && checkReminder('Hey Ashley, Upper Push today with Barbell Bench Press at 70kg. Ready for it?', plainMoment, { ...base } as never).ok)
+check('a reminder with no chips need not end on a question', checkReminder('Hey Ashley, Upper Push today with Barbell Bench Press at 70kg. Make the first set count.', { ...plainMoment, chips: [] }, { ...base } as never).ok)
 
 console.log('\n6. The chat')
 const row = rowToMessage({ id: 'r1', role: 'assistant', content: 'x', action_data: { source: 'reminder', moment: 'load_clash', shortcut: 'exercise', chips: ["Trim today's session", 'Keep it as is', 7, ''] } })

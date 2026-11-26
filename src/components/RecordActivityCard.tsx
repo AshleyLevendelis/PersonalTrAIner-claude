@@ -20,7 +20,7 @@ import { isPhoneApp } from '@/lib/steps-store'
 //   recording  the clock, the live heart rate when a strap sends, End, and Cancel (which asks once)
 //   ended      what the phone read for the window, "How hard was it?" (one tap logs it), Keep going, Throw away
 // The ended state is THE SUMMARY (26 Nov 2026, his "too simple" on the watch card; WorkoutFigures): the figures as
-// tiles, the heart rate as a graph and time by effort, the same drawing a watch workout gets on Home.
+// tiles, the heart rate as a graph and time in zones, the same drawing a watch workout gets on Home.
 // The figures are read once at End; a watch that has not synced yet is said, and filled in later on its own.
 // ---------------------------------------------------------------------------
 

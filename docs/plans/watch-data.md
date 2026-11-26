@@ -49,8 +49,9 @@ of our own.
    saved: the nights are read from the phone each time, so there is no migration. Needs READ_SLEEP (declared) and the
    `chat-gemini` deploy. Rules and basis: `src/lib/sleep-nights.ts`.
    **And the watch workout card was redrawn the same day** on his word that the first one was too simple: tiles, a
-   heart-rate graph, time by effort (Easy / Steady / Hard by share of an estimated maximum), the plan beside what he
-   did on a planned cardio day. `src/lib/heart-series.ts`, `src/components/WorkoutFigures.tsx`.
+   heart-rate graph, time in five heart rate zones (his ruling the same day, over my three effort bands), the plan
+   beside what he did on a planned cardio day. And his pick "A": when a session planned easy averaged zone 4 or 5,
+   the coach says so once and asks whether he wants the next one slower; nothing changes without a yes. `src/lib/heart-series.ts`, `src/components/WorkoutFigures.tsx`.
 3. **Smarter steps**: a weekly trend, and an OFFER to correct the activity level when a fortnight of steps disagrees
    with it. Calories burned still never change the food target.
 4. **A Wear OS app**: start on the wrist, live heart rate in the app, tick sets from the watch. Native, his machine.

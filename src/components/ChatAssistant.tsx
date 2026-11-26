@@ -165,6 +165,8 @@ import { GROCERY_AISLE_LABEL, chatGroceryAmount } from '@/lib/grocery-display'
 import { logWater, undoLog as undoWaterLog, subscribeWaterStore } from '@/lib/water-store'
 import { subscribeCardioLogStore, deleteCardioLog, isPlausibleCardioDuration, isPlausibleDistanceKm } from '@/lib/cardio-log-store'
 import { subscribeMealStore } from '@/lib/meal-store'
+import { easyRanHard } from '@/lib/heart-trends'
+import { estimatedMaxHeartRate } from '@/lib/heart-series'
 import { getStepsForDate, logStepsManual, restoreStepsForDate, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS, isPhoneApp } from '@/lib/steps-store'
 import { buildCoachStepsSummary } from '@/lib/steps-context'
 import { buildCoachInjuriesSummary } from '@/lib/injuries-context'
@@ -928,6 +930,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // a raised resting heart rate for the opener. Empty with no watch or strap.
   const [heartContext, setHeartContext] = useState('')
   const [heartRecovery, setHeartRecovery] = useState<{ line: string; since: string; kind?: 'sleep' } | null>(null)
+  // AN EASY SESSION THAT RAN HARD (his pick "A", 26 Nov 2026; heart-trends.ts easyRanHard): today's and yesterday's
+  // cardio with a heart figure, read with the heart picture; the plan's side is asked of the week at render.
+  const [heartRecentCardio, setHeartRecentCardio] = useState<{ date: string; activity_name: string; duration_minutes: number; avg_heart_rate: number; max_heart_rate: number | null }[]>([])
   // SLEEP (his pick "A", 26 Nov 2026; sleep-nights.ts): what the coach is told. Empty with no watch or the switch off.
   const [sleepContext, setSleepContext] = useState('')
   // The daily hello waits for this read (a raised resting heart rate is its first-ranked offer on a training day).
@@ -1547,6 +1552,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // The birthday wish (his 9 Nov request), from the date of birth he picked; none for an age typed instead.
     birthdayToday: isBirthday(profile.date_of_birth, activeSession.date),
     recovery: heartRecovery,
+    // Heart rate is never judged for someone with a health condition or pregnancy ticked (no maximum is passed).
+    effortGap: easyRanHard({
+      logs: heartRecentCardio,
+      plannedOn: date => { const a = trainingWeek.days.find(d => d.date === date)?.session?.plannedActivity; return a ? { activity: a.activity, targetRpe: a.targetRpe ?? null } : null },
+      estimatedMax: (profile.health_conditions ?? []).length > 0 ? null : estimatedMaxHeartRate(profile.age),
+      today: activeSession.date,
+    }),
   }
   // A ref as well as the value, because the opener finalises from inside a
   // setTimeout: the closure it captured could be several data arrivals old by
@@ -1714,6 +1726,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   //     opener, which has already said its one thing;
   //   - and never twice unanswered.
   const nudgeInFlightRef = useRef(false)
+  // Declared here, beside the decision that reads them; refreshFromServer (below) holds the count. See its note.
+  const refreshingRef = useRef(0)
+  const [refreshedTick, setRefreshedTick] = useState(0)
   useEffect(() => {
     if (!profile.id || nudgeInFlightRef.current) return
     if (!historyLoaded || isFirstEverChat !== false || isLoading) return
@@ -1721,6 +1736,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (messages.length === 0) return
     if (messages.length === 1 && !messages[0].id) return
     if (hasUnreadCoachMessage(messages, seenAttention)) return
+    // NOT WHILE THE CHAT IS BEING RE-READ (refreshFromServer): what the phone's reminders already said is not in yet.
+    if (refreshingRef.current > 0) return
     // NEVER OVER A QUESTION SHE IS IN THE MIDDLE OF ANSWERING. hasUnreadCoachMessage
     // covers the case where she has not looked yet; this covers the case where she
     // has — a proposal card open for confirmation, or a clarification waiting on a
@@ -1814,7 +1831,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile.id, historyLoaded, isFirstEverChat, isLoading, proactiveData, feelContext, trainingWeek.loading, planKnown, messages, seenAttention, clockTick, reminderSettings, logsMeals, heartLoaded])
+  }, [profile.id, historyLoaded, isFirstEverChat, isLoading, proactiveData, feelContext, trainingWeek.loading, planKnown, messages, seenAttention, clockTick, reminderSettings, logsMeals, heartLoaded, refreshedTick])
 
   // One-shot finalization of the synchronous fallback greeting once we know
   // (a) whether this is a genuinely first-ever conversation (no prior
@@ -2004,11 +2021,17 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * chat-history-merge.ts), so an open card on screen is never lost to a re-read.
    */
   const lastRefreshRef = useRef(0)
+  // THE COACH DOES NOT SPEAK WHILE THE CHAT IS BEING RE-READ (his phone, 26 Nov 2026: the 8:00 reminder "Ready for it?"
+  // and, five minutes later when he opened the app, "Feeling good for it?" about the same session). Coming back to
+  // the app both re-reads the chat and re-asks "is there something to say?"; the second ran first, on the chat as it
+  // stood before the phone's reminder had been read in, so it did not know the session had been spoken for. The
+  // count is held in a ref (read by the decision) and its end is a state change (so the decision runs again).
   const refreshFromServer = async (force = false) => {
     if (!profile.id || !historyLoaded) return
     const now = Date.now()
     if (!force && now - lastRefreshRef.current < 2000) return
     lastRefreshRef.current = now
+    refreshingRef.current++
     try {
       const { data } = await supabase
         .from('chat_messages')
@@ -2039,6 +2062,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       }
     } catch (err) {
       console.error('Re-reading the chat failed:', err)
+    } finally {
+      // Read or failed, the decision may run again: a failed re-read must not silence the coach for the visit.
+      refreshingRef.current = Math.max(0, refreshingRef.current - 1)
+      setRefreshedTick(t => t + 1)
     }
   }
   const refreshRef = useRef(refreshFromServer)
@@ -2115,6 +2142,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     void import('@/lib/health-heart').then(async m => {
       const picture = await m.readHeartPicture(profile.id!, getLocalDateString(getAppNow(profile.id)))
       setHeartContext(m.heartContextForCoach(picture))
+      setHeartRecentCardio(picture.recentCardio)
       // TWO SHORT NIGHTS make the same offer (sleep-nights.ts). Read on the phone only, and only with its switch on.
       // A raised resting heart rate comes first where both are true: one offer of a lighter day, never two.
       let sleepFlag: { line: string; since: string; kind: 'sleep' } | null = null
