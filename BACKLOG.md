@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **THE MEAL-REGENERATE CHECK COMPARED AGAINST A WEEK STILL LOADING (26 Nov 2026, found by the pre-merge sweep).**
+  `verify:meal-regenerate-one` 4b ("a failed new breakfast leaves the week exactly as it was") failed on the branch, on
+  its base and on `main` alike, and passed on some runs. Measured, not reasoned: the app did nothing wrong. The page
+  reloads carrying picks saved earlier in the run, and the check's "before" was the first week drawn, which can come
+  before those picks are read back. With a steady week before and after (unchanged for two seconds), the failed attempt
+  moves nothing: 3 runs of 3. Mutation: a failure that drops a breakfast is caught; the same change on the thrown-error
+  path is equivalent here (the writer's 502 comes back as an answer, not a throw). Also from that sweep: the 16+ age
+  rule had no line on the coach's why-sheet (`test:app-decisions`), now added.
 - [x] **A SIMPLER FIRST WEEK: LEFT AS IT IS, HIS RULING 26 Nov 2026.** Asked (setup is about 15 screens and the tour
   22 stops), from four options: an optional tour with a tip a day, a short tour with the rest as needed, hiding extras
   for week 1, or "Leave it as it is". He chose to leave it; the tester toolkit's recordings are where to look first if
