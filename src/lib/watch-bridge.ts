@@ -30,7 +30,7 @@ export interface WatchBridgeAdapter {
 
 let real: Promise<WatchBridgeAdapter | null> | null = null
 
-export function watchBridgeAdapter(): Promise<WatchBridgeAdapter | null> {
+function watchBridgeAdapter(): Promise<WatchBridgeAdapter | null> {
   const fake = (globalThis as { __watchBridgeForTest?: WatchBridgeAdapter | null }).__watchBridgeForTest
   if (fake !== undefined) return Promise.resolve(fake)
   if (!isPhoneApp()) return Promise.resolve(null)
@@ -169,5 +169,3 @@ export function startWatchBridge(context: () => WatchContext | null): () => void
   return () => { stopped = true; unlisten?.(); document.removeEventListener('visibilitychange', onVisible) }
 }
 
-/** Tests only. */
-export function __resetWatchBridgeForTests(): void { real = null; lastPublished = null }
