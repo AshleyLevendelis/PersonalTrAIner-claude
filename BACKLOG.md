@@ -2,6 +2,10 @@
 
 Newest first. One line each.
 
+- [x] **A SIMPLER FIRST WEEK: LEFT AS IT IS, HIS RULING 26 Nov 2026.** Asked (setup is about 15 screens and the tour
+  22 stops), from four options: an optional tour with a tip a day, a short tour with the rest as needed, hiding extras
+  for week 1, or "Leave it as it is". He chose to leave it; the tester toolkit's recordings are where to look first if
+  real testers drop off in week 1. Nothing built.
 - [x] **AN UNUSED ACCOUNT IS DELETED AFTER TWO YEARS, WITH AN EMAIL A MONTH BEFORE (26 Nov 2026).** His ruling, from
   three options: "Delete after 2 years, email first" (over one year, and over keeping it until they delete it). The
   privacy draft now has every time limit; its open items are only his address and email, the storage region, and a
