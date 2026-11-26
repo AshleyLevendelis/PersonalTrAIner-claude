@@ -863,7 +863,9 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 25 Nov 2026: 3415 -> 3432, the walk-and-run recorder (its card is its own lazy chunk). MEASURED 3423; 9 kB over today.
   // MOVED 25 Nov 2026: 3466 -> 3475, the recorder merged onto main's own workout. MEASURED 3466 on the merged tree
   // (0 kB of room left at 3466); 9 kB over today.
-  const TOTAL_BUDGET_KB = 3475
+  // MOVED 26 Nov 2026: 3475 -> 3493, workouts the watch recorded (its card and its reader are their own lazy chunks,
+  // loaded only in the phone app with the switch on). MEASURED 3484; 9 kB over today.
+  const TOTAL_BUDGET_KB = 3493
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)

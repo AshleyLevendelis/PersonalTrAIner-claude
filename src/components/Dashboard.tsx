@@ -47,6 +47,7 @@ const SessionSummaryDialog = lazyWithReload(() => import('@/components/exercise/
 // meals now, and is up one day a week; first paint does not wait for it.
 // AMBIENT: it appears on its own day, nobody taps to open it, so with its file missing Home draws nothing in its place.
 const WeightHistory = lazyWithReload(() => import('@/components/WeightHistory').then(m => ({ default: m.WeightHistory })))
+const WatchWorkoutsCard = lazyWithReload(() => import('@/components/WatchWorkoutsCard').then(m => ({ default: m.WatchWorkoutsCard })))
 const ShopDayCard = lazyWithReload(() => import('@/components/ShopDayCard').then(m => ({ default: m.ShopDayCard })), { ambient: true })
 import { personalBest, bestReadingOf, weeksOnPlanPill, weeksOnPlanSentence } from '@/lib/coach-voice'
 import { useCardioLogsToday } from '@/components/exercise/CardioSetRow'
@@ -410,6 +411,16 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     return () => { live = false; document.removeEventListener('visibilitychange', onVisible) }
   }, [profile.id, activeSession.date])
 
+  // WORKOUTS FROM THE WATCH (26 Nov 2026; watch-workouts.ts): whether its switch is on, asked only in the phone app so
+  // the website never loads that code. The card reads the phone itself.
+  const [watchOn, setWatchOn] = useState(false)
+  useEffect(() => {
+    if (!isPhoneApp()) return
+    let live = true
+    void import('@/lib/watch-workouts').then(m => { if (live) setWatchOn(m.isWatchWorkoutsConnected()) }).catch(() => { /* no card */ })
+    return () => { live = false }
+  }, [profile.id])
+
   // HEART RATE FROM THE PHONE (his 24 Nov 2026 "1 + 2"; health-heart.ts): the same moments as steps. Today's and
   // yesterday's finished sessions get their heart rate, and Progress shows the resting figure's week. Loaded only in the
   // phone app with the switch on; nothing in a browser.
@@ -662,6 +673,14 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           <HomeWeekBoundaryNote days={week.days} todayDate={activeSession.date} />
         </>}
       />
+
+      {/* 2b. FROM YOUR WATCH (26 Nov 2026; watch-workouts.ts): a workout the watch recorded that the app does not hold,
+          offered under today's card. Mounted only in the phone app with its switch on; draws nothing with no offer. */}
+      {watchOn && profile.id && (
+        <Suspense fallback={null}>
+          <WatchWorkoutsCard profileId={profile.id} today={activeSession.date} body={{ weightKg: profile.weight_kg, age: profile.age, gender: profile.gender === 'male' || profile.gender === 'female' ? profile.gender : null }} onLogged={() => { /* the cardio store tells Home's lines */ }} />
+        </Suspense>
+      )}
 
       {/* 3. THE TRAINER'S LINE — one per screen, no box. An adaptation message is shown alone, never rotated away. */}
       {trainerNudge

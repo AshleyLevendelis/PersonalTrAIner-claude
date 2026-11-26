@@ -1867,6 +1867,13 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   effort tap logs it; a watch that syncs late fills in. Calories burned NEVER change the food target (CSCS, mine).
   `test:recorded-activity`, `verify:record-activity`, `docs/plans/recorded-activity.md`. Needs migration 20261125140000
   and a phone app rebuild
+- **A workout started on the watch is picked up: his brief 26 Nov 2026** ("with my Samsung Watch, I could just go in,
+  start a workout ... log workouts that are not necessarily in the plan"): with Profile's "Workouts from your watch" on,
+  Home offers any workout the watch recorded that the app does not hold, and one effort tap logs it at the watch's own
+  start; never logged unasked, never twice, "Not mine" for good; extra work, never in place of a session. Resting heart
+  rate is worked out from the night's readings when the watch shares none (never mixed with a shared figure). Step 1 of
+  `docs/plans/watch-data.md`; sleep (step 2) waits on his pick. `test:watch-workouts`, `verify:watch-workouts`. Needs a
+  phone app rebuild. NOT on a real watch yet
 - **Heart rate from a watch: his "1 + 2, build it", 24 Nov 2026**: after each session its average and highest heart rate
   (from Health Connect, which the watch writes to) show under it, and Progress shows resting heart rate against last
   week. Read only, its own switch, phone app only; never a target or zone. `test:health-heart`, `verify:health-steps`
