@@ -2,6 +2,153 @@
 
 Newest first. One line each.
 
+- [x] **THE MEAL-REGENERATE CHECK COMPARED AGAINST A WEEK STILL LOADING (26 Nov 2026, found by the pre-merge sweep).**
+  `verify:meal-regenerate-one` 4b ("a failed new breakfast leaves the week exactly as it was") failed on the branch, on
+  its base and on `main` alike, and passed on some runs. Measured, not reasoned: the app did nothing wrong. The page
+  reloads carrying picks saved earlier in the run, and the check's "before" was the first week drawn, which can come
+  before those picks are read back. With a steady week before and after (unchanged for two seconds), the failed attempt
+  moves nothing: 3 runs of 3. Mutation: a failure that drops a breakfast is caught; the same change on the thrown-error
+  path is equivalent here (the writer's 502 comes back as an answer, not a throw). Also from that sweep: the 16+ age
+  rule had no line on the coach's why-sheet (`test:app-decisions`), now added.
+- [x] **A SIMPLER FIRST WEEK: LEFT AS IT IS, HIS RULING 26 Nov 2026.** Asked (setup is about 15 screens and the tour
+  22 stops), from four options: an optional tour with a tip a day, a short tour with the rest as needed, hiding extras
+  for week 1, or "Leave it as it is". He chose to leave it; the tester toolkit's recordings are where to look first if
+  real testers drop off in week 1. Nothing built.
+- [x] **AN UNUSED ACCOUNT IS DELETED AFTER TWO YEARS, WITH AN EMAIL A MONTH BEFORE (26 Nov 2026).** His ruling, from
+  three options: "Delete after 2 years, email first" (over one year, and over keeping it until they delete it). The
+  privacy draft now has every time limit; its open items are only his address and email, the storage region, and a
+  qualified review. Built: the app writes "last used" once a day on open (`last_active_on`, every existing row starts
+  on the day the migration runs, so nobody is counted idle for time before it existed); a nightly database job
+  (`prune_inactive_accounts`, 03:41 UTC) emails a warning at 23 months idle, naming the day (two years from last use,
+  never sooner than 28 days away), and deletes at two years once the warning is 28+ days old; coming back cancels a
+  warning. Decided by me, recorded here: (1) a warning is recorded ONLY when the email is actually queued, so with email
+  not set up nobody who has an address is ever deleted; (2) an account with no email (an anonymous one) is deleted at
+  two years with no warning, as his option said; (3) an old plan left behind by "New Plan" while its owner uses a newer
+  one is deleted at two years with no email, because their account is not going and "your account will be deleted"
+  would be false; (4) the sign-in goes only once its owner has no profile left. The email goes to the PERSON (the
+  report function had only ever written to Ashley). Checks: `test:rls-local` §13 (eleven people, each on one side of
+  one rule, run with and without email; 13 mutations, all caught), `test:report-email` §9 (7 checks, 4 mutations),
+  `verify:app-boot` (the open writes the day; 2 mutations). The email's words are mine and are his to change. NEEDS:
+  migration 20261126130000 via db:push-both, the `report-email` deploy, and Resend set up to send to any address
+  (today it may only send to his own: a domain verified in Resend, and its sender in REPORT_EMAIL_FROM). THEN, and only
+  then, the Vault secret `inactive_warning_ready` = yes: until it exists no warning is sent, because Resend's test sender
+  would refuse it AFTER the job had recorded it, and the account would be deleted unwarned (found writing the handover;
+  `test:rls-local` §13 holds it, 1 more mutation, caught).
+- [x] **THE APP IS FOR 16 AND OVER, AND SETUP NOW SAYS SO (26 Nov 2026).** His ruling, from four options: "16+, setup
+  stops younger" (over 18+, over 13+, and over the privacy policy stating an age that nothing checks). Before this
+  setup took a date of birth and let any age through (the floor was 13, the card's own limit). Now an age under 16,
+  however setup gets it (the card's birthday, a typed age, or the setup coach), replaces the conversation with "This app
+  is for 16 and over": why (the targets and weights are written for adults), that no account was made, and who can
+  help (a PE teacher, a club coach, a GP); its one button, "I entered my birthday wrong", clears the age and asks it
+  again. Generate refuses too. CSCS basis, mine: an adult calorie deficit and adult loads are not a plan a coach would
+  sign for a growing body. Deliberately NOT claimed: that nothing left the phone (the setup chat goes to the coach's
+  server). `minimum-age.ts` holds the number. `verify:under-age` (11 checks: the stop at 14, its words and button, the
+  way back, 16 carrying on, 15 recorded by the coach; 5 mutations, all caught). AND THE BIRTHDAY MUST BE ANSWERED: his
+  second ruling the same day, "Must answer" (over keeping Skip), because a skippable birthday is a check an under-16
+  steps round. Height, weight and sex stay skippable. 2 more checks (no Skip; a blank Save does not carry on; 1
+  mutation, caught); `test:onboarding-slots` now holds age as not declinable. Under 13 is still refused as an invalid date by the card
+  (its limit), not shown the stop screen. Existing profiles are not checked (no live users).
+- [x] **TESTER DATA NOW HAS A TIME LIMIT, AND THE PRIVACY DRAFT HAS THREE OF ITS FIVE ANSWERS (26 Nov 2026).** His
+  rulings, each from options: the controller is **him personally**; the coach's Gemini key is **paid, billing on**
+  (so the draft says messages are not used for training; check AI Studio before publishing); tester data is kept
+  **activity 90 days, reports 1 year** (over 30 days and over a year for everything). Before this nothing was ever
+  deleted. New migration 20261126120000: `prune_tester_data()` deletes older rows and only the database can run it
+  (anon and signed-in users refused), scheduled nightly at 03:23 UTC where pg_cron exists. `test:rls-local` §12 seeds
+  rows either side of each limit and runs it (5 checks, 5 mutations: each interval, both tables swapped, both revokes,
+  all caught). The gate also now prints how many checks ran, so the mutation harness can score it. Still open for
+  the policy: his address and email, the storage region, inactive accounts, a minimum age, a qualified review.
+  NEEDS: migration 20261126120000 via db:push-both
+- [x] **TWO DATABASE CHANGES SHARED ONE TIMESTAMP, AND THREE CHECKS HAD LOST THEIR END MARKER (25 Nov 2026, found
+  drafting the privacy policy).** The tester toolkit's migration and main's days_ahead were both 20261125120000;
+  Supabase keys a migration by that number, so db:push-both would have applied one and skipped or refused the other.
+  Restamped to 20261125150000 (every reference updated), the second same-day collision after the walk recorder's. New
+  `test:migration-stamps` (every file has its own 14-digit stamp, and the detector is proven on the real collision;
+  1 mutation, caught). Also: main deleted `handleMacroModeChange`, which three checks used as the end of the code they
+  read, so `test:reset-clears-draft` and `test:weigh-in-targets` silently read to the END OF App.tsx (still green, now
+  vacuous: a key cleared anywhere counted) and `test:tester-toolkit` went red. All three now stop at the next function
+  at App's own level; removing New Plan's call that turns tester recording off fails two of them. Also corrected the
+  walk recorder's entry, which named its pre-merge stamp.
+- [x] **A SUPERSET SAVES TIME IN EVERY WEEK, AT EVERY SESSION LENGTH (25 Nov 2026; CSCS mine; the "OPEN, mine, next
+  engine pass" of the 15 Nov short-session entry).** Traced first: one line in the per-week loop read a superset
+  partner's shared rest ('alternate') as 20 seconds and raised it to the tier's full rest in every week after the base
+  plan, except at 20-30 minutes. MEASURED with a new `measure:superset-rest` (every 8th grid plan): before, 0 of 12,960
+  superset partners in loading weeks 2+ kept their shared rest (all 12,960 given a full rest of their own); after, all
+  12,960 keep it. The 15 Nov fear (honest timing pushes sessions under their minimum) did not hold now: the 18 Nov
+  filler reorder had taken those counts to 0, and `test:session-length` stays 0 below the minimum at every length. The
+  top-up step's forecast costed 'alternate' at 60s plus the phase shift; it now costs it as the shipped week does
+  (20s), so the time saved goes back into work: +675 working sets on 27,648 loading days (+0.14%), mean session 65.31 ->
+  65.33 minutes (measured both ways; no check sees that half, named). CSCS review: (1) a superset is a pair done back to
+  back for density; giving the second member a full rest made it two straight sets with a label, so the training
+  effect is now what the pairing promises; (2) takes away 20-60 seconds of rest after each paired isolation, trunk or
+  carry move (never a main lift: pairs never cross it); (3) patterns, overload and volume kept, a little more work where
+  time frees up; (4) no floor redefined: rest floors still apply to every unpaired slot, and the main lift is never
+  paired; (5) in scope. GATES: `test:session-length` §2b (every partner in weeks 2+ alternates, and partners exist;
+  1 mutation, putting back the 20-30 clause, caught twice); `test:short-session`, `test:filler-yields`,
+  `test:rest-floors`, `test:thin-day`, `test:pattern-floor`, `test:persona-audit-fixes`, `test:older-beginner`,
+  `test:compound-order`, `test:exercise-consistency`, `test:frozen-weeks`, `test:main-lift-rest`, `test:day-purpose`,
+  `test:audit` green; `test:quality` result below. Frontend only.
+- [x] **"REBUILD TODAY" KEEPS THE MAIN LIFT ON A DAY WITH NO BARBELL LIFT (25 Nov 2026; found by the main-lift trace,
+  CSCS mine).** His 16 Sep ruling: rebuild today keeps the main lift and changes the rest. It read the main lift by slot
+  tier alone, so on a bodyweight or limited-kit day (no tier-1 slot) it kept NOTHING and rebuilt the very lift the day
+  is labelled with (measured: Close-Grip Push-Ups, labelled main, became Deficit Push-Ups). Now, with no tier-1 slot,
+  the day's labelled main lift (the hardest standalone compound, the one the plan keeps all block) is kept in its place
+  and everything else is rebuilt as before. CSCS review: (1) the progression thread on the day's main lift survives a
+  rebuild, which is the ruling's point; (2) takes nothing away (one fewer slot changes on those days); (3) coverage and
+  volume as before; (4) no floor or ceiling moves; (5) in scope. `test:session-rebuild` (+4 checks: the case binds,
+  kept in its place, never replaced, the rest still rebuilt; 1 mutation, caught, 2 failures). `test:kit-list`,
+  `test:qa-training-nov14`, `test:replacement-prescription` green. Frontend only.
+- [x] **CORRECTION: MEALS ALREADY LAND THEIR NUMBERS (25 Nov 2026).** I told Ashley only about half of planned days hit
+  every band, from the 18 Oct line in CLAUDE.md (52.5% after the bands tightened). The 9 Nov deep pool changed that and
+  I did not read the later line before quoting the older one. Measured today, `measure:deep-pool`: 99.8% of days on
+  target on the deep pool (97.1% on seven a meal), 20 different dishes a meal over four weeks. Off the list.
+- [x] **THE LIFT LABELLED "MAIN LIFT" IS THE ONE KEPT FOR THE WHOLE PLAN (25 Nov 2026, the 826 named under the
+  compound-order entry; CSCS, mine).** Traced first (three definitions of a day's main lift, not two: the label and
+  the rest floor rank by difficulty, the block rotation took the first tier-2 compound, and a dozen readers use the
+  slot tier only). MEASURED with a new `measure:main-lift-kept` (every 8th grid plan, the same day in block 1 and
+  block 2): the lift labelled main in block 1 was GONE from that day in block 2 on 635 of 4,499 days and still there
+  but no longer labelled on 226, against his 16 Nov "main lifts for the whole plan". Two causes, two fixes:
+  (1) on a day with no tier-1 lift, the block rotation now keeps the labelled lift (`dayAnchorExercise`), not the
+  first tier-2 compound; (2) trunk work and carries are never a day's main lift (a "Conditioning & Core" day had a
+  Russian Twist labelled MAIN LIFT, given the main-lift rest floor, and rotated away). AFTER: gone on 1 day; still
+  there, label moved, on ~375 (the label follows a harder accessory a later block adds). TRIED AND DROPPED: keeping
+  each new accessory no harder than the main lift took that to 141, but it changes which accessories the seeded
+  rotation draws, and persona plan #2103 (a knee plan) then broke the front/back-of-thigh balance (quad 9 sets to
+  hamstring 3, counting knee-rehab quad drills); fixing that properly means deciding whether rehab drills count as
+  training volume in that rule, which changes what a measure measures, so it is left named, not built. NOT CHANGED,
+  by decision: where a block's extra sets go and what the time trim protects still read the first tier-2 compound
+  (they move prescriptions; a separate measured change). Rebuild today on a no-tier-1 day still keeps nothing
+  (it reads slot tier only; the trace's finding, named). CSCS review: (1) the hardest standalone compound of the day
+  is the one progressed for the whole plan, which is what the day is for; the first compound now rotates as an
+  accessory; (2) takes away the first compound's plan-long continuity, and a core day's "main lift" rest floor;
+  (3) pattern coverage, push:pull and volume unchanged (rotation swaps within a slot; sets untouched); (4) the main-lift
+  rest floor no longer applies to trunk work or carries, the intended direction; (5) in scope. GATES: `test:older-
+  beginner`'s bodyweight check now reads the label (it read the first compound, a second definition); 3 mutations
+  caught across it and a new `test:session-derive` [23] (core day has no main lift, with a compound control).
+  `test:persona-audit-fixes`, `test:exercise-consistency`, `test:block-swap-reach`, `test:compound-order`, rest
+  floors, session length, `test:audit` green; `test:quality` 11.56 -> 11.59 of 12, 0 of 9,216 below the floor. Frontend only; existing plans keep
+  their exercises until rebuilt.
+- [x] **THE TESTER TOOLKIT (25 Nov 2026): his four rulings, "Everything", "Both", "Yes, they can untick", "Email +
+  daily summary"** (asked together on his "work through all of these without stopping", each from options; my
+  recommendations were errors-plus-actions, both, yes, email-plus-summary, and he chose more recording than I
+  recommended). Plan and limits: `docs/plans/tester-toolkit.md`. A tester agrees on Profile ("Help test the app",
+  off by default, every kind of thing recorded said before the tap, never a password or an email address); the app
+  then records screens, taps, typing, crashes, console errors, failed requests and failure messages on screen
+  (`tester-log.ts`, `tester_events`), and gives a bug button beside the gear, "Report a problem" on every exercise ⋮
+  and a flag on each meal sheet; a report carries the area, his words, a picture of the screen (untickable) and the
+  last 30 things done (`tester_reports`). Each report is emailed with the picture attached, and a daily 07:17 UTC
+  summary groups the last 24 hours' problems, one line each with counts, most testers first, nothing sent when no
+  tester was active. Owner-only tables, deleted with the account, in the data download; New Plan turns it off. The
+  report sheet and screenshot library load only for a tester (total budget 3415 -> 3440, measured 3435).
+  VERIFIED: `test:tester-toolkit` (53 checks; 14 mutations, 14 caught, one rewritten after it crashed the gate rather
+  than breaking it and one re-anchored after it did not apply), `verify:tester-report` (35 checks on the whole app at
+  390px, screenshots read; 8 mutations, 7 caught: the eighth removed the Profile switch's own call to start recording
+  and changed nothing, because App already starts it from the saved date, so that call was deleted as inert). NOT VERIFIED: a real email (needs the deploy), the summary's schedule (needs the
+  migration on Supabase), a picture taken on a real phone. NEEDS: migration 20261125150000 (restamped from 20261125120000 on merge: days_ahead holds that number) and the `report-email`
+  deploy. CSCS review: not applicable, nothing prescribed changes.
+  THE FULL SWEEP found two more, fixed the same day: `test:profile-restore` (tester_since read back, and left ABSENT
+  before its migration so a read that did not say never switches recording off) and `test:rls-local` (the two tester
+  tables named as records with no update policy, beside coach_reply_reports). `verify:correction-loop` failed once
+  under the sweep's load and passed alone.
 - [x] **THE GALAXY WATCH APP: WORKOUTS, STEPS AND HEART RATE, AND LIFTING FROM THE WRIST (27 Nov 2026; his "Go in the watch with your recommendations" and his vision: "Track workouts steps and heart rate. On a weight workout see 'next exercise 3x10 bench press @100kg' then start rest from watch, start next set").** BUILT, `docs/plans/watch-app.md` (W1-W3 together, decisions 1a, 2 and 3 as recommended). The watch (`android/wear`, Java, same app id and key): Home with today's session and Walk / Run / Bike / Other; cardio with the clock, "♥ N · Zone N", steps and km on foot, End tapped twice, then "Mostly zone 3 · Steady · Log it" (or Easy / Steady / Hard); lifting with "NEXT · name · 3 × 10 @ 100 kg · Set 2 of 3", Set done starting the rest, a countdown naming what is next, one buzz, Start next set. Health Services in a foreground service (screen off), an outbox so nothing is lost with the phone away. The phone: a listener keeping the watch's events until the app opens; heart rate into the strap's store (live beside the gear and on the running card, "Heart rate live from your watch", each session's figure and graph; the three readers that asked `pairedStrap()` now ask `hasOwnReadings()`); a watch cardio workout shown running and logged once when ended on the watch, the watch's steps, distance and calories winning; each watch set saved by PRESSING THE ROW'S OWN TICK on Exercise (opening a closed row first), so weight, checks, rest and records are the phone's; a set it cannot place is said with Dismiss. Exercise sends the watch the rows it draws (today's weights), the zone maximum only where the phone shows zones. FOUND ON THE WAY: a heart rate reading older than the newest held was silently dropped (`StrapReadings.add` refuses anything not a second after the last), so a batch that waited on the watch would have been lost; it is now filed at its own time (`insert`). CSCS (mine): zones describe, never prescribe; nothing typed on the watch; the rest is the plan's own. LIMIT, named: a watch set reaches the log when the app is open on Exercise. VERIFIED: `test:watch-app` (52 checks; 14 mutations, 13 caught, 1 equivalent: an unknown effort already fails inside the same guard), `verify:watch-sets` (16 checks on the whole app as the phone app; 5/5 mutations; screenshot read: two squat sets ticked by the watch, the phone's rest running, "Log set 3" next). `test:recorded-activity`'s plugin-order check re-anchored on the property (registered before the app starts), 2/2 mutations. Budgets moved with measured notes (app chunk 1699 -> 1704, total 3533 -> 3551, both changes of the day). NOT PROVEN: none of the watch code is compiled (Google's Android libraries are blocked from the cloud session) or run on a watch; the phone's native half compiled nowhere either. Needs his machine: build, fix compile errors, install on the Galaxy Watch 7, test a walk and a lifting session. SWEEP (the 178 checks and 92 drivers reading the changed files): 268 pass; the two failures, `test:reset-clears-draft` (three new phone keys unlisted; the watch's waiting sets are now cleared by Start a new plan) and `test:chunk-reload` (the watch's lazy part now reloads onto a new version), fixed and re-run green with `verify:watch-sets`, `verify:live-set-count` and `verify:app-boot`.
 - [x] **A WALK LOGGED BY MISTAKE CAN BE TAKEN OFF, BY THE ROW OR BY THE COACH (27 Nov 2026; his report with two screenshots: "I accidentally added a walk today. Remove it", answered "I couldn't match "Walk" to anything on Thursday. It has: Leg Swings, Barbell Squats...", while Exercise showed "✓ Walk · 5 min · Easy" under Additional work with nothing to tap).** WHY: a logged activity could be taken off only by its Undo, which lasts ten minutes; after that neither the screen nor the coach had a way. The coach reached for the only removal it had, `propose_exercise_remove`, which searches the PLAN's exercises, so it could never find a log. CHANGED: (1) the row: once Undo has gone a logged activity's row offers Remove (named "Remove Walk · 5 min · Easy", 44px), which deletes it (the unsent copy from the phone, the sent one from the server, by id and his account) and leaves "Walk · 5 min · Easy removed · Undo"; Undo puts it back as it was (minutes, effort, distance, heart rate, steps). On Exercise's Additional work and the rest day card. The "removed" line is held in the shared hook, because Additional work hides itself when nothing is logged and took the line with it (found by the driver). (2) the coach: a new action, `propose_cardio_remove` (Coach actions row, parity doc row, prompt line "never propose_exercise_remove for a log"), whose card names the log before Apply ("Want me to take Walk · 5 min · Easy off today's log?", "Nothing else changes: your plan and your sessions stay as they are."), Apply by the row's own function, Undo. The log is found by his words, whole words only ("walk" is the Walk, never the Brisk Walk too; "brisk hill walk" is nothing); two that fit ask which; none says what the day holds. The last two weeks only. (3) the app's catch for the DEPLOYED coach: when `propose_exercise_remove` names something not in today's session but logged today, the card becomes the cardio removal, so his exact sentence works on the frontend alone. VERIFIED: `test:cardio-remove` (26 checks, 10 mutations, all caught after two were retargeted at the right copy of a line repeated 25 times in the file), `test:cardio-log` §4-5 (remove after Undo's window, someone else's account untouched, unsent log never reaches the server; 4 mutations, 3 caught, the 4th equivalent: the delete had already run), `verify:cardio-remove` (38 checks: the row, his sentence as the deployed coach sends it, the new tool, a name not logged; 4 mutations, 4 caught; screenshots read). NOT PROVEN: on his phone; what the real model calls (needs the `chat-gemini` deploy for the new tool; the catch works without it). Decided by me (mechanical: a missing remove path; the wording follows his 8 Nov "Undo line" ruling).
 - [x] **LIVE WHILE IT RUNS: STEPS FROM THE PHONE, HEART RATE WITH ITS ZONE, AND A WATCH'S LATE HEART RATE (27 Nov 2026; his phone test T7: "Walk · 5 min · felt Easy", no heart rate, no steps; his words: "While the exercise is running I should be able to see my heart rate and the zone and steps if applicable").** MEASURED ON HIS PHONE (relayed from his machine): Galaxy Watch 7 through Samsung Health, all nine Health Connect reads granted, Bluetooth granted, NO strap paired. So nothing was live (the live number reads a strap only) and the watch's readings reach Health Connect through Samsung Health late, so End found under three heart readings and no steps. **His question, answered in chat: live heart rate from the Galaxy Watch alone is not possible for a phone app**: Samsung lets only an app ON THE WATCH read the sensor live, and passes readings to Health Connect in batches; the watch has no standard Bluetooth broadcast. Routes: a chest strap (works today), a third-party broadcast app on the watch (untested; if it sends the standard heart rate service, "Find my strap" finds it), or our own watch app (plan step 7). BUILT, his four points: (1) **the live zone beside the live heart rate** on the running workout: "♥ 150 · Zone 4", the summary's own tenths of an estimated maximum (`zoneOf`), none with a health condition, pregnancy or no age; it NARROWS the strap's "shown, never judged, no zone" for this card, his request. (2) **Live steps on foot from the phone's own step counter** (Android TYPE_STEP_COUNTER), through the app's own small Android plugin (`StepCounterPlugin.java`, registered in `MainActivity`), with the "Physical activity" permission (ACTIVITY_RECOGNITION, not a health permission; the seven health reads are unchanged). The count is the counter minus its first value after Start, kept on the phone with the recording's start so an app closed mid-walk keeps it, and carried across a phone restart; zero is "no count" (a phone left on a shelf). At End the health store's steps win; when it has none the phone's count is used and the card says "Steps counted by your phone". Bikes and rowers never count. iPhone: nothing yet (no plugin), the tile shows a dash. (3) **A watch that syncs late fills the heart rate too** (`lateFill`, `fillRecordedFromHealth`; it had filled steps, distance and calories only): only where the log has none, never over a strap's. The finished card names heart rate among what is still to come, and the logged card says "Heart rate fills in when your watch syncs." NOT DONE: the zone in the day's "Did anything else?" list (needs a stored field; his open question) and an effort already tapped is not changed by heart rate arriving later. (4) **The running card says where heart rate comes from**: "Heart rate live from your strap", "Your strap isn't sending yet: check it's on and the pads are damp", or with none paired "Pair your strap for live heart rate: Profile, Steps from your phone, Heart rate strap. Your watch's heart rate fills in when it syncs." VERIFIED: `test:recorded-activity` 86 checks (18 breaks, 16 caught at first: End stopping the counter was checked by a call that another path also made, and a ride taking a count could not happen with no count kept; both rewritten to the property, 18 of 18), `verify:record-activity` 58 checks with a pretend step counter that outlives a page load as a phone's does (7 screen breaks, 5 caught at first: the steps check read a label instead of the number on screen, and the card's own restart of the counter had no check that a reload mid-walk keeps counting; both added, 7 of 7). `test:strap-live`'s "no zone in the live number" narrowed to his request: a zone only where a maximum is handed in, never a target or "too high" (3 of 3 breaks caught). A driver step tapped Cancel while the card's own smooth scroll was still moving it; it now waits for the page to settle. The Android code was compiled against stand-ins of the Android and Capacitor classes it uses, matched to the real signatures (no Android toolkit here); NOT built for a phone and NOT run on one. NEEDS: a phone app rebuild (new native code and a new permission). No migration, no server deploy.
@@ -56,7 +203,8 @@ Newest first. One line each.
   `test:phone-app` re-anchored. My first mutation harness read only the standard output and called every catch a crash
   (failures print to the error stream): the house rule "checks RAN is passes plus failures", relearned.
   NOT proven: a real watch or strap on his phone; whether Health Connect returns calories for a window this short on his
-  watch; strap readings while the app is in the background. NEEDS: migration `20261125120000` (db:push-both) and a
+  watch; strap readings while the app is in the background. NEEDS: migration `20261125140000` (db:push-both; this line
+  said 20261125120000, the branch's stamp before the merge restamped it, corrected 25 Nov 2026) and a
   phone app rebuild (new Android permissions). NOT BUILT: GPS, the coach told steps and calories, an indicator outside
   Tools while recording.
 - [x] **A NEW PLAN AND THE HEART RATE SETTINGS (25 Nov 2026, found by the pre-merge sweep)**. `test:reset-clears-draft`

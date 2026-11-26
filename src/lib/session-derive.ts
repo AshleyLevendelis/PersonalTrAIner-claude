@@ -507,6 +507,11 @@ export function dayAnchorExercise(exercises: Exercise[]): Exercise | undefined {
     // movement progressed by load and reps; no main lift is better than a
     // wrong one. The engine's rest floor uses canAnchor too.
     if (!canAnchor(entry)) continue
+    // NEVER TRUNK WORK OR A CARRY (25 Nov 2026, CSCS, mine): a "Conditioning & Core" day had a Russian Twist or a cable
+    // woodchop labelled MAIN LIFT, given the main-lift rest floor, and rotated away at the next block, because the
+    // block rotation (classifyRotationTiers) never counted core or carry work as a main lift. The two now agree: trunk
+    // work is not the day's progressed lift, and such a day has no main lift. measure:main-lift-kept.
+    if (entry.movement_pattern === 'core' || entry.movement_pattern === 'carry') continue
     // Tier THEN difficulty. Before this carried the difficulty half, a day
     // holding both a Pistol Squat and an Air Squat picked whichever the
     // generator happened to list first — they are the same tier, and the

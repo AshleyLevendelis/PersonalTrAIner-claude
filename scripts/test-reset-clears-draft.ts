@@ -111,6 +111,10 @@ const KEYS: Record<string, { clear: boolean; why: string }> = {
   // strap is this phone's paired Bluetooth device. The strap's raw readings stay on the phone for four hours and are
   // only ever matched to a session by its start and end times, so a reading from before a New Plan can never land in
   // the new plan's sessions, and they expire on their own.
+  // THE TESTER LOG (tester toolkit, 25 Nov 2026): the person being left agreed, not the next one, and their unsent
+  // record is theirs. setTester(null) removes both.
+  fitplan_tester_on: { clear: true, why: 'whether the person being left agreed to be recorded' },
+  fitplan_tester_queue: { clear: true, why: "that person's record still waiting to be sent" },
   fitplan_health_heart_connected: { clear: false, why: "this phone's Health permission switch for heart rate, as steps" },
   // WORKOUTS FROM THE WATCH AND SLEEP (26 Nov 2026; watch-workouts.ts, health-sleep.ts): two more of this phone's Health
   // permission switches, and the watch workouts he said were not his (ids on this phone's watch, two days at most).
@@ -177,7 +181,11 @@ console.log('\n1. Every global localStorage key in src/ is classified above')
 console.log('\n2. handleReset clears exactly the keys marked clear:true')
 {
   const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
-  const body = app.slice(app.indexOf('const handleReset'), app.indexOf('const handleMacroModeChange'))
+  // To the next function at App's own level (25 Nov 2026): the old end marker, handleMacroModeChange, was deleted on
+  // main and the slice ran to the end of the file, so any key cleared ANYWHERE after New Plan counted as cleared by it.
+  const resetStart = app.indexOf('const handleReset')
+  const resetEnd = app.indexOf('\n  const ', resetStart + 20)
+  const body = resetStart >= 0 && resetEnd > resetStart ? app.slice(resetStart, resetEnd) : ''
   check('handleReset was found (sanity check on this gate)', body.length > 200)
 
   const clearedLiterals = [...body.matchAll(/localStorage\.removeItem\(\s*([^)]+)\)/g)]
@@ -188,6 +196,7 @@ console.log('\n2. handleReset clears exactly the keys marked clear:true')
   if (/\bclearOnboardingDraft\(\)/.test(body)) cleared.add('fitplan_onboarding_draft')
   // And the kept copy for a fast open has its own (boot-cache.ts, 31 Oct 2026).
   if (/\bclearBootSnapshot\(\)/.test(body)) cleared.add('fitplan_boot_v1')
+  if (/\bsetTester\(null\)/.test(body)) { cleared.add('fitplan_tester_on'); cleared.add('fitplan_tester_queue') }
 
   for (const [key, { clear, why }] of Object.entries(KEYS)) {
     if (clear) check(`clears ${key} — ${why}`, cleared.has(key), [...cleared])

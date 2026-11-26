@@ -103,12 +103,20 @@ await closeSheet()
 
 console.log('\n4. The meal writer failing changes nothing, and says so\n')
 await go('&tour=off&daymove=1&regen=1&topupfail=1&nolibrary=1', '#/tab/nutrition')
-const f0 = await until(week, v => v && Object.keys(v).length === 7, 60)
+// A STEADY WEEK, NOT THE FIRST ONE DRAWN (26 Nov 2026): this load carries the picks sections 1-3 saved, and the week
+// can be drawn once before they are read back. Compared against that first drawing, a failed attempt that changed
+// nothing read as five breakfasts moved, on some runs and not others. Measured with a steady baseline: nothing moves.
+const steadyWeek = async () => {
+  let w = await until(week, v => v && Object.keys(v).length === 7, 60)
+  for (let i = 0, still = 0; i < 40 && still < 4; i++) { await wait(500); const n = await week(); still = JSON.stringify(n) === JSON.stringify(w) ? still + 1 : 0; w = n }
+  return w
+}
+const f0 = await steadyWeek()
 const fOptions = await options()
 await openSheet('breakfast')
 await tapRegenerate()
 const failed = await until(sheet, v => !!v?.note, 60)
-const f1 = await week()
+const f1 = await steadyWeek()
 check('4a. it says it could not, in words, IN THE MEAL\'S OWN SHEET and in view (it was on the page behind the sheet)', /couldn't/i.test(failed?.note ?? '') && /Yours is as it was/.test(failed?.note ?? '') && failed?.noteInView === true, failed)
 check('4a2. ...with no Undo, since nothing was done', failed?.undo === false, failed)
 check('4b. the week is exactly as it was', JSON.stringify(f1) === JSON.stringify(f0), others(f1 ?? {}, []).filter(l => !others(f0 ?? {}, []).includes(l)))

@@ -953,7 +953,8 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   has no tool for these three yet. `test:rebuild-offer`, `verify:profile-fixes` §8
 - **A 20-30 minute session setting** — since 15 Nov 2026 (CSCS, the coeliac nurse's 20 minutes): main lift and two
   accessories, an upper push and pull supersetted, conditioning as its own session, and a set (never rest, a pattern or
-  the main lift first) given up on a day still over 30. Superset rest is honest only at 20-30 so far (BACKLOG).
+  the main lift first) given up on a day still over 30. Superset rest is honest at every length since 25 Nov 2026
+  (`test:session-length` §2b, `measure:superset-rest`).
   `test:short-session`, `measure:short-sessions`. Needs the `chat-gemini` deploy for chat
 - **"I only have 45 minutes today" ALREADY WORKS on both surfaces**, and is a
   different thing from the above — `propose_session_shorten`
@@ -1825,6 +1826,28 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   choices; the meal writer is asked for plain names. `test:simple-meals`, `measure:simple-meals`. Needs the
   `generate-meals` deploy for the writer's half
 
+### His rulings of 25 Nov 2026, the tester toolkit (`docs/plans/tester-toolkit.md`)
+- **Testers are recorded "Everything", only once they agree** (over errors only and errors plus taps): Profile, "Help
+  test the app", off by default, every kind recorded said before the tap; screens, taps, typing (never a password, an
+  email address or a `data-no-log` box), crashes, console errors, failed requests, failure messages on screen.
+  **Report buttons "Both"**: a bug beside the gear on every screen, "Report a problem" on every exercise ⋮ and a flag on
+  each meal sheet; **a picture of the screen "Yes, they can untick"**; **"Email + daily summary"**: each report emailed
+  with its picture, one summary a day of the problems grouped. A new screen control that can fail says so in an
+  alert or status line, or the log cannot see it. `test:tester-toolkit`, `verify:tester-report`. Needs migration
+  20261125150000 and the `report-email` deploy
+- **The app is for 16 and over: his ruling 26 Nov 2026, "16+, setup stops younger"** (over 18+, 13+ and the policy alone):
+  an age under 16, however setup gets it, replaces setup with a stop screen and no account is made; "I entered my
+  birthday wrong" asks again (`minimum-age.ts`). **And the birthday must be answered: his ruling the same day, "Must
+  answer"** (no Skip). `verify:under-age`, `test:onboarding-slots`
+- **An account unused for two years is deleted, with an email a month before: his ruling 26 Nov 2026, "Delete after 2
+  years, email first"** (over 1 year and over keeping it): the app marks each day it is opened; a nightly job warns at
+  23 months ONLY when the email can be sent (no warning queued, no deletion of anyone with an address), deletes at two
+  years 28+ days after the warning, deletes an account with no email unwarned, and quietly drops an old plan left by
+  "New Plan" while its owner is active. `test:rls-local` §13, `test:report-email` §9, `verify:app-boot`. Needs migration
+  20261126130000, the `report-email` deploy, Resend allowed to send to any address (a verified domain), then the Vault
+  secret `inactive_warning_ready` = yes (until then nobody with an email is warned or deleted)
+- **Tester data is kept 90 days (activity) and 1 year (reports): his ruling 26 Nov 2026** (over 30 days and over a year for
+  everything): a nightly clean-up only the database can run. `test:rls-local` §12. Needs migration 20261126120000
 ### His requests of 27 Nov 2026
 - **Live while a recorded workout runs: his words "While the exercise is running I should be able to see my heart rate
   and the zone and steps if applicable"**: heart rate with its zone ("♥ 150 · Zone 4", narrowing the strap's "never a
