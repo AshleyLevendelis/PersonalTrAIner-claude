@@ -198,6 +198,100 @@ async function main() {
     check('...and nothing of it is downloaded until a recording has been open', /if \(!profileId \|\| !\(recording \|\| seen\)\) return null/.test(day) && /lazyWithReload\(\(\) => import\('@\/components\/RecordActivityCard'\)\)/.test(day))
   }
 
+  console.log('\n8. Live while it runs: steps from the phone, heart rate with its zone, and a watch\'s late heart rate (his phone test, 27 Nov 2026)')
+  {
+    const live = await import('../src/lib/live-steps')
+    const k0 = { startedAt: 'x', base: null, carried: 0, steps: 0 }
+    const k1 = live.takeTotal(k0, 120000)
+    const k2 = live.takeTotal(k1, 120437)
+    check('the first counter value after Start is the start; steps are counted from there (437)', k1.base === 120000 && k1.steps === 0 && k2.steps === 437, [k1, k2])
+    const k3 = live.takeTotal(k2, 25)
+    const k4 = live.takeTotal(k3, 125)
+    check('a phone restart (the counter drops to zero) keeps what was already counted: 437 + 100', k4.steps === 537, [k3, k4])
+    check('a value that is not a count changes nothing', live.takeTotal(k2, Number.NaN) === k2)
+
+    // The pretend counter: a total, and a way to step it on.
+    let total = 120000, how: 'on' | 'denied' = 'on'
+    const subs = new Set<(t: number) => void>()
+    const stepsSend = (n: number) => { total += n; for (const f of subs) f(total) }
+    const calls: string[] = []
+    ;(globalThis as { __stepCounterForTest?: unknown }).__stepCounterForTest = {
+      start: async () => { calls.push('start'); return how === 'denied' ? { started: false, reason: 'denied' } : { started: true, total } },
+      stop: async () => { calls.push('stop') },
+      onTotal: async (cb: (t: number) => void) => { subs.add(cb); return () => { subs.delete(cb) } },
+    }
+    live.__resetLiveStepsForTests()
+    discardRecording()
+    calls.length = 0
+    phone.stepsBetween = async () => 0 // the watch has not synced: the phone's store holds nothing for the walk yet
+    const walk = await startRecording('Walk', new Date('2026-11-25T11:00:00Z'))
+    await new Promise(r => setTimeout(r, 0))
+    check('Start on foot starts the phone\'s step counter', calls.includes('start'), calls)
+    stepsSend(250); stepsSend(312)
+    check('while he walks, the count is the steps since Start: 562', live.liveStepsFor(walk.startedAt) === 562, live.liveStepsFor(walk.startedAt))
+    check('...kept on the phone, so an app closed mid-walk still has it', JSON.parse(store.get('fitplan_live_steps') ?? '{}').steps === 562)
+    check('...and another recording never takes this one\'s count', live.liveStepsFor('2026-11-25T09:00:00.000Z') === null)
+    const walkEnd = endRecording(new Date('2026-11-25T11:05:00Z'))!
+    await new Promise(r => setTimeout(r, 0))
+    check('End stops the counter', calls.includes('stop'), calls)
+    stepsSend(40)
+    check('...so steps after End are not the walk\'s: still 562', live.liveStepsFor(walk.startedAt) === 562, live.liveStepsFor(walk.startedAt))
+    const gw = await gatherFigures(walkEnd, body)
+    check('End: the phone\'s store has no steps yet, so the walk takes the phone\'s own count, and says so', gw.steps === 562 && gw.stepsFromPhoneCounter === true, gw)
+    phone.stepsBetween = async () => 610
+    const gw2 = await gatherFigures(walkEnd, body)
+    check('...but when the store has steps, they win', gw2.steps === 610 && gw2.stepsFromPhoneCounter === false, gw2)
+    phone.stepsBetween = async () => 0
+    const walkView = logRecording({ profileId: 'p1', date: '2026-11-25', recording: walkEnd, figures: gw, effort: 'easy' })
+    check('logging keeps the counted steps, and clears the count', walkView?.steps === 562 && !store.get('fitplan_live_steps'), walkView)
+
+    calls.length = 0
+    await startRecording('Assault Bike', new Date('2026-11-25T12:00:00Z'))
+    await new Promise(r => setTimeout(r, 0))
+    stepsSend(900)
+    const bikeEnd2 = endRecording(new Date('2026-11-25T12:10:00Z'))!
+    // Even with a count kept under the ride's own start (a phone shaken on the handlebars), a ride takes none.
+    store.set('fitplan_live_steps', JSON.stringify({ startedAt: bikeEnd2.startedAt, base: 1, carried: 0, steps: 900 }))
+    live.__resetLiveStepsForTests()
+    const gb2 = await gatherFigures(bikeEnd2, body)
+    check('a bike never starts the counter and never takes a count', !calls.includes('start') && gb2.steps === null && !gb2.stepsFromPhoneCounter, { calls, gb2 })
+    discardRecording()
+
+    how = 'denied'
+    live.__resetLiveStepsForTests()
+    const st = await live.startLiveSteps('2026-11-25T13:00:00.000Z')
+    check('"Physical activity" refused: the count is off and says so, and the walk is still timed', st === 'denied' && live.liveStepsFor('2026-11-25T13:00:00.000Z') === null, st)
+    live.clearLiveSteps()
+    phone.stepsBetween = realSteps
+
+    // A WATCH'S LATE HEART RATE (his walk: a Galaxy Watch, no strap, no heart rate at End).
+    const fresh = recordingFigures({ start, end, heart: { avg: 118, max: 131 } }, {})
+    check('a log with no heart rate takes the watch\'s when it syncs', JSON.stringify(lateFill({ activity_name: 'Walk', steps: 500, distance_km: 0.4, active_kcal: 30, avg_heart_rate: null }, fresh)) === JSON.stringify({ avg_heart_rate: 118, max_heart_rate: 131 }), lateFill({ activity_name: 'Walk', steps: 500, distance_km: 0.4, active_kcal: 30, avg_heart_rate: null }, fresh))
+    check('...never over one it has (a strap\'s stays)', lateFill({ activity_name: 'Walk', steps: 500, distance_km: 0.4, active_kcal: 30, avg_heart_rate: 140, max_heart_rate: 150 }, fresh) === null)
+    updates.length = 0
+    rows.length = 0
+    rows.push({ id: 'hr', user_id: 'p1', date: '2026-11-25', activity_name: 'Walk', started_at: '2026-11-25T08:00:00Z', completed_at: '2026-11-25T08:48:00Z', steps: 5000, distance_km: 3.8, active_kcal: 300, kcal_estimated: false, avg_heart_rate: null } as never)
+    const filledHr = await fillRecordedFromHealth('p1', '2026-11-25')
+    check('a recorded walk complete except for heart rate is read again, and the watch\'s heart rate is written', filledHr === 1 && typeof updates[0]?.patch.avg_heart_rate === 'number' && typeof updates[0]?.patch.max_heart_rate === 'number' && updates[0].patch.steps === undefined, updates)
+
+    // THE SCREEN'S HALF, as source (verify:record-activity drives it).
+    const strip = (x: string) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+    const cardSrc = strip(readFileSync('src/components/RecordActivityCard.tsx', 'utf8'))
+    check('the running card shows the live heart rate WITH its zone, and no zone where none is drawn (condition, no age)', /<LiveHeart className="text-foreground" estimatedMax=\{estimatedMax\} \/>/.test(cardSrc) && /const estimatedMax = noHeartBands \? null : estimatedMaxHeartRate\(body\.age\)/.test(cardSrc))
+    check('...and with no strap paired it says how to get live heart rate, and that the watch\'s fills in', /Pair your strap for live heart rate[^']*Your watch’s heart rate fills in when it syncs\./.test(cardSrc))
+    check('...and the finished card names heart rate among what is still to come', /figures\.avgHeartRate == null && 'heart rate'/.test(cardSrc))
+    const heartSrc = strip(readFileSync('src/components/LiveHeart.tsx', 'utf8'))
+    check('the zone is the summary\'s own (zoneOf), only when a maximum is given', /const zone = estimatedMax \? zoneOf\(bpm, Math\.max\(estimatedMax, bpm\)\) : null/.test(heartSrc))
+    const manifest = strip(readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8').replace(/<!--[\s\S]*?-->/g, ''))
+    check('Android declares "Physical activity" for the step counter', /<uses-permission android:name="android\.permission\.ACTIVITY_RECOGNITION" \/>/.test(manifest))
+    const main = readFileSync('android/app/src/main/java/uk/co/personaltrainerapp/MainActivity.java', 'utf8')
+    const plugin = readFileSync('android/app/src/main/java/uk/co/personaltrainerapp/StepCounterPlugin.java', 'utf8')
+    const js = readFileSync('src/lib/live-steps.ts', 'utf8')
+    const pluginName = (plugin.match(/name = "([A-Za-z]+)"/) ?? [])[1]
+    check('the step counter is registered before the app starts, under the name the app asks for', /registerPlugin\(StepCounterPlugin\.class\);\s*super\.onCreate/.test(main) && !!pluginName && js.includes(`registerPlugin<Plugin>('${pluginName}')`), pluginName)
+    check('...it reads the phone\'s own counter, sends "step" events, and asks only for Physical activity', /Sensor\.TYPE_STEP_COUNTER/.test(plugin) && /notifyListeners\("step"/.test(plugin) && /addListener\(e: 'step'/.test(js) && (plugin.match(/Manifest\.permission\.[A-Z_]+/g) ?? []).every(p => p === 'Manifest.permission.ACTIVITY_RECOGNITION'))
+  }
+
   console.log(`\n${ran} checks ran.`)
   if (failures > 0) { console.error(`${failures} check(s) failed`); process.exit(1) }
   console.log('test:recorded-activity passed: Start and End set the window, the phone fills it, a strap gives a marked estimate.')

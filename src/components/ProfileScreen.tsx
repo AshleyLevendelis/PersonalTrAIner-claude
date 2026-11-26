@@ -100,6 +100,7 @@ const HealthHeartSection = lazyWithReload(() => import('@/components/HealthSteps
 const HealthWorkoutsSection = lazyWithReload(() => import('@/components/HealthStepsSection').then(m => ({ default: m.HealthWorkoutsSection })))
 const HealthSleepSection = lazyWithReload(() => import('@/components/HealthStepsSection').then(m => ({ default: m.HealthSleepSection })))
 const HeartStrapSection = lazyWithReload(() => import('@/components/HealthStepsSection').then(m => ({ default: m.HeartStrapSection })))
+const HealthReportSection = lazyWithReload(() => import('@/components/HealthStepsSection').then(m => ({ default: m.HealthReportSection })))
 const RemindersSection = lazyWithReload(() => import('@/components/RemindersSection').then(m => ({ default: m.RemindersSection })))
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
@@ -2111,7 +2112,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         </>
       )
       case 'health': return (
-        <>{healthPlatform && <Suspense fallback={null}><HealthStepsSection platform={healthPlatform} onChanged={setHealthOn} /><HealthHeartSection platform={healthPlatform} /><HealthWorkoutsSection platform={healthPlatform} /><HealthSleepSection platform={healthPlatform} /><HeartStrapSection /></Suspense>}</>
+        <>{healthPlatform && <Suspense fallback={null}><HealthStepsSection platform={healthPlatform} onChanged={setHealthOn} /><HealthHeartSection platform={healthPlatform} /><HealthWorkoutsSection platform={healthPlatform} /><HealthSleepSection platform={healthPlatform} /><HeartStrapSection /><HealthReportSection /></Suspense>}</>
       )
       case 'account': return (
         <AccountSection status={account} onChanged={setAccount} onClose={() => setSheet(null)} />
