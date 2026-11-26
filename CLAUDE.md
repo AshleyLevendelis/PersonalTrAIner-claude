@@ -945,7 +945,8 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   has no tool for these three yet. `test:rebuild-offer`, `verify:profile-fixes` §8
 - **A 20-30 minute session setting** — since 15 Nov 2026 (CSCS, the coeliac nurse's 20 minutes): main lift and two
   accessories, an upper push and pull supersetted, conditioning as its own session, and a set (never rest, a pattern or
-  the main lift first) given up on a day still over 30. Superset rest is honest only at 20-30 so far (BACKLOG).
+  the main lift first) given up on a day still over 30. Superset rest is honest at every length since 25 Nov 2026
+  (`test:session-length` §2b, `measure:superset-rest`).
   `test:short-session`, `measure:short-sessions`. Needs the `chat-gemini` deploy for chat
 - **"I only have 45 minutes today" ALREADY WORKS on both surfaces**, and is a
   different thing from the above — `propose_session_shorten`

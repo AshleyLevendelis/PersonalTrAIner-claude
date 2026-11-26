@@ -63,11 +63,11 @@ const DURATIONS: SessionDuration[] = ['30-45', '45-60', '60-90']
 const EQUIP = ['full_gym', 'home_gym', 'minimalist', 'bodyweight'] as const
 const SPLITS = ['upper_lower', 'push_pull_legs', 'full_body'] as const
 
-interface Tally { loading: number; belowMin: number; overBudget: number; deload: number; deloadFilled: number }
+interface Tally { loading: number; belowMin: number; overBudget: number; deload: number; deloadFilled: number; pairAlt: number; pairFull: number }
 
 const tally = new Map<SessionDuration, Tally>()
 for (const dur of DURATIONS) {
-  const t: Tally = { loading: 0, belowMin: 0, overBudget: 0, deload: 0, deloadFilled: 0 }
+  const t: Tally = { loading: 0, belowMin: 0, overBudget: 0, deload: 0, deloadFilled: 0, pairAlt: 0, pairFull: 0 }
   for (const equipment_access of EQUIP) {
     for (const workout_split_preference of SPLITS) {
       const profile = buildProfile({ session_duration_preference: dur, equipment_access, workout_split_preference })
@@ -90,6 +90,9 @@ for (const dur of DURATIONS) {
             continue
           }
           t.loading++
+          // A superset's second member keeps its shared rest after week 1 (25 Nov 2026): it had been given a full
+          // rest of its own in every week but the base one, at every length except 20-30.
+          if (week.week_number > 1) for (const e of day.exercises) if (e.superset_label && /2$/.test(e.superset_label)) { if (e.rest === 'alternate') t.pairAlt++; else t.pairFull++ }
           if (seconds < minimum) t.belowMin++
           // Against the stated MAXIMUM, not the midpoint budget — symmetric
           // with the minimum check above, and for the same reason. A "30-45"
@@ -140,6 +143,14 @@ for (const dur of DURATIONS) {
 }
 
 // ---------------------------------------------------------------------------
+console.log('\n2b. A superset still saves time after week 1')
+{
+  const alt = DURATIONS.reduce((n, d) => n + tally.get(d)!.pairAlt, 0)
+  const full = DURATIONS.reduce((n, d) => n + tally.get(d)!.pairFull, 0)
+  check(`every superset partner in weeks 2+ shares its partner's rest (${alt} alternating, ${full} given a full rest)`, full === 0, String(full))
+  check('...and superset partners exist in weeks 2+, so the check has teeth', alt > 0, String(alt))
+}
+
 console.log('\n3. Deload weeks are deliberately left short')
 // ---------------------------------------------------------------------------
 {

@@ -7467,6 +7467,9 @@ function computeDurationTopUp(
     const entries = day.exercises.map(ex => getExerciseEntry(ex.name))
     const topUpAnchor = dayAnchorExercise(day.exercises)
     const restSeconds = day.exercises.map((ex, i) => {
+      // A superset partner's 'alternate' rest costs what the shipped week charges it (parseRestSeconds: 20s, no phase
+      // shift), so the top-up's target matches estimateDaySeconds (25 Nov 2026, superset rest kept at every length).
+      if (ex.rest === 'alternate') return parseRestSeconds(ex.rest)
       const match = ex.rest.match(/(\d+)/)
       const base = match ? parseInt(match[1], 10) : 60
       // Same main-lift floor the real per-week derivation applies. Without
@@ -9335,15 +9338,14 @@ export function generateMesocycle(
           // Cardio, intervals and steady-state are excluded by
           // unbudgetedRestSeconds returning null: their rest is the bout, not
           // the tier.
-          // A SUPERSET PARTNER KEEPS ALTERNATING, at 20-30 (15 Nov 2026). Its rest is the literal 'alternate': it rests
-          // while its partner works, then shares the partner's rest. This floor reads 'alternate' as 20 seconds and
-          // raises it to the tier's full rest, so every A2 after the base plan carries a full rest of its own and a
-          // superset saves no time. TRUE AT EVERY LENGTH, fixed here only at 20-30: at 45-60 the honest timing put 4
-          // more of 576 sessions under 45 minutes (test:session-length, 32 -> 36), because the overcounted rest had been
-          // padding them. That needs the top-up step looked at too; it is its own fix (BACKLOG, 15 Nov 2026).
+          // A SUPERSET PARTNER KEEPS ALTERNATING, AT EVERY LENGTH (20-30 on 15 Nov 2026; every length 25 Nov 2026). Its
+          // rest is the literal 'alternate': it rests while its partner works, then shares the partner's rest. This floor
+          // read 'alternate' as 20 seconds and raised it to the tier's full rest, so every A2 after the base plan carried
+          // a full rest of its own and a superset saved no time (12,960 of 12,960 partners in weeks 2+, measure:superset-
+          // rest). The top-up's forecast now costs 'alternate' as the shipped week does, so the time saved goes to work.
           {
             const unbudgeted = unbudgetedRestSeconds(dbEntry, profile.training_style || 'hybrid', restShift)
-            const keepsAlternating = restForWeek === 'alternate' && profile.session_duration_preference === '20-30'
+            const keepsAlternating = restForWeek === 'alternate'
             if (!keepsAlternating && unbudgeted != null && dbEntry && dbEntry.mechanics_tier !== 'tier1_compound' && ex !== promotedAnchor) {
               const floor = restFloorFor(mapTier(dbEntry.mechanics_tier), unbudgeted)
               const current = parseRestSeconds(restForWeek)

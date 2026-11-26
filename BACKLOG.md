@@ -2,6 +2,25 @@
 
 Newest first. One line each.
 
+- [x] **A SUPERSET SAVES TIME IN EVERY WEEK, AT EVERY SESSION LENGTH (25 Nov 2026; CSCS mine; the "OPEN, mine, next
+  engine pass" of the 15 Nov short-session entry).** Traced first: one line in the per-week loop read a superset
+  partner's shared rest ('alternate') as 20 seconds and raised it to the tier's full rest in every week after the base
+  plan, except at 20-30 minutes. MEASURED with a new `measure:superset-rest` (every 8th grid plan): before, 0 of 12,960
+  superset partners in loading weeks 2+ kept their shared rest (all 12,960 given a full rest of their own); after, all
+  12,960 keep it. The 15 Nov fear (honest timing pushes sessions under their minimum) did not hold now: the 18 Nov
+  filler reorder had taken those counts to 0, and `test:session-length` stays 0 below the minimum at every length. The
+  top-up step's forecast costed 'alternate' at 60s plus the phase shift; it now costs it as the shipped week does
+  (20s), so the time saved goes back into work: +675 working sets on 27,648 loading days (+0.14%), mean session 65.31 ->
+  65.33 minutes (measured both ways; no check sees that half, named). CSCS review: (1) a superset is a pair done back to
+  back for density; giving the second member a full rest made it two straight sets with a label, so the training
+  effect is now what the pairing promises; (2) takes away 20-60 seconds of rest after each paired isolation, trunk or
+  carry move (never a main lift: pairs never cross it); (3) patterns, overload and volume kept, a little more work where
+  time frees up; (4) no floor redefined: rest floors still apply to every unpaired slot, and the main lift is never
+  paired; (5) in scope. GATES: `test:session-length` §2b (every partner in weeks 2+ alternates, and partners exist;
+  1 mutation, putting back the 20-30 clause, caught twice); `test:short-session`, `test:filler-yields`,
+  `test:rest-floors`, `test:thin-day`, `test:pattern-floor`, `test:persona-audit-fixes`, `test:older-beginner`,
+  `test:compound-order`, `test:exercise-consistency`, `test:frozen-weeks`, `test:main-lift-rest`, `test:day-purpose`,
+  `test:audit` green; `test:quality` result below. Frontend only.
 - [x] **"REBUILD TODAY" KEEPS THE MAIN LIFT ON A DAY WITH NO BARBELL LIFT (25 Nov 2026; found by the main-lift trace,
   CSCS mine).** His 16 Sep ruling: rebuild today keeps the main lift and changes the rest. It read the main lift by slot
   tier alone, so on a bodyweight or limited-kit day (no tier-1 slot) it kept NOTHING and rebuilt the very lift the day

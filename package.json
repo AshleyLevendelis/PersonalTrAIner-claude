@@ -743,6 +743,7 @@
     "test:coach-proactive": "tsx scripts/test-coach-proactive.ts",
     "phone:sync": "npm run build && npx cap sync",
     "verify:countdown-timer": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/countdown-timer.mjs",
+    "measure:superset-rest": "tsx scripts/measure-superset-rest.ts",
     "measure:main-lift-kept": "tsx scripts/measure-main-lift-kept.ts",
     "verify:tester-report": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/tester-report.mjs",
     "test:tester-toolkit": "tsx scripts/test-tester-toolkit.ts",
