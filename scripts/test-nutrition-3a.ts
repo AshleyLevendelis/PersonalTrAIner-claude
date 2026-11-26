@@ -133,7 +133,7 @@ check('one list in the day\'s order, each row\'s state from the same mealSection
   }
   const ratio = (a: string, b: string) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05) }
   const names = Object.keys(themes)
-  check('the theme file has its nine themes (sanity check on the contrast check below)', names.length === 9, names)
+  check('the theme file has its five themes (sanity check on the contrast check below)', names.length === 5, names)
   const below = names.flatMap(t => {
     const ink = softInk ? themes[t][softInk] : undefined
     return (['background', 'surface-deep'] as const)

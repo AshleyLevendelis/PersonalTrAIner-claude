@@ -496,7 +496,7 @@ console.log('\n9. The ring and the pulse vanish at glow Off and stop under reduc
   }
   const block = (header: string): string => blocks(header)[0] ?? ''
 
-  const FRAMES = ['chatUnreadPulse', 'chatUnreadRing', 'chatUnreadPulseLight', 'chatUnreadRingLight']
+  const FRAMES = ['chatUnreadPulse', 'chatUnreadRing']
   for (const name of FRAMES) {
     const body = block(`@keyframes ${name}`)
     check(`@keyframes ${name} exists`, body.length > 0)
@@ -538,13 +538,8 @@ console.log('\n9. The ring and the pulse vanish at glow Off and stop under reduc
   check('...leaving a static ring behind, which still scales with glow',
     /border:\s*1\.5px solid rgba\(var\(--glow-rgb\), calc\([.\d]+ \* var\(--glow-strength\)\)\)/.test(block('.chat-unread-ring')))
 
-  // On paper a halo under a button reads as a printing fault — the same
-  // reason .glow-bloom-once swaps keyframes on a light canvas.
-  check('a light canvas swaps the pulse for a flat drop shadow',
-    /\[data-canvas="light"\] \.chat-unread \{\s*animation-name: chatUnreadPulseLight/.test(css))
-  check('...and drops the ring\'s halo, leaving its border to do the work',
-    /\[data-canvas="light"\] \.chat-unread-ring \{\s*animation-name: chatUnreadRingLight/.test(css) &&
-    !/box-shadow/.test(block('@keyframes chatUnreadRingLight')))
+  // The light-canvas versions of the pulse and the ring went with the light themes (27 Nov 2026): every theme is dark.
+  check('no light-canvas pulse is left behind', !/chatUnread(Pulse|Ring)Light|data-canvas/.test(css))
 
   // ...and the button actually wears them, only when something is waiting.
   check('the button wears the pulse only while something is waiting',

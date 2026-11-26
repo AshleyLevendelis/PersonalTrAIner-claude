@@ -1826,6 +1826,12 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   `generate-meals` deploy for the writer's half
 
 ### His requests of 27 Nov 2026
+- **Nightshift plus four violet themes: his words "keep the nightshift theme ... replace the current themes with the
+  purplish background with red ... purple ... blue or green", and his pick "B: each leans"**: Ruby, Amethyst, Sapphire and
+  Emerald, each on Nightshift's violet nudged toward its colour; the other eight themes, the three light ones among them,
+  are gone, and with them "Match system" and every light-canvas rule. A saved retired theme opens on its accent's new one.
+  The "81 theme x accent pairs" figures in this file are now 45, with no named shortfalls. `test:appearance`,
+  `verify:appearance-themes`, `verify:chat-bubbles`
 - **Live while a recorded workout runs: his words "While the exercise is running I should be able to see my heart rate
   and the zone and steps if applicable"**: heart rate with its zone ("♥ 150 · Zone 4", narrowing the strap's "never a
   zone" for this card), steps on foot from the phone's own step counter (Android, the "Physical activity" permission;

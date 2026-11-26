@@ -3,7 +3,7 @@ import { readFileSync } from 'fs'
 import { contrastRatio } from '../src/lib/appearance-palette'
 
 const css = readFileSync('src/index.css', 'utf8')
-const themes = ['nightshift', 'ember', 'field', 'graphite', 'daylight']
+const themes = ['nightshift', 'ruby', 'amethyst', 'sapphire', 'emerald']
 function blockFor(theme: string): string {
   const sel = theme === 'nightshift' ? '[data-theme="nightshift"]' : `[data-theme="${theme}"]`
   const i = css.indexOf(sel)

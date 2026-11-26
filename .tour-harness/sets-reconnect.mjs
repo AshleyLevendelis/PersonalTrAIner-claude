@@ -13,8 +13,9 @@
 // the rows stay drawn while the tick is tapped on a dead connection, that a
 // reload draws them BEFORE the read gives up rather than after, that the line
 // under the title appears and goes, and that the card's words can be read: its
-// contrast is measured off the pixels' own colours, in a dark theme and a
-// light one, rather than asserted from a class name.
+// contrast is measured off the pixels' own colours, in the default theme and
+// in Ruby (the red one, nearest the warning colour), rather than asserted
+// from a class name. The light themes went on 27 Nov 2026.
 //
 // THE NETWORK IS KILLED THE WAY IT DIES ON A PHONE: every request resolves
 // with an error (see fake-supabase's __netDown) and navigator.onLine stays
@@ -323,13 +324,13 @@ const dark = await measure()
 console.log('      dark theme:  ' + (dark ?? []).map(d => `"${d.text}" ${d.ratio}:1`).join(' · '))
 check('6f. every line on the card reads at 4.5:1 or better on the default dark theme', Array.isArray(dark) && dark.length >= 4 && dark.every(d => d.ratio >= 4.5), dark)
 await shoot('sets-reconnect-didnt-save')
-await ev(`(() => { const el = document.documentElement; el.setAttribute('data-theme', 'daylight'); el.setAttribute('data-canvas', 'light') })()`)
+await ev(`(() => { const el = document.documentElement; el.setAttribute('data-theme', 'ruby') })()`)
 await wait(300)
-const light = await measure()
-console.log('      light theme: ' + (light ?? []).map(d => `"${d.text}" ${d.ratio}:1`).join(' · '))
-check('6g. ...and on a light theme', Array.isArray(light) && light.length >= 4 && light.every(d => d.ratio >= 4.5), light)
-await shoot('sets-reconnect-didnt-save-light')
-await ev(`(() => { const el = document.documentElement; el.setAttribute('data-theme', 'nightshift'); el.removeAttribute('data-canvas') })()`)
+const ruby = await measure()
+console.log('      ruby theme:  ' + (ruby ?? []).map(d => `"${d.text}" ${d.ratio}:1`).join(' · '))
+check('6g. ...and on Ruby, the red theme', Array.isArray(ruby) && ruby.length >= 4 && ruby.every(d => d.ratio >= 4.5), ruby)
+await shoot('sets-reconnect-didnt-save-ruby')
+await ev(`(() => { const el = document.documentElement; el.setAttribute('data-theme', 'nightshift') })()`)
 
 // Retry, with the connection still dead: back to waiting, off the list.
 await tapExpr(`[...document.querySelectorAll('[data-testid="didnt-save-item"] button')].find(b => /retry/i.test(b.textContent))`)
