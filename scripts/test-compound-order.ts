@@ -44,8 +44,17 @@ for (const c of combos) {
     if (isWeekSupportLeg(day.focus, entry)) continue
     added++
     if (/Push/.test(day.focus) && entry.movement_pattern.endsWith('push')) pushPressAdds++
-    const firstLater = list.findIndex(e => isLaterWork(e.name))
-    if (firstLater !== -1 && firstLater < at) { misplaced++; if (bad.length < 3) bad.push(`${day.focus}: ${list.map(e => e.name).join(' > ')}`) }
+    // THE PROPERTY, NOT THE OLD MECHANISM (26 Nov 2026). This read "nothing that is not a compound sits before it",
+    // which is what the pass did and also what was wrong with it: on an injured day the rehab drill sits straight after
+    // the warm-up, so the only way to satisfy the check was to put the added press AHEAD of the Bird Dog and the bench
+    // press. The check was enforcing the defect. What a coach means: the added compound follows the day's other
+    // compounds with no isolation, finisher or trunk work between them, and never leads them. Prep in front of the
+    // day's first compound (a rehab drill) is not "later work".
+    const firstCompound = list.findIndex((e, i) => i !== at && isCompound(e.name))
+    const wrong = firstCompound === -1
+      ? list.slice(0, at).some(e => isLaterWork(e.name))
+      : at < firstCompound || list.slice(firstCompound, at).some(e => isLaterWork(e.name))
+    if (wrong) { misplaced++; if (bad.length < 3) bad.push(`${day.focus}: ${list.map(e => e.name).join(' > ')}`) }
   }
 }
 check(`1a. the grid sample reaches the pass: compounds were added (${added}), presses among them on push days (${pushPressAdds})`, added >= 20 && pushPressAdds >= 5, { added, pushPressAdds })

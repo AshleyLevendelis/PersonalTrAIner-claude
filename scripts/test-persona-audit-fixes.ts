@@ -63,10 +63,13 @@ for (const [i, cap] of [[2830, BEGINNER_MAX_WORKING_SETS], [4443, BEGINNER_MAX_W
 
 console.log('\n4. One lift, one weight a week at the same reps (C7)')
 {
-  const { m } = audited(5722)
+  // RE-ANCHORED 26 Nov 2026: this read person #5722, whose plan no longer holds the lift on two days (its picks changed
+  // when band and improvised moves stopped being taken ahead of loadable ones). #5730 does, in week 5, so the "two days,
+  // one weight" property still has a week where it binds; the check below still fails on a fixture that does not.
+  const { m } = audited(5730)
   const two = m.flatMap(w => { const kg = w.days.flatMap(d => d.exercises.filter(e => e.name === 'Single-Leg Leg Press').map(e => `${e.reps}|${e.suggested_load_kg}`)); return new Set(kg.map(k => k.split('|')[0])).size < new Set(kg).size ? [`w${w.week_number}`] : [] })
   const both = m.filter(w => w.days.filter(d => d.exercises.some(e => e.name === 'Single-Leg Leg Press')).length >= 2).length
-  check('audit person #5722: the single-leg leg press is on two days of a week (the fixture binds)', both > 0, both)
+  check('audit person #5730: the single-leg leg press is on two days of a week (the fixture binds)', both > 0, both)
   check('...at one weight (it read 30 kg a leg on Monday, 17.5 on Friday)', two.length === 0, two)
 }
 

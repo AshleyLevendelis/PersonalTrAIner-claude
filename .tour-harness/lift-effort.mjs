@@ -42,7 +42,9 @@ const read = name => ev(`(() => {
   // "after set 1" is a prompt, not a weight (15 Nov 2026: the box says which set it waits on).
   const num = s => /^after set/.test(String(s)) ? NaN : parseFloat(String(s).replace(/[^\\d.]/g, ''))
   const headline = [...card.querySelectorAll('[data-testid="exercise-load"]')].map(n => num(n.textContent)).filter(n => Number.isFinite(n) && n > 0)
-  const boxes = [...card.querySelectorAll('input')].filter(i => /^setgrid-weight-/.test(i.id))
+  // WORKING SETS ONLY (26 Nov 2026): a main lift's card also holds its build-up rows (ids end "-w1", "-w2"), and the
+  // lift this page lands on is now one that has them. Every check here is about the working sets ("-s1", "-s2").
+  const boxes = [...card.querySelectorAll('input')].filter(i => /^setgrid-weight-.*-s\\d+$/.test(i.id))
   const prefills = boxes.map(i => i.value || i.placeholder).map(num)
   const eff = card.querySelector('[data-testid="lift-effort"]')
   const r = eff?.getBoundingClientRect()

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { connectHealthHeart, disconnectHealthHeart, isHealthHeartConnected } from '@/lib/health-heart'
+import { connectWatchWorkouts, disconnectWatchWorkouts, isWatchWorkoutsConnected } from '@/lib/watch-workouts'
 import { connectPairedStrap, forgetStrap, pairStrap, pairedStrap, useLiveHeartRate, useStrapState, type PairedStrap } from '@/lib/strap-live'
 import {
   connectHealthSteps, disconnectHealthSteps, healthStoreName, isHealthStepsConnected,
@@ -93,7 +94,7 @@ export function HealthHeartSection({ platform }: { platform: HealthPlatform }) {
       <p className="font-medium text-foreground">Heart rate from your watch</p>
       <p className="text-muted-foreground">
         {connected
-          ? `After each session your average and highest heart rate show under it, and Home shows your resting heart rate. It comes from ${store}, which your watch or strap writes to.`
+          ? `After each session your average and highest heart rate show under it, and Home shows your resting heart rate (worked out from your overnight readings if your watch doesn’t share one). It comes from ${store}, which your watch or strap writes to.`
           : `If a watch or chest strap writes your heart rate to ${store}, the app can show your average and highest heart rate after each session, and your resting heart rate on Home. It reads heart rate only, and writes nothing.`}
       </p>
       {connected ? (
@@ -104,6 +105,48 @@ export function HealthHeartSection({ platform }: { platform: HealthPlatform }) {
         </Button>
       )}
       {note && <p role="alert" className="text-[0.75rem] text-[color:var(--role-warn-text)]" data-heart-note>{note}</p>}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Profile, "Workouts from your watch" (his brief 26 Nov 2026; watch-workouts.ts). The same shape as the two above:
+// drawn only in the phone app, nothing asked until he taps, read only. The words promise only what is built: a workout
+// the watch recorded is OFFERED on Home, and nothing is logged until he says how hard it was.
+// ---------------------------------------------------------------------------
+export function HealthWorkoutsSection({ platform }: { platform: HealthPlatform }) {
+  const store = healthStoreName(platform)
+  const [connected, setConnected] = useState(isWatchWorkoutsConnected())
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+  const connect = async () => {
+    setBusy(true)
+    setNote(null)
+    const r = await connectWatchWorkouts()
+    setBusy(false)
+    if (r.ok) { setConnected(true); return }
+    setNote(r.reason === 'denied'
+      ? `Workouts weren’t allowed. You can allow them in ${store}, then tap again.`
+      : r.reason === 'unavailable'
+      ? `${store} isn’t available on this phone.`
+      : `Couldn’t reach ${store}. Nothing was changed. Try again in a moment.`)
+  }
+  return (
+    <div className="space-y-3 text-sm pt-4 border-t border-[color:var(--hairline)]" data-health-workouts={connected ? 'on' : 'off'}>
+      <p className="font-medium text-foreground">Workouts from your watch</p>
+      <p className="text-muted-foreground">
+        {connected
+          ? `When your watch records a workout the app doesn’t have, Home offers it and one tap logs it, with its time, distance, calories and heart rate. It comes from ${store}. Nothing is logged until you say how hard it was.`
+          : `Start a workout on your watch as you always do. The app can pick it up from ${store} and offer it on Home, so a run, a ride or a class is one tap to log. It reads workouts and writes nothing.`}
+      </p>
+      {connected ? (
+        <Button variant="outline" className="min-h-[44px]" onClick={() => { disconnectWatchWorkouts(); setConnected(false) }} data-workouts-off>Stop reading workouts</Button>
+      ) : (
+        <Button className="min-h-[44px]" onClick={() => void connect()} disabled={busy} data-workouts-connect>
+          {busy ? 'Asking your phone…' : 'Read my watch’s workouts'}
+        </Button>
+      )}
+      {note && <p role="alert" className="text-[0.75rem] text-[color:var(--role-warn-text)]" data-workouts-note>{note}</p>}
     </div>
   )
 }

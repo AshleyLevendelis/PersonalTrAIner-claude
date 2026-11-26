@@ -7181,6 +7181,9 @@ const MOVEMENT_FAMILIES: Record<string, string> = {
   'Kettlebell Swing (Heavy)': 'kettlebell_swing',
   'Chest Dips': 'dip',
   'Tricep Dips': 'dip',
+  // A dip on a chair is a dip (26 Nov 2026): it had its own family, so a day could hold Tricep Dips AND Chair Dips,
+  // the same elbow-and-shoulder movement twice, the second time on furniture (found on a 90+ minute home day).
+  'Chair Dips': 'dip',
   'Pull-Ups': 'pull_up',
   'Pull-Ups (Assisted)': 'pull_up',
   'Lat Pulldown': 'pulldown',

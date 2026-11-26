@@ -1,6 +1,6 @@
 import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from './types'
 import { getMovementFamily, isGenuineDuplicate, getVolumeRole, isIndicatedFor, type ExerciseEntry, getExerciseEntry } from './exercise-db'
-import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, isEquipmentQualityExempt, hasBetterLoadingPeer, TRACKS, dayHoldsDefiningWork, pullHeavyIsPrescribed } from './exercise-plan'
+import { getConstrainedPool, generateMesocycle, beginnerWorkingSets, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, isEquipmentQualityExempt, worseKitOnSession, TRACKS, dayHoldsDefiningWork, pullHeavyIsPrescribed } from './exercise-plan'
 import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS } from './goal-policies'
 import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
@@ -924,7 +924,13 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclus
             : me === 'hip_hinge' ? 'hinge' : null
           return mp === pattern
         })
-        if (main?.suggested_load_kg != null && ex.suggested_load_kg > main.suggested_load_kg * 0.8) {
+        // NOT WHEN THE LIFT ALREADY SITS AT THE LIGHTEST ITS IMPLEMENT GOES (26 Nov 2026). 31 of 34 firings on a
+        // 999-plan sample were a beginner's Landmine Press at 20 kg beside a bench press at 20-22.5 kg: both are the
+        // empty bar. The engine's own clamp asked for 13 kg and the bar cannot weigh less, so there was nothing the
+        // generator could have prescribed lower, and on a landmine the hand holds about half the bar in any case.
+        // A lift ABOVE its floor is still held to the 80%.
+        const atItsFloor = ex.suggested_load_kg <= getEquipmentFloorKg(entry)
+        if (main?.suggested_load_kg != null && !atItsFloor && ex.suggested_load_kg > main.suggested_load_kg * 0.8) {
           violatedRules.add('load_incoherent')
           deductions.push({
             rule: 'load_incoherent', day: day.day, weekNumber: 1,
@@ -1020,7 +1026,11 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclus
         // CHANGE. *** It now counts a narrower thing, so a drop is partly a
         // change of definition and not only better plans. Any before/after
         // quoting this rule must say which side of 21 Sep 2026 it came from.
-        if (!entry || !hasBetterLoadingPeer(entry, equipmentPool)) continue
+        // AND NARROWED AGAIN, 26 Nov 2026 (not comparable across this date either): a band move that is a DIFFERENT
+        // movement is right once every loadable equivalent is already on the same session (a sore shoulder leaves one
+        // weighted triceps move; the band pushdown is then a real second movement). A copy of a loadable move, or one
+        // taken while a loadable equivalent sat off the session, still fires. worseKitOnSession holds the rule.
+        if (!entry || !worseKitOnSession(entry, equipmentPool, day.exercises.map(e => e.name))) continue
         violatedRules.add('worse_implement_than_available')
         deductions.push({
           rule: 'worse_implement_than_available', day: day.day, weekNumber: week.week_number,
@@ -1188,9 +1198,14 @@ function countMainCompoundSlots(week: MesocycleWeek | undefined): number {
   return count
 }
 
+// WORKING SETS ONLY (26 Nov 2026). This summed every row, so the warm-up primers, rehab drills and conditioning rounds
+// (the same in a low-recovery and a high-recovery plan, by design: recovery scales the WORK) sat in both totals and
+// pulled the ratio toward 1. A beginner's week of 43 working sets against 58 (0.74, inside the bar) read "53 against
+// 66" (0.80, a failure). THIS CHANGES WHAT THE RULE MEASURES: recovery_volume_not_reduced counts before 26 Nov 2026
+// are not comparable.
 function sumWeeklySets(week: MesocycleWeek | undefined): number {
   if (!week) return 0
-  return week.days.reduce((sum, day) => sum + day.exercises.reduce((s, ex) => s + ex.sets, 0), 0)
+  return week.days.reduce((sum, day) => sum + beginnerWorkingSets(day), 0)
 }
 
 /**
@@ -1223,8 +1238,19 @@ function scoreGoalAlignment(profile: UserProfile, mesocycle: MesocycleWeek[], co
   // preference expected fewer (or zero) sessions.
   const week1 = mesocycle.find(w => w.week_number === 1)
   const actualConditioningDays = week1?.days.filter(d => d.conditioning_note && !d.recommendedCardio?.is_filler).length ?? 0
-  const expectedFrequency = resolveConditioningFrequency(policy, profile.conditioning_preference)
-  const conditioningOk = Math.abs(actualConditioningDays - expectedFrequency) <= 1
+  // THE DOSE A BEGINNER OR LOW RECOVERY IS ALLOWED (26 Nov 2026). Two rules cap it and the expectation ignored both, so
+  // the rule fired on 520 of 9,216 plans that were built as decided: none on a rest day for a beginner or low recovery
+  // (his ruling "B", 14 Nov), so never more than the training days; and in a 20-30 or 30-45 minute session, one short
+  // session of its own and no more (CSCS, 22 Nov, the persona audit's C10). Stated here independently of the
+  // generator, which is the point of a scorer: a beginner given none at all still fails.
+  const cautious = profile.training_experience === 'beginner' || effectiveRecoveryCapacity(profile) === 'low'
+  const shortSession = profile.session_duration_preference === '20-30' || profile.session_duration_preference === '30-45'
+  const trainingDayCount = week1?.days.filter(d => d.exercises.length > 0).length ?? 0
+  const expectedFrequency = Math.min(resolveConditioningFrequency(policy, profile.conditioning_preference), cautious ? trainingDayCount : Infinity)
+  // In a short session a heavy day takes none after lifting, and one session of its own is the least that counts;
+  // a light day still takes its own (so the week may hold more), which is why this is a floor and not a new target.
+  const leastAllowed = cautious && shortSession ? Math.min(1, Math.max(0, expectedFrequency - 1)) : expectedFrequency - 1
+  const conditioningOk = actualConditioningDays >= leastAllowed && actualConditioningDays <= expectedFrequency + 1
   checks.push({
     pass: conditioningOk,
     detail: conditioningOk ? undefined : {
@@ -1295,8 +1321,8 @@ function scoreGoalAlignment(profile: UserProfile, mesocycle: MesocycleWeek[], co
     })
   }
 
-  // low recovery_capacity: >=15% fewer weekly sets than an otherwise
-  // identical high-recovery profile.
+  // low recovery_capacity: fewer weekly sets than an otherwise identical
+  // high-recovery profile, by the generator's own ratio (less 2 points).
   if (profile.recovery_capacity === 'low' && !skipComparisons) {
     const highProfile: UserProfile = { ...profile, recovery_capacity: 'high' }
     const highMeso = generateComparisonMesocycle(highProfile, `${comboKey}::high-recovery-compare`)
@@ -1312,7 +1338,9 @@ function scoreGoalAlignment(profile: UserProfile, mesocycle: MesocycleWeek[], co
       pass: recoveryOk,
       detail: recoveryOk ? undefined : {
         rule: 'recovery_volume_not_reduced', weekNumber: 1,
-        detail: `low recovery_capacity weekly sets (${lowSets}) not >=15% below high (${highSets})`,
+        // THE THRESHOLD PRINTED IS THE ONE COMPARED (26 Nov 2026). It said ">=15%" whatever the bar was, and the bar is
+        // 23% with no second sport (0.75 + 0.02), so "60 not >=15% below 74" read as a scorer that could not subtract.
+        detail: `low recovery_capacity weekly sets (${lowSets}) not >=${Math.round((1 - expectedRatio - 0.02) * 100)}% below high (${highSets})`,
       },
     })
   }

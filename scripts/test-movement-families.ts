@@ -65,7 +65,10 @@ const DELIBERATE_SPLITS: Record<string, { why: string; families: Record<string, 
     families: {
       tricep_pushdown: ['Tricep Pushdowns', 'Rope Tricep Pushdown', 'Straight-Bar Tricep Pushdown', 'Band Tricep Pushdown'],
       tricep_kickback: ['Band Tricep Kickback', 'Dumbbell Tricep Kickback'],
-      tricep_extension: ['Lying Dumbbell Tricep Extension', 'Overhead Tricep Extension', 'Skull Crushers', 'Chair Dips', 'Machine Tricep Extension'],
+      tricep_extension: ['Lying Dumbbell Tricep Extension', 'Overhead Tricep Extension', 'Skull Crushers', 'Machine Tricep Extension'],
+      // A dip on a chair is a dip (26 Nov 2026): it sat in the extension family, so a day could hold Tricep Dips AND
+      // Chair Dips. It shares the dips' family now and is listed with them below.
+      dip: ['Chair Dips'],
     },
   },
   row: {
@@ -112,6 +115,8 @@ const DELIBERATE_MERGES: Record<string, string[]> = {
   push_up: ['Push-Ups', 'Plyo Push-Ups'],
   pulldown: ['Lat Pulldown', 'Close-Grip Lat Pulldown', 'Iso-Lateral Pulldown'],
   kettlebell_swing: ['Kettlebell Swing (Heavy)', 'Kettlebell Swings'],
+  // Chair Dips is filed with the triceps extensions and is a dip (26 Nov 2026): it must not share a day with one.
+  dip: ['Chest Dips', 'Tricep Dips', 'Assisted Dip Machine', 'Chair Dips', 'Seated Dip Machine'],
 }
 
 function main() {

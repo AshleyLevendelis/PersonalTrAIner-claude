@@ -34,13 +34,32 @@ if (platform === 'ios' || platform === 'android') {
     activeKcalBetween: async (start, end) => { calls.push({ kcal: [start.toISOString(), end.toISOString()] }); return Number(q.get('healthkcal') ?? '300') },
     restingHeartRateSamples: async (_start, end) => {
       calls.push('resting')
+      // &healthnoresting=1: a watch that shares heart rate and no resting figure (Samsung Health, as reported).
+      if (q.get('healthnoresting') === '1') return []
       return Array.from({ length: 14 }, (_, i) => {
         const d = new Date(end.getFullYear(), end.getMonth(), end.getDate() - i, 4, 0, 0)
         return { bpm: i < 7 ? 58 : 60, at: d.toISOString() }
       })
     },
+    // WORKOUTS THE WATCH RECORDED (26 Nov 2026, watch-workouts.ts). &healthworkouts= chooses what the watch holds:
+    //   run (default)  a 42 minute run that ended 90 minutes ago (5.2 km, 410 kcal, "Samsung Health"), and a
+    //                  3 minute walk half an hour ago that is too short to be a workout
+    //   two            that run, and 55 minutes of strength training five hours ago with no calories or distance
+    //   none           nothing
+    requestWorkoutAccess: async () => { calls.push({ request: ['workouts', 'distance', 'calories', 'heartRate', 'steps'] }); return q.get('healthdenied') !== '1' },
+    workoutsBetween: async (start, end) => {
+      calls.push({ workouts: [start.toISOString(), end.toISOString()] })
+      const kind = q.get('healthworkouts') ?? 'run'
+      if (kind === 'none') return []
+      const at = (minsAgo: number) => new Date(end.getTime() - minsAgo * 60000).toISOString()
+      const run = { id: 'w-run', type: 'running', start: at(132), end: at(90), kcal: 410, distanceM: 5200, source: 'Samsung Health' }
+      const blip = { id: 'w-blip', type: 'walking', start: at(33), end: at(30), kcal: 9, distanceM: 210, source: 'Samsung Health' }
+      const lift = { id: 'w-lift', type: 'strengthTraining', start: at(355), end: at(300), kcal: null, distanceM: null, source: 'Samsung Health' }
+      return kind === 'two' ? [run, blip, lift] : [run, blip]
+    },
   }
   ;(globalThis as { __healthAdapterForTest?: HealthAdapter }).__healthAdapterForTest = adapter
   if (q.get('healthon') === '1') { try { localStorage.setItem('fitplan_health_steps_connected', '1') } catch { /* */ } }
   if (q.get('hearton') === '1') { try { localStorage.setItem('fitplan_health_heart_connected', '1') } catch { /* */ } }
+  if (q.get('workoutson') === '1') { try { localStorage.setItem('fitplan_health_workouts_connected', '1') } catch { /* */ } }
 }

@@ -139,7 +139,10 @@ async function main() {
   // -------------------------------------------------------------------------
   // The tester's own case first: Thursday of week 1 is finished.
   const samContext = contextOn(THU, [THU])
-  const samTargets = planDaysInWindow(plan, samContext.calendar, 14)
+  // THREE WEEKS, not two (26 Nov 2026): his knee work is on Thursdays only now (the Saturday support lift became a
+  // Romanian deadlift), and two weeks from a finished Thursday held ONE leg day still ahead. Section 6 needs a changed
+  // day he then edits and another he leaves alone, so the window reaches the Thursday after as well.
+  const samTargets = planDaysInWindow(plan, samContext.calendar, 21)
   const knee = await silentlyAsync(() => substituteForInjury({ mesocycle: plan, profile: sam, injuryCode: 'knees', targetDays: samTargets, exclusions: [], context: samContext }))
   check('the fixture has knee work on the finished Thursday', namesOf(plan, 1, 'Thursday').some(loadsKnee), namesOf(plan, 1, 'Thursday'))
   check('the finished Thursday is the SAME day object afterwards', dayOf(knee.mesocycle, 1, 'Thursday') === dayOf(plan, 1, 'Thursday'), namesOf(knee.mesocycle, 1, 'Thursday'))
@@ -148,7 +151,12 @@ async function main() {
   // 6 until 15 Nov 2026, measured 5 since: the "Legs & Calves" day now keeps its calf raise (test:calf-day), which
   // took the place of a Dumbbell Leg Curl, so the window holds one fewer knee-loading lift to substitute. A vacuity
   // guard: it proves the adaptation changed things, not how many.
-  check('something was changed (the check below is not vacuous)', knee.touchedSlots.length >= 5, knee.touchedSlots.length)
+  // RE-ANCHORED 26 Nov 2026. This was ">= 5", then noted as 6 and 5 as the plan's leg picks moved; it is 3 now (his
+  // Saturday support lift became a Romanian deadlift when improvised moves stopped being taken ahead of loadable
+  // ones). A count read off one plan is not a requirement. What must hold: every knee-loading lift on a day still
+  // ahead in the window was changed, and there was at least one.
+  const kneeSlotsAhead = samTargets.filter(d => !samContext.isProtected?.(d.weekNumber, d.dayName)).reduce((n, d) => n + namesOf(plan, d.weekNumber, d.dayName).filter(loadsKnee).length, 0)
+  check('something was changed: every knee-loading lift still ahead in the window (the check below is not vacuous)', knee.touchedSlots.length >= 1 && knee.touchedSlots.length === kneeSlotsAhead, { touched: knee.touchedSlots.length, kneeSlotsAhead })
 
   let datesChecked = 0, kneeDaysSeen = 0, outsideCompared = 0
   const stillLoaded: string[] = []
@@ -188,12 +196,29 @@ async function main() {
   console.log('\n4. Rows are in week, day, position order')
   // -------------------------------------------------------------------------
   {
-    const order = knee.touchedSlots.map(s => ({ weekNumber: s.weekNumber, dayName: s.dayName, position: s.position }))
+    // THE ADAPTATION IS FOUND, NOT ASSUMED (26 Nov 2026). This used the knee ease-off, which touched Saturday and
+    // Thursday while his Saturday held a knee move; it holds a Romanian deadlift now, so the knee rows sit on one
+    // weekday and "Saturday of week 1 before Thursday of week 2" compared a row that was not there (-1 is less than
+    // everything, so it passed). An ease-off whose rows span two weeks AND two weekdays is found among four joints,
+    // and the pair compared is found among its rows, both asserted to exist.
+    const ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    let spread = knee
+    for (const injuryCode of ['knees', 'wrists', 'elbows', 'lower_back']) {
+      const out = await silentlyAsync(() => substituteForInjury({ mesocycle: plan, profile: sam, injuryCode, targetDays: samTargets, exclusions: [], context: samContext }))
+      if (new Set(out.touchedSlots.map(o => o.weekNumber)).size >= 2 && new Set(out.touchedSlots.map(o => o.dayName)).size >= 2) { spread = out; break }
+    }
+    const order = spread.touchedSlots.map(s => ({ weekNumber: s.weekNumber, dayName: s.dayName, position: s.position }))
     const sorted = [...order].sort(comparePlanDays)
     check('the rows span at least two weeks and two days (so order is a real choice)', new Set(order.map(o => o.weekNumber)).size >= 2 && new Set(order.map(o => o.dayName)).size >= 2, order.length)
     check('they are already sorted as produced', JSON.stringify(order) === JSON.stringify(sorted), order.map(o => `${o.weekNumber}:${o.dayName}:${o.position}`))
-    check('Saturday of week 1 comes before Thursday of week 2', knee.touchedSlots.findIndex(s => s.weekNumber === 1 && s.dayName === 'Saturday') < knee.touchedSlots.findIndex(s => s.weekNumber === 2 && s.dayName === 'Thursday'))
-    check('the stored changes are in the same order', JSON.stringify(knee.changes.map(c => key(c.weekNumber, c.dayName))) === JSON.stringify([...knee.changes].sort(comparePlanDays).map(c => key(c.weekNumber, c.dayName))))
+    // A later weekday in an earlier week, and an earlier weekday in a later week: the pair where "by week first" and
+    // "by weekday first" disagree.
+    const days = [...new Map(order.map(o => [`${o.weekNumber}:${o.dayName}`, o])).values()]
+    const late = days.find(a => days.some(b => b.weekNumber > a.weekNumber && ORDER.indexOf(b.dayName) < ORDER.indexOf(a.dayName)))
+    const early = late && days.find(b => b.weekNumber > late.weekNumber && ORDER.indexOf(b.dayName) < ORDER.indexOf(late.dayName))
+    const at = (o?: { weekNumber: number; dayName: string }) => (o ? spread.touchedSlots.findIndex(s => s.weekNumber === o.weekNumber && s.dayName === o.dayName) : -1)
+    check('a later weekday of an earlier week comes before an earlier weekday of a later week (both rows exist)', !!late && !!early && at(late) !== -1 && at(early) !== -1 && at(late) < at(early), { late, early })
+    check('the stored changes are in the same order', spread.changes.length >= 2 && JSON.stringify(spread.changes.map(c => key(c.weekNumber, c.dayName))) === JSON.stringify([...spread.changes].sort(comparePlanDays).map(c => key(c.weekNumber, c.dayName))))
   }
 
   // -------------------------------------------------------------------------
@@ -302,20 +327,24 @@ async function main() {
           for (const sl of c.slots) if (sl.was.name !== X && !now.includes(sl.was.name)) otherSlotsBack.push(`${sl.was.name} on ${c.weekNumber}:${c.dayName}`)
         }
       }
-      check(`a knee move banned during the ease-off stays out when it ends (${removed.length} moves, ${daysChecked} days ahead)`, removed.length >= 3 && daysChecked >= 4 && back.length === 0, back)
+      check(`a knee move banned during the ease-off stays out when it ends (${removed.length} moves, ${daysChecked} days ahead)`, removed.length >= 1 && daysChecked >= removed.length && back.length === 0, back)
       check('...while the day\'s other knee work still comes back', daysChecked >= 4 && otherSlotsBack.length === 0, otherSlotsBack.slice(0, 4))
     }
-    check('a day nobody touched since goes back exactly as it was (same object)', dayOf(ended.mesocycle, 1, 'Saturday') === dayOf(plan, 1, 'Saturday') && dayOf(ended.mesocycle, 2, 'Saturday') === dayOf(plan, 2, 'Saturday'), namesOf(ended.mesocycle, 1, 'Saturday'))
+    // The days the ease-off changed that he has not touched since: found from its own record (every changed day
+    // still ahead except the Thursday of week 2 he edited above), never assumed to be a Saturday.
+    const untouched = knee.changes.filter(c => !guard(c.weekNumber, c.dayName) && !(c.weekNumber === 2 && c.dayName === 'Thursday'))
+    check('a day nobody touched since goes back exactly as it was (same object)', untouched.length >= 1 && untouched.every(c => dayOf(ended.mesocycle, c.weekNumber, c.dayName) === dayOf(plan, c.weekNumber, c.dayName)), untouched.map(c => `${c.weekNumber}:${c.dayName}`))
     check('on the day the person edited, their swap stays', namesOf(ended.mesocycle, 2, 'Thursday').includes('Wall Sit') && !namesOf(ended.mesocycle, 2, 'Thursday').includes(swapped.before), namesOf(ended.mesocycle, 2, 'Thursday'))
     const others = knee.touchedSlots.filter(s => s.weekNumber === 2 && s.dayName === 'Thursday' && s !== swapped)
     check('...and every other slot the adaptation changed that day is put back', others.length >= 1 && others.every(s => namesOf(ended.mesocycle, 2, 'Thursday').includes(s.before) && (!s.after || !namesOf(ended.mesocycle, 2, 'Thursday').includes(s.after))), { others: others.map(s => `${s.before}/${s.after}`), now: namesOf(ended.mesocycle, 2, 'Thursday') })
-    check('it reports the kept edit', ended.keptEdits >= 1 && ended.restoredDays >= 2, { kept: ended.keptEdits, restored: ended.restoredDays })
+    check('it reports the kept edit, and every day it put back', ended.keptEdits >= 1 && ended.restoredDays >= 1 && ended.restoredDays >= untouched.length, { kept: ended.keptEdits, restored: ended.restoredDays, untouched: untouched.length })
     // The same ending a week later: week 2 is now in the past.
     const lateGuard = buildDayGuard(plan, { ...calendar('2026-10-20'), loggedDates: [], closedDates: [] })
     const late = silently(() => revertAdaptationChanges(knee.mesocycle, record, [1, 2, 3], lateGuard, sam, adaptationConflictTest('injury', 'knees', null)))
     check('a day already trained is not rewritten by an ending either', dayOf(late.mesocycle, 2, 'Thursday') === dayOf(knee.mesocycle, 2, 'Thursday') && dayOf(late.mesocycle, 1, 'Saturday') === dayOf(knee.mesocycle, 1, 'Saturday'))
     // At expiry every day of the window is behind us: nothing is rewritten.
-    const expiryGuard = buildDayGuard(plan, { ...calendar('2026-10-22'), loggedDates: [], closedDates: [] })
+    // (The window is three weeks from Thursday 8 Oct now, so it is all history on the 29th.)
+    const expiryGuard = buildDayGuard(plan, { ...calendar('2026-10-29'), loggedDates: [], closedDates: [] })
     const expired = silently(() => revertAdaptationChanges(knee.mesocycle, record, [1, 2, 3], expiryGuard, sam, adaptationConflictTest('injury', 'knees', null)))
     check('at expiry the whole window is history, so no week is rewritten', expired.changedWeeks.length === 0, expired.changedWeeks)
 

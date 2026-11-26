@@ -5,7 +5,7 @@
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Personal TrAIner connects to your heart rate strap so the timer and your workout can show your heart rate while you train. It reads heart rate only.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Personal TrAIner reads your steps, and for a walk or run you record, its distance, calories burned and heart rate, so they fill in without typing. It never writes to Health.</string>
+	<string>Personal TrAIner reads your steps, the workouts your watch records, and for a workout, its distance, calories burned and heart rate, so they fill in without typing. It never writes to Health.</string>
   <key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
