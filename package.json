@@ -772,7 +772,9 @@
     "test:meal-protein-spread": "tsx scripts/test-meal-protein-spread.ts",
     "test:peek-recovery": "tsx scripts/test-peek-recovery.ts",
     "test:cardio-remove": "tsx scripts/test-cardio-remove.ts",
-    "verify:cardio-remove": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/cardio-remove.mjs"
+    "verify:cardio-remove": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/cardio-remove.mjs",
+    "test:watch-app": "tsx scripts/test-watch-app.ts",
+    "verify:watch-sets": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/watch-sets.mjs"
   },
   "dependencies": {
     "@capacitor-community/bluetooth-le": "8.3.0",

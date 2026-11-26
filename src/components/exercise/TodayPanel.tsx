@@ -118,6 +118,9 @@ import { CircuitOffer } from './CircuitOffer'
 import { describeDayGap, dayGapCanAddPress } from '@/lib/day-gap-note'
 import type { Exercise, WorkoutDay, MesocycleWeek, UserProfile, PlannedActivity } from '@/lib/types'
 import type { LoadSource } from './LoadChip'
+import { watchTodayPayload, waitingWatchSets, subscribeWatchSets, dropWatchSets, tickForWatchSet, type WatchSet } from '@/lib/watch-session'
+import { isPhoneApp } from '@/lib/steps-store'
+import { estimatedMaxHeartRate } from '@/lib/heart-series'
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -1550,6 +1553,67 @@ export function TodayPanel({
       carry: carriedWeightFor,
     })
   })()
+  // THE WATCH (27 Nov 2026; his vision: "On a weight workout see 'next exercise 3x10 bench press @100kg' then start rest
+  // from watch, start next set"; docs/plans/watch-app.md W3). The watch is sent the rows this tab draws, today's
+  // weights and all, never the plan's own (watch-session.ts). Zones go with them only where this phone shows zones.
+  const watchPayload = showsTodaysSession && workout && isPhoneApp()
+    ? watchTodayPayload({
+        date: today,
+        title: workout.focus?.trim() || 'Today\'s session',
+        estimatedMax: (profile?.health_conditions ?? []).length > 0 ? null : estimatedMaxHeartRate(profile?.age),
+        rows: workout.exercises.map(ex => {
+          const { rowEx } = liveRowExercise(ex, { progressedLoads, progressedAddedLoads, layoff, profile })
+          const id = ex.id ?? getExerciseId(ex.name)
+          return {
+            id, name: rowEx.name, sets: rowEx.sets, reps: rowEx.reps,
+            suggestedLoad: rowEx.suggested_load, addedLoadKg: rowEx.suggested_added_load_kg ?? null,
+            restSeconds: parseRestSeconds(rowEx.rest ?? '60s'), done: setsFor(id, ex.name).length,
+          }
+        }),
+      })
+    : null
+  useEffect(() => {
+    if (watchPayload) void import('@/lib/watch-bridge').then(m => m.publishToday(watchPayload)).catch(() => {})
+  }, [watchPayload])
+  // A SET TICKED ON THE WATCH IS SAVED BY ITS OWN TICK HERE, one at a time, each pressed once: the weight, the checks,
+  // the rest and the record are this tab's. One that needs a weight typed, or that the tick did not take, waits and
+  // is said below the heading, never guessed.
+  const [watchSets, setWatchSets] = useState<WatchSet[]>(() => waitingWatchSets())
+  useEffect(() => subscribeWatchSets(() => setWatchSets(waitingWatchSets())), [])
+  const pressedWatchSets = useRef(new Set<string>())
+  const openedForWatch = useRef(new Set<string>())
+  // A press the tick did not take changes nothing this effect watches, so it looks again a moment later.
+  const [watchRecheck, setWatchRecheck] = useState(0)
+  const [watchSetsNeedYou, setWatchSetsNeedYou] = useState<{ set: WatchSet; why: 'typed' | 'missing' | 'refused' }[]>([])
+  useEffect(() => {
+    if (!listEl || !showsTodaysSession || watchSets.length === 0) { setWatchSetsNeedYou([]); return }
+    dropWatchSets(watchSets.filter(x => x.date < today).map(x => x.id))
+    const t = setTimeout(() => {
+      const needYou: { set: WatchSet; why: 'typed' | 'missing' | 'refused' }[] = []
+      const done: string[] = []
+      let pressed = false
+      for (const w of watchSets.filter(x => x.date === today)) {
+        const found = tickForWatchSet(listEl, w)
+        if ('state' in found) {
+          if (found.state === 'saved') done.push(w.id)
+          else needYou.push({ set: w, why: found.state })
+          continue
+        }
+        if ('opener' in found) {
+          // A closed row draws no ticks: it is opened, once, and looked at again.
+          if (!pressed && !openedForWatch.current.has(w.id)) { openedForWatch.current.add(w.id); found.opener.click(); pressed = true; setTimeout(() => setWatchRecheck(n => n + 1), 700) }
+          else if (openedForWatch.current.has(w.id) && !pressed) needYou.push({ set: w, why: 'refused' })
+          continue
+        }
+        if (pressedWatchSets.current.has(w.id)) { needYou.push({ set: w, why: 'refused' }); continue }
+        if (!pressed) { pressedWatchSets.current.add(w.id); found.tick.click(); pressed = true; setTimeout(() => setWatchRecheck(n => n + 1), 1500) }
+      }
+      dropWatchSets(done)
+      setWatchSetsNeedYou(needYou)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [listEl, showsTodaysSession, watchSets, today, logs, watchRecheck])
+
   /** The line on screen is the week's note — so the week row must not print it again, and its chevron opens the rest. */
   const lineIsWeekNote = coachLine?.source === 'fallback' && todayNudge?.source === 'week-note'
   const weekPhase = weekPhaseLine(currentMesoWeekObj?.block_number, currentMesoWeekObj?.phase_label, { isDeload: currentMesoWeekObj?.is_deload, isCalibrationWeek: currentMesoWeekObj?.isCalibrationWeek })
@@ -2066,6 +2130,19 @@ export function TodayPanel({
             <span className="text-[0.625rem] font-semibold uppercase tracking-[.12em] text-text-tertiary">Exercises</span>
             <span className="text-[0.6875rem] text-muted-foreground" data-testid="exercises-done">{exercisesDone} of {workout!.exercises.length} done</span>
           </p>
+          {watchSetsNeedYou.length > 0 && (
+            <div className="space-y-1 rounded-xl px-3 py-2 text-[0.8125rem] text-muted-foreground bg-[color:var(--surface-raised)]" data-testid="watch-sets-waiting" role="status">
+              {watchSetsNeedYou.map(({ set, why }) => (
+                <div key={set.id} className="flex min-h-11 items-center justify-between gap-2" data-watch-set={`${set.name}:${set.setNumber}`}>
+                  <span className="min-w-0">
+                    From your watch: set {set.setNumber} of {set.name}{' '}
+                    {why === 'typed' ? 'needs its weight typed here.' : why === 'missing' ? 'isn’t on today’s list.' : 'didn’t save. Tap its tick to save it.'}
+                  </span>
+                  <button type="button" className="shrink-0 min-h-11 px-2 text-xs font-semibold text-primary-text" onClick={() => dropWatchSets([set.id])}>Dismiss</button>
+                </div>
+              ))}
+            </div>
+          )}
           <div ref={setListEl} data-today-exercises>
           <ExerciseList
             workout={workout!}

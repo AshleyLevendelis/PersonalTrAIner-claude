@@ -92,7 +92,7 @@ function rememberStrap(s: PairedStrap | null): void {
 // ---------------------------------------------------------------------------
 // The live number and the session readings. One store; screens subscribe.
 // ---------------------------------------------------------------------------
-type Live = { bpm: number; at: number } | null
+type Live = { bpm: number; at: number; from: 'strap' | 'watch' } | null
 export type StrapState = 'none' | 'connecting' | 'connected' | 'lost'
 
 let live: Live = null
@@ -132,9 +132,47 @@ export function onStrapValue(v: DataView, at: Date = new Date()): void {
   if (bpm == null) return
   loadReadings()
   readings.add(bpm, at)
-  live = { bpm, at: at.getTime() }
+  live = { bpm, at: at.getTime(), from: 'strap' }
   saveReadings()
   emit()
+}
+
+// ---------------------------------------------------------------------------
+// THE WATCH APP'S READINGS, INTO THE SAME STORE (27 Nov 2026, docs/plans/watch-app.md, his "Go in the watch with your
+// recommendations"). The watch reads its sensor about once a second during a workout and sends a few seconds at a time
+// (watch-bridge.ts); a batch that waited on the watch arrives later with its own times. Each reading is kept exactly as
+// a strap's is, so a session's figure, its graph and its zones read the watch with no change; only a reading newer
+// than STALE_MS is live. A strap's live number is not overwritten by an older watch batch.
+// ---------------------------------------------------------------------------
+const WATCH_SEEN_KEY = 'fitplan_watch_heart_seen'
+
+/** Returns how many readings were kept (a reading no heart makes is not). */
+export function onWatchReadings(samples: readonly (readonly [number, number])[], now: number = Date.now()): number {
+  const good = samples.filter(([t, bpm]) => Number.isFinite(t) && Number.isFinite(bpm) && bpm >= 30 && bpm <= 230 && t <= now + 60_000)
+  if (good.length === 0) return 0
+  loadReadings()
+  for (const [t, bpm] of [...good].sort((x, y) => x[0] - y[0])) readings.insert(Math.round(bpm), new Date(t))
+  const [t, bpm] = good.reduce((a, b) => (b[0] > a[0] ? b : a))
+  if (!live || t >= live.at) live = { bpm: Math.round(bpm), at: t, from: 'watch' }
+  try { localStorage.setItem(WATCH_SEEN_KEY, String(now)) } catch { /* the readings still count today */ }
+  saveReadings()
+  emit()
+  return good.length
+}
+
+/**
+ * Whether the phone holds heart rate readings of its own to work a session's figure out from: a paired strap, or the
+ * watch app sending in the last four hours (the readings kept). Where this was `pairedStrap()` alone, a watch-only
+ * workout had readings that nothing read.
+ */
+export function hasOwnReadings(now: number = Date.now()): boolean {
+  if (pairedStrap()) return true
+  try { return now - Number(localStorage.getItem(WATCH_SEEN_KEY) ?? 0) <= KEEP_MS } catch { return false }
+}
+
+/** Where the live number comes from, or null when none is live. */
+export function liveHeartSource(now: number = Date.now()): 'strap' | 'watch' | null {
+  return live && now - live.at <= STALE_MS ? live.from : null
 }
 
 /** Writes the readings to the phone now: when the app goes to the back, where it may be closed. */
@@ -227,4 +265,5 @@ export function useStrapState(): StrapState {
 /** Tests only: a clean store. */
 export function __resetStrapForTests(): void {
   live = null; state = 'none'; readings.clear(); loaded = false; lastSaved = 0; realAdapter = null
+  try { localStorage.removeItem(WATCH_SEEN_KEY) } catch { /* none */ }
 }

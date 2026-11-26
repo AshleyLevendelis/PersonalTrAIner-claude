@@ -79,3 +79,34 @@ holds up on your watch for a week of real walks; W3 last.
 
 - Health Services on Wear OS, recording an exercise: https://developer.android.com/health-and-fitness/health-services/active-data
 - The Data Layer (same app id and signing key on watch and phone): https://developer.android.com/training/wearables/data/overview
+
+## Built, 27 Nov 2026 (his "Go in the watch with your recommendations")
+
+His vision, the same day: "Track workouts steps and heart rate. On a weight workout see 'next exercise 3x10 bench press
+@100kg' then start rest from watch, start next set." W1, W2 and W3 were built together, on the recommendations above:
+a workout starts on the watch (decision 1a); the cardio screen holds the clock, heart rate and zone, steps on foot and
+End (decision 2); the lifting screen is one exercise at a time, no weight typed on the watch (decision 3).
+
+- **The watch app** (`android/wear`, Java, plain views; same app id and key as the phone): Home lists today's session
+  (once Exercise has been opened in the phone app that day) and Walk / Run / Bike / Other. Cardio: the clock, "♥ 142 · Zone 3", steps and km on
+  foot, End tapped twice, then "Mostly zone 3 · Steady · Log it" or Easy / Steady / Hard. Lifting: "NEXT · Barbell
+  Bench Press · 3 × 10 @ 100 kg · Set 2 of 3 · ♥", **Set done · rest 2:00** ticks the set and starts the rest, the
+  rest counts down with what comes next, buzzes once at the end, **Start next set** (also ends it early), then the next
+  exercise, then Session done. Health Services records heart rate (about once a second), steps, distance and calories
+  in a foreground service, so it runs with the screen off. Everything the watch sends waits in an outbox until the
+  phone takes it.
+- **The phone app**: a listener that keeps what the watch sends until the app opens; the app then puts heart rate into
+  the strap's store (live beside the gear and on the running card, "Heart rate live from your watch", and in each
+  session's figure, graph and zones), shows a watch cardio workout running, logs it when ended on the watch (once, with
+  the watch's steps, distance and calories), and saves each watch set by **pressing the row's own tick** on Exercise,
+  so the weight, checks, rest and records are the phone's. A set it cannot save in one tap is said under the heading,
+  with Dismiss. The phone sends the watch today's session from the rows Exercise draws (today's weights) and the
+  zone maximum only where the phone shows zones.
+- **One limit, named**: a set ticked on the watch reaches the phone's log when the app is open on Exercise (Android
+  pauses the app's screen in a pocket). Until then the watch keeps count and the phone keeps the sets waiting.
+- **Checks**: `test:watch-app` (52 checks: the payload, the events, the two sides agreeing on paths, keys, zones and
+  heart rate range, the settings; 14 mutations, 13 caught, 1 equivalent) and `verify:watch-sets` (16 checks on the
+  whole app as the phone app; 5 mutations, 5 caught).
+- **NOT PROVEN**: none of the watch code has been compiled (Google's Android libraries are blocked from the cloud
+  session) or run on a watch. Next: his machine builds it, fixes any compile error, installs it on the Galaxy Watch 7,
+  and he tests a walk and a lifting session.

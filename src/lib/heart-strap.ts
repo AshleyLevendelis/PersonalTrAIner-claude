@@ -59,6 +59,21 @@ export class StrapReadings {
     this.samples.push({ bpm: Math.round(bpm), at: at.toISOString() })
   }
 
+  /**
+   * A reading that may be older than the newest held (the watch app's batch that waited while the phone was out of
+   * reach, 27 Nov 2026): filed at its own time, in order, never within a second of one already held.
+   */
+  insert(bpm: number, at: Date): void {
+    const t = at.getTime()
+    if (!isPlausibleBpm(bpm) || !Number.isFinite(t)) return
+    if (t >= this.lastAt + 1000) { this.add(bpm, at); return }
+    let i = this.samples.length
+    while (i > 0 && Date.parse(this.samples[i - 1].at) > t) i--
+    const near = (j: number) => j >= 0 && j < this.samples.length && Math.abs(Date.parse(this.samples[j].at) - t) < 1000
+    if (near(i - 1) || near(i)) return
+    this.samples.splice(i, 0, { bpm: Math.round(bpm), at: at.toISOString() })
+  }
+
   get count(): number { return this.samples.length }
 
   /** The average and highest between two instants (a log's own time), or null with fewer than three readings. */
