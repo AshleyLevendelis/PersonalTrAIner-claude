@@ -107,6 +107,8 @@ export interface ToolsTabProps {
   profileId?: string
   /** Weight, age and sex, for a recorded walk's calorie ESTIMATE when only a strap gave a heart rate (activity-figures.ts). */
   body?: BodyForEstimate
+  /** A health condition or pregnancy is ticked: a session's heart rate is shown, never sorted into effort. */
+  noHeartBands?: boolean
   /**
    * The training week, so the round timer can offer today's conditioning as a
    * one-tap prefill.
@@ -129,7 +131,7 @@ export interface ToolsTabProps {
 /** Stable identity, so a missing plan does not hand the week hook a fresh array each render. */
 const EMPTY_PLAN: WorkoutDay[] = []
 
-export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipmentAccess, planCreatedAt, logsVersion, onLogsUpdated, body }: ToolsTabProps) {
+export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipmentAccess, planCreatedAt, logsVersion, onLogsUpdated, body, noHeartBands }: ToolsTabProps) {
   const timers = useTimers()
   // The session facade already owns "which day is it" (frozen at session
   // start, dev-clock aware). Deriving it again here from a fresh Date would
@@ -538,6 +540,7 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
             profileId={profileId}
             date={todayDate}
             body={body ?? {}}
+            noHeartBands={noHeartBands}
             onLogged={line => { setLoggedNote(`Logged · ${line}`); week.refresh(); onLogsUpdated?.() }}
           />
         </Suspense>

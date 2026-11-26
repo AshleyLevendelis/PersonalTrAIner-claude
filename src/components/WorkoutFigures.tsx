@@ -158,7 +158,7 @@ export function WorkoutFigures(p: WorkoutFiguresProps) {
   if (p.km != null && p.km > 0) stats.push({ id: 'distance', value: String(p.km), unit: 'km', label: 'Distance', color: 'var(--chart-3)' })
   // "/km" beside a four-figure pace does not fit a third of a phone, so the unit rides in the label.
   if (pace) stats.push({ id: 'pace', value: pace, label: 'Pace / km', color: 'var(--chart-3)' })
-  if (p.kcal != null && p.kcal > 0) stats.push({ id: 'kcal', value: `${p.kcalEstimated ? '≈ ' : ''}${Math.round(p.kcal)}`, unit: 'kcal', label: p.kcalEstimated ? 'Estimate' : 'Active', color: 'var(--chart-4)' })
+  if (p.kcal != null && p.kcal > 0) stats.push({ id: 'kcal', value: `${p.kcalEstimated ? '≈' : ''}${Math.round(p.kcal)}`, unit: 'kcal', label: p.kcalEstimated ? 'Estimate' : 'Active', color: 'var(--chart-4)' })
   if (p.steps != null && p.steps > 0) stats.push({ id: 'steps', value: p.steps.toLocaleString('en-GB'), label: 'Steps', color: 'var(--chart-2)' })
   if (p.avgHeart != null) stats.push({ id: 'avg-heart', value: String(p.avgHeart), unit: 'bpm', label: 'Average', color: HEART })
   if (p.maxHeart != null) stats.push({ id: 'max-heart', value: String(p.maxHeart), unit: 'bpm', label: 'Highest', color: HEART })

@@ -69,8 +69,8 @@ export function estimatedMaxHeartRate(age: number | null | undefined): number | 
   return Math.round(208 - 0.7 * a)
 }
 
-export const STEADY_FROM = 0.7
-export const HARD_FROM = 0.85
+const STEADY_FROM = 0.7
+const HARD_FROM = 0.85
 /** A reading stands for the time until the next one, but never for more than this: a gap is not effort. */
 const LONGEST_HOLD_MS = 5 * 60 * 1000
 

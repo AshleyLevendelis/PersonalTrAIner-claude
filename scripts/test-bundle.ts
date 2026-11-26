@@ -865,7 +865,10 @@ console.log('\n3. Nothing has crept back up')
   // (0 kB of room left at 3466); 9 kB over today.
   // MOVED 26 Nov 2026: 3475 -> 3493, workouts the watch recorded (its card and its reader are their own lazy chunks,
   // loaded only in the phone app with the switch on). MEASURED 3484; 9 kB over today.
-  const TOTAL_BUDGET_KB = 3493
+  // MOVED 26 Nov 2026: 3493 -> 3518, the watch workout summary (figures, heart-rate graph, time by effort) and sleep
+  // (its rules, its reader and Home's row), each its own lazy chunk loaded only in the phone app with its switch on.
+  // MEASURED 3509; 9 kB over today. First paint and the app chunk did not move (649 and 1693).
+  const TOTAL_BUDGET_KB = 3518
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)

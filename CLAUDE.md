@@ -1874,6 +1874,20 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   rate is worked out from the night's readings when the watch shares none (never mixed with a shared figure). Step 1 of
   `docs/plans/watch-data.md`; sleep (step 2) waits on his pick. `test:watch-workouts`, `verify:watch-workouts`. Needs a
   phone app rebuild. NOT on a real watch yet
+- **The watch workout card is a summary: his words 26 Nov 2026** ("too simple, doesnt add any real value and doesnt for
+  the aesthetic", with Garmin's and Apple's summaries): figures as tiles, the heart rate as a graph, and time by effort in
+  the app's three words (Easy under 70% of an estimated maximum, Steady to 85%, Hard above; CSCS mine, "about", never a
+  target; none for strength, a health condition, pregnancy or no age). On a planned cardio day the plan sits beside what
+  he did, and a matching workout starts as "Today's session" (mine, his to overturn; a lifting day is unchanged: extra
+  work). The walk-and-run recorder's End shows the same summary. `test:watch-workouts`, `verify:watch-workouts`,
+  `verify:record-activity`. Needs a phone app rebuild
+- **Sleep: his pick 26 Nov 2026, "A"** (from three options: read it, show it on Home against his usual, tell the coach;
+  after two or more short nights the coach OFFERS a lighter session, main lift kept; never changes the plan unasked, no
+  score). Its own Profile switch, read only; Home's row in sight without a tap; NOTHING about his sleep is saved (read
+  from the phone each time, no migration). CSCS, mine: a night is time asleep, its longest sleep, two hours at least;
+  short is an hour or more under his usual (median of nights 3-16 back) and under seven hours; one short night changes
+  nothing; a raised resting heart rate comes first where both are true. `test:sleep`, `verify:sleep`,
+  `docs/plans/watch-data.md`. Needs the `chat-gemini` deploy and a phone app rebuild. NOT on a real watch yet
 - **Heart rate from a watch: his "1 + 2, build it", 24 Nov 2026**: after each session its average and highest heart rate
   (from Health Connect, which the watch writes to) show under it, and Progress shows resting heart rate against last
   week. Read only, its own switch, phone app only; never a target or zone. `test:health-heart`, `verify:health-steps`

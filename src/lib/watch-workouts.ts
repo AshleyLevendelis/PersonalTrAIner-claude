@@ -260,8 +260,19 @@ export async function logWatchWorkout(p: {
   })
 }
 
-/** The heart readings the phone holds for a workout's own time, for its graph. Never throws; nothing read is []. */
-export async function readWatchHeart(w: Pick<WatchWorkout, 'start' | 'end'>): Promise<{ bpm: number; at: string }[]> {
+/**
+ * The heart readings for a session's own time, for its graph. A paired strap's readings first, as the saved figure
+ * takes them (gatherFigures), so the graph and the number beside it come from one source; else the phone's. Never
+ * throws; nothing read is [].
+ */
+export async function readWatchHeart(w: { start: string; end: string }): Promise<{ bpm: number; at: string }[]> {
+  try {
+    const strap = await import('./strap-live')
+    if (strap.pairedStrap()) {
+      const own = strap.strapSamplesBetween(new Date(w.start), new Date(w.end))
+      if (own.length >= 3) return own
+    }
+  } catch { /* no strap */ }
   try {
     const { healthAdapter } = await import('./health-steps')
     const adapter = await healthAdapter()

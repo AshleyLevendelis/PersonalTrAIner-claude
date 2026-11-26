@@ -3,12 +3,15 @@ import { Check, Footprints, Play, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LiveHeart } from '@/components/LiveHeart'
 import { EffortBox } from '@/components/exercise/CardioSetRow'
+import { WorkoutFigures } from '@/components/WorkoutFigures'
 import { activityFiguresLine, clockText, type BodyForEstimate } from '@/lib/activity-figures'
 import {
   RECORDING_NAMES, discardRecording, endRecording, gatherFigures, logRecording, looksForgotten, resumeRecording,
   startRecording, useRecording, type GatheredFigures, type RecordingKind,
 } from '@/lib/activity-recording'
 import { cardioReadback, heartLine } from '@/lib/cardio-effort'
+import { estimatedMaxHeartRate, type HeartReading } from '@/lib/heart-series'
+import { readWatchHeart } from '@/lib/watch-workouts'
 import { isPhoneApp } from '@/lib/steps-store'
 
 // ---------------------------------------------------------------------------
@@ -16,15 +19,19 @@ import { isPhoneApp } from '@/lib/steps-store'
 //   idle       Start walk / Start run
 //   recording  the clock, the live heart rate when a strap sends, End, and Cancel (which asks once)
 //   ended      what the phone read for the window, "How hard was it?" (one tap logs it), Keep going, Throw away
+// The ended state is THE SUMMARY (26 Nov 2026, his "too simple" on the watch card; WorkoutFigures): the figures as
+// tiles, the heart rate as a graph and time by effort, the same drawing a watch workout gets on Home.
 // The figures are read once at End; a watch that has not synced yet is said, and filled in later on its own.
 // ---------------------------------------------------------------------------
 
 const cardStyle = { background: 'var(--surface-raised)', border: '1px solid var(--hairline)' }
 
-export function RecordActivityCard({ profileId, date, body, onLogged }: {
+export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogged }: {
   profileId: string
   date: string
   body: BodyForEstimate
+  /** A health condition or pregnancy is ticked: heart rate is shown, never sorted into effort. */
+  noHeartBands?: boolean
   /** The read-back line for the screen's "Logged" banner. */
   onLogged: (line: string) => void
 }) {
@@ -32,6 +39,7 @@ export function RecordActivityCard({ profileId, date, body, onLogged }: {
   const [now, setNow] = useState(() => Date.now())
   const [figures, setFigures] = useState<GatheredFigures | null>(null)
   const [reading, setReading] = useState(false)
+  const [samples, setSamples] = useState<HeartReading[]>([])
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // THE LOGGED LINE SITS ON THE CARD, where the effort was tapped: the page's own banner is at the top, off screen.
@@ -48,10 +56,11 @@ export function RecordActivityCard({ profileId, date, body, onLogged }: {
   // ENDED: read the phone for the window, once per End (also after an app restart with an ended recording waiting).
   const endedAt = rec?.endedAt ?? null
   useEffect(() => {
-    if (!rec || !rec.endedAt) { setFigures(null); return }
+    if (!rec || !rec.endedAt) { setFigures(null); setSamples([]); return }
     let live = true
     setReading(true)
     void gatherFigures(rec, body).then(f => { if (live) { setFigures(f); setReading(false) } })
+    void readWatchHeart({ start: rec.startedAt, end: rec.endedAt }).then(s => { if (live) setSamples(s) })
     return () => { live = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rec?.startedAt, endedAt])
@@ -120,12 +129,6 @@ export function RecordActivityCard({ profileId, date, body, onLogged }: {
   // ENDED: the figures, then one effort tap logs it.
   const forgotten = looksForgotten(rec)
   const minutes = figures?.minutes ?? Math.max(1, Math.round((Date.parse(rec.endedAt) - Date.parse(rec.startedAt)) / 60000))
-  const rows: { label: string; value: string; key: string }[] = []
-  rows.push({ key: 'time', label: 'Time', value: clockText(Date.parse(rec.endedAt) - Date.parse(rec.startedAt)) })
-  if (figures?.steps != null) rows.push({ key: 'steps', label: 'Steps', value: figures.steps.toLocaleString('en-GB') })
-  if (figures?.distanceKm != null) rows.push({ key: 'distance', label: 'Distance', value: `${figures.distanceKm} km` })
-  if (figures?.kcal != null) rows.push({ key: 'kcal', label: 'Calories burned', value: figures.kcalEstimated ? `≈ ${figures.kcal} kcal` : `${figures.kcal} kcal` })
-  const heart = figures ? heartLine(figures.avgHeartRate, figures.maxHeartRate) : null
   const missing = figures?.phoneRead ? [figures.steps == null && 'steps', figures.kcal == null && 'calories'].filter(Boolean) as string[] : []
 
   const log = (effort: Parameters<typeof logRecording>[0]['effort']) => {
@@ -147,15 +150,14 @@ export function RecordActivityCard({ profileId, date, body, onLogged }: {
         <p className="mt-3 text-sm text-muted-foreground" data-record-reading>Reading your phone…</p>
       ) : (
         <>
-          <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2" data-record-figures>
-            {rows.map(r => (
-              <div key={r.key} data-record-figure={r.key}>
-                <dt className="text-[0.65625rem] uppercase tracking-[0.1em] text-muted-foreground">{r.label}</dt>
-                <dd className="tabular-mono text-[1.125rem] font-semibold">{r.value}</dd>
-              </div>
-            ))}
-          </dl>
-          {heart && <p className="mt-2 text-[0.8125rem] tabular-mono text-muted-foreground" data-record-heart>{heart}</p>}
+          <div className="mt-3" data-record-figures>
+            <WorkoutFigures
+              minutes={minutes} km={figures.distanceKm} showPace kcal={figures.kcal} kcalEstimated={figures.kcalEstimated} steps={figures.steps}
+              avgHeart={figures.avgHeartRate} maxHeart={figures.maxHeartRate}
+              samples={samples} start={new Date(rec.startedAt)} end={new Date(rec.endedAt)}
+              estimatedMax={noHeartBands ? null : estimatedMaxHeartRate(body.age)}
+            />
+          </div>
           {figures?.kcalEstimated && (
             <p className="mt-1.5 text-[0.71875rem] text-muted-foreground" data-record-estimate>Calories are an estimate from your heart rate, age and weight. A watch’s own figure replaces it if one arrives.</p>
           )}
