@@ -62,6 +62,7 @@ import { ScreenEditUndoLine } from './ScreenEditUndoLine'
 // the first pixel. It costs one extra chunk header in the total and takes its
 // whole weight off first paint.
 const TightnessSheet = lazyWithReload(() => import('./TightnessSheet').then(m => ({ default: m.TightnessSheet })))
+const RecordActivityCard = lazyWithReload(() => import('@/components/RecordActivityCard').then(m => ({ default: m.RecordActivityCard })))
 import type { TightnessAnswer } from './TightnessSheet'
 import { tightnessWarmup, uncoveredNote } from '@/lib/tightness'
 import { ExerciseRow } from './ExerciseRow'
@@ -2159,6 +2160,24 @@ export function TodayPanel({
           profile={profile}
           exclusions={exclusions}
         />
+      )}
+
+      {/* RECORD A WALK OR RUN, under today (his 26 Nov 2026: "start a walk shouldn't be in tools it should be in
+          exercise"). Today only: a walk is recorded as it happens, so a past or coming day has nothing to start. Logged
+          as extra activity; today's planned session is untouched. Heart rate from a paired strap, else the watch
+          through the phone's health store; zones hidden with a health condition ticked, as on Home. */}
+      {!weekOpen && !peekDay && profileId && (
+        <Suspense fallback={null}>
+          <div className="mt-3">
+            <RecordActivityCard
+              profileId={profileId}
+              date={today}
+              body={{ weightKg: profile?.weight_kg, age: profile?.age, gender: profile?.gender }}
+              noHeartBands={(profile?.health_conditions ?? []).length > 0}
+              onLogged={() => { onLogsUpdated?.() }}
+            />
+          </div>
+        </Suspense>
       )}
 
       {/* THE PROGRAM ROW LEFT THIS PAGE on 30 Oct 2026 ("less is more"): "Program ›" and the week line at

@@ -1825,6 +1825,12 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   choices; the meal writer is asked for plain names. `test:simple-meals`, `measure:simple-meals`. Needs the
   `generate-meals` deploy for the writer's half
 
+### His requests of 26 Nov 2026
+- **A walk or run is recorded from Exercise, under today, not Tools (his words), and with a heart rate it is logged by
+  its zone; with none, Easy / Steady / Hard: his ruling "Keep Easy/Steady/Hard"** (over a zone by feel and over no
+  effort). Strap first, else the watch. The effort stored is the zone's word (1-2 Easy, 3 Steady, 4-5 Hard).
+  `verify:record-activity` A12a, B7-B8, E1-E2
+
 ### His requests of 20 Nov 2026
 - **Profile has an Account row, "Email & sign-in" (his request 20 Nov 2026, "Build the account row")**: an email can be
   saved any time, not only from the weekly prompt; it says saved, waiting on the email's link (never "saved"), or not
