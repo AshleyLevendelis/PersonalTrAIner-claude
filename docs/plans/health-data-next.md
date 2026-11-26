@@ -1,12 +1,16 @@
 # Health data: what to build next (for Ashley to evaluate, 26 Nov 2026)
 
 Where it stands: the logic is well tested; nothing has run on a real watch. Confidence about 5 of 10 on his phone,
-value about 6 of 10. Eight steps below, in the order recommended. Nothing here is started.
+value about 6 of 10. Eight steps below, in the order recommended. Step 0 is built; the rest is not started.
 
 Sizes: S is about half a day, M one to two days, L a week or more. "His machine" means it cannot be finished from a
 cloud session.
 
 ## Step 0. A "Copy what my watch shared" button (S)
+
+**BUILT 26 Nov 2026** (on the working branch; not merged, not on his phone). Profile, "Steps from your phone", last
+section: "Check what your watch shares", Make the report, Copy the report. What to do with it is in
+`docs/testing/watch-test-sheet.md` (B4).
 
 - **What you get**: on Profile, one button that copies a short plain summary of what your phone's health store handed
   the app (how many workouts, heart readings a minute, whether sleep has stages, the last sync time). You paste it

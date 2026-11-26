@@ -1826,6 +1826,11 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   `generate-meals` deploy for the writer's half
 
 ### His requests of 26 Nov 2026
+- **"Check what your watch shares" on Profile (step 0 of `docs/plans/health-data-next.md`, his "Start the planned
+  work")**: on his tap, a plain report of what the phone's health store hands the app, as counts and times only (a
+  record is read with no reading in it), to copy and send with a bug. It reads only what his switches allow, never
+  shows a permission sheet, saves and sends nothing. `test:health-diagnostics`, `verify:watch-report`. Needs a phone
+  app rebuild. A report from his real watch is what steps 1 and 6 of the plan wait on
 - **A recorded workout is on Exercise, not Tools (his words), and with a heart rate it is logged by its zone; with
   none, Easy / Steady / Hard: his ruling "Keep Easy/Steady/Hard"** (over a zone by feel and over no effort). End says
   "Mostly zone N" with one Log button; strap first, else the watch. The effort stored is the zone's word (1-2 Easy, 3

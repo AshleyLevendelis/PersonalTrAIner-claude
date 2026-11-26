@@ -92,6 +92,35 @@ if (platform === 'ios' || platform === 'android') {
     }
     return out.filter(s => Date.parse(s.end) <= end.getTime() && Date.parse(s.end) >= start.getTime())
   }
+  // THE WATCH REPORT (27 Nov 2026, health-diagnostics.ts): the records behind each figure, as when and from what.
+  // &healthrecords= chooses how finely the watch shares them:
+  //   fine (default)  steps, distance and calories one record a minute from the watch (and steps every five minutes
+  //                   from the phone as well); heart rate every 30 seconds; a resting figure each night
+  //   coarse          one record an hour; heart rate every 10 minutes
+  //   none            nothing of any kind
+  //   denied          distance refuses ("SecurityException: ... READ_DISTANCE"), the rest as fine
+  adapter.recordsBetween = async (kind, start, end) => {
+    calls.push({ records: kind, window: [start.toISOString(), end.toISOString()] })
+    const how = q.get('healthrecords') ?? 'fine'
+    if (how === 'none') return []
+    if (how === 'denied' && kind === 'distance') throw new Error('SecurityException: the app has no android.permission.health.READ_DISTANCE')
+    const rec = (t: number, lenMs: number, source: string, device: string | null) => ({ start: new Date(t).toISOString(), end: new Date(t + lenMs).toISOString(), source, device })
+    const out: { start: string; end: string; source: string | null; device: string | null }[] = []
+    if (kind === 'restingHeartRate') {
+      if (q.get('healthnoresting') === '1') return []
+      for (let i = 0; i < 14; i++) { const t = new Date(end.getFullYear(), end.getMonth(), end.getDate() - i, 4).getTime(); if (t >= start.getTime() && t <= end.getTime()) out.push(rec(t, 0, 'Samsung Health', 'watch')) }
+      return out
+    }
+    if (kind === 'heartRate') {
+      const step = how === 'coarse' ? 600000 : 30000
+      for (let t = start.getTime(); t <= end.getTime(); t += step) out.push(rec(t, 0, 'Samsung Health', 'watch'))
+      return out
+    }
+    const step = how === 'coarse' ? 3600000 : 60000
+    for (let t = start.getTime(); t + step <= end.getTime(); t += step) out.push(rec(t, step, 'Samsung Health', 'watch'))
+    if (kind === 'steps' && how !== 'coarse') for (let t = start.getTime(); t + 300000 <= end.getTime(); t += 300000) out.push(rec(t, 300000, 'Google Fit', 'phone'))
+    return out
+  }
   ;(globalThis as { __healthAdapterForTest?: HealthAdapter }).__healthAdapterForTest = adapter
   if (q.get('healthon') === '1') { try { localStorage.setItem('fitplan_health_steps_connected', '1') } catch { /* */ } }
   if (q.get('hearton') === '1') { try { localStorage.setItem('fitplan_health_heart_connected', '1') } catch { /* */ } }

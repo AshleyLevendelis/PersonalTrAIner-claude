@@ -10,6 +10,9 @@ yet, so every line is a real test. Each test has a number so a report can be one
 - **B2. Switch the app's four readers on.** In the app: gear → Profile → "Steps from your phone". Switch on Steps,
   Heart rate from your watch, Workouts from your watch, and Sleep from your watch. Say Allow each time.
 - **B3. Wear the watch to bed.** The sleep row shows last night straight away; "your usual" needs five nights.
+- **B4. Send the watch report once, after your first recorded workout.** Same page, at the bottom: "Check what your
+  watch shares" → Make the report → Copy the report, then paste it into the chat with Claude. It holds counts and
+  times only (no step counts, heart rates or sleep times). Send it again with any test that comes out wrong.
 
 ## The tests
 
@@ -36,6 +39,7 @@ One line per test, with a screenshot when it is wrong:
 - `T2 wrong: app says 3.1 km, watch says 5.2 km` plus a screenshot of the app AND of Samsung Health's page for the
   same workout or night. The pair is what lets the cause be found.
 - `T10 nothing: no sleep row at all` when something never appears.
+- With anything wrong or missing, paste a fresh watch report (B4) under it. It says why, where a screenshot says what.
 - `IDEA: ...` for anything you would like changed or added, in your own words.
 - `LOOKS: ...` for anything that works but looks wrong.
 

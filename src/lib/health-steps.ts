@@ -53,7 +53,15 @@ export interface HealthAdapter {
   requestSleepAccess?(): Promise<boolean>
   /** Sleep sessions between two instants, each with its stages where the watch wrote them. */
   sleepSessions?(start: Date, end: Date): Promise<{ start: string; end: string; stages?: { start: string; end: string; stage: string }[] | null }[]>
+  /** THE WATCH REPORT ONLY (health-diagnostics.ts, 27 Nov 2026): the individual records behind a figure, as WHEN and
+   *  FROM WHAT, never the figure itself (no value leaves this function), so the report can say how finely a watch
+   *  shares something. It reads; it never shows a permission sheet. */
+  recordsBetween?(kind: HealthRecordKind, start: Date, end: Date): Promise<HealthRecord[]>
 }
+
+export type HealthRecordKind = 'steps' | 'distance' | 'calories' | 'heartRate' | 'restingHeartRate'
+/** One record's when and where-from. No reading. */
+export interface HealthRecord { start: string; end: string; source: string | null; device: string | null }
 
 /** One workout as the phone's health store holds it. `type` is the store's own word ('running', 'strengthTraining'). */
 export interface WatchWorkout {
@@ -141,6 +149,10 @@ export function healthAdapter(): Promise<HealthAdapter | null> {
               distanceM: typeof w.totalDistance === 'number' && Number.isFinite(w.totalDistance) ? w.totalDistance : null,
               source: w.sourceName ?? null,
             }))
+          },
+          recordsBetween: async (kind, start, end) => {
+            const res = await Health.readSamples({ dataType: kind, startDate: start.toISOString(), endDate: end.toISOString(), limit: 5000, ascending: true })
+            return res.samples.map(x => ({ start: x.startDate, end: x.endDate, source: x.sourceName ?? null, device: x.deviceType ?? null }))
           },
           requestSleepAccess: async () => {
             const status = await Health.requestAuthorization({ read: ['sleep'] })
