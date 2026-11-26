@@ -112,3 +112,5 @@ End (decision 2); the lifting screen is one exercise at a time, no weight typed 
   and he tests a walk and a lifting session.
 
 **27 Nov 2026, on his machine (relayed):** both apps compiled first time with no changes, installed on his phone and Galaxy Watch 7 (SM-L310, Wear OS 6); he tested and said "it worked". Still to learn from real use: which screens he tried, and how the watch behaves over a long session with the screen off.
+
+**27 Nov 2026, the look (his "the watch needs to look more high end"):** every screen redrawn in the app's own colours, fonts (Space Grotesk, a monospace for numbers) and icons, with a ring round the edge for sets, rest and the heart rate's zone. Mock-up: `docs/design/watch/watch-look-2026-11-27.png`. Needs a rebuild of the watch app on his machine.

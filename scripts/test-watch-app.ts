@@ -179,6 +179,29 @@ async function main() {
   check('the phone shows the watch\'s live number as the watch\'s', /liveHeartSource\(\) === 'watch' \? 'Heart rate live from your watch\.'/.test(read('src/components/RecordActivityCard.tsx')))
   check('every reader of the strap\'s readings reads the watch\'s too', ['src/lib/health-heart.ts', 'src/lib/activity-recording.ts', 'src/lib/watch-workouts.ts'].every(f => /hasOwnReadings\(\)/.test(read(f)) && !/strap\.pairedStrap\(\)/.test(strip(read(f)))))
 
+  console.log('\n5. The look is the app\'s (his "the watch needs to look more high end", 27 Nov 2026)')
+  const css = read('src/index.css')
+  const nightshift = css.slice(css.indexOf('[data-theme="nightshift"]'), css.indexOf('}', css.indexOf('[data-theme="nightshift"]')))
+  const token = (name: string, src = nightshift) => new RegExp(`--${name}:\\s*(#[0-9A-Fa-f]{6})`).exec(src)?.[1]?.toUpperCase()
+  const style = read(`${W}WatchStyle.java`)
+  const javaColor = (name: string) => new RegExp(`${name} = Color\\.parseColor\\("(#[0-9A-Fa-f]{6})"\\)`).exec(style)?.[1]?.toUpperCase()
+  const pairs: [string, string | undefined][] = [
+    ['BG', token('background')], ['FG', token('foreground')], ['MUTED', token('muted-foreground')], ['BORDER', token('border')],
+    ['MINT', token('theme-primary')], ['MINT_2', token('theme-primary-2')], ['ON_MINT', token('primary-foreground')],
+    ['VIOLET', token('role-ai', css)], ['HEART', token('destructive', css)], ['NUM', token('num-hero')],
+  ]
+  const off = pairs.filter(([j, t]) => !t || javaColor(j) !== t).map(([j, t]) => `${j}: watch ${javaColor(j)} app ${t}`)
+  check('every watch colour is the app\'s own (the default theme)', off.length === 0, off)
+  const fonts = ['space_grotesk_medium', 'space_grotesk_semibold', 'space_grotesk_bold', 'jetbrains_mono_bold']
+  const { existsSync, statSync } = await import('fs')
+  check('the app\'s font, Space Grotesk, and a monospace for numbers, are in the watch app', fonts.every(f => existsSync(`android/wear/src/main/res/font/${f}.ttf`) && statSync(`android/wear/src/main/res/font/${f}.ttf`).size > 20_000) && fonts.every(f => style.includes(`R.font.${f}`)))
+  const icons = ['ic_walk', 'ic_run', 'ic_bike', 'ic_other', 'ic_heart', 'ic_check']
+  check('the app\'s own icons (lucide), every one the screens use', icons.every(i => /lucide/.test(read(`android/wear/src/main/res/drawable/${i}.xml`))) && icons.every(i => main.includes(`R.drawable.${i}`)))
+  const ringSrc = strip(read(`${W}RingView.java`))
+  check('progress lives on the edge ring: sets in mint, rest in violet, the zone in the heart\'s colour', /ring\.set\(sessionFraction\(s\), MINT\)/.test(main) && /ring\.set\(restTotalMs > 0 \? left \/ \(float\) restTotalMs : 0f, WatchStyle\.VIOLET\)/.test(main) && /ring\.set\(zone \/ 5f, WatchStyle\.HEART\)/.test(main) && /drawArc/.test(ringSrc))
+  check('numbers are monospaced, so the clock does not shuffle', /clock = mono\(/.test(main) && /restClock = mono\(/.test(main) && /heartBpm = inline\(heartRow, "–", 22, FG, WatchStyle\.mono\(this\)\)/.test(main))
+  check('a stale heart rate shows a dash, never its last number', /heartBpm\.setText\(fresh \? String\.valueOf\(l\.bpm\) : "–"\)/.test(main) && /System\.currentTimeMillis\(\) - l\.bpmAt <= 5000/.test(main))
+
   console.log(`\n${ran} checks ran`)
   if (failures > 0) { console.error(`${failures} failure(s)`); process.exit(1) }
   console.log('All watch-app checks passed.')

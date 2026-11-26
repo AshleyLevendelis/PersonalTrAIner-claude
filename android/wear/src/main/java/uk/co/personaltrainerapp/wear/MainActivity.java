@@ -5,7 +5,11 @@ import android.app.Activity;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -17,7 +21,6 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -43,6 +46,10 @@ import java.util.Locale;
  *
  * Decisions (docs/plans/watch-app.md, his "go with your recommendations"): a workout starts on the watch; the cardio
  * screen holds nothing that needs reading mid-stride; no weight is typed on the watch, the phone's number is ticked.
+ *
+ * THE LOOK (27 Nov 2026, his "the watch needs to look more high end"): the app's own colours, fonts and icons
+ * (WatchStyle), and a ring round the screen's edge (RingView) carrying the progress: sets done, the rest running down,
+ * the heart rate's zone.
  */
 public class MainActivity extends Activity {
     private static WeakReference<MainActivity> open = new WeakReference<>(null);
@@ -63,23 +70,30 @@ public class MainActivity extends Activity {
     private boolean restBuzzed;
     private long endArmedAt;
 
-    private static final int MINT = Color.rgb(94, 234, 196);
-    private static final int INK = Color.rgb(21, 20, 46);
-    private static final int MUTED = Color.rgb(170, 168, 200);
+    private static final int MINT = WatchStyle.MINT;
+    private static final int MUTED = WatchStyle.MUTED;
+    private static final int FG = WatchStyle.FG;
+    private RingView ring;
 
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
+        FrameLayout root = new FrameLayout(this);
+        ring = new RingView(this);
+        root.addView(ring, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(INK);
+        scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(false);
         column = new LinearLayout(this);
         column.setOrientation(LinearLayout.VERTICAL);
-        column.setGravity(Gravity.CENTER_HORIZONTAL);
-        int pad = dp(22);
-        // Round screens: generous side padding keeps text off the curve.
-        column.setPadding(pad, dp(28), pad, dp(36));
-        scroll.addView(column);
-        setContentView(scroll);
+        column.setGravity(Gravity.CENTER);
+        int pad = dp(26);
+        // Round screens: generous side padding keeps text off the curve; the column centres when it is short.
+        column.setPadding(pad, dp(30), pad, dp(34));
+        scroll.addView(column, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
+        root.addView(scroll, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        root.setBackgroundColor(WatchStyle.BG_EDGE);
+        setContentView(root);
         askPermissions();
     }
 
@@ -113,22 +127,28 @@ public class MainActivity extends Activity {
         screen = Screen.HOME;
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         column.removeAllViews();
-        label("Personal TrAIner", 13, MUTED, false);
+        clearLive();
         TodayStore.Session s = TodayStore.read(this);
         if (s != null) {
             int done = 0, total = 0;
             for (TodayStore.Exercise x : s.exercises) { done += TodayStore.done(this, x); total += x.sets; }
-            label("TODAY", 11, MINT, true);
-            label(s.title, 18, Color.WHITE, true);
-            label(done + " of " + total + " sets done", 12, MUTED, false);
-            button(done >= total ? "Session done" : "Start session", true, v -> startLift());
+            ring.set(total > 0 ? done / (float) total : 0f, MINT);
+            kicker("TODAY", MINT, 0);
+            title(s.title, 21, true, 2);
+            text(done + " of " + total + " sets done", 13, MUTED, 4);
+            button(done >= total ? "Session done" : "Start session", true, 0, v -> startLift());
         } else {
-            label("Today's session shows here once you open Exercise in the phone app today.", 12, MUTED, false);
+            ring.set(0f, MINT);
+            kicker("PERSONAL TRAINER", MINT, 0);
+            text("Today's session shows here once you open Exercise in the phone app today.", 13, MUTED, 6);
         }
-        label("CARDIO", 11, MINT, true);
-        for (String a : new String[] { "Walk", "Run", "Bike", "Other" }) button(a, false, v -> startCardio(a));
+        kicker("CARDIO", MINT, 18);
+        tile(R.drawable.ic_walk, "Walk", "Steps · heart rate", v -> startCardio("Walk"));
+        tile(R.drawable.ic_run, "Run", "Steps · heart rate", v -> startCardio("Run"));
+        tile(R.drawable.ic_bike, "Bike", "Heart rate", v -> startCardio("Bike"));
+        tile(R.drawable.ic_other, "Other", "Heart rate", v -> startCardio("Other"));
         int waiting = PhoneLink.waiting(this);
-        if (waiting > 0) label(waiting + " waiting to reach your phone", 11, MUTED, false);
+        if (waiting > 0) text(waiting + " waiting to reach your phone", 11, MUTED, 10);
     }
 
     // ---------------------------------------------------------------- CARDIO
@@ -142,18 +162,37 @@ public class MainActivity extends Activity {
         showCardio();
     }
 
-    private TextView clock, heart, extra, setLine, nextLine, restClock;
-    private Button endButton;
+    private TextView clock, nextLine, restClock, statA, statALabel, statB, statBLabel;
+    private TextView heartBpm, heartZone;
+    private LinearLayout heartRow;
+    private TextView endButton;
+    private long restTotalMs;
+
+    private void clearLive() {
+        clock = null; nextLine = null; restClock = null; statA = null; statB = null; statALabel = null; statBLabel = null;
+        heartBpm = null; heartZone = null; heartRow = null;
+    }
 
     private void showCardio() {
         screen = Screen.CARDIO;
         endArmedAt = 0;
         column.removeAllViews();
-        label(WorkoutService.LIVE.activity, 13, MINT, true);
-        clock = label("0:00", 34, Color.WHITE, true);
-        heart = label("", 18, Color.WHITE, false);
-        extra = label("", 13, MUTED, false);
-        endButton = button("End", false, v -> {
+        clearLive();
+        ring.set(0f, WatchStyle.HEART);
+        kicker(WorkoutService.LIVE.activity.toUpperCase(Locale.UK), MINT, 0);
+        clock = mono("0:00", 54, WatchStyle.NUM, 2);
+        heartRow(6);
+        LinearLayout stats = row(12);
+        LinearLayout a = stat(stats), b;
+        statA = (TextView) a.getChildAt(0); statALabel = (TextView) a.getChildAt(1);
+        View sep = new View(this);
+        sep.setBackgroundColor(WatchStyle.BORDER);
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(dp(1), dp(28));
+        sp.leftMargin = dp(16); sp.rightMargin = dp(16);
+        stats.addView(sep, sp);
+        b = stat(stats);
+        statB = (TextView) b.getChildAt(0); statBLabel = (TextView) b.getChildAt(1);
+        endButton = button("End", false, 0, v -> {
             long now = SystemClock.elapsedRealtime();
             if (now - endArmedAt < 3000) { endCardio(); return; }
             endArmedAt = now;
@@ -171,19 +210,22 @@ public class MainActivity extends Activity {
     private void showLogged() {
         screen = Screen.LOGGED;
         column.removeAllViews();
+        clearLive();
         WorkoutService.Live l = WorkoutService.LIVE;
         long ms = System.currentTimeMillis() - l.startedAt;
-        label(l.activity + " · " + duration(ms), 15, Color.WHITE, true);
+        kicker(l.activity.toUpperCase(Locale.UK), MINT, 0);
+        mono(duration(ms), 40, WatchStyle.NUM, 2);
         int zone = WorkoutService.mostlyZone();
+        ring.set(zone / 5f, WatchStyle.HEART);
         if (zone > 0) {
             String effort = zone <= 2 ? "easy" : zone == 3 ? "steady" : "hard";
-            label("Mostly zone " + zone + " · " + word(effort), 14, MINT, false);
-            button("Log it", true, v -> logCardio(effort, zone));
+            text("Mostly zone " + zone + " · " + word(effort), 14, FG, 6);
+            button("Log it", true, R.drawable.ic_check, v -> logCardio(effort, zone));
         } else {
-            label("How did it feel?", 14, MUTED, false);
-            for (String e : new String[] { "easy", "steady", "hard" }) button(word(e), false, v -> logCardio(e, 0));
+            text("How did it feel?", 14, MUTED, 6);
+            for (String e : new String[] { "easy", "steady", "hard" }) button(word(e), false, 0, v -> logCardio(e, 0));
         }
-        button("Don't log it", false, v -> showHome());
+        quiet("Don't log it", v -> showHome());
     }
 
     private void logCardio(String effort, int zone) {
@@ -203,10 +245,13 @@ public class MainActivity extends Activity {
             PhoneLink.send(this, e);
         } catch (Exception ignored) { /* our own object */ }
         column.removeAllViews();
+        clearLive();
         screen = Screen.DONE;
-        label("Sent to your phone", 15, MINT, true);
-        label("It's logged when the phone app has it.", 12, MUTED, false);
-        button("Done", false, v -> showHome());
+        ring.set(1f, MINT);
+        badge(R.drawable.ic_check);
+        title("Sent to your phone", 19, false, 10);
+        text("It's logged when the phone app has it.", 13, MUTED, 4);
+        button("Done", false, 0, v -> showHome());
     }
 
     // ---------------------------------------------------------------- LIFT
@@ -232,22 +277,32 @@ public class MainActivity extends Activity {
         return x.load == null || x.load.isEmpty() ? base : base + " @ " + x.load;
     }
 
+    /** Sets done today, of all the session's sets: the ring on the lifting screens. */
+    private float sessionFraction(TodayStore.Session s) {
+        if (s == null) return 0f;
+        int done = 0, total = 0;
+        for (TodayStore.Exercise x : s.exercises) { done += TodayStore.done(this, x); total += x.sets; }
+        return total > 0 ? done / (float) total : 0f;
+    }
+
     private void showLift() {
         screen = Screen.LIFT;
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         column.removeAllViews();
+        clearLive();
         TodayStore.Session s = TodayStore.read(this);
         TodayStore.Exercise x = s == null ? null : nextExercise(s);
         if (x == null) { showSessionDone(); return; }
+        ring.set(sessionFraction(s), MINT);
         int setNumber = TodayStore.done(this, x) + 1;
-        label("NEXT", 11, MINT, true);
-        label(x.name, 18, Color.WHITE, true);
-        label(prescription(x), 16, Color.WHITE, false);
-        setLine = label("Set " + setNumber + " of " + x.sets, 13, MUTED, false);
-        heart = label("", 15, Color.WHITE, false);
+        kicker("NEXT", MINT, 0);
+        title(x.name, 20, false, 2);
+        prescriptionRow(x, 6);
+        setDots(x, setNumber, 8);
+        heartRow(8);
         String rest = x.restSeconds > 0 ? " · rest " + duration(x.restSeconds * 1000L) : "";
-        button("Set done" + rest, true, v -> setDone(s, x));
-        button("End workout", false, v -> endLift());
+        button("Set done" + rest, true, R.drawable.ic_check, v -> setDone(s, x));
+        quiet("End workout", v -> endLift());
         redrawLive();
     }
 
@@ -268,6 +323,7 @@ public class MainActivity extends Activity {
         if (after == null || nextExercise(after) == null) { showSessionDone(); return; }
         if (x.restSeconds <= 0) { showLift(); return; }
         restEndsAt = SystemClock.elapsedRealtime() + x.restSeconds * 1000L;
+        restTotalMs = x.restSeconds * 1000L;
         restBuzzed = false;
         showRest();
     }
@@ -275,16 +331,17 @@ public class MainActivity extends Activity {
     private void showRest() {
         screen = Screen.REST;
         column.removeAllViews();
-        label("REST", 11, MINT, true);
-        restClock = label("", 40, Color.WHITE, true);
+        clearLive();
+        kicker("REST", WatchStyle.VIOLET, 0);
+        restClock = mono("", 60, WatchStyle.NUM, 2);
         TodayStore.Session s = TodayStore.read(this);
         TodayStore.Exercise x = s == null ? null : nextExercise(s);
         if (x != null) {
             int setNumber = TodayStore.done(this, x) + 1;
-            nextLine = label(setNumber == 1 ? "Next: " + x.name + " · " + prescription(x) : "Then set " + setNumber + " of " + x.sets + " · " + x.name, 13, MUTED, false);
+            nextLine = text(setNumber == 1 ? "Next: " + x.name + " · " + prescription(x) : "Then set " + setNumber + " of " + x.sets + " · " + x.name, 13, MUTED, 4);
         }
-        heart = label("", 15, Color.WHITE, false);
-        button("Start next set", true, v -> { restEndsAt = 0; showLift(); });
+        heartRow(8);
+        button("Start next set", true, 0, v -> { restEndsAt = 0; showLift(); });
         redrawLive();
         tick();
     }
@@ -292,9 +349,12 @@ public class MainActivity extends Activity {
     private void showSessionDone() {
         screen = Screen.DONE;
         column.removeAllViews();
-        label("Session done", 18, MINT, true);
-        label("Every set is ticked. Your phone saves them as its own ticks.", 12, MUTED, false);
-        button("End workout", true, v -> endLift());
+        clearLive();
+        ring.set(1f, MINT);
+        badge(R.drawable.ic_check);
+        title("Session done", 21, false, 10);
+        text("Every set is ticked. Your phone saves them as its own ticks.", 13, MUTED, 4);
+        button("End workout", true, 0, v -> endLift());
     }
 
     private void endLift() {
@@ -319,31 +379,48 @@ public class MainActivity extends Activity {
 
     private void redrawLive() {
         WorkoutService.Live l = WorkoutService.LIVE;
+        int zone = liveZone(l);
         if (screen == Screen.CARDIO && clock != null) {
             clock.setText(duration(System.currentTimeMillis() - l.startedAt));
-            List<String> parts = new ArrayList<>();
-            if (l.steps >= 0) parts.add(String.format(Locale.UK, "%,d steps", l.steps));
-            if (l.distanceM > 0) parts.add(String.format(Locale.UK, "%.2f km", l.distanceM / 1000));
-            extra.setText(String.join(" · ", parts));
+            if (l.steps >= 0) {
+                statA.setText(String.format(Locale.UK, "%,d", l.steps)); statALabel.setText("STEPS");
+                statB.setText(String.format(Locale.UK, "%.2f", Math.max(0, l.distanceM) / 1000)); statBLabel.setText("KM");
+            } else {
+                statA.setText(l.kcal > 0 ? String.format(Locale.UK, "%d", Math.round(l.kcal)) : "–"); statALabel.setText("KCAL");
+                statB.setText(l.maxBpm > 0 ? String.valueOf(l.maxBpm) : "–"); statBLabel.setText("MAX ♥");
+            }
+            // The edge carries the zone, zone N of 5 in the heart's colour.
+            ring.set(zone / 5f, WatchStyle.HEART);
         }
-        if (heart != null) heart.setText(heartLine(l));
+        drawHeart(l, zone);
         if (screen == Screen.REST && restClock != null) {
             long left = restEndsAt - SystemClock.elapsedRealtime();
             if (left <= 0) {
                 restClock.setText("Go");
+                restClock.setTextColor(MINT);
+                ring.set(1f, MINT);
                 if (!restBuzzed) { restBuzzed = true; buzz(); }
             } else {
                 restClock.setText(duration(left + 999));
+                ring.set(restTotalMs > 0 ? left / (float) restTotalMs : 0f, WatchStyle.VIOLET);
             }
         }
     }
 
-    /** "♥ 142 · Zone 3"; no zone when the phone shows none; nothing stale (the phone's five seconds). */
-    private String heartLine(WorkoutService.Live l) {
-        if (!l.running) return "";
-        if (l.bpm <= 0 || System.currentTimeMillis() - l.bpmAt > 5000) return "♥ –";
-        int zone = Zones.zoneOf(l.bpm, TodayStore.estimatedMax(this));
-        return zone > 0 ? "♥ " + l.bpm + " · Zone " + zone : "♥ " + l.bpm;
+    /** The live zone, or 0: none when the phone shows none, the reading is stale, or nothing is running. */
+    private int liveZone(WorkoutService.Live l) {
+        if (!l.running || l.bpm <= 0 || System.currentTimeMillis() - l.bpmAt > 5000) return 0;
+        return Zones.zoneOf(l.bpm, TodayStore.estimatedMax(this));
+    }
+
+    /** "♥ 142  ZONE 3"; no zone when the phone shows none; a dash, never a stale number (the phone's five seconds). */
+    private void drawHeart(WorkoutService.Live l, int zone) {
+        if (heartRow == null) return;
+        heartRow.setVisibility(l.running ? View.VISIBLE : View.INVISIBLE);
+        boolean fresh = l.bpm > 0 && System.currentTimeMillis() - l.bpmAt <= 5000;
+        heartBpm.setText(fresh ? String.valueOf(l.bpm) : "–");
+        heartZone.setVisibility(zone > 0 ? View.VISIBLE : View.GONE);
+        heartZone.setText("ZONE " + zone);
     }
 
     private void buzz() {
@@ -372,40 +449,222 @@ public class MainActivity extends Activity {
         if (!missing.isEmpty()) requestPermissions(missing.toArray(new String[0]), 7);
     }
 
-    // ---------------------------------------------------------------- drawing
+    // ---------------------------------------------------------------- drawing (WatchStyle: the app's own look)
 
-    private TextView label(String text, int sp, int color, boolean bold) {
+    private LinearLayout.LayoutParams wide(int topDp) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(topDp);
+        return lp;
+    }
+
+    private TextView text(String value, int sp, int color, int topDp) {
         TextView t = new TextView(this);
-        t.setText(text);
+        t.setText(value);
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
         t.setTextColor(color);
         t.setGravity(Gravity.CENTER);
-        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.topMargin = dp(4);
-        column.addView(t, lp);
+        t.setTypeface(WatchStyle.medium(this));
+        t.setLineSpacing(0, 1.1f);
+        column.addView(t, wide(topDp));
         return t;
     }
 
-    private Button button(String text, boolean primary, View.OnClickListener onClick) {
-        Button b = new Button(this);
-        b.setText(text);
-        b.setAllCaps(false);
-        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        b.setTextColor(primary ? INK : Color.WHITE);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(dp(26));
-        if (primary) bg.setColor(MINT); else { bg.setColor(Color.TRANSPARENT); bg.setStroke(dp(1), MUTED); }
-        b.setBackground(bg);
-        b.setMinHeight(dp(48));
+    /** The app's small capitals: semi-bold, widely spaced. */
+    private TextView kicker(String value, int color, int topDp) {
+        TextView t = text(value, 12, color, topDp);
+        t.setTypeface(WatchStyle.semibold(this));
+        t.setLetterSpacing(0.18f);
+        return t;
+    }
+
+    /** A heading; the app draws a session's last word in mint ("Upper Push & Core"). */
+    private TextView title(String value, int sp, boolean accentLastWord, int topDp) {
+        TextView t = text(value, sp, FG, topDp);
+        t.setTypeface(WatchStyle.bold(this));
+        t.setLineSpacing(0, 1.0f);
+        int cut = value.lastIndexOf(' ');
+        if (accentLastWord && cut > 0) {
+            SpannableString span = new SpannableString(value);
+            span.setSpan(new ForegroundColorSpan(MINT), cut + 1, value.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            t.setText(span);
+        }
+        return t;
+    }
+
+    /** A number: monospaced, so the clock does not shuffle as it runs. */
+    private TextView mono(String value, int sp, int color, int topDp) {
+        TextView t = text(value, sp, color, topDp);
+        t.setTypeface(WatchStyle.mono(this));
+        t.setIncludeFontPadding(false);
+        t.setLetterSpacing(-0.02f);
+        return t;
+    }
+
+    private LinearLayout row(int topDp) {
+        LinearLayout r = new LinearLayout(this);
+        r.setOrientation(LinearLayout.HORIZONTAL);
+        r.setGravity(Gravity.CENTER);
+        column.addView(r, wide(topDp));
+        return r;
+    }
+
+    private TextView inline(LinearLayout parent, CharSequence value, int sp, int color, Typeface face) {
+        TextView t = new TextView(this);
+        t.setText(value);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
+        t.setTextColor(color);
+        t.setTypeface(face);
+        t.setIncludeFontPadding(false);
+        parent.addView(t, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        return t;
+    }
+
+    /** A figure over its label ("3,912" / "STEPS"). */
+    private LinearLayout stat(LinearLayout parent) {
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
+        c.setGravity(Gravity.CENTER);
+        inline(c, "–", 20, FG, WatchStyle.mono(this));
+        TextView label = inline(c, "", 10, MUTED, WatchStyle.semibold(this));
+        label.setLetterSpacing(0.16f);
+        ((LinearLayout.LayoutParams) label.getLayoutParams()).topMargin = dp(3);
+        parent.addView(c);
+        return c;
+    }
+
+    /** "3 × 10 @ 100 kg": the reps in white, the weight in mint, its unit smaller. */
+    private void prescriptionRow(TodayStore.Exercise x, int topDp) {
+        LinearLayout r = row(topDp);
+        r.setGravity(Gravity.CENTER | Gravity.BOTTOM);
+        inline(r, x.sets + "×" + x.reps, 28, FG, WatchStyle.mono(this));
+        if (x.load == null || x.load.isEmpty()) return;
+        TextView at = inline(r, "@", 18, MUTED, WatchStyle.medium(this));
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) at.getLayoutParams();
+        lp.leftMargin = dp(7); lp.rightMargin = dp(7);
+        int space = x.load.indexOf(' ');
+        SpannableString load = new SpannableString(x.load);
+        if (space > 0) load.setSpan(new android.text.style.RelativeSizeSpan(0.5f), space, x.load.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        inline(r, load, 28, MINT, WatchStyle.mono(this));
+    }
+
+    /** One dot a set, the done ones lit, and "Set 2 of 3". */
+    private void setDots(TodayStore.Exercise x, int setNumber, int topDp) {
+        LinearLayout r = row(topDp);
+        for (int i = 1; i <= Math.min(x.sets, 8); i++) {
+            View dot = new View(this);
+            android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+            g.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            g.setColor(i < setNumber ? MINT : i == setNumber ? FG : WatchStyle.BORDER);
+            dot.setBackground(g);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(7), dp(7));
+            lp.rightMargin = dp(5);
+            r.addView(dot, lp);
+        }
+        TextView t = inline(r, "Set " + setNumber + " of " + x.sets, 13, MUTED, WatchStyle.medium(this));
+        ((LinearLayout.LayoutParams) t.getLayoutParams()).leftMargin = dp(4);
+    }
+
+    /** The heart, its number and its zone chip, drawn by drawHeart. */
+    private void heartRow(int topDp) {
+        heartRow = row(topDp);
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.drawable.ic_heart);
+        icon.setImageTintList(android.content.res.ColorStateList.valueOf(WatchStyle.HEART));
+        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(20), dp(20));
+        ip.rightMargin = dp(7);
+        heartRow.addView(icon, ip);
+        heartBpm = inline(heartRow, "–", 22, FG, WatchStyle.mono(this));
+        heartZone = inline(heartRow, "", 10, WatchStyle.HEART, WatchStyle.semibold(this));
+        heartZone.setLetterSpacing(0.14f);
+        heartZone.setPadding(dp(8), dp(3), dp(8), dp(3));
+        heartZone.setBackground(WatchStyle.chip(WatchStyle.HEART, dp(20), dp(1)));
+        ((LinearLayout.LayoutParams) heartZone.getLayoutParams()).leftMargin = dp(9);
+        heartZone.setVisibility(View.GONE);
+    }
+
+    /** The app's pill: mint and lit for the main action, an outline for the rest. */
+    private TextView button(String label, boolean primary, int icon, View.OnClickListener onClick) {
+        TextView b = new TextView(this);
+        b.setText(label);
+        b.setGravity(Gravity.CENTER);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, primary ? 16 : 15);
+        b.setTypeface(WatchStyle.bold(this));
+        b.setTextColor(primary ? WatchStyle.ON_MINT : FG);
+        b.setBackground(primary ? WatchStyle.primaryPill(dp(28)) : WatchStyle.ghostPill(dp(28), dp(1.5f)));
+        b.setMinHeight(dp(primary ? 52 : 46));
+        b.setPadding(dp(20), 0, dp(20), 0);
+        b.setClickable(true);
+        b.setFocusable(true);
         b.setOnClickListener(onClick);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.topMargin = dp(8);
-        column.addView(b, lp);
+        if (icon != 0) {
+            android.graphics.drawable.Drawable d = getDrawable(icon);
+            if (d != null) {
+                d = d.mutate();
+                d.setTint(primary ? WatchStyle.ON_MINT : FG);
+                d.setBounds(0, 0, dp(18), dp(18));
+                b.setCompoundDrawables(d, null, null, null);
+                b.setCompoundDrawablePadding(dp(8));
+            }
+        }
+        if (primary) {
+            // The app's mint glow, as the button's own shadow.
+            b.setElevation(dp(10));
+            b.setOutlineSpotShadowColor(MINT);
+            b.setOutlineAmbientShadowColor(MINT);
+        }
+        column.addView(b, wide(14));
         return b;
     }
 
-    private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
+    /** A small text action at the foot ("End workout", "Don't log it"). */
+    private TextView quiet(String label, View.OnClickListener onClick) {
+        TextView t = text(label, 13, MUTED, 8);
+        t.setTypeface(WatchStyle.semibold(this));
+        t.setMinHeight(dp(40));
+        t.setGravity(Gravity.CENTER);
+        t.setClickable(true);
+        t.setOnClickListener(onClick);
+        return t;
+    }
+
+    /** A cardio choice: the app's icon in a mint disc, the name, and what it records. */
+    private void tile(int icon, String name, String sub, View.OnClickListener onClick) {
+        LinearLayout t = new LinearLayout(this);
+        t.setOrientation(LinearLayout.HORIZONTAL);
+        t.setGravity(Gravity.CENTER_VERTICAL);
+        t.setPadding(dp(12), dp(10), dp(14), dp(10));
+        t.setBackground(WatchStyle.tile(dp(24), dp(1)));
+        t.setClickable(true);
+        t.setOnClickListener(onClick);
+        ImageView ic = new ImageView(this);
+        ic.setImageResource(icon);
+        ic.setImageTintList(android.content.res.ColorStateList.valueOf(MINT));
+        ic.setBackground(WatchStyle.iconDisc(MINT));
+        ic.setPadding(dp(8), dp(8), dp(8), dp(8));
+        t.addView(ic, new LinearLayout.LayoutParams(dp(36), dp(36)));
+        LinearLayout words = new LinearLayout(this);
+        words.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams wp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        wp.leftMargin = dp(12);
+        t.addView(words, wp);
+        inline(words, name, 16, FG, WatchStyle.bold(this));
+        inline(words, sub, 11, MUTED, WatchStyle.medium(this));
+        column.addView(t, wide(8));
+    }
+
+    /** A large icon in a mint disc, for a finished screen. */
+    private void badge(int icon) {
+        ImageView ic = new ImageView(this);
+        ic.setImageResource(icon);
+        ic.setImageTintList(android.content.res.ColorStateList.valueOf(MINT));
+        ic.setBackground(WatchStyle.iconDisc(MINT));
+        ic.setPadding(dp(12), dp(12), dp(12), dp(12));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(52), dp(52));
+        lp.gravity = Gravity.CENTER_HORIZONTAL;
+        column.addView(ic, lp);
+    }
+
+    private int dp(float v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 
     static String duration(long ms) {
         long s = Math.max(0, ms / 1000);

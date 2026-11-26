@@ -1841,6 +1841,9 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   Start next set; no weight typed on the watch. The phone saves a watch set by pressing the row's own tick on Exercise,
   and its heart rate goes into the strap's store. `test:watch-app`, `verify:watch-sets`, `docs/plans/watch-app.md`.
   Compiled first time and installed on his Galaxy Watch 7 (Wear OS 6), 27 Nov 2026; he said "it worked" (relayed)
+  **And it looks like the app (his "the watch needs to look more high end", 27 Nov 2026)**: the app's own colours (held
+  equal to its tokens), fonts and icons, mint glow pills, and a ring round the edge for sets, rest and the heart rate's
+  zone. `test:watch-app` §5, `docs/design/watch/watch-look-2026-11-27.png`
 - **A logged activity can be taken off after its Undo has gone: his report 27 Nov 2026** ("I accidentally added a walk
   today. Remove it"): the row offers Remove and leaves "Walk · 5 min · Easy removed · Undo"; the coach has
   `propose_cardio_remove` (the card names the log, Apply, Undo), and its exercise removal aimed at a log becomes that
