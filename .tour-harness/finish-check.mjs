@@ -108,6 +108,16 @@ check(`2h. THE CARD SAYS IT IS DONE, WITH THE COUNT: "✓ Done · ${H.sets} of $
 // THE WEEK KNOWS TOO: today's strip cell is done, and says the same count.
 const todayCellLabel = await ev(`(() => { const d = window.__fakeDb?.workout_sessions?.[0]?.date; if (!d) return null; const name = new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long' }); return [...document.querySelectorAll('[aria-label]')].map(e => e.getAttribute('aria-label')).find(t => t.startsWith(name + ': ')) ?? null })()`)
 check(`2h2. the strip's cell for today now says it is done, with the same count: "done, ${H.sets} of ${N} sets"`, typeof todayCellLabel === 'string' && todayCellLabel.endsWith(`: done, ${H.sets} of ${N} sets`), todayCellLabel)
+// A WALK LOGGED AFTER FINISH IS ON THE CARD WHEN IT OPENS AGAIN (his report 27 Nov 2026, "if I log more than one walk
+// in a day it doesn't get added": the card's cardio list was saved at Finish).
+await ev(`(() => { const d = window.__fakeDb?.workout_sessions?.[0]?.date; window.__fakeDb.cardio_logs ??= []; window.__fakeDb.cardio_logs.push({ id: 'late-walk', user_id: window.__fakeDb.workout_sessions[0].profile_id, date: d, activity_name: 'Walk', duration_minutes: 23, intensity_rpe: 3, completed_at: d + 'T18:00:00Z' }) })()`)
+await tapExpr(q('[data-testid="session-finished"]'))
+await until(`[...document.querySelectorAll('[role="dialog"] h2')].some(h => /^Session (complete|saved)$/.test(h.textContent))`, 8000)
+await wait(1200)
+const reopened = await summary()
+check('2h3. a walk logged after Finish is on the card when it opens again', /Walk · 23 min/.test(reopened?.text ?? ''), reopened?.text)
+await escape()
+await wait(400)
 check('2i. ...and neither Start nor Finish is offered beside it', (await ev(`!!${byText('Start session')}`)) === false && (await ev(`!!${byText('Finish session')}`)) === false)
 // FINISHED SHORT, NOTHING IS "NEXT" (1 Nov 2026, whole-app test #6): the line under the card still coached the next
 // set and a lift still wore NOW, as if she had not ended the session.

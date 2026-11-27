@@ -35,6 +35,8 @@ export const LOOK_BACK_HOURS = 48
 const COVERED_SHARE = 0.5
 /** A typed log of the same activity that day counts as the same workout within this share of its length. */
 const SAME_LENGTH_SHARE = 0.25
+/** An unfinished weights session holds this long from its start, not for ever (a second walk later that day is his). */
+const OPEN_SESSION_HOLD_MS = 2 * 3600 * 1000
 
 export function isWatchWorkoutsConnected(): boolean {
   try { return localStorage.getItem(WATCH_WORKOUTS_CONNECTED_KEY) === '1' } catch { return false }
@@ -118,8 +120,9 @@ function heldWindows(cardio: readonly HeldCardio[], sessions: readonly HeldSessi
     const started = ms(s.started_at)
     if (!Number.isFinite(started)) continue
     const finished = ms(s.finished_at)
-    // A session still running holds everything from its start.
-    out.push({ start: started, end: Number.isFinite(finished) ? finished : now.getTime() })
+    // A session still running holds from its start, for two hours at most (his report 27 Nov 2026, "if I log more than
+    // one walk in a day it doesn't get added": a weights session never finished hid every watch workout after it).
+    out.push({ start: started, end: Number.isFinite(finished) ? finished : Math.min(now.getTime(), started + OPEN_SESSION_HOLD_MS) })
   }
   return out
 }
@@ -147,7 +150,10 @@ export function watchOffers(p: {
     const covered = windows.reduce((most, win) => Math.max(most, Math.min(end, win.end) - Math.max(start, win.start)), 0)
     if (covered >= (end - start) * COVERED_SHARE) return false
     const name = watchActivityName(w.type).toLowerCase(), date = localDateOf(w.start)
-    const typedTheSame = p.cardio.some(c => (c.activity_name ?? '').trim().toLowerCase() === name && c.date === date
+    // ONLY A LOG WITH NO TIME OF ITS OWN (as the header says): a recorded walk knows when it was, and the window check
+    // above already holds it, so a second walk of about the same length later in the day is a walk of its own (his
+    // report 27 Nov 2026: a second walk "doesn't get added").
+    const typedTheSame = p.cardio.some(c => !Number.isFinite(ms(c.started_at)) && (c.activity_name ?? '').trim().toLowerCase() === name && c.date === date
       && Math.abs(c.duration_minutes - minutes) <= Math.max(2, minutes * SAME_LENGTH_SHARE))
     return !typedTheSame
   }).sort((a, b) => ms(b.end) - ms(a.end))

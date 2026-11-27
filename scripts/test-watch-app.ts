@@ -189,6 +189,12 @@ async function main() {
   check('...the open workout on the phone is closed', rec.readRecording() === null)
   const r3 = await applyWatchEvents([{ ...end, id: 'c3' }], ctx)
   check('THE SAME WORKOUT IS NEVER LOGGED TWICE (ended on the phone too, or sent again)', r3.logged === 0 && (await getCardioLogsForDateMerged('p1', '2026-11-27')).filter(l => l.activity_name === 'Walk').length === 1)
+  // A START EVENT THAT ARRIVES LATE never re-opens a walk already logged (27 Nov 2026: it blocked the next walk).
+  await applyWatchEvents([{ id: 'c1late', type: 'cardio-start', activity: 'Walk', startedAt }], ctx)
+  check('a late "started" for a walk already logged does not open it again on the phone', rec.readRecording() === null, rec.readRecording())
+  const r3b = await applyWatchEvents([{ ...end, id: 'c3b', startedAt: startedAt + 5 * 3600_000, endedAt: startedAt + 5 * 3600_000 + 30 * 60_000 }], ctx)
+  check('A SECOND WALK THE SAME DAY IS LOGGED (his report 27 Nov 2026: "it doesn\'t get added")',
+    r3b.logged === 1 && (await getCardioLogsForDateMerged('p1', '2026-11-27')).filter(l => l.activity_name === 'Walk').length === 2)
   rec.writeRecording({ activity: 'Bike', startedAt: new Date().toISOString() })
   await applyWatchEvents([{ ...end, id: 'c4', activity: 'Run', startedAt: startedAt + 3 * 3600_000, endedAt: startedAt + 3.5 * 3600_000 }], ctx)
   check('logging a watch workout leaves a different open workout on the phone as it was', rec.readRecording()?.activity === 'Bike')

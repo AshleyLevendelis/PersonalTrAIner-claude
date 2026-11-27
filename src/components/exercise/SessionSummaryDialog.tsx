@@ -14,6 +14,8 @@ import { personalBest, BEST_SET_QUALIFIER, noSetsButCardio, extraSetsNote } from
 import type { DoubleProgressionRecommendation } from '@/lib/progression-engine'
 import { useEffect, useState } from 'react'
 import { readSessionCalories, subscribeSessionCalories } from '@/lib/session-calories'
+import { readCardioLogsForDate, subscribeCardioLogStore } from '@/lib/cardio-log-store'
+import { cardioLine } from '@/lib/cardio-lines'
 import { recordSessionEffort, readSessionEffort, effortWord, EFFORT_MIN, EFFORT_MAX } from '@/lib/session-feel'
 
 export interface SessionSummaryData {
@@ -70,6 +72,18 @@ export function SessionSummaryDialog({
     const off = subscribeSessionCalories(load)
     return () => { live = false; off() }
   }, [open, who, day])
+  // THE DAY'S CARDIO AS IT STANDS (his report 27 Nov 2026: a second walk "doesn't get added"): the card's list was
+  // saved at Finish, so a walk logged after it never appeared. Read again when the card opens and when a log lands.
+  const [liveCardio, setLiveCardio] = useState<string[] | null>(null)
+  useEffect(() => {
+    if (!open || !who || !day) return
+    let live = true
+    const load = () => { void readCardioLogsForDate(who, day).then(r => { if (live) setLiveCardio(r.rows.map(cardioLine)) }).catch(() => {}) }
+    load()
+    const off = subscribeCardioLogStore(load)
+    return () => { live = false; off() }
+  }, [open, who, day])
+  const cardioLines = liveCardio ?? data?.cardio ?? []
   const progressionLines = (data?.progressions ?? []).filter((entry): entry is readonly [string, { note: string; didProgress: boolean }] => entry[1] != null)
 
   return (
@@ -143,10 +157,10 @@ export function SessionSummaryDialog({
 
             {effortFor && open && <EffortRow profileId={effortFor.profileId} date={effortFor.date} />}
 
-            {(data.cardio?.length ?? 0) > 0 && (
+            {cardioLines.length > 0 && (
               <div className="space-y-1.5" data-testid="summary-cardio">
                 <p className="ds-label-compact">Cardio</p>
-                {data.cardio!.map((line, i) => <p key={i} className="text-sm">{line}</p>)}
+                {cardioLines.map((line, i) => <p key={i} className="text-sm">{line}</p>)}
               </div>
             )}
 
