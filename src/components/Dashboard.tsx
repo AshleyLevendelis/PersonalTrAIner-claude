@@ -47,6 +47,7 @@ const SessionSummaryDialog = lazyWithReload(() => import('@/components/exercise/
 // meals now, and is up one day a week; first paint does not wait for it.
 // AMBIENT: it appears on its own day, nobody taps to open it, so with its file missing Home draws nothing in its place.
 const WeightHistory = lazyWithReload(() => import('@/components/WeightHistory').then(m => ({ default: m.WeightHistory })))
+const WatchSetsWaiting = lazyWithReload(() => import('@/components/WatchSetsWaiting'), { ambient: true })
 const WatchWorkoutsCard = lazyWithReload(() => import('@/components/WatchWorkoutsCard').then(m => ({ default: m.WatchWorkoutsCard })))
 const SleepRow = lazyWithReload(() => import('@/components/SleepRow').then(m => ({ default: m.SleepRow })), { ambient: true })
 const ShopDayCard = lazyWithReload(() => import('@/components/ShopDayCard').then(m => ({ default: m.ShopDayCard })), { ambient: true })
@@ -683,6 +684,13 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           <HomeWeekBoundaryNote days={week.days} todayDate={activeSession.date} />
         </>}
       />
+
+      {/* 2a. SETS FROM THE WATCH, WAITING (27 Nov 2026): saved by Exercise's own ticks, so Home says they are waiting. */}
+      {isPhoneApp() && (
+        <Suspense fallback={null}>
+          <WatchSetsWaiting today={activeSession.date} />
+        </Suspense>
+      )}
 
       {/* 2b. FROM YOUR WATCH (26 Nov 2026; watch-workouts.ts): a workout the watch recorded that the app does not hold,
           offered under today's card. Mounted only in the phone app with its switch on; draws nothing with no offer. */}
