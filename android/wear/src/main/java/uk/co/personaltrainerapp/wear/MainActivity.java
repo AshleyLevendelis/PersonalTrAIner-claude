@@ -295,7 +295,7 @@ public class MainActivity extends Activity {
         hideEdge();
         clearLive();
         WorkoutService.Live l = WorkoutService.LIVE;
-        long ms = System.currentTimeMillis() - l.startedAt;
+        long ms = (l.endedAt > 0 ? l.endedAt : System.currentTimeMillis()) - l.startedAt;
         kicker((l.display.isEmpty() ? l.activity : l.display).toUpperCase(Locale.UK), MINT, 0);
         mono(duration(ms), 40, WatchStyle.NUM, 2);
         int zone = WorkoutService.mostlyZone();
@@ -318,7 +318,8 @@ public class MainActivity extends Activity {
             e.put("type", "cardio-end");
             e.put("activity", l.activity);
             e.put("startedAt", l.startedAt);
-            e.put("endedAt", System.currentTimeMillis());
+            // When End was tapped, not when Log was (27 Nov 2026): the summary screen is not part of the walk.
+            e.put("endedAt", l.endedAt > 0 ? l.endedAt : System.currentTimeMillis());
             e.put("effort", effort);
             if (zone > 0) e.put("zone", zone);
             if (l.steps >= 0) e.put("steps", l.steps);
@@ -464,6 +465,7 @@ public class MainActivity extends Activity {
     }
 
     private void hideEdge() {
+        column.setClipToPadding(true); // every screen but the − / + one keeps inside the side padding
         if (edgeBtn == null) return;
         edgeBtn.setVisibility(View.GONE);
         edgeBtn.setOnClickListener(null);
@@ -490,16 +492,17 @@ public class MainActivity extends Activity {
 
     /** A big round − or + (58dp: a gloved, sweaty thumb's size). */
     private void round(LinearLayout parent, String label, View.OnClickListener onClick) {
+        // 56dp, and the row out by 8dp a side: about 14dp clear of the ring at the face's edge.
         TextView t = new TextView(this);
         t.setText(label);
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26);
         t.setTypeface(WatchStyle.bold(this));
         t.setTextColor(FG);
         t.setGravity(Gravity.CENTER);
-        t.setBackground(WatchStyle.ghostPill(dp(29), dp(1.5f)));
+        t.setBackground(WatchStyle.ghostPill(dp(28), dp(1.5f)));
         t.setClickable(true);
         t.setOnClickListener(onClick);
-        parent.addView(t, new LinearLayout.LayoutParams(dp(58), dp(58)));
+        parent.addView(t, new LinearLayout.LayoutParams(dp(56), dp(56)));
     }
 
     private void setDone(TodayStore.Session s, TodayStore.Exercise x) {
@@ -618,10 +621,14 @@ public class MainActivity extends Activity {
         kicker(kg ? "WEIGHT" : (LiftFlow.timed(x.reps) ? "TIME" : "REPS"), MINT, 0);
         text(x.name, 13, MUTED, 2).setMaxLines(1);
         // − THE NUMBER +, on one line across the widest part of the face, so both buttons are big and the number
-        // never wraps (28 Nov 2026).
+        // never wraps (28 Nov 2026). Out by 8dp a side, not 16 (27 Nov 2026, the drawn screens): at 16
+        // the buttons' outer edges came within about 7dp of the ring; now about 10dp clear of it.
+        // The column clips what reaches into its side padding, which cut the buttons off at the sides (27 Nov 2026, the
+        // drawn screens): on this screen alone it draws there. hideEdge, which every screen calls, puts it back.
+        column.setClipToPadding(false);
         LinearLayout r = row(8);
-        ((LinearLayout.LayoutParams) r.getLayoutParams()).leftMargin = -dp(16);
-        ((LinearLayout.LayoutParams) r.getLayoutParams()).rightMargin = -dp(16);
+        ((LinearLayout.LayoutParams) r.getLayoutParams()).leftMargin = -dp(8);
+        ((LinearLayout.LayoutParams) r.getLayoutParams()).rightMargin = -dp(8);
         round(r, "−", v -> stepEdit(-1));
         LinearLayout value = new LinearLayout(this);
         value.setOrientation(LinearLayout.VERTICAL);
@@ -717,12 +724,12 @@ public class MainActivity extends Activity {
         clearLive();
         ring.set(1f, MINT);
         badge(R.drawable.ic_check);
-        title("Session done", 21, false, 10);
+        title("Session done", 21, false, 6);
         TodayStore.Session s = TodayStore.read(this);
         boolean movedOn = false;
         if (s != null) for (TodayStore.Exercise e : s.exercises) if (TodayStore.skipped(this, e) && TodayStore.done(this, e) < e.sets) movedOn = true;
-        text(movedOn ? "Sets you moved on from stay open on your phone. Your phone saves the rest as its own ticks."
-            : "Every set is ticked. Your phone saves them as its own ticks.", 13, MUTED, 4);
+        // ONE SHORT LINE (27 Nov 2026, the drawn screens): the old sentence ran three lines and under the End button.
+        text(movedOn ? "Sets you moved on from stay open on your phone." : "Every set is on your phone.", 13, MUTED, 4);
         edge("End workout", 0, v -> endLift());
         if (movedOn) quiet("All exercises", v -> showList());
         // The last set of the session can be undone too (27 Nov 2026 review): it is the one most often mis-tapped.

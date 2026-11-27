@@ -20,6 +20,8 @@ public class TodayListenerService extends WearableListenerService {
                 if (WorkoutService.LIVE.running && "lift".equals(WorkoutService.LIVE.kind) && TodayStore.finishedToday(json)) WorkoutService.end(this);
             }
         }
+        // THE PHONE IS IN REACH (it just sent this): whatever waited on the watch goes now, not at the next event.
+        PhoneLink.flush(this);
         MainActivity.refreshIfOpen();
     }
 }

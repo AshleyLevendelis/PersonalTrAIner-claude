@@ -187,23 +187,26 @@ export function ExerciseTab({
    * balancing will change on other days. The same reason TodayPanel trials the
    * real removal rather than predicting it.
    *
-   * Scoped to 'today': the sentence is about the week in front of the person,
-   * and the block-wide scope does the same thing to each of its weeks.
+   * TWO TRIALS, ONE PER CHOICE (gym dry run, 28 Nov 2026): a just-today swap
+   * moves no other day, so the evening-out sentence ("I'll also trim...") is
+   * the whole-block swap's alone, read off a whole-block trial and drawn under
+   * that choice. The cost line is the just-today trial's: what one session
+   * does to the week with nothing evened out. Both read the week in front of
+   * the person; the block-wide scope does the same thing to each of its weeks.
    */
   const swapImpact = useCallback(async (candidate: ExerciseEntry) => {
     const nothing = { cost: null, balancing: null }
     if (!swapTarget || !profile || !mesocycle) return nothing
     const weekNumber = swapTarget.weekNumber ?? liveWeek
-    const after = await swapExerciseInMesocycle({
+    const trial = (scope: SwapScope) => swapExerciseInMesocycle({
       mesocycle, profile, currentWeekNumber: weekNumber,
       dayName: swapTarget.dayName, exIndex: swapTarget.exIndex,
-      newExercise: candidate, scope: 'today',
+      newExercise: candidate, scope,
     })
-    return describeEditImpact(
-      mesocycle.find(w => w.week_number === weekNumber),
-      after.find(w => w.week_number === weekNumber),
-      swapTarget.dayName,
-    )
+    const [today, block] = await Promise.all([trial('today'), trial('permanent')])
+    const before = mesocycle.find(w => w.week_number === weekNumber)
+    const impactOf = (after: MesocycleWeek[]) => describeEditImpact(before, after.find(w => w.week_number === weekNumber), swapTarget.dayName)
+    return { cost: impactOf(today).cost, balancing: impactOf(block).balancing }
   }, [swapTarget, profile, mesocycle, liveWeek])
 
   // THE TWO APPLIERS LIVE IN A MODULE OF THEIR OWN, loaded on the tap.

@@ -55,4 +55,7 @@ dependencies {
     // ListenableFuture, which Health Services returns.
     implementation "com.google.guava:guava:33.3.1-android"
     implementation "androidx.core:core:$androidxCoreVersion"
+    // The workout on the watch face and in the recent apps while it runs (an "ongoing activity", as Samsung's own
+    // workouts do), 27 Nov 2026.
+    implementation "androidx.wear:wear-ongoing:1.0.0"
 }

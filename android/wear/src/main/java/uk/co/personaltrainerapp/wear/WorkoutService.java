@@ -22,6 +22,8 @@ import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.ServiceCompat;
 import androidx.core.content.ContextCompat;
+import androidx.wear.ongoing.OngoingActivity;
+import androidx.wear.ongoing.Status;
 import androidx.health.services.client.ExerciseClient;
 import androidx.health.services.client.ExerciseUpdateCallback;
 import androidx.health.services.client.HealthServices;
@@ -98,6 +100,11 @@ public class WorkoutService extends Service {
         String kind = "";
         String activity = "";
         long startedAt;
+        /**
+         * When End was tapped (wall clock), 0 while running. THE WORKOUT ENDS THERE (27 Nov 2026, the cardio tail): the
+         * summary, the logged time and the zones read this, never the moment Log was tapped a while later.
+         */
+        long endedAt;
         int bpm;
         long bpmAt;
         long steps = -1;      // -1: not recorded for this activity
@@ -148,7 +155,11 @@ public class WorkoutService extends Service {
         ContextCompat.startForegroundService(c, i);
     }
 
-    static void end(Context c) {
+    static void end(Context c) { endAt(c, System.currentTimeMillis()); }
+
+    /** End the workout as of `wallMs` (an idle weights workout ends at its last set or rest, not when it was noticed). */
+    static void endAt(Context c, long wallMs) {
+        if (LIVE.running && LIVE.endedAt == 0) LIVE.endedAt = wallMs;
         c.startService(new Intent(c, WorkoutService.class).setAction(ACTION_END));
     }
 
@@ -228,6 +239,7 @@ public class WorkoutService extends Service {
             goForeground(activity);
             onFootPlanned = intent.getBooleanExtra(EXTRA_ON_FOOT, false);
             begin(kind == null ? "cardio" : kind, activity == null ? "Workout" : activity);
+            showRunning(); // again, now the workout's start is known: the face's clock counts from it
             if (intent.getIntExtra(EXTRA_MINUTES, 0) > 0) scheduleProgram();
         } else if (ACTION_END.equals(action)) {
             finish();
@@ -257,9 +269,41 @@ public class WorkoutService extends Service {
                 .setContentText(text)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
+                .setCategory(NotificationCompat.CATEGORY_WORKOUT)
                 .setContentIntent(open);
         if (countdownTo > 0) b.setWhen(countdownTo).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true);
+        // ON THE WATCH FACE WHILE IT RUNS (27 Nov 2026, the watch leftovers): an ongoing activity puts the workout's
+        // icon on the face and at the top of the recent apps, one tap back into it, as Samsung's own workouts do. It
+        // shows the workout's clock, or the rest counting down. A failure here never costs the notification.
+        try {
+            long now = SystemClock.elapsedRealtime();
+            boolean resting = LIVE.restEndsAt > now;
+            Status status = resting
+                    ? new Status.Builder().addTemplate("Rest #time#").addPart("time", new Status.TimerPart(LIVE.restEndsAt)).build()
+                    : new Status.Builder().addTemplate("#type# #time#")
+                        .addPart("type", new Status.TextPart(title == null ? "Workout" : title))
+                        .addPart("time", new Status.StopwatchPart(now - (System.currentTimeMillis() - LIVE.startedAt))).build();
+            new OngoingActivity.Builder(this, NOTIFICATION_ID, b)
+                    .setStaticIcon(iconFor(LIVE.kind, LIVE.activity))
+                    .setTouchIntent(open)
+                    .setCategory(NotificationCompat.CATEGORY_WORKOUT)
+                    .setStatus(status)
+                    .build()
+                    .apply(this);
+        } catch (Exception e) {
+            Log.w(TAG, "ongoing activity", e);
+        }
         return b.build();
+    }
+
+    /** The workout's own icon (the home screen's): weights, walk, run, bike, else the general one. */
+    static int iconFor(String kind, String activity) {
+        if ("lift".equals(kind)) return R.drawable.ic_lift;
+        String a = activity == null ? "" : activity.toLowerCase(java.util.Locale.UK);
+        if (a.matches(".*\\b(run|jog|sprint).*")) return R.drawable.ic_run;
+        if (a.matches(".*\\b(walk|hik).*")) return R.drawable.ic_walk;
+        if (a.matches(".*\\b(bike|cycl|spin).*")) return R.drawable.ic_bike;
+        return R.drawable.ic_other;
     }
 
     private void notify(String title, String text, long countdownTo) {
@@ -269,7 +313,7 @@ public class WorkoutService extends Service {
 
     private void begin(String kind, String activity) {
         Live l = LIVE;
-        l.running = true; l.kind = kind; l.activity = activity; l.startedAt = System.currentTimeMillis();
+        l.running = true; l.kind = kind; l.activity = activity; l.startedAt = System.currentTimeMillis(); l.endedAt = 0;
         l.bpm = 0; l.bpmAt = 0; l.maxBpm = 0; l.sumBpm = 0; l.readings = 0; l.lastZoneAt = 0; l.lastZone = 0;
         java.util.Arrays.fill(l.zoneMs, 0);
         boolean onFoot = "cardio".equals(kind) && ("Walk".equals(activity) || "Run".equals(activity) || onFootPlanned);
@@ -346,6 +390,7 @@ public class WorkoutService extends Service {
 
     private final ExerciseUpdateCallback callback = new ExerciseUpdateCallback() {
         @Override public void onExerciseUpdateReceived(@NonNull ExerciseUpdate update) {
+            if (!LIVE.running && !finishing) return;
             DataPointContainer m = update.getLatestMetrics();
             Instant boot = Instant.ofEpochMilli(System.currentTimeMillis() - SystemClock.elapsedRealtime());
             List<SampleDataPoint<Double>> hr = m.getData(DataType.HEART_RATE_BPM);
@@ -356,11 +401,15 @@ public class WorkoutService extends Service {
             if (distance != null && LIVE.distanceM >= 0) LIVE.distanceM = distance.getTotal();
             CumulativeDataPoint<Double> kcal = m.getData(DataType.CALORIES_TOTAL);
             if (kcal != null) LIVE.kcal = kcal.getTotal();
-            sendBatch(false);
+            sendBatch(finishing);
             changed();
-            if ("lift".equals(LIVE.kind) && LIVE.running && SystemClock.elapsedRealtime() - LIVE.lastActionAt > LIFT_IDLE_END_MS) {
+            // THE WATCH'S LAST READINGS ARRIVE AFTER END (27 Nov 2026, the cardio tail): it hands over what it still
+            // held with the ended update, so the service listens until then and sends them, calories included.
+            if (finishing && update.getExerciseStateInfo().getState().isEnded()) { main.removeCallbacks(stopNow); stopNow.run(); return; }
+            long idle = SystemClock.elapsedRealtime() - LIVE.lastActionAt;
+            if ("lift".equals(LIVE.kind) && LIVE.running && idle > LIFT_IDLE_END_MS) {
                 Log.i(TAG, "weights workout idle, ending it");
-                end(WorkoutService.this);
+                endAt(WorkoutService.this, System.currentTimeMillis() - idle);
             }
         }
         @Override public void onLapSummaryReceived(@NonNull ExerciseLapSummary summary) {}
@@ -372,6 +421,7 @@ public class WorkoutService extends Service {
     private void onHeartRate(int bpm, long at) {
         if (bpm < 30 || bpm > 230) return; // the phone's own believable range (heart-series.ts)
         Live l = LIVE;
+        if (l.endedAt > 0 && at > l.endedAt) return; // after End: not part of the workout
         if (l.lastZone > 0 && at > l.lastZoneAt) l.zoneMs[l.lastZone - 1] += Math.min(at - l.lastZoneAt, LONGEST_HOLD_MS);
         int z = Zones.zoneOf(bpm, estimatedMax);
         l.lastZone = z; l.lastZoneAt = at;
@@ -382,7 +432,8 @@ public class WorkoutService extends Service {
     /** Heart rate goes to the phone every few seconds, as one event. */
     private void sendBatch(boolean force) {
         long now = SystemClock.elapsedRealtime();
-        if (pending.length() == 0 || (!force && now - lastBatchAt < (appVisible ? BATCH_VISIBLE_MS : BATCH_HIDDEN_MS))) return;
+        // The last message goes even with no new readings: it carries the workout's final calories.
+        if ((pending.length() == 0 && !(force && finishing)) || (!force && now - lastBatchAt < (appVisible ? BATCH_VISIBLE_MS : BATCH_HIDDEN_MS))) return;
         lastBatchAt = now;
         try {
             JSONObject e = new JSONObject();
@@ -394,20 +445,29 @@ public class WorkoutService extends Service {
             e.put("startedAt", LIVE.startedAt);
             e.put("date", TodayStore.today());
             if (LIVE.kcal > 0) e.put("kcal", Math.round(LIVE.kcal));
+            if (finishing) e.put("final", true); // the workout's last count: the phone saves it at once
             e.put("samples", new JSONArray(pending.toString()));
             PhoneLink.send(this, e);
         } catch (Exception ignored) { /* our own object */ }
         while (pending.length() > 0) pending.remove(0);
     }
 
+    /** Between End and the watch's ended update: still listening for the readings it held back. */
+    private boolean finishing;
+    /** Stop listening and close the service: on the ended update, or after a few seconds if it never comes. */
+    private final Runnable stopNow = () -> {
+        finishing = false;
+        if (exercise != null) { exercise.clearUpdateCallbackAsync(callback); exercise = null; }
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE);
+        stopSelf();
+    };
+    private static final long LAST_READINGS_WAIT_MS = 8_000;
+
     private void finish() {
-        sendBatch(true);
-        if (exercise != null) {
-            Futures.addCallback(exercise.endExerciseAsync(), logFailure("end"), ContextCompat.getMainExecutor(this));
-            exercise.clearUpdateCallbackAsync(callback);
-        }
+        if (finishing) return;
         Live l = LIVE;
-        if (l.lastZone > 0) l.zoneMs[l.lastZone - 1] += Math.min(System.currentTimeMillis() - l.lastZoneAt, LONGEST_HOLD_MS);
+        if (l.endedAt == 0) l.endedAt = System.currentTimeMillis();
+        sendBatch(true);
         l.running = false;
         l.restEndsAt = 0;
         for (Runnable r : programBuzzes) main.removeCallbacks(r);
@@ -417,14 +477,22 @@ public class WorkoutService extends Service {
         main.removeCallbacks(endBuzz);
         releaseRestLock();
         changed();
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE);
-        stopSelf();
+        if (exercise != null) {
+            finishing = true;
+            Futures.addCallback(exercise.endExerciseAsync(), logFailure("end"), ContextCompat.getMainExecutor(this));
+            main.postDelayed(stopNow, LAST_READINGS_WAIT_MS);
+        } else stopNow.run();
     }
 
     /** The zone that held the most time, a tie to the lower (the phone's mostlyZone), or 0 under half a minute. */
     static int mostlyZone() {
+        Live l = LIVE;
+        long[] ms = l.zoneMs.clone();
+        // The last reading counts up to the end (or now), as every reading counts up to the next one.
+        long upTo = l.endedAt > 0 ? l.endedAt : System.currentTimeMillis();
+        if (l.lastZone > 0 && upTo > l.lastZoneAt) ms[l.lastZone - 1] += Math.min(upTo - l.lastZoneAt, LONGEST_HOLD_MS);
         int best = 0; long most = 0;
-        for (int i = 0; i < 5; i++) if (LIVE.zoneMs[i] > most) { most = LIVE.zoneMs[i]; best = i + 1; }
+        for (int i = 0; i < 5; i++) if (ms[i] > most) { most = ms[i]; best = i + 1; }
         return most >= 30_000 ? best : 0; // half a minute, as the phone asks
     }
 

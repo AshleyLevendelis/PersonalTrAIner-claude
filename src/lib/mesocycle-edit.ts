@@ -809,7 +809,11 @@ export async function swapExerciseInMesocycle(params: SwapExerciseParams): Promi
     // CLEARS the incoming lift's ramp (see its comment), so the day shipped
     // with a warm-up still preparing for the exercise that just left. BACKLOG's
     // 11 Sep entry named this as the next job and it sat open until now.
-    replacedByWeek.set(weekNumber, settleWeek({ ...week, days }, dayName, profile).week)
+    // A JUST-TODAY SWAP MOVES NO OTHER DAY (gym dry run, 28 Nov 2026): "Only this session changes" is what the button
+    // promises, and the week-balance pass had trimmed a set off another day (one already gone, in the walk). One session
+    // that reverts next week is not worth re-balancing a week for (CSCS, mine; the addition's rule of 7 Nov 2026). The
+    // whole-block swap keeps the pass: it changes the shape of every week it reaches.
+    replacedByWeek.set(weekNumber, settleWeek({ ...week, days }, dayName, profile, { weekBalance: scope !== 'today' }).week)
   }
   return mesocycle.map(week => replacedByWeek.get(week.week_number) ?? week)
 }

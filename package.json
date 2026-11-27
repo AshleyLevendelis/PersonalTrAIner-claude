@@ -780,6 +780,7 @@
     "test:peek-recovery": "tsx scripts/test-peek-recovery.ts",
     "test:cardio-remove": "tsx scripts/test-cardio-remove.ts",
     "verify:cardio-remove": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/cardio-remove.mjs",
+    "test:gym-dry-run-fixes": "tsx scripts/test-gym-dry-run-fixes.ts",
     "test:watch-flow": "tsx scripts/test-watch-flow.ts",
     "test:watch-app": "tsx scripts/test-watch-app.ts",
     "verify:watch-sets": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/watch-sets.mjs"
