@@ -2,6 +2,7 @@
 
 Newest first. One line each.
 
+- [x] **HOME'S CARD TITLE ON A SWAPPED DAY IS THE ACTIVITY'S NAME, NOT ITS WHOLE LOG LINE (27 Nov 2026, his screenshot after the walk: "Swapped for Walk · 19 min · Easy · 1.69 km" in the card's big type over three lines, the same line again under the week strip).** The title read the day's full logged line before the activity's name. It now reads the name ("Swapped for Walk"); the minutes, effort and distance stay on the line under the strip. `verify:qa-training` T9a2 (new; fixture `swapped=1&oldwalk=1`, a logged walk as the swap), 1 mutation, caught.
 - [x] **AN EASY WALK NO LONGER TAKES OVER A WEIGHTS DAY (27 Nov 2026; his walk before the gym, logged, then "Count this as today's workout instead of Upper Pull & Core?" with "Count it as today's workout" / "Not today": he tapped yes "because it seemed like the only option that would actually log the walk without losing it", and the app then read as trained. "A cardio session shouldn't necessarily overtake a weight session or the wording needs to be different").**
   HIS RULING, from three options: **"Only ask after real work"** (over always asking with clearer words, and over never
   asking). The question is asked only after a timer circuit, or 20+ minutes at Steady or Hard; anything less is kept as

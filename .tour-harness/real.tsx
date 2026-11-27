@@ -1161,7 +1161,8 @@ const db: Db = {
     ? [{ id: 'sess-done', profile_id: PROFILE_ID, date: today, is_completed: true, duration_minutes: 46,
         started_at: anchorDate().toISOString(), finished_at: anchorDate().toISOString() }]
     : new URLSearchParams(location.search).get('swapped') === '1'
-    ? [{ id: 'ws-swap', profile_id: PROFILE_ID, date: today, is_completed: false, swapped_for_activity: 'Muay Thai' }]
+    // With ?oldwalk=1 the swap is the walk logged today (his morning of 27 Nov 2026), so the day's line has minutes.
+    ? [{ id: 'ws-swap', profile_id: PROFILE_ID, date: today, is_completed: false, swapped_for_activity: new URLSearchParams(location.search).get('oldwalk') === '1' ? 'Walk' : 'Muay Thai' }]
     : new URLSearchParams(location.search).get('moved') === '1'
     ? [{
         id: 'ws-move', profile_id: PROFILE_ID, date: today, is_completed: false,
