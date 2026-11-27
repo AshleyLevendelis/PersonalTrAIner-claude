@@ -1390,7 +1390,7 @@ export function retryFailedSet(params: {
 }
 
 /** How long the last-session read may take before the phone answers from what it holds. */
-export const LAST_SESSION_READ_MS = 4000
+const LAST_SESSION_READ_MS = 4000
 
 /**
  * The trainee's most recent session for an exercise strictly before
