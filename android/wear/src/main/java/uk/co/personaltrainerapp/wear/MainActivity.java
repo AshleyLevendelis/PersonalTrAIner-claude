@@ -75,6 +75,9 @@ public class MainActivity extends Activity {
     private static final int MUTED = WatchStyle.MUTED;
     private static final int FG = WatchStyle.FG;
     private RingView ring;
+    private TextView edgeBtn;
+    /** The edge button's height: about a quarter of a 225dp round screen, the whole width of the curve at its top. */
+    private static final int EDGE_DP = 64;
 
     @Override
     protected void onCreate(Bundle saved) {
@@ -93,6 +96,25 @@ public class MainActivity extends Activity {
         column.setPadding(pad, dp(30), pad, dp(34));
         scroll.addView(column, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
         root.addView(scroll, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        // THE EDGE BUTTON (28 Nov 2026, his "the buttons need to be big enough to press with shaky sweaty hands in a
+        // gym"): during a session the one thing to tap fills the bottom of the round screen, edge to edge, as Wear OS's
+        // own edge button does, so a thumb finds it without looking. The screen's curve shapes it; it never scrolls.
+        edgeBtn = new TextView(this);
+        edgeBtn.setGravity(Gravity.CENTER);
+        edgeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        edgeBtn.setMaxLines(1);
+        edgeBtn.setTypeface(WatchStyle.bold(this));
+        edgeBtn.setTextColor(WatchStyle.ON_MINT);
+        edgeBtn.setBackground(WatchStyle.edgeFill());
+        // The words sit in the top of the button, where the curve leaves the most width.
+        edgeBtn.setPadding(dp(10), 0, dp(10), dp(EDGE_DP / 3f));
+        edgeBtn.setClickable(true);
+        edgeBtn.setFocusable(true);
+        edgeBtn.setElevation(dp(10));
+        edgeBtn.setOutlineSpotShadowColor(MINT);
+        edgeBtn.setOutlineAmbientShadowColor(MINT);
+        edgeBtn.setVisibility(View.GONE);
+        root.addView(edgeBtn, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(EDGE_DP), Gravity.BOTTOM));
         root.setBackgroundColor(WatchStyle.BG_EDGE);
         setContentView(root);
         askPermissions();
@@ -149,6 +171,7 @@ public class MainActivity extends Activity {
         screen = Screen.HOME;
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         column.removeAllViews();
+        hideEdge();
         clearLive();
         TodayStore.Session s = TodayStore.read(this);
         if (s != null && !s.exercises.isEmpty()) {
@@ -226,6 +249,7 @@ public class MainActivity extends Activity {
         screen = Screen.CARDIO;
         endArmedAt = 0;
         column.removeAllViews();
+        hideEdge();
         clearLive();
         ring.set(0f, WatchStyle.HEART);
         boolean p = planned();
@@ -264,6 +288,7 @@ public class MainActivity extends Activity {
     private void showLogged() {
         screen = Screen.LOGGED;
         column.removeAllViews();
+        hideEdge();
         clearLive();
         WorkoutService.Live l = WorkoutService.LIVE;
         long ms = System.currentTimeMillis() - l.startedAt;
@@ -299,6 +324,7 @@ public class MainActivity extends Activity {
             PhoneLink.send(this, e);
         } catch (Exception ignored) { /* our own object */ }
         column.removeAllViews();
+        hideEdge();
         clearLive();
         screen = Screen.DONE;
         ring.set(1f, MINT);
@@ -348,6 +374,7 @@ public class MainActivity extends Activity {
         screen = Screen.LIFT;
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         column.removeAllViews();
+        hideEdge();
         clearLive();
         TodayStore.Session s = TodayStore.read(this);
         TodayStore.Exercise x = s == null ? null : nextExercise(s);
@@ -356,12 +383,12 @@ public class MainActivity extends Activity {
         int setNumber = TodayStore.done(this, x) + 1;
         // "Next exercise up is ..." on a new exercise's first set; "Next set" on the rest of it.
         kicker(LiftFlow.liftKicker(setNumber), MINT, 0);
-        title(x.name, 20, false, 2);
-        doneRow(x, 8);
-        setDots(x, setNumber, 8);
-        heartRow(6);
-        // ONE TAP logs the set AND starts the rest (his ruling 27 Nov 2026, "One tap, with options").
-        button(LiftFlow.logLabel(x), true, R.drawable.ic_check, v -> setDone(s, x));
+        title(x.name, 18, false, 2).setMaxLines(2);
+        setLine(x, 0);
+        setDots(x, setNumber, 0);
+        heartRow(2);
+        // ONE TAP logs the set AND starts the rest (his ruling 27 Nov 2026, "One tap, with options"), on the edge button.
+        edge(LiftFlow.logLabel(x), R.drawable.ic_check, v -> setDone(s, x));
         if (exerciseAfter(s, x) != null) quiet("Next exercise", v -> moveOn(x));
         quiet("All exercises", v -> showList());
         quiet("End workout", v -> endLift());
@@ -369,40 +396,68 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * The set as he will do it: two chips, "10 reps" and "100 kg", each opening its own − / + screen. A number he has
-     * changed from the plan shows in violet. With no weight to change (bodyweight), the load is shown, not a chip.
+     * The set as he will do it, as one line (28 Nov 2026, his mock): "3 × 10 @ 100kg". The reps and the weight are each a
+     * number to tap (48dp tall, a thumb's size), opening its own − / + screen; a number he has changed from the plan
+     * shows in violet. The weight's other words ("per hand", "single side") go on the set line under it. With no weight
+     * to change (bodyweight) the load is shown, not a number to tap.
      */
-    private void doneRow(TodayStore.Exercise x, int topDp) {
+    private void setLine(TodayStore.Exercise x, int topDp) {
         LinearLayout r = row(topDp);
         int reps = TodayStore.reps(this, x);
-        boolean repsChanged = reps != LiftFlow.plannedReps(x.reps);
-        chip(r, LiftFlow.repsText(reps, x.reps), repsChanged, v -> showEdit(x, false));
+        TextView sets = inline(r, x.sets + " ×", 22, MUTED, WatchStyle.mono(this));
+        ((LinearLayout.LayoutParams) sets.getLayoutParams()).rightMargin = dp(2);
+        tapNumber(r, LiftFlow.countText(reps, x.reps), null, reps != LiftFlow.plannedReps(x.reps) ? WatchStyle.VIOLET : FG, v -> showEdit(x, false));
         if (x.kg >= 0) {
             double kg = TodayStore.kg(this, x);
-            TextView at = inline(r, "@", 16, MUTED, WatchStyle.medium(this));
-            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) at.getLayoutParams();
-            lp.leftMargin = dp(6); lp.rightMargin = dp(6);
-            chip(r, LiftFlow.loadWith(x.load, kg), kg != x.kg, v -> showEdit(x, true));
+            String[] load = LiftFlow.loadParts(x.load, kg);
+            inline(r, "@", 15, MUTED, WatchStyle.medium(this));
+            tapNumber(r, load[0], load[1], kg != x.kg ? WatchStyle.VIOLET : MINT, v -> showEdit(x, true));
         } else if (x.load != null && !x.load.isEmpty()) {
-            TextView load = inline(r, "  " + x.load, 16, MUTED, WatchStyle.semibold(this));
+            TextView load = inline(r, " " + x.load, 15, MUTED, WatchStyle.semibold(this));
             load.setGravity(Gravity.CENTER_VERTICAL);
         }
     }
 
-    /** A number to tap: monospaced, in an outlined pill, violet once changed from the plan. */
-    private void chip(LinearLayout parent, String value, boolean changed, View.OnClickListener onClick) {
+    /** A number to tap in the set line: monospaced, its unit half size, underlined so it reads as something to press. */
+    private void tapNumber(LinearLayout parent, String value, String unit, int color, View.OnClickListener onClick) {
         TextView t = new TextView(this);
-        t.setText(value);
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        SpannableString text = new SpannableString(unit == null ? value : value + unit);
+        if (unit != null) text.setSpan(new android.text.style.RelativeSizeSpan(0.5f), value.length(), text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        t.setText(text);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26);
         t.setTypeface(WatchStyle.mono(this));
-        t.setTextColor(changed ? WatchStyle.VIOLET : FG);
+        t.setTextColor(color);
         t.setGravity(Gravity.CENTER);
-        t.setMinHeight(dp(44));
-        t.setPadding(dp(12), 0, dp(12), 0);
-        t.setBackground(WatchStyle.ghostPill(dp(22), dp(1.5f)));
+        t.setMinHeight(dp(48));
+        t.setPadding(dp(5), 0, dp(5), 0);
+        t.setBackground(WatchStyle.tapUnderline(dp(2), dp(9), dp(10)));
         t.setClickable(true);
         t.setOnClickListener(onClick);
         parent.addView(t, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+    }
+
+    /** The edge button: the screen's one action, the whole bottom of the round face. */
+    private void edge(String label, int icon, View.OnClickListener onClick) {
+        edgeBtn.setText(label);
+        android.graphics.drawable.Drawable d = icon == 0 ? null : getDrawable(icon);
+        if (d != null) {
+            d = d.mutate();
+            d.setTint(WatchStyle.ON_MINT);
+            d.setBounds(0, 0, dp(18), dp(18));
+            edgeBtn.setCompoundDrawablePadding(dp(6));
+        }
+        edgeBtn.setCompoundDrawables(d, null, null, null);
+        edgeBtn.setOnClickListener(onClick);
+        edgeBtn.setVisibility(View.VISIBLE);
+        // What the screen holds scrolls clear of it.
+        column.setPadding(column.getPaddingLeft(), column.getPaddingTop(), column.getPaddingRight(), dp(EDGE_DP + 10));
+    }
+
+    private void hideEdge() {
+        if (edgeBtn == null) return;
+        edgeBtn.setVisibility(View.GONE);
+        edgeBtn.setOnClickListener(null);
+        column.setPadding(column.getPaddingLeft(), column.getPaddingTop(), column.getPaddingRight(), dp(34));
     }
 
     /** A small outlined button in a row ("−15s", "+15s"). */
@@ -413,9 +468,9 @@ public class MainActivity extends Activity {
         t.setTypeface(WatchStyle.semibold(this));
         t.setTextColor(FG);
         t.setGravity(Gravity.CENTER);
-        t.setMinHeight(dp(40));
-        t.setMinWidth(dp(64));
-        t.setBackground(WatchStyle.ghostPill(dp(20), dp(1.5f)));
+        t.setMinHeight(dp(48));
+        t.setMinWidth(dp(72));
+        t.setBackground(WatchStyle.ghostPill(dp(24), dp(1.5f)));
         t.setClickable(true);
         t.setOnClickListener(onClick);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -423,7 +478,7 @@ public class MainActivity extends Activity {
         parent.addView(t, lp);
     }
 
-    /** A big round − or + (52dp, a gloved thumb's size). */
+    /** A big round − or + (58dp: a gloved, sweaty thumb's size). */
     private void round(LinearLayout parent, String label, View.OnClickListener onClick) {
         TextView t = new TextView(this);
         t.setText(label);
@@ -431,12 +486,10 @@ public class MainActivity extends Activity {
         t.setTypeface(WatchStyle.bold(this));
         t.setTextColor(FG);
         t.setGravity(Gravity.CENTER);
-        t.setBackground(WatchStyle.ghostPill(dp(26), dp(1.5f)));
+        t.setBackground(WatchStyle.ghostPill(dp(29), dp(1.5f)));
         t.setClickable(true);
         t.setOnClickListener(onClick);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(56), dp(56));
-        lp.leftMargin = dp(10); lp.rightMargin = dp(10);
-        parent.addView(t, lp);
+        parent.addView(t, new LinearLayout.LayoutParams(dp(58), dp(58)));
     }
 
     private void setDone(TodayStore.Session s, TodayStore.Exercise x) {
@@ -484,23 +537,25 @@ public class MainActivity extends Activity {
     private void showRest() {
         screen = Screen.REST;
         column.removeAllViews();
+        hideEdge();
         clearLive();
         kicker("REST", WatchStyle.VIOLET, 0);
-        restClock = mono("", 56, WatchStyle.NUM, 2);
-        // −15s / +15s: a set that needs longer, or a shorter rest on an easy accessory.
-        LinearLayout nudge = row(4);
-        small(nudge, "−15s", v -> nudgeRest(-1));
-        small(nudge, "+15s", v -> nudgeRest(1));
+        restClock = mono("", 52, WatchStyle.NUM, 2);
         TodayStore.Session s = TodayStore.read(this);
         TodayStore.Exercise x = s == null ? null : nextExercise(s);
         // More of the same exercise, or a new one: the line and the button say which (his "Next set", "Next exercise").
         boolean same = x != null && x.id.equals(WorkoutService.LIVE.restAfterId);
         if (x != null) {
             int setNumber = TodayStore.done(this, x) + 1;
-            nextLine = text(LiftFlow.restLine(x, setNumber, same), 13, MUTED, 6);
+            nextLine = text(LiftFlow.restLine(x, setNumber, same), 13, MUTED, 4);
+            nextLine.setMaxLines(2);
         }
-        heartRow(6);
-        button(LiftFlow.restButton(same), true, 0, v -> endRest());
+        heartRow(4);
+        edge(LiftFlow.restButton(same), 0, v -> endRest());
+        // −15s / +15s: a set that needs longer, or a shorter rest on an easy accessory. Below the fold, with the bezel.
+        LinearLayout nudge = row(8);
+        small(nudge, "−15s", v -> nudgeRest(-1));
+        small(nudge, "+15s", v -> nudgeRest(1));
         // Moving on early, mid-exercise: skips the rest AND this exercise's remaining sets.
         if (same && exerciseAfter(s, x) != null) quiet("Next exercise", v -> moveOn(x));
         TodayStore.Exercise last = find(s, WorkoutService.LIVE.restAfterId);
@@ -542,31 +597,54 @@ public class MainActivity extends Activity {
 
     private TodayStore.Exercise editing;
     private boolean editingKg;
-    private TextView editValue;
+    private TextView editValue, editUnit;
 
     private void showEdit(TodayStore.Exercise x, boolean kg) {
         screen = Screen.EDIT;
         editing = x; editingKg = kg;
         column.removeAllViews();
+        hideEdge();
         clearLive();
         kicker(kg ? "WEIGHT" : (LiftFlow.timed(x.reps) ? "TIME" : "REPS"), MINT, 0);
-        text(x.name, 13, MUTED, 2);
-        editValue = mono("", 44, WatchStyle.NUM, 6);
+        text(x.name, 13, MUTED, 2).setMaxLines(1);
+        // − THE NUMBER +, on one line across the widest part of the face, so both buttons are big and the number
+        // never wraps (28 Nov 2026).
         LinearLayout r = row(8);
+        ((LinearLayout.LayoutParams) r.getLayoutParams()).leftMargin = -dp(16);
+        ((LinearLayout.LayoutParams) r.getLayoutParams()).rightMargin = -dp(16);
         round(r, "−", v -> stepEdit(-1));
+        LinearLayout value = new LinearLayout(this);
+        value.setOrientation(LinearLayout.VERTICAL);
+        value.setGravity(Gravity.CENTER);
+        r.addView(value, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        editValue = inline(value, "", 32, WatchStyle.NUM, WatchStyle.mono(this));
+        editValue.setMaxLines(1);
+        editValue.setAutoSizeTextTypeUniformWithConfiguration(16, 32, 1, TypedValue.COMPLEX_UNIT_SP);
+        editValue.setGravity(Gravity.CENTER);
+        editValue.getLayoutParams().width = LinearLayout.LayoutParams.MATCH_PARENT;
+        editUnit = inline(value, "", 12, MUTED, WatchStyle.semibold(this));
         round(r, "+", v -> stepEdit(1));
-        button("Done", true, 0, v -> showLift());
-        quiet("Back to the plan", v -> {
+        edge("Done", R.drawable.ic_check, v -> showLift());
+        // Below the Done button's edge, reached with the bezel: never half-showing behind it.
+        TextView back = quiet("Back to the plan", v -> {
             if (editingKg) TodayStore.setKg(this, x, x.kg); else TodayStore.setReps(this, x, LiftFlow.plannedReps(x.reps));
             drawEdit();
         });
+        ((LinearLayout.LayoutParams) back.getLayoutParams()).topMargin = dp(36);
         drawEdit();
     }
 
     private void drawEdit() {
         if (editing == null || editValue == null) return;
-        editValue.setText(editingKg ? LiftFlow.loadWith(editing.load, TodayStore.kg(this, editing))
-            : LiftFlow.repsText(TodayStore.reps(this, editing), editing.reps));
+        if (editingKg) {
+            String[] load = LiftFlow.loadParts(editing.load, TodayStore.kg(this, editing));
+            editValue.setText(load[0]);
+            editUnit.setText(load[2].isEmpty() ? load[1] : load[1] + " · " + load[2]);
+        } else {
+            int reps = TodayStore.reps(this, editing);
+            editValue.setText(String.valueOf(reps));
+            editUnit.setText(LiftFlow.timed(editing.reps) ? "seconds" : reps == 1 ? "rep" : "reps");
+        }
     }
 
     private void stepEdit(int dir) {
@@ -593,6 +671,7 @@ public class MainActivity extends Activity {
     private void showList() {
         screen = Screen.LIST;
         column.removeAllViews();
+        hideEdge();
         clearLive();
         TodayStore.Session s = TodayStore.read(this);
         kicker("ALL EXERCISES", MINT, 0);
@@ -624,6 +703,7 @@ public class MainActivity extends Activity {
     private void showSessionDone() {
         screen = Screen.DONE;
         column.removeAllViews();
+        hideEdge();
         clearLive();
         ring.set(1f, MINT);
         badge(R.drawable.ic_check);
@@ -633,7 +713,7 @@ public class MainActivity extends Activity {
         if (s != null) for (TodayStore.Exercise e : s.exercises) if (TodayStore.skipped(this, e) && TodayStore.done(this, e) < e.sets) movedOn = true;
         text(movedOn ? "Sets you moved on from stay open on your phone. Your phone saves the rest as its own ticks."
             : "Every set is ticked. Your phone saves them as its own ticks.", 13, MUTED, 4);
-        button("End workout", true, 0, v -> endLift());
+        edge("End workout", 0, v -> endLift());
         if (movedOn) quiet("All exercises", v -> showList());
         // The last set of the session can be undone too (27 Nov 2026 review): it is the one most often mis-tapped.
         TodayStore.Exercise last = find(s, WorkoutService.LIVE.restAfterId);
@@ -775,9 +855,9 @@ public class MainActivity extends Activity {
 
     /** The app's small capitals: semi-bold, widely spaced. */
     private TextView kicker(String value, int color, int topDp) {
-        TextView t = text(value, 12, color, topDp);
+        TextView t = text(value, 11, color, topDp);
         t.setTypeface(WatchStyle.semibold(this));
-        t.setLetterSpacing(0.18f);
+        t.setLetterSpacing(0.16f);
         return t;
     }
 
@@ -864,7 +944,8 @@ public class MainActivity extends Activity {
             lp.rightMargin = dp(5);
             r.addView(dot, lp);
         }
-        TextView t = inline(r, "Set " + setNumber + " of " + x.sets, 13, MUTED, WatchStyle.medium(this));
+        String extra = x.kg >= 0 ? LiftFlow.loadParts(x.load, x.kg)[2] : "";
+        TextView t = inline(r, "Set " + setNumber + " of " + x.sets + (extra.isEmpty() ? "" : " · " + extra), 13, MUTED, WatchStyle.medium(this));
         ((LinearLayout.LayoutParams) t.getLayoutParams()).leftMargin = dp(4);
     }
 
@@ -877,7 +958,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(20), dp(20));
         ip.rightMargin = dp(7);
         heartRow.addView(icon, ip);
-        heartBpm = inline(heartRow, "–", 22, FG, WatchStyle.mono(this));
+        heartBpm = inline(heartRow, "–", 20, FG, WatchStyle.mono(this));
         heartZone = inline(heartRow, "", 10, WatchStyle.HEART, WatchStyle.semibold(this));
         heartZone.setLetterSpacing(0.14f);
         heartZone.setPadding(dp(8), dp(3), dp(8), dp(3));
@@ -922,9 +1003,9 @@ public class MainActivity extends Activity {
 
     /** A small text action at the foot ("End workout", "Don't log it"). */
     private TextView quiet(String label, View.OnClickListener onClick) {
-        TextView t = text(label, 13, MUTED, 8);
+        TextView t = text(label, 14, MUTED, 4);
         t.setTypeface(WatchStyle.semibold(this));
-        t.setMinHeight(dp(40));
+        t.setMinHeight(dp(48));
         t.setGravity(Gravity.CENTER);
         t.setClickable(true);
         t.setOnClickListener(onClick);

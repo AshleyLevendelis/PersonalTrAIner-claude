@@ -115,6 +115,10 @@ public final class FlowCheck {
         out("kg.dumbbell", LiftFlow.kgText(LiftFlow.stepKg(20, 1, 2)));
         out("kg.floor", LiftFlow.kgText(LiftFlow.stepKg(1, -1, 2.5)));
         out("kg.load", LiftFlow.loadWith("100 kg", 97.5) + "|" + LiftFlow.loadWith("20 kg per hand", 18));
+        // His mock's set line, "3 × 10 @ 100kg" (28 Nov 2026): the count alone, and the weight split three ways.
+        out("count.text", LiftFlow.countText(8, "8-12") + "|" + LiftFlow.countText(35, "30s"));
+        out("load.parts", String.join(",", LiftFlow.loadParts("100 kg", 97.5)) + "|" + String.join(",", LiftFlow.loadParts("16 kg (single side)", 14))
+            + "|" + String.join(",", LiftFlow.loadParts("20 kg per hand", 18)) + "|" + String.join(",", LiftFlow.loadParts("", 40)));
         // The rest: ±15s, never below zero or above ten minutes; the early buzz only on a rest of 30s or more.
         out("rest.plus", LiftFlow.nudgeRestMs(60_000, 1));
         out("rest.floor", LiftFlow.nudgeRestMs(10_000, -1));
@@ -195,6 +199,10 @@ check('a held exercise counts in seconds, stepped in fives', is('reps.timed', 't
 check('the count reads as words ("1 rep", "8 reps", "35s")', is('reps.text', '1 rep|8 reps|35s'))
 check('the weight steps by the implement\'s notch (2.5 a bar, 2 a dumbbell), never below zero', is('kg.down', '97.5') && is('kg.dumbbell', '22') && is('kg.floor', '0'))
 check('the load keeps its words ("97.5 kg", "18 kg per hand")', is('kg.load', '97.5 kg|18 kg per hand'))
+
+check('the set line prints the count alone ("8", "35s")', is('count.text', '8|35s'), got['count.text'])
+check('the weight splits into the number he taps, its unit, and its other words ("single side", "per hand")',
+  is('load.parts', '97.5,kg,|14,kg,single side|18,kg,per hand|40,kg,'), got['load.parts'])
 
 console.log('\n8. The rest')
 check('+15s adds fifteen seconds', is('rest.plus', '75000'))

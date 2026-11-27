@@ -50,6 +50,35 @@ final class WatchStyle {
         return new RippleDrawable(ColorStateList.valueOf(Color.argb(60, 255, 255, 255)), fill, null);
     }
 
+    /**
+     * The edge button's fill (28 Nov 2026): the app's mint, lit from above, square, so the round screen's own curve
+     * gives it its shape; a ripple across the whole of it.
+     */
+    static RippleDrawable edgeFill() {
+        GradientDrawable fill = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { MINT, MINT_2 });
+        return new RippleDrawable(ColorStateList.valueOf(Color.argb(60, 255, 255, 255)), fill, null);
+    }
+
+    /**
+     * A number to tap in the set line: a short line under it in the border colour, so it reads as pressable without a
+     * box round it (his mock); a rounded ripple the size of the touch area.
+     */
+    static RippleDrawable tapUnderline(int thickness, int bottomInset, int sideInset) {
+        GradientDrawable line = new GradientDrawable();
+        line.setColor(BORDER);
+        line.setCornerRadius(thickness);
+        android.graphics.drawable.LayerDrawable layer = new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[] { line });
+        layer.setLayerGravity(0, android.view.Gravity.BOTTOM | android.view.Gravity.FILL_HORIZONTAL);
+        layer.setLayerHeight(0, thickness);
+        layer.setLayerInsetBottom(0, bottomInset);
+        layer.setLayerInsetLeft(0, sideInset);
+        layer.setLayerInsetRight(0, sideInset);
+        GradientDrawable mask = new GradientDrawable();
+        mask.setCornerRadius(24f * 3);
+        mask.setColor(Color.WHITE);
+        return new RippleDrawable(ColorStateList.valueOf(Color.argb(40, 255, 255, 255)), layer, mask);
+    }
+
     /** A quiet action: an outline in the app's border colour. */
     static RippleDrawable ghostPill(float radius, float stroke) {
         GradientDrawable fill = new GradientDrawable();

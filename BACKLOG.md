@@ -2,6 +2,21 @@
 
 Newest first. One line each.
 
+- [x] **THE WATCH'S WEIGHT SESSION, TIGHTENED TO HIS MOCK WITH BIG BUTTONS (28 Nov 2026, his "tighten it to match my mock" and "the buttons need to be big enough to press with shaky sweaty hands in a gym").**
+  A redraw of the session screens from the code on main showed them crowded on a round 225dp face: the main button half
+  off the bottom (a scroll to reach it), the reps and weight chips touching the curve, "42.5 kg" wrapping on the weight
+  screen. His mock draws one compact line, "3 × 10 @ 100kg", with a small floating pill; his second message rules out a
+  small pill. DECIDED (mine, layout only): the one action of each session screen (Log set, Next set / Next exercise,
+  Done, End workout) is an EDGE BUTTON across the whole bottom of the face, 64dp tall, as Wear OS's own edge button,
+  fixed (it never scrolls) and the curve gives it its shape; above it his mock's line, "3 × 9 @ 47.5kg", where the 9
+  and the 47.5 are themselves the buttons to tap (48dp tall, underlined, violet once changed); "per hand" / "single
+  side" moved to the set line; the − / + are 58dp either side of the number on one line (it never wraps); ±15s, the
+  quiet actions and "Back to the plan" are 48dp and sit below, reached with the bezel. Nothing changed in what is
+  logged, sent or decided: the same LiftFlow words and the same taps. Gates: test:watch-app (113, 4 new on sizes and
+  the edge button), test:watch-flow (41, 2 new on the line's text); 10 mutations, 10 caught. Type-checked against
+  Android 14's own classes (the Robolectric android-all jar; Google's download server is blocked here, so the files
+  that need Play Services and Health Services were not), with a planted error caught. NOT built for a watch or seen
+  on one: the redraw is from the code, not a photo. Needs a watch rebuild on his machine.
 - [x] **AN EASY WALK NO LONGER TAKES OVER A WEIGHTS DAY (27 Nov 2026; his walk before the gym, logged, then "Count this as today's workout instead of Upper Pull & Core?" with "Count it as today's workout" / "Not today": he tapped yes "because it seemed like the only option that would actually log the walk without losing it", and the app then read as trained. "A cardio session shouldn't necessarily overtake a weight session or the wording needs to be different").**
   HIS RULING, from three options: **"Only ask after real work"** (over always asking with clearer words, and over never
   asking). The question is asked only after a timer circuit, or 20+ minutes at Steady or Hard; anything less is kept as
