@@ -2,6 +2,21 @@
 
 Newest first. One line each.
 
+- [x] **THE WATCH'S WEIGHT SESSION, TIGHTENED TO HIS MOCK WITH BIG BUTTONS (28 Nov 2026, his "tighten it to match my mock" and "the buttons need to be big enough to press with shaky sweaty hands in a gym").**
+  A redraw of the session screens from the code on main showed them crowded on a round 225dp face: the main button half
+  off the bottom (a scroll to reach it), the reps and weight chips touching the curve, "42.5 kg" wrapping on the weight
+  screen. His mock draws one compact line, "3 × 10 @ 100kg", with a small floating pill; his second message rules out a
+  small pill. DECIDED (mine, layout only): the one action of each session screen (Log set, Next set / Next exercise,
+  Done, End workout) is an EDGE BUTTON across the whole bottom of the face, 64dp tall, as Wear OS's own edge button,
+  fixed (it never scrolls) and the curve gives it its shape; above it his mock's line, "3 × 9 @ 47.5kg", where the 9
+  and the 47.5 are themselves the buttons to tap (48dp tall, underlined, violet once changed); "per hand" / "single
+  side" moved to the set line; the − / + are 58dp either side of the number on one line (it never wraps); ±15s, the
+  quiet actions and "Back to the plan" are 48dp and sit below, reached with the bezel. Nothing changed in what is
+  logged, sent or decided: the same LiftFlow words and the same taps. Gates: test:watch-app (113, 4 new on sizes and
+  the edge button), test:watch-flow (41, 2 new on the line's text); 10 mutations, 10 caught. Type-checked against
+  Android 14's own classes (the Robolectric android-all jar; Google's download server is blocked here, so the files
+  that need Play Services and Health Services were not), with a planted error caught. NOT built for a watch or seen
+  on one: the redraw is from the code, not a photo. Needs a watch rebuild on his machine.
 - [x] **THE WATCH'S HEART RATE ON THE PHONE KEPT GOING BLANK AND RAN 5 SECONDS BEHIND (27 Nov 2026, his first walk recorded on the watch: "the heart rate seems to drop occasionally, quite often ... my Samsung watch generally doesn't drop out that much ... about a 5-second delay", then "when the watch screen is off ... I think that might also be happening").**
   MEASURED IN THE CODE, three causes, all ours. (1) The watch sent its readings in 5-second batches, and the phone
   drew a reading only while it was under 5 seconds old, so the newest reading in each batch went stale before the
