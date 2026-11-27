@@ -66,6 +66,9 @@ export function unclaimedCardio<T extends { activity_name: string }>(logs: reado
 export function swappedActivityLine(activity: string | null | undefined, dayLogs: readonly Loggish[]): string | null {
   const name = activity?.trim()
   if (!name) return null
-  const log = dayLogs.find(l => l.activity_name.trim().toLowerCase() === name.toLowerCase())
+  // THE FIRST LOG OF THAT NAME, the one that was counted (27 Nov 2026: with two walks, the newer one took the line).
+  const same = dayLogs.filter(l => l.activity_name.trim().toLowerCase() === name.toLowerCase())
+  const at = (l: Loggish) => { const t = Date.parse((l as { started_at?: string | null; completed_at?: string | null }).started_at ?? (l as { completed_at?: string | null }).completed_at ?? ''); return Number.isFinite(t) ? t : Infinity }
+  const log = [...same].sort((a, b) => at(a) - at(b))[0]
   return log ? cardioLine(log) : name
 }

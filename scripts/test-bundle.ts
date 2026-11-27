@@ -886,7 +886,10 @@ console.log('\n3. Nothing has crept back up')
   // and its Exercise part (lazy chunks, phone app only). MEASURED 3533 before them on a clean copy, 3551 with them; 9 kB
   // over today.
   // MOVED 27 Nov 2026: 3560 -> 3590, the same merge. MEASURED 3581 on the merged tree.
-  const TOTAL_BUDGET_KB = 3590
+  // MOVED 27 Nov 2026: 3590 -> 3600, his gym report fixes, the session calories and the second-walk fixes on top of the
+  // merged tree (watch-now, set rows, summary's live cardio). MEASURED 3590; 10 kB over today. The app chunk has 2 kB
+  // left (1719 of 1721): the next change to it moves that line too.
+  const TOTAL_BUDGET_KB = 3600
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)

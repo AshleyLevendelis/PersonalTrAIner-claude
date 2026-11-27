@@ -276,6 +276,12 @@ async function main() {
   check('...matched whatever the capitals', swappedLine?.('football', tuesday) === 'Football · 60 min · Hard', swappedLine?.('football', tuesday))
   check('...and when no minutes were given, it is just the name — never an invented duration', swappedLine?.('Muay Thai', tuesday) === 'Muay Thai', swappedLine?.('Muay Thai', tuesday))
   check('...and a day that was not swapped has no such line', swappedLine?.(null, tuesday) === null, swappedLine?.(null, tuesday))
+  // TWO WALKS ON A SWAPPED DAY (27 Nov 2026): the line is the walk that was counted, the first, never the newer one.
+  const walksOnSwappedDay = [
+    { activity_name: 'Walk', duration_minutes: 33, intensity_rpe: 3, completed_at: '2026-11-27T18:00:00Z', started_at: '2026-11-27T17:27:00Z' },
+    { activity_name: 'Walk', duration_minutes: 19, intensity_rpe: 3, completed_at: '2026-11-27T06:00:00Z', started_at: '2026-11-27T05:41:00Z' },
+  ] as Row[]
+  check('two walks, the newer listed first: the swapped line is the first walk of the day', /^Walk · 19 min/.test(swappedLine?.('Walk', walksOnSwappedDay) ?? ''), swappedLine?.('Walk', walksOnSwappedDay))
   const label = glyphs.dayLabel as ((d: Row) => string) | undefined
   check('the strip SAYS the activity, not only "swapped"',
     label?.({ dayName: 'Tuesday', state: 'swapped', swappedLine: 'Football · 60 min · Hard' }) === 'Tuesday: swapped for Football · 60 min · Hard',

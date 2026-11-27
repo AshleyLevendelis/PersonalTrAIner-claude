@@ -77,6 +77,14 @@ console.log('\n2. What is offered')
   // Logged from the offer before the recorded-activity migration: no started_at was kept, the typed rule still holds it.
   check('one logged from the offer on a database with no start column is still not offered twice', offer({ cardio: [{ activity_name: 'Run', date: localDateOf(run.start), duration_minutes: 42, completed_at: at(1) }] }).length === 0)
 
+  // A SECOND WALK IS HIS (his report 27 Nov 2026, "if I log more than one walk in a day it doesn't get added").
+  const morning = { activity_name: 'Walk', date: localDateOf(at(300)), duration_minutes: 19, started_at: at(400), completed_at: at(381) }
+  check('a walk recorded this morning does not hide a second walk of about the same length this afternoon',
+    offer({ workouts: [w('walk2', 'walking', 60, 40)], cardio: [morning] }).length === 1)
+  check('...while the same walk itself (its own time) is still held', offer({ workouts: [w('walk1', 'walking', 400, 381)], cardio: [morning] }).length === 0)
+  check('a weights session never finished holds two hours from its start, not every workout after it',
+    offer({ workouts: [w('walk3', 'walking', 60, 40)], sessions: [{ started_at: at(300), finished_at: null }] }).length === 1
+    && offer({ workouts: [w('lift2', 'strengthTraining', 70, 15)], sessions: [{ started_at: at(80), finished_at: null }] }).length === 0)
   const order = watchOffers({ workouts: [w('a', 'running', 300, 250), w('b', 'cycling', 100, 40), w('c', 'walking', 200, 150)], cardio: [], sessions: [], dismissed: [], now: NOW }).map(x => x.id)
   check('the newest is offered first', JSON.stringify(order) === '["b","c","a"]', order)
   check('a workout with an unreadable time is never offered', offer({ workouts: [{ ...run, id: 'bad', start: 'not a time' }] }).length === 0)

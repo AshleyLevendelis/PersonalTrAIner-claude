@@ -93,8 +93,13 @@ export async function applyWatchEvents(events: readonly unknown[], ctx: WatchCon
         if (samples.length) out.readings += (await import('./strap-live')).onWatchReadings(samples)
       } else if (e.type === 'cardio-start' && typeof e.activity === 'string' && num(e.startedAt) != null) {
         const rec = await import('./recording-store')
-        // Shown running on the phone; never over a workout already open there.
-        if (!rec.readRecording()) { rec.writeRecording({ activity: e.activity, startedAt: new Date(num(e.startedAt)!).toISOString() }); out.started++ }
+        // Shown running on the phone; never over a workout already open there, and never one already logged (a late
+        // start event re-opened a finished walk and blocked the next, 27 Nov 2026).
+        const startMs = num(e.startedAt)!
+        const { getCardioLogsForDateMerged } = await import('./cardio-log-store')
+        const logged = (await getCardioLogsForDateMerged(ctx.profileId, localDate(startMs))).some(l =>
+          l.activity_name === e.activity && l.started_at != null && Math.abs(Date.parse(l.started_at) - startMs) < 120_000)
+        if (!logged && !rec.readRecording()) { rec.writeRecording({ activity: e.activity, startedAt: new Date(startMs).toISOString() }); out.started++ }
       } else if (e.type === 'lift-end' && typeof e.date === 'string') {
         // A WEIGHTS SESSION ENDED ON THE WATCH (his request 27 Nov 2026): its calories, kept with the day's session.
         if (await (await import('./session-calories')).saveSessionCalories(ctx.profileId, e.date, e.kcal)) out.logged++
