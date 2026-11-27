@@ -79,6 +79,27 @@ final class LiftFlow {
         return load.replaceFirst("^\\s*\\d+(\\.\\d+)?", kgText(kg));
     }
 
+    /** The count alone, as the set line prints it beside "3 ×": "10", or "30s" for a hold (28 Nov 2026, his mock). */
+    static String countText(int value, String reps) {
+        return timed(reps) ? value + "s" : String.valueOf(value);
+    }
+
+    /**
+     * The weight split for the set line (his mock, "3 × 10 @ 100kg"): the number he can tap, its unit small beside it,
+     * and what else the load says ("per hand", "single side") for the line under it. "16 kg (single side)" gives
+     * {"16", "kg", "single side"}; an empty load gives {number, "kg", ""}.
+     */
+    static String[] loadParts(String load, double kg) {
+        String rest = load == null ? "" : load.replaceFirst("^\\s*\\d+(\\.\\d+)?\\s*", "").trim();
+        String unit = "kg", extra = "";
+        if (!rest.isEmpty()) {
+            int sp = rest.indexOf(' ');
+            unit = sp < 0 ? rest : rest.substring(0, sp);
+            extra = sp < 0 ? "" : rest.substring(sp + 1).replaceAll("[()]", "").trim();
+        }
+        return new String[] { kgText(kg), unit, extra };
+    }
+
     /** The count as words: "10 reps", "1 rep", "30s". */
     static String repsText(int value, String reps) {
         if (timed(reps)) return value + "s";
