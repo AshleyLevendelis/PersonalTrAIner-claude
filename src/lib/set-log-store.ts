@@ -1389,6 +1389,9 @@ export function retryFailedSet(params: {
   if (item) retryDeadLetterItem(clientIdOf(item.op))
 }
 
+/** How long the last-session read may take before the phone answers from what it holds. */
+export const LAST_SESSION_READ_MS = 4000
+
 /**
  * The trainee's most recent session for an exercise strictly before
  * `beforeDate` — ghost values and progression both hang off this. Working
@@ -1412,7 +1415,7 @@ export async function getLastSessionSets(
 ): Promise<ExerciseSetLog[]> {
   let serverRows: ServerSetRow[] = []
   try {
-    const { data } = await supabase
+    const read = supabase
       .from('exercise_set_logs')
       .select('*')
       .eq('user_id', userId)
@@ -1421,6 +1424,11 @@ export async function getLastSessionSets(
       .lt('completed_at', beforeDate)
       .order('completed_at', { ascending: false })
       .limit(60)
+    // NEVER WAIT ON A GYM'S SIGNAL (his report 27 Nov 2026: a swap sat on "Applying…" with no signal). The client
+    // retries a read three times with no limit on each; past this the pending-only view below answers.
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const late = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('no answer in time')), LAST_SESSION_READ_MS) })
+    const { data } = await Promise.race([read, late]).finally(() => clearTimeout(timer))
     // Malformed rows are filtered out BEFORE picking "the latest session" —
     // a session that's entirely malformed (e.g. an old chat-logged 0kg entry)
     // must be skipped in favor of the last session with real data, not

@@ -72,7 +72,23 @@ const watchExercise = (r: WatchRow, done: number) => ({
  * weights, and the watch sends a reps or weight number only where he changed it, so a number from days ago never
  * overrides the phone's own on the set it saves.
  */
-export function watchTodayPayload(p: { date: string; title: string; estimatedMax: number | null; rows: WatchRow[]; cardio?: WatchCardio | null; days?: readonly WatchDay[] }): string | null {
+/**
+ * THE EXERCISE AND SET THE PHONE IS ON, for the watch (his gym report 27 Nov 2026: "the watch and phone disagree with
+ * each other"). Read off the Exercise tab's own Log set button (`readNextSet`), so the watch names the lift, reps and
+ * weight that button would log: the set just done copied, the set nudge, last time. A build-up set names the lift
+ * only (the watch counts working sets). Null when the button offers nothing, or names a lift not on the watch's list.
+ */
+export function watchNowFrom(next: { set: string; name: string; weight: string; reps: string } | null, rows: readonly Pick<WatchRow, 'id' | 'name'>[]): { id: string; reps?: number; kg?: number } | null {
+  if (!next || !next.name) return null
+  const row = rows.find(r => r.name === next.name)
+  if (!row) return null
+  if (!/^Set \d/.test(next.set)) return { id: row.id }
+  const reps = parseInt(next.reps, 10)
+  const kg = Number(next.weight)
+  return { id: row.id, ...(reps > 0 ? { reps } : {}), ...(next.weight && Number.isFinite(kg) && kg > 0 ? { kg } : {}) }
+}
+
+export function watchTodayPayload(p: { date: string; title: string; estimatedMax: number | null; rows: WatchRow[]; cardio?: WatchCardio | null; days?: readonly WatchDay[]; now?: { id: string; reps?: number; kg?: number } | null }): string | null {
   const ahead = (p.days ?? []).filter(d => d.date > p.date && (d.rows.length > 0 || !!d.cardio))
   if (p.rows.length === 0 && !p.cardio && ahead.length === 0) return null
   return JSON.stringify({
@@ -81,6 +97,7 @@ export function watchTodayPayload(p: { date: string; title: string; estimatedMax
     title: p.title,
     estimatedMax: p.estimatedMax ?? 0,
     exercises: p.rows.map(r => watchExercise(r, r.done)),
+    ...(p.now ? { now: p.now } : {}),
     // A PLANNED CARDIO SESSION (27 Nov 2026): the watch runs its rounds or minutes and logs it under this exact name.
     ...(p.cardio ? { cardio: watchCardio(p.cardio) } : {}),
     ...(ahead.length ? { days: ahead.map(d => ({ date: d.date, title: d.title, exercises: d.rows.map(r => watchExercise(r, 0)), ...(d.cardio ? { cardio: watchCardio(d.cardio) } : {}) })) } : {}),

@@ -28,7 +28,7 @@ import { checkForPR, getTopPRSet, toSessionSets, isFirstTimeLogged, type PRResul
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, plateBarKg, probeNextKg, unloadedLoadLabel } from '@/lib/load-prescription'
 import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG, repsLookImpossible, prescribedRepsHigh } from '@/lib/set-plausibility'
-import { blankWeightFor, carriedWeightFor, type BlankWeight } from '@/lib/set-row'
+import { blankWeightFor, carriedRepsFor, carriedWeightFor, type BlankWeight } from '@/lib/set-row'
 import type { UserProfile } from '@/lib/types'
 import { EFFORT_RPE, PROBE_RPE, effortFromRpe, type LiftEffort } from '@/lib/lift-effort'
 import { restAfterWarmupSeconds } from '@/lib/warmup-rest'
@@ -586,6 +586,21 @@ export function SetGrid({
    * Ashley ruled on 18 Sep. Mixing the two would print last week's 11 reps
    * beside this week's 24 kg and mark half a row as history.
    */
+  /**
+   * What a blank reps box logs, ONE rule for the saved value, the faint number and the Log set button: last session's
+   * set where the row is last session's, else the set just done (his 27 Nov 2026 "Copy the last set",
+   * carriedRepsFor), else the bottom of the range (defaultRepsFor).
+   */
+  const blankRepsFor = (ref: SetRef): string => {
+    const ghost = drivingGhostFor(ref)
+    if (ghost) return String(ghost.reps_completed)
+    if (!isWarm(ref) && !isDrop(ref)) {
+      const blank = plainWorkingBlankFor(ref)
+      const carried = carriedRepsFor({ blank, nudged: blank.source === 'carried' && !!nudgeFor(ref), loggedWorkingSets: existingLogs, prescribedReps })
+      if (carried != null) return carried
+    }
+    return defaultRepsFor(ref)
+  }
   const drivingGhostFor = (ref: SetRef) => {
     const g = ghostFor(ref)
     return g && workingBlankFor(ref).source === 'last_time' ? g : undefined
@@ -684,7 +699,7 @@ export function SetGrid({
     // feedback. The prescribed step is NEW and does not reopen either: it
     // supplies a real target where one exists, and falls through to the same
     // refusal where one does not. See defaultRepsFor.
-    const repsStr = input.reps || (ghost ? String(ghost.reps_completed) : defaultRepsFor(ref))
+    const repsStr = input.reps || blankRepsFor(ref)
     const reps = repsStr ? parseInt(repsStr, 10) : NaN
     if (!Number.isFinite(reps) || reps <= 0) {
       setRowErrors(prev => ({ ...prev, [k]: 'Enter reps to log this set' }))
@@ -1310,7 +1325,7 @@ export function SetGrid({
               step="1"
               /* Never '0' as a fallback: that suggested the exact value the
                  save refuses, on the one session where the fallback applies. */
-              placeholder={ghost ? String(ghost.reps_completed) : defaultRepsFor(ref)}
+              placeholder={blankRepsFor(ref)}
               value={input.reps}
               onChange={e => updateInput(ref, 'reps', e.target.value)}
               onFocus={e => { e.currentTarget.select(); scrollRowIntoView(e) }}
@@ -1358,7 +1373,7 @@ export function SetGrid({
                 data-next-unit={!isSaved && !drop ? (loadUnitLabel ?? 'kg') : undefined}
                 data-next-weight-box={!isSaved && !drop ? `setgrid-weight-${exerciseId}-${rowKey(ref)}` : undefined}
                 data-next-reps-box={!isSaved && !drop ? `setgrid-reps-${exerciseId}-${rowKey(ref)}` : undefined}
-                data-next-reps={!isSaved && !drop ? (input.reps || (ghost ? String(ghost.reps_completed) : defaultRepsFor(ref))) : undefined}
+                data-next-reps={!isSaved && !drop ? (input.reps || blankRepsFor(ref)) : undefined}
                 // THE KIND IS IN THE SPOKEN LABEL TOO: warm-up 2 and working set
                 // 2 are two different ticks.
                 aria-label={!isSaved

@@ -31,6 +31,8 @@ final class TodayStore {
         int phoneDone;    // sets done as the phone last saw them
         double kg = -1;   // the planned weight as a number (the "100" of "100 kg"); -1: no weight to change (BW, none)
         double step = 2.5; // the implement's notch, from the phone (2.5 a bar or a stack, 2 a dumbbell)
+        int nextReps = -1;   // the phone's next set, when this is the exercise it is on: the reps its Log set would save
+        double nextKg = Double.NaN; // ...and the weight; NaN: the plan's
     }
 
     /** The day's planned cardio session, run on the wrist (IntervalFlow) and logged under `activity`, the plan's name. */
@@ -52,13 +54,34 @@ final class TodayStore {
         int estimatedMax; // 0: no zones
         final List<Exercise> exercises = new ArrayList<>();
         Cardio cardio;    // null: no cardio planned
+        String nowId;     // the exercise the phone is on, or null
     }
 
     static String today() { return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date()); }
 
+    /**
+     * A NEW SESSION FROM THE PHONE IS THE TRUTH (27 Nov 2026, his gym report: "the watch and phone disagree"). The watch's
+     * own moves for today ("Next exercise", a pick from "All exercises", a changed reps or weight) are cleared, so it
+     * follows the phone's exercise and next set; a set he logs on the watch reaches the phone and comes back in the next
+     * one. The sets ticked on the watch and an Undo held down are kept (LiftFlow.doneCount).
+     */
     static void save(Context c, String json) {
-        prefs(c).edit().putString("json", json).apply();
+        SharedPreferences.Editor e = prefs(c).edit().putString("json", json);
+        String day = today();
+        for (String k : prefs(c).getAll().keySet()) {
+            if (k.equals("chosen:" + day) || k.startsWith("skip:" + day + ":") || k.startsWith("reps:" + day + ":") || k.startsWith("kg:" + day + ":")) e.remove(k);
+        }
+        e.apply();
     }
+
+    /** The exercise the phone is on today, or null. */
+    static String nowId(Context c) { Session s = read(c); return s == null ? null : s.nowId; }
+
+    /** The reps a set of this exercise is offered at: the phone's next set where it is on it, else the plan's first. */
+    static int plannedReps(Exercise x) { return x.nextReps > 0 ? x.nextReps : LiftFlow.plannedReps(x.reps); }
+
+    /** ...and the weight: the phone's next set's, else the plan's. */
+    static double plannedKg(Exercise x) { return x.kg >= 0 && !Double.isNaN(x.nextKg) ? x.nextKg : x.kg; }
 
     /** His estimated maximum for the zones, from the last thing the phone sent, whatever its date; 0 for none. */
     static int estimatedMax(Context c) {
@@ -89,7 +112,8 @@ final class TodayStore {
         try {
             String raw = prefs(c).getString("json", null);
             if (raw == null) return null;
-            JSONObject o = dayFor(new JSONObject(raw), today());
+            JSONObject sent = new JSONObject(raw);
+            JSONObject o = dayFor(sent, today());
             if (o == null) return null;
             Session s = new Session();
             s.date = o.optString("date");
@@ -109,6 +133,9 @@ final class TodayStore {
                 k.onFoot = cj.optBoolean("onFoot", false);
                 if (!k.activity.isEmpty()) s.cardio = k;
             }
+            // Only today's own entry carries it: a day out of the week ahead has no "now".
+            JSONObject now = o == sent ? o.optJSONObject("now") : null;
+            if (now != null && !now.optString("id").isEmpty()) s.nowId = now.optString("id");
             JSONArray arr = o.optJSONArray("exercises");
             if ((arr == null || arr.length() == 0) && s.cardio == null) return null;
             if (arr != null) for (int i = 0; i < arr.length(); i++) {
@@ -123,6 +150,10 @@ final class TodayStore {
                 x.phoneDone = Math.max(0, e.optInt("done", 0));
                 x.kg = e.has("kg") && !e.isNull("kg") ? e.optDouble("kg", -1) : -1;
                 x.step = e.optDouble("step", 2.5);
+                if (x.id.equals(s.nowId)) {
+                    x.nextReps = now.optInt("reps", -1);
+                    if (now.has("kg") && !now.isNull("kg")) x.nextKg = now.optDouble("kg", Double.NaN);
+                }
                 s.exercises.add(x);
             }
             return s;
@@ -162,11 +193,11 @@ final class TodayStore {
     }
 
     /** The reps and weight he set for this exercise today (carried to its next sets), or the plan's when unchanged. */
-    static int reps(Context c, Exercise x) { return prefs(c).getInt("reps:" + today() + ":" + x.id, LiftFlow.plannedReps(x.reps)); }
+    static int reps(Context c, Exercise x) { return prefs(c).getInt("reps:" + today() + ":" + x.id, plannedReps(x)); }
 
     static double kg(Context c, Exercise x) {
         String v = prefs(c).getString("kg:" + today() + ":" + x.id, null);
-        return v == null ? x.kg : Double.parseDouble(v);
+        return v == null ? plannedKg(x) : Double.parseDouble(v);
     }
 
     static void setReps(Context c, Exercise x, int reps) { prefs(c).edit().putInt("reps:" + today() + ":" + x.id, reps).apply(); }

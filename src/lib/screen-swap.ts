@@ -58,7 +58,8 @@ export async function swapOnScreen(input: {
     // DEFECT: the client resolves with an error on a dead network rather than throwing, and with no signal this
     // line was observed to pass quietly (verify:gym-offline is unchanged without it). An offer left open is checked
     // against the plan again at its own tap (offerStillHolds).
-    await sweepStaleForTarget(profile.id, `${profile.id}:propose_exercise_swap:${dayName}:${exIndex}`)
+    // NOT AWAITED (27 Nov 2026): on a gym's signal it could hold the sheet on "Applying…" after the swap was saved.
+    void sweepStaleForTarget(profile.id, `${profile.id}:propose_exercise_swap:${dayName}:${exIndex}`)
       .catch(err => console.error('Sweeping stale swap offers failed (the swap itself is saved):', err))
     // THE UNDO LINE (QA walk T7): the plan as it was, filed for the Exercise tab's one line.
     const was = mesocycle.find(w => w.week_number === weekNumber)?.days.find(d => d.day === dayName)?.exercises[exIndex]?.name

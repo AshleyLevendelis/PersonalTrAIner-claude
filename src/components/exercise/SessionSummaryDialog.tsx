@@ -114,6 +114,14 @@ export function SessionSummaryDialog({
               </div>
             </div>
 
+            {/* A WARM-UP MOVE LEFT UNDONE IS NAMED (his report 27 Nov 2026): the fraction counts working sets only, so a
+                full one beside an untouched warm-up move read as everything done. "Not logged", never "skipped". */}
+            {(data.summary.prepNotLogged?.length ?? 0) > 0 && (
+              <p className="text-[0.75rem] text-muted-foreground" data-testid="summary-prep-not-logged">
+                Not logged: {data.summary.prepNotLogged!.join(', ')} (warm-up {data.summary.prepNotLogged!.length === 1 ? 'move' : 'moves'})
+              </p>
+            )}
+
             {effortFor && open && <EffortRow profileId={effortFor.profileId} date={effortFor.date} />}
 
             {(data.cardio?.length ?? 0) > 0 && (

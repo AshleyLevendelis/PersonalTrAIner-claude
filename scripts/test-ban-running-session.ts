@@ -75,7 +75,10 @@ async function main() {
   check('a set of ANOTHER exercise logged today does not', ban({ loggedTodayNames: new Set([other.toLowerCase()]) })(1, 'Thursday') === false)
   check('matching is by name whatever the case', ban({ loggedTodayNames: new Set([victim.toUpperCase().toLowerCase()]), exerciseName: victim.toUpperCase() })(1, 'Thursday') === true)
   check('no session running: shut, as before', ban({ runningToday: false })(1, 'Thursday') === true)
-  check('a closed day (missed, rested, swapped): shut', ban({ closedDates: [THU] })(1, 'Thursday') === true)
+  // REVERSED 27 Nov 2026 (his gym report): a day he closed and is now TRAINING ("Train it anyway") is open, like any
+  // running session; closed and NOT running stays shut.
+  check('a closed day he is now training (swapped, then "Train it anyway"): open', ban({ closedDates: [THU] })(1, 'Thursday') === false)
+  check('a closed day with no session running: shut', ban({ closedDates: [THU], runningToday: false })(1, 'Thursday') === true)
   check("today's sets unreadable: shut (errs protective)", ban({ loggedTodayNames: null })(1, 'Thursday') === true)
 
   console.log('\n3. The ban itself takes it off the running session')

@@ -144,10 +144,10 @@ type DayEdit = { kind: 'shorten' | 'rebuild'; note: string | null; record: Scree
 const dayEditKept = new Map<string, DayEdit>()
 
 /** The rows a session summary counts: working exercises as planned sets, and movement prep kept out of both counts. */
-function summaryRowsOf(workout: WorkoutDay): { planned: { id?: string; name: string; sets: number }[]; prep: { id?: string; name: string }[] } {
+function summaryRowsOf(workout: WorkoutDay): { planned: { id?: string; name: string; sets: number }[]; prep: { id?: string; name: string; sets: number }[] } {
   return {
     planned: workout.exercises.filter(ex => !isMovementPrepRow(ex)).map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets })),
-    prep: workout.exercises.filter(ex => isMovementPrepRow(ex)).map(ex => ({ id: ex.id, name: ex.name })),
+    prep: workout.exercises.filter(ex => isMovementPrepRow(ex)).map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets })),
   }
 }
 

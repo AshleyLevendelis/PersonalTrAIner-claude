@@ -57,10 +57,12 @@ import java.util.Locale;
 public class MainActivity extends Activity {
     private static WeakReference<MainActivity> open = new WeakReference<>(null);
 
-    /** Today's session changed on the phone: redraw the home screen if it is showing. */
+    /** Today's session changed on the phone: redraw the home or lift screen if it is showing. */
     static void refreshIfOpen() {
         MainActivity a = open.get();
-        if (a != null) a.runOnUiThread(() -> { if (a.screen == Screen.HOME) a.showHome(); });
+        // THE LIFT SCREEN FOLLOWS THE PHONE TOO (27 Nov 2026, his gym report): it was drawn once and kept, so a set or a swap
+        // on the phone left it naming another exercise. A rest, an edit and the list are left as they are.
+        if (a != null) a.runOnUiThread(() -> { if (a.screen == Screen.HOME) a.showHome(); else if (a.screen == Screen.LIFT) a.showLift(); });
     }
 
     private enum Screen { HOME, CARDIO, LOGGED, LIFT, REST, DONE, EDIT, LIST }
@@ -358,6 +360,7 @@ public class MainActivity extends Activity {
         @Override public int done(TodayStore.Exercise x) { return TodayStore.done(MainActivity.this, x); }
         @Override public boolean skipped(TodayStore.Exercise x) { return TodayStore.skipped(MainActivity.this, x); }
         @Override public String chosen() { return TodayStore.chosen(MainActivity.this); }
+        @Override public String now() { return TodayStore.nowId(MainActivity.this); }
     };
 
     private TodayStore.Exercise nextExercise(TodayStore.Session s) { return LiftFlow.next(s.exercises, state); }
@@ -411,13 +414,13 @@ public class MainActivity extends Activity {
         int sp = LiftFlow.setLineSp(x.sets, count, load == null ? "" : load[0], load == null ? null : load[1]);
         TextView sets = inline(r, x.sets + " ×", sp - 4, MUTED, WatchStyle.mono(this));
         ((LinearLayout.LayoutParams) sets.getLayoutParams()).rightMargin = dp(2);
-        tapNumber(r, count, null, reps != LiftFlow.plannedReps(x.reps) ? WatchStyle.VIOLET : FG, sp, v -> showEdit(x, false));
+        tapNumber(r, count, null, reps != TodayStore.plannedReps(x) ? WatchStyle.VIOLET : FG, sp, v -> showEdit(x, false));
         if (load != null) {
             inline(r, "@", 15, MUTED, WatchStyle.medium(this));
-            tapNumber(r, load[0], load[1], kg != x.kg ? WatchStyle.VIOLET : MINT, sp, v -> showEdit(x, true));
+            tapNumber(r, load[0], load[1], kg != TodayStore.plannedKg(x) ? WatchStyle.VIOLET : MINT, sp, v -> showEdit(x, true));
         } else if (x.load != null && !x.load.isEmpty()) {
-            TextView load = inline(r, " " + x.load, 15, MUTED, WatchStyle.semibold(this));
-            load.setGravity(Gravity.CENTER_VERTICAL);
+            TextView bw = inline(r, " " + x.load, 15, MUTED, WatchStyle.semibold(this));
+            bw.setGravity(Gravity.CENTER_VERTICAL);
         }
     }
 
@@ -510,8 +513,8 @@ public class MainActivity extends Activity {
             e.put("setNumber", setNumber);
             // What he did, ONLY where he changed it (his "Adjust reps and weight"): unchanged, the phone saves its own
             // number for the set, which is the right one even when this session came days ago with the week ahead.
-            if (reps != LiftFlow.plannedReps(x.reps)) e.put("reps", reps);
-            if (x.kg >= 0 && kg != x.kg) e.put("kg", kg);
+            if (reps != TodayStore.plannedReps(x)) e.put("reps", reps);
+            if (x.kg >= 0 && kg != TodayStore.plannedKg(x)) e.put("kg", kg);
             e.put("at", System.currentTimeMillis());
             PhoneLink.send(this, e);
         } catch (Exception ignored) { /* our own object */ }
@@ -631,7 +634,7 @@ public class MainActivity extends Activity {
         edge("Done", R.drawable.ic_check, v -> showLift());
         // Below the Done button's edge, reached with the bezel: never half-showing behind it.
         TextView back = quiet("Back to the plan", v -> {
-            if (editingKg) TodayStore.setKg(this, x, x.kg); else TodayStore.setReps(this, x, LiftFlow.plannedReps(x.reps));
+            if (editingKg) TodayStore.setKg(this, x, TodayStore.plannedKg(x)); else TodayStore.setReps(this, x, TodayStore.plannedReps(x));
             drawEdit();
         });
         ((LinearLayout.LayoutParams) back.getLayoutParams()).topMargin = dp(36);

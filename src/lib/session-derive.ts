@@ -742,6 +742,12 @@ export interface SessionSummary {
   /** Sets beyond the plan: extra rows on a planned exercise, and anything off-plan. */
   extraSets: number
   exercises: SessionExerciseSummary[]
+  /**
+   * The day's movement prep he did not finish (his report 27 Nov 2026: "I didn't log Prone Y-T Raises but the app said
+   * I logged 14/14 sets"). Prep is never a working set (7 Nov 2026), so it stays out of the fraction; the card names it
+   * instead, so a full fraction never reads as everything done. Absent on a card saved before this.
+   */
+  prepNotLogged?: string[]
 }
 
 /**
@@ -783,7 +789,7 @@ export function summaryAsItStands(
   saved: SessionSummary,
   logs: ExerciseSetLog[],
   plannedExercises: { id?: string; name: string; sets: number }[],
-  prep: { id?: string; name: string }[] = [],
+  prep: { id?: string; name: string; sets?: number }[] = [],
 ): SessionSummary {
   return { ...computeSessionSummary(logs, plannedExercises, '', '', prep), durationMinutes: saved.durationMinutes }
 }
@@ -899,7 +905,7 @@ export function computeSessionSummary(
    * The day's movement prep: on the plan but not working sets, so its ticks are neither planned sets done nor
    * "+1 extra" (whole-app QA walk, 7 Nov 2026: a ticked Arm Circles set read "0/15 planned sets +1 extra").
    */
-  prep: { id?: string; name: string }[] = [],
+  prep: { id?: string; name: string; sets?: number }[] = [],
 ): SessionSummary {
   const exercises: SessionExerciseSummary[] = []
   const accountedIds = new Set<string>()
@@ -954,5 +960,8 @@ export function computeSessionSummary(
     setsPrescribed: exercises.reduce((sum, e) => sum + e.setsPrescribed, 0),
     extraSets: exercises.reduce((sum, e) => sum + Math.max(0, e.setsCompleted - e.setsPrescribed), 0),
     exercises,
+    prepNotLogged: prep
+      .filter(p => (p.sets ?? 0) > 0 && filterLoggableSets(logs, p.id ?? p.name, p.name).length < (p.sets ?? 0))
+      .map(p => p.name),
   }
 }

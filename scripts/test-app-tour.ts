@@ -336,7 +336,7 @@ console.log('\nTHE SET STOP\'S PROMISE HAS TO BE KEEPABLE')
     // app asked for — so the check follows the promise, not the signature.
     check('...and reps has a prescribed fallback to make that true',
       /const defaultRepsFor = \(\w+: SetRef\)/.test(grid) &&
-      /input\.reps \|\| \(ghost \? String\(ghost\.reps_completed\) : defaultRepsFor\((\w+)\)\)/.test(grid))
+      /input\.reps \|\| blankRepsFor\((\w+)\)/.test(grid) && /return defaultRepsFor\(ref\)\s*\}/.test(grid))
     check('...and the reps box no longer suggests the value the save refuses',
       !/placeholder=\{ghost \? String\(ghost\.reps_completed\) : '0'\}/.test(grid))
   }
