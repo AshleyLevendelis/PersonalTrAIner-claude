@@ -1907,6 +1907,11 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   card. Matched by whole words, two that fit ask which. `test:cardio-remove`, `test:cardio-log` §4-5,
   `verify:cardio-remove`. Needs the `chat-gemini` deploy for the coach's own tool
 
+- **A watch workout ends when End is tapped and keeps its last readings; waiting messages fold; it is on the watch face**
+  (27 Nov 2026, his "Do all your parts"): the service listens until the watch's ended update, the last message is
+  marked final and saved at once; heart rate waiting for the phone folds into the last waiting message; a running
+  workout is an ongoing activity. `test:watch-app`. Needs a watch rebuild (wear-ongoing's first compile is his)
+
 ### His requests of 26 Nov 2026
 - **"Check what your watch shares" on Profile (step 0 of `docs/plans/health-data-next.md`, his "Start the planned
   work")**: on his tap, a plain report of what the phone's health store hands the app, as counts and times only (a
