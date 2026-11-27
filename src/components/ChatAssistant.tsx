@@ -5,7 +5,7 @@ import { plainTyped } from '@/lib/typed-text'
 import { isRunningGoal, runningGoalLabel, raceDateWords, weeksBetween, reachableByRace, chooseRunningDays, raceDateMissing, RACE_DATE_QUESTION } from '@/lib/running'
 import { blockShape } from '@/lib/timer-engine'
 import { cardioSessionRounds, sessionMinutesFor, PLANNED_ROUNDS_WORDS } from '@/lib/planned-rounds'
-import { circuitName } from '@/lib/circuit'
+import { circuitName, couldReplaceASession } from '@/lib/circuit'
 import { textBesideSave, contextNoteText } from '@/lib/save-reply'
 import { goalAsk, goalAmount, goalLabel } from '@/lib/goal-ask'
 import { rpeToStore, effortLabel, cardioReadback, type EffortKey } from '@/lib/cardio-effort'
@@ -4629,7 +4629,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const isToday = date === activeSession.date
     const session = sessionForDate({ date, plan: planForDate(date), moves: trainingWeek.moves }).day
     const dayState = trainingWeek.days.find(d => d.date === date)?.state
-    const countableFocus = session && session.exercises.length > 0 && dayState === 'due' ? session.focus : null
+    // Only real work is offered as the day's workout (his ruling 27 Nov 2026, "Only ask after real work"): the same
+    // rule as the Today card, so an easy walk told to the coach is logged as extra with no second button.
+    const countableFocus = session && session.exercises.length > 0 && dayState === 'due' && couldReplaceASession([{ duration_minutes: minutes, intensity_rpe: intensityRpe }]) ? session.focus : null
     const line = cardioReadback({ activity: activityName, minutes, rpe: intensityRpe, distanceKm })
     const dayWord = isToday ? 'today' : dayName
     return {

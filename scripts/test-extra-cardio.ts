@@ -148,7 +148,7 @@ async function main() {
   check('"count it" never swaps a day whose session was not due', noFocus.counted === false && !db.workout_sessions.some(r => r.profile_id === 'u2' && r.date === '2026-10-19'), noFocus)
   const chat = strip(readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
   const builder = chat.slice(chat.indexOf('const buildCardioLogProposal'), chat.indexOf('const buildCircuitLogProposal'))
-  check('the offer counts it only while the day\'s session is still due', /const countableFocus = session && session\.exercises\.length > 0 && dayState === 'due' \? session\.focus : null/.test(builder))
+  check('the offer counts it only while the day\'s session is still due', /const countableFocus = session && session\.exercises\.length > 0 && dayState === 'due' && couldReplaceASession\([^)]*\) \? session\.focus : null/.test(builder))
   check('...and the second button exists only then; "Log it" leads', /\.\.\.\(countableFocus\s*\?\s*\{ editable: \[\{ field: 'scope', options: \['extra', 'instead'\], labels: \{ extra: 'Log it'/.test(builder))
   const confirm = chat.slice(chat.indexOf("row.kind === 'propose_cardio_log'"), chat.indexOf("row.kind === 'propose_circuit_log'", chat.indexOf("row.kind === 'propose_cardio_log'")))
   check('Apply runs the one write with her choice', /executeCardioLog\(profile, payload, editedScope === 'instead'\)/.test(confirm))

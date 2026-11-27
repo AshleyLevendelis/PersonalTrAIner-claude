@@ -481,6 +481,10 @@ export const APP_DECISIONS: AppDecision[] = [
   { area: 'Weekly structure', anchor: { file: 'src/components/exercise/OwnWorkoutDay.tsx', token: 'markDayDone' }, also: ['own workout', 'rest day', 'extra workout', 'counts', 'trained'],
     rule: 'Finishing a workout of your own on a day with no plan session marks that day trained; beside a plan session, the plan\'s session still counts as to do.',
     why: 'Your own workout is extra; counting it as the day\'s session is your choice, never the default.' },
+  { area: 'Weekly structure', anchor: { file: 'src/lib/circuit.ts', token: 'couldReplaceASession' }, also: ['walk', 'cardio', 'instead', 'replace', 'count it', 'todays workout', 'swap'],
+    numbersFrom: [{ file: 'src/lib/circuit.ts', token: 'SESSION_MINUTES' }],
+    rule: 'Cardio logged on a day with a lifting session still to do is asked about as a replacement only when it is a timer circuit, or 20 minutes or more at Steady or Hard; an easy walk is kept as extra and the session stays on.',
+    why: 'An easy walk is movement, not a substitute for resistance training; a circuit or 20 minutes of steady or hard work is a conditioning session of its own.' },
 ]
 
 /** Files that mention a coaching decision but make none of their own; each with the reason. */
