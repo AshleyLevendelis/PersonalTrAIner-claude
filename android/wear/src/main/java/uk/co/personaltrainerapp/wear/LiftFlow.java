@@ -80,6 +80,16 @@ final class LiftFlow {
     }
 
     /** The count alone, as the set line prints it beside "3 ×": "10", or "30s" for a hold (28 Nov 2026, his mock). */
+    /**
+     * The set line's number size, so "3 × 10 @ 100kg" fits across the round face on ONE line (his gym photo, 27 Nov 2026:
+     * a weight that did not fit wrapped one letter per line, "4 / 0 / k / g"). Counted in characters of the mono face,
+     * the unit at half size: 26sp up to 10, 22sp up to 13, else 18sp.
+     */
+    static int setLineSp(int sets, String count, String kg, String unit) {
+        double chars = (sets + " ×").length() + count.length() + 1 + kg.length() + (unit == null ? 0 : unit.length() / 2.0);
+        return chars <= 10 ? 26 : chars <= 13 ? 22 : 18;
+    }
+
     static String countText(int value, String reps) {
         return timed(reps) ? value + "s" : String.valueOf(value);
     }

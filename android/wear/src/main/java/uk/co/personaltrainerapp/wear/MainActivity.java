@@ -404,14 +404,17 @@ public class MainActivity extends Activity {
     private void setLine(TodayStore.Exercise x, int topDp) {
         LinearLayout r = row(topDp);
         int reps = TodayStore.reps(this, x);
-        TextView sets = inline(r, x.sets + " ×", 22, MUTED, WatchStyle.mono(this));
+        String count = LiftFlow.countText(reps, x.reps);
+        double kg = x.kg >= 0 ? TodayStore.kg(this, x) : 0;
+        String[] load = x.kg >= 0 ? LiftFlow.loadParts(x.load, kg) : null;
+        // ONE LINE, sized to fit (his gym photo, 27 Nov 2026: "40kg" wrapped a letter a line).
+        int sp = LiftFlow.setLineSp(x.sets, count, load == null ? "" : load[0], load == null ? null : load[1]);
+        TextView sets = inline(r, x.sets + " ×", sp - 4, MUTED, WatchStyle.mono(this));
         ((LinearLayout.LayoutParams) sets.getLayoutParams()).rightMargin = dp(2);
-        tapNumber(r, LiftFlow.countText(reps, x.reps), null, reps != LiftFlow.plannedReps(x.reps) ? WatchStyle.VIOLET : FG, v -> showEdit(x, false));
-        if (x.kg >= 0) {
-            double kg = TodayStore.kg(this, x);
-            String[] load = LiftFlow.loadParts(x.load, kg);
+        tapNumber(r, count, null, reps != LiftFlow.plannedReps(x.reps) ? WatchStyle.VIOLET : FG, sp, v -> showEdit(x, false));
+        if (load != null) {
             inline(r, "@", 15, MUTED, WatchStyle.medium(this));
-            tapNumber(r, load[0], load[1], kg != x.kg ? WatchStyle.VIOLET : MINT, v -> showEdit(x, true));
+            tapNumber(r, load[0], load[1], kg != x.kg ? WatchStyle.VIOLET : MINT, sp, v -> showEdit(x, true));
         } else if (x.load != null && !x.load.isEmpty()) {
             TextView load = inline(r, " " + x.load, 15, MUTED, WatchStyle.semibold(this));
             load.setGravity(Gravity.CENTER_VERTICAL);
@@ -419,15 +422,16 @@ public class MainActivity extends Activity {
     }
 
     /** A number to tap in the set line: monospaced, its unit half size, underlined so it reads as something to press. */
-    private void tapNumber(LinearLayout parent, String value, String unit, int color, View.OnClickListener onClick) {
+    private void tapNumber(LinearLayout parent, String value, String unit, int color, int sp, View.OnClickListener onClick) {
         TextView t = new TextView(this);
         SpannableString text = new SpannableString(unit == null ? value : value + unit);
         if (unit != null) text.setSpan(new android.text.style.RelativeSizeSpan(0.5f), value.length(), text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         t.setText(text);
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
         t.setTypeface(WatchStyle.mono(this));
         t.setTextColor(color);
         t.setGravity(Gravity.CENTER);
+        t.setSingleLine(true);
         t.setMinHeight(dp(48));
         t.setPadding(dp(5), 0, dp(5), 0);
         t.setBackground(WatchStyle.tapUnderline(dp(2), dp(9), dp(10)));
@@ -899,6 +903,7 @@ public class MainActivity extends Activity {
         t.setTextColor(color);
         t.setTypeface(face);
         t.setIncludeFontPadding(false);
+        t.setSingleLine(true);
         parent.addView(t, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         return t;
     }

@@ -119,6 +119,8 @@ public final class FlowCheck {
         out("count.text", LiftFlow.countText(8, "8-12") + "|" + LiftFlow.countText(35, "30s"));
         out("load.parts", String.join(",", LiftFlow.loadParts("100 kg", 97.5)) + "|" + String.join(",", LiftFlow.loadParts("16 kg (single side)", 14))
             + "|" + String.join(",", LiftFlow.loadParts("20 kg per hand", 18)) + "|" + String.join(",", LiftFlow.loadParts("", 40)));
+        // One line across the face (his gym photo, 27 Nov 2026: "40kg" wrapped a letter a line): short at 26, longer smaller.
+        out("line.sp", LiftFlow.setLineSp(3, "10", "40", "kg") + "," + LiftFlow.setLineSp(3, "12", "102.5", "kg") + "," + LiftFlow.setLineSp(4, "120s", "102.5", "kg"));
         // The rest: ±15s, never below zero or above ten minutes; the early buzz only on a rest of 30s or more.
         out("rest.plus", LiftFlow.nudgeRestMs(60_000, 1));
         out("rest.floor", LiftFlow.nudgeRestMs(10_000, -1));
@@ -203,6 +205,7 @@ check('the load keeps its words ("97.5 kg", "18 kg per hand")', is('kg.load', '9
 check('the set line prints the count alone ("8", "35s")', is('count.text', '8|35s'), got['count.text'])
 check('the weight splits into the number he taps, its unit, and its other words ("single side", "per hand")',
   is('load.parts', '97.5,kg,|14,kg,single side|18,kg,per hand|40,kg,'), got['load.parts'])
+  check('the set line fits on one line: 26sp for "3 × 10 @ 40kg", smaller as it grows (his gym photo, "40kg" wrapped a letter a line)', got['line.sp'] === '26,22,18', got['line.sp'])
 
 console.log('\n8. The rest')
 check('+15s adds fifteen seconds', is('rest.plus', '75000'))
