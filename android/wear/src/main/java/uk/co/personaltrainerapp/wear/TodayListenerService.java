@@ -13,7 +13,12 @@ public class TodayListenerService extends WearableListenerService {
             if (e.getType() != DataEvent.TYPE_CHANGED) continue;
             if (!Protocol.TODAY_PATH.equals(e.getDataItem().getUri().getPath())) continue;
             String json = DataMapItem.fromDataItem(e.getDataItem()).getDataMap().getString(Protocol.TODAY_KEY);
-            if (json != null) TodayStore.save(this, json);
+            if (json != null) {
+                TodayStore.save(this, json);
+                // FINISHED ON THE PHONE (27 Nov 2026, the battery): today's weights session is done there, so the watch's
+                // workout ends too, its calories sent first (MainActivity's End sends them the same way).
+                if (WorkoutService.LIVE.running && "lift".equals(WorkoutService.LIVE.kind) && TodayStore.finishedToday(json)) WorkoutService.end(this);
+            }
         }
         MainActivity.refreshIfOpen();
     }

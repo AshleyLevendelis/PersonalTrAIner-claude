@@ -120,7 +120,7 @@ export const INTEGER_COLUMNS: Record<string, readonly string[]> = {
   weight_basis_offers: ['applied_from_week'],
   workout_exercises: ['execution_order', 'rest_seconds', 'rpe_target', 'sets', 'tier'],
   workout_logs: ['reps_completed', 'set_number'],
-  workout_sessions: ['avg_heart_rate', 'duration_minutes', 'effort', 'max_heart_rate', 'week_number'],
+  workout_sessions: ['active_kcal', 'avg_heart_rate', 'duration_minutes', 'effort', 'max_heart_rate', 'week_number'],
 }
 
 /**

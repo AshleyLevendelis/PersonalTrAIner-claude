@@ -29,7 +29,7 @@ function typeInto(id: string | undefined, value: string): boolean {
   return true
 }
 
-export default function WatchLink({ rows, cardio, days, listEl, today, logs, title, age, noZones }: {
+export default function WatchLink({ rows, cardio, days, listEl, today, logs, title, age, noZones, finished = false }: {
   rows: WatchRow[]
   /** Today's planned cardio session, for the watch to run (rounds or minutes). */
   cardio?: WatchCardio | null
@@ -43,6 +43,8 @@ export default function WatchLink({ rows, cardio, days, listEl, today, logs, tit
   age: number | null
   /** A health condition is ticked: the watch shows heart rate, never a zone (the phone's own rule). */
   noZones: boolean
+  /** Today's session is finished on the phone: the watch ends its weights workout. */
+  finished?: boolean
 }) {
   // THE PHONE'S NEXT SET, read off the list's own Log set facts and kept as text so a redraw that changes nothing sends
   // nothing (his gym report 27 Nov 2026: the watch and phone named different lifts and numbers).
@@ -56,7 +58,7 @@ export default function WatchLink({ rows, cardio, days, listEl, today, logs, tit
     return () => watcher.disconnect()
   }, [listEl, rows])
   const now = nowJson ? (JSON.parse(nowJson) as ReturnType<typeof watchNowFrom>) : null
-  const payload = watchTodayPayload({ date: today, title, estimatedMax: noZones ? null : estimatedMaxHeartRate(age), rows, cardio, days, now })
+  const payload = watchTodayPayload({ date: today, title, estimatedMax: noZones ? null : estimatedMaxHeartRate(age), rows, cardio, days, now, finished })
   useEffect(() => {
     if (payload) void import('@/lib/watch-bridge').then(m => m.publishToday(payload)).catch(() => {})
   }, [payload])

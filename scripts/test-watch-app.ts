@@ -385,9 +385,21 @@ async function main() {
   const svcHr = strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/WorkoutService.java'))
   const holdMs = Number(/HR_HOLD_MS = ([\d_]+)L?;/.exec(svcHr)?.[1]?.replace(/_/g, ''))
   check('the watch holds a reading through a sensor skip exactly as long as the phone does', holdMs === strap.WATCH_STALE_MS, { holdMs })
-  check('with the screen off the watch is asked for heart rate every five seconds, where it says it can (his walk, 27 Nov 2026)',
-    /if \(caps\.getSupportedBatchingModeOverrides\(\)\.contains\(BatchingMode\.HEART_RATE_5_SECONDS\)\) \{\s*builder\.setBatchingModeOverrides\(java\.util\.Collections\.singleton\(BatchingMode\.HEART_RATE_5_SECONDS\)\);/.test(svcHr) && /ExerciseConfig config = builder\.build\(\);/.test(svcHr))
-  check('readings go to the phone every second, never five (the phone ran behind the wrist)', Number(/BATCH_MS = (\d+);/.exec(svcHr)?.[1]) <= 1000)
+  // RE-ANCHORED 27 Nov 2026 (his "draining my watch battery fast"): cardio only.
+  check('with the screen off a CARDIO workout is asked for heart rate every five seconds, where the watch says it can (his walk, 27 Nov 2026)',
+    /if \("cardio"\.equals\(kind\) && caps\.getSupportedBatchingModeOverrides\(\)\.contains\(BatchingMode\.HEART_RATE_5_SECONDS\)\) \{\s*builder\.setBatchingModeOverrides\(java\.util\.Collections\.singleton\(BatchingMode\.HEART_RATE_5_SECONDS\)\);/.test(svcHr) && /ExerciseConfig config = builder\.build\(\);/.test(svcHr))
+  // THE BATTERY (27 Nov 2026, his "the app is draining my watch battery fast").
+  const msOf = (name: string) => Number((new RegExp(`${name} = ([\\d_]+);`).exec(svcHr)?.[1] ?? '').replace(/_/g, ''))
+  check('readings go to the phone every second while the watch app is on screen (the phone keeps up with the wrist)', msOf('BATCH_VISIBLE_MS') <= 1000 && /appVisible \? BATCH_VISIBLE_MS : BATCH_HIDDEN_MS/.test(svcHr))
+  check('...and every 10 seconds with it away, inside the phone\'s 15 second hold', msOf('BATCH_HIDDEN_MS') >= 5000 && msOf('BATCH_HIDDEN_MS') < strap.WATCH_STALE_MS)
+  const mainB = strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/MainActivity.java'))
+  check('the watch app says when it is on screen', /super\.onResume\(\);\s*WorkoutService\.appVisible = true;/.test(mainB) && /super\.onPause\(\);\s*WorkoutService\.appVisible = false;/.test(mainB))
+  check('the screen is never held on for a weights session (the rest buzzes with it off)', !/addFlags\(WindowManager\.LayoutParams\.FLAG_KEEP_SCREEN_ON\)/.test(mainB))
+  check('a weights workout with no set or rest for 90 minutes ends itself', msOf('LIFT_IDLE_END_MS') === 0 ? /LIFT_IDLE_END_MS = 90 \* 60 \* 1000;/.test(svcHr) && /"lift"\.equals\(LIVE\.kind\) && LIVE\.running && SystemClock\.elapsedRealtime\(\) - LIVE\.lastActionAt > LIFT_IDLE_END_MS\) \{[\s\S]{0,120}end\(WorkoutService\.this\);/.test(svcHr) && /static void rest\([^)]*\) \{\s*LIVE\.lastActionAt = SystemClock\.elapsedRealtime\(\);/.test(svcHr) : false)
+  const listenerSrc = strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/TodayListenerService.java'))
+  check('a session finished on the phone ends the watch\'s weights workout', /if \(WorkoutService\.LIVE\.running && "lift"\.equals\(WorkoutService\.LIVE\.kind\) && TodayStore\.finishedToday\(json\)\) WorkoutService\.end\(this\);/.test(listenerSrc)
+    && JSON.parse(watchTodayPayload({ date: '2026-11-27', title: 't', estimatedMax: null, rows: [{ id: 'a', name: 'A', sets: 1, reps: '5', suggestedLoad: '', restSeconds: 60, done: 1 }] as never, finished: true }) ?? '{}').finished === true
+    && /finished=\{status === 'finished'\}/.test(read('src/components/exercise/TodayPanel.tsx')))
 
   console.log(`\n${ran} checks ran`)
   if (failures > 0) { console.error(`${failures} failure(s)`); process.exit(1) }

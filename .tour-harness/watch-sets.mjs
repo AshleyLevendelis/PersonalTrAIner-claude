@@ -160,7 +160,7 @@ if (await ev(`!!(${btn('/^Not now$/')})`)) { await clickAt(btn('/^Not now$/')); 
 const last7 = sent
 const lift7 = target ? { ...target, done: 2 } : null
 const homeBefore = await ev(`!!document.querySelector('[data-testid="watch-sets-home"]')`)
-const ev7 = { id: 'h7', type: 'set', date: last7?.date, exerciseId: lift7?.id, name: lift7?.name, setNumber: (lift7?.done ?? 0) + 1, at: Date.now() }
+const ev7 = { id: 'h7', type: 'set', date: last7?.date, exerciseId: lift7?.id, name: lift7?.name, setNumber: (lift7?.done ?? 0) + 1, at: now + 7 }
 await ev(`(() => { window.__watchInbox = [${JSON.stringify(ev7)}]; window.__watchWake && window.__watchWake() })()`)
 const homeLine = await until(() => ev(`document.querySelector('[data-testid="watch-sets-home"]')?.innerText ?? null`), v => !!v, 20)
 check('7a. on Home, a set from the watch is said to be waiting (and nothing was said before)', homeBefore === false && /1 set from your watch is waiting/.test(homeLine ?? ''), { homeBefore, homeLine, lift7: lift7?.name })
