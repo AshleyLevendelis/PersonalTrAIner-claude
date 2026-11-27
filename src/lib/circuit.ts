@@ -67,6 +67,38 @@ export interface CircuitOffer {
   lines: string[]
 }
 
+/** A round off the timer, as its log's note reads: "5 × 3 min", "2 × 10s, 5s rest". */
+const ROUND_SHAPE = /^\s*\d+\s*×/
+
+/** Steady is RPE 5 (cardio-effort.ts: Easy up to 4, Steady 5-6, Hard 7+). */
+const STEADY_RPE = 5
+/** Minutes of Steady or Hard cardio that make a session of their own. */
+const SESSION_MINUTES = 20
+
+/**
+ * WHETHER WHAT WAS LOGGED COULD STAND IN FOR A LIFTING SESSION — his ruling 27 Nov 2026, "Only ask after real work"
+ * (his walk before the gym: "a cardio session shouldn't necessarily overtake a weight session"). CSCS, mine: a round
+ * off the timer is a conditioning session in itself, and so is 20 minutes or more at Steady or Hard; an easy walk or a
+ * short easy spin is movement, not a substitute for resistance training, so it is logged as extra and never offered
+ * as the day's workout. Logs with no effort recorded count as Easy (the app never assumes effort it was not told).
+ */
+export function couldReplaceASession(logs: readonly { duration_minutes: number; intensity_rpe?: number | null; notes?: string | null }[]): boolean {
+  if (logs.some(l => ROUND_SHAPE.test(l.notes ?? ''))) return true
+  const workMinutes = logs.reduce((n, l) => n + ((l.intensity_rpe ?? 0) >= STEADY_RPE ? Math.max(0, l.duration_minutes) : 0), 0)
+  return workMinutes >= SESSION_MINUTES
+}
+
+/**
+ * What the Today card says instead of the question, after cardio that cannot stand in for the session: that it was
+ * kept, and that the session is still on. Null where the question is asked, or where there is no session due.
+ */
+export function cardioExtraNote(input: Parameters<typeof circuitOfferFor>[0]): { lines: string[]; sentence: string } | null {
+  const { dayState, sessionFocus, sessionHasExercises, workingSetsToday, logs } = input
+  if (logs.length === 0 || !sessionFocus || !sessionHasExercises || dayState !== 'due' || workingSetsToday > 0) return null
+  if (couldReplaceASession(logs)) return null
+  return { lines: logs.map(blockLine), sentence: `Saved as extra. ${sessionFocus} is still on for today.` }
+}
+
 /**
  * Whether to offer "count this as today's workout", and what it would say.
  *
@@ -81,13 +113,14 @@ export function circuitOfferFor(input: {
   sessionFocus: string | null
   sessionHasExercises: boolean
   workingSetsToday: number
-  logs: readonly { activity_name: string; duration_minutes: number; notes?: string | null }[]
+  logs: readonly { activity_name: string; duration_minutes: number; intensity_rpe?: number | null; notes?: string | null }[]
 }): CircuitOffer | null {
   const { dayState, sessionFocus, sessionHasExercises, workingSetsToday, logs } = input
   if (logs.length === 0) return null
   if (!sessionFocus || !sessionHasExercises) return null
   if (dayState !== 'due') return null
   if (workingSetsToday > 0) return null
+  if (!couldReplaceASession(logs)) return null
   return {
     sessionFocus,
     name: circuitName(blockNames(logs)),

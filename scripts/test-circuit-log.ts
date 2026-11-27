@@ -141,7 +141,7 @@ async function main() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setSupabaseClient(fakeClient as any)
   const { blockShape } = await import('../src/lib/timer-engine')
-  const { circuitName, blockNames, blockLine, circuitOfferFor, BLOCK_NAMES } = await import('../src/lib/circuit')
+  const { circuitName, blockNames, blockLine, circuitOfferFor, couldReplaceASession, cardioExtraNote, BLOCK_NAMES } = await import('../src/lib/circuit')
   const ev = await import('../supabase/functions/_shared/message-evidence.ts')
 
   console.log('\n1. A block is written down the way she would write it')
@@ -178,6 +178,21 @@ async function main() {
   check('not on a day with no lifting session', circuitOfferFor({ ...base, sessionFocus: null, sessionHasExercises: false }) === null)
   check('not on a walk day (nothing to lift to replace)', circuitOfferFor({ ...base, sessionHasExercises: false }) === null)
   check('not with nothing logged', circuitOfferFor({ ...base, logs: [] }) === null)
+
+  // HIS RULING 27 NOV 2026, "Only ask after real work": an easy walk is extra, never the day's workout.
+  const walk = [{ activity_name: 'Walk', duration_minutes: 19, intensity_rpe: 3, notes: null }]
+  check('an easy 19 min walk is not offered as the day\'s workout', circuitOfferFor({ ...base, logs: walk }) === null)
+  const note = cardioExtraNote({ ...base, logs: walk })
+  check('...the card says it was kept as extra and the session is still on', note?.sentence === 'Saved as extra. Upper Pull & Core is still on for today.' && note?.lines[0] === 'Walk · 19 min', note)
+  check('a hard 30 min bike IS offered (a session of its own)', !!circuitOfferFor({ ...base, logs: [{ activity_name: 'Bike', duration_minutes: 30, intensity_rpe: 7, notes: null }] }))
+  check('20 min at Steady is the line: offered at 20, not at 19', couldReplaceASession([{ duration_minutes: 20, intensity_rpe: 5 }]) && !couldReplaceASession([{ duration_minutes: 19, intensity_rpe: 5 }]))
+  check('...and 60 easy minutes is still not a session (RPE 4 is Easy)', !couldReplaceASession([{ duration_minutes: 60, intensity_rpe: 4 }]))
+  check('steady minutes add up across logs (10 + 10)', couldReplaceASession([{ duration_minutes: 10, intensity_rpe: 6 }, { duration_minutes: 10, intensity_rpe: 7 }]))
+  check('a round off the timer is a session however short (2 × 10s)', couldReplaceASession([{ duration_minutes: 1, intensity_rpe: 3, notes: '2 × 10s, 5s rest' }]))
+  check('no extra note where the question is asked', cardioExtraNote(base) === null)
+  check('no extra note once he has lifted, or on a day with nothing due', cardioExtraNote({ ...base, logs: walk, workingSetsToday: 1 }) === null && cardioExtraNote({ ...base, logs: walk, dayState: 'swapped' }) === null)
+  const chatSrc = readFileSync('src/components/ChatAssistant.tsx', 'utf8')
+  check('the coach\'s cardio card offers "count it" by the same rule', /dayState === 'due' && couldReplaceASession\(\[\{ duration_minutes: minutes, intensity_rpe: intensityRpe \}\]\)/.test(chatSrc))
 
   console.log('\n4. The coach builds the card only from what SHE said')
   const secs = ev.statedDurationsSeconds(HER_MESSAGE)
@@ -283,7 +298,7 @@ async function main() {
   const offer = strip(readFileSync('src/components/exercise/CircuitOffer.tsx', 'utf8'))
   check('Today renders the offer', /<CircuitOffer[\s\S]{0,300}session=\{workout\}/.test(today))
   check('Tools renders the same offer under a logged block', /loggedNote && \(\s*<CircuitOffer/.test(tools))
-  check('the offer decides through circuitOfferFor', /circuitOfferFor\(\{/.test(offer))
+  check('the offer decides through circuitOfferFor', /const offer = circuitOfferFor\(input\)/.test(offer) && /const extra = offer \? null : cardioExtraNote\(input\)/.test(offer))
   check('...and writes the day swap with the offer\'s own name', /setSwappedForActivity\(profileId, date, offer\.name\)/.test(offer))
   check('...and writes no cardio row of its own', !/saveCardioLog/.test(offer))
   const chat = strip(readFileSync('src/components/ChatAssistant.tsx', 'utf8'))

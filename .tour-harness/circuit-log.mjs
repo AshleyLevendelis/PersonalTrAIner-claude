@@ -102,7 +102,7 @@ const homeBefore = await homeCounts()
 const a = await offerReady()
 check('1. the Today card offers to count them as today\'s workout', a.offer === true, a)
 check('2. ...listing each block with its shape', JSON.stringify(a.blocks) === JSON.stringify(['Skipping rope · 5 × 3 min', 'Assault bike · 5 × 15s, 45s rest']), a.blocks)
-check('3. ...and naming the session they would replace (today\'s, read off the page)', !!a.text && !!a.focus && a.text.includes(`instead of ${a.focus}?`), { text: a.text, focus: a.focus })
+check('3. ...and naming the session they would replace (today\'s, read off the page)', !!a.text && !!a.focus && a.text.includes(`Saved either way. Did this replace ${a.focus} today?`), { text: a.text, focus: a.focus })
 await shoot('circuit-offer-today')
 const before = await fake()
 check('4. counting it', await tapTestId('circuit-offer-yes'))
@@ -119,11 +119,11 @@ check('7b. counting it counts as a session done, of the same number owed (it rea
 // cannot move them, and the pill must say the same before and after.
 check('7c. ...and the weeks on plan do not go down', homeBefore.weeks != null && homeAfter.weeks === homeBefore.weeks, { homeBefore, homeAfter })
 
-console.log('\nB. "Not today"')
+console.log('\nB. "No, I\'ll still train"')
 await open('circuit=1')
 const b = await offerReady()
 check('8. the offer is back on a fresh day\'s load', b.offer === true, b)
-check('9. tapping Not today', await tapTestId('circuit-offer-no'))
+check('9. tapping No, I\'ll still train', await tapTestId('circuit-offer-no'))
 await wait(600)
 const b2 = await readOffer()
 check('10. ...puts it away, and writes nothing', !b2.offer && !b2.swapped && (await fake()).sessions.every(s => !s.swapped), b2)
@@ -137,6 +137,19 @@ await open('plain=1')
 await wait(1500)
 const c = await readOffer()
 check('12. no blocks, no offer', !c.offer, c)
+
+// D. AN EASY WALK IS NOT ASKED ABOUT (his ruling 27 Nov 2026, "Only ask after real work"; his walk before the gym had
+// "Count it as today's workout" or "Not today", and the session went). It says it kept the walk and the session is on.
+console.log('\nD. An easy walk logged before the session')
+await open('oldwalk=1')
+let d = await readOffer()
+for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('[data-testid="cardio-extra-note"]')`)); i++) { await wait(400) }
+d = await readOffer()
+const note = await ev(`document.querySelector('[data-testid="cardio-extra-note"]')?.innerText.replace(/\\s+/g, ' ').trim() ?? null`)
+check('13a. no question: an easy walk cannot replace the session', !d.offer && !d.swapped, d)
+check('13b. ...the card says the walk was kept and the session is still on', !!note && /Walk · 5 min/.test(note) && !!d.focus && note.includes(`Saved as extra. ${d.focus} is still on for today.`), { note, focus: d.focus })
+await shoot('circuit-easy-walk-extra')
+check('13c. ...and Start is still the session\'s own button', (await ev(`document.querySelector('[data-testid="hero-start"]')?.textContent.trim() ?? null`)) === 'Start session')
 
 const err = await ev('window.__err ?? null')
 check('13. no uncaught error on the page', err === null, err)

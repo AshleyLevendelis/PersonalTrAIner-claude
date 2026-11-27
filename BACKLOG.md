@@ -17,6 +17,17 @@ Newest first. One line each.
   Android 14's own classes (the Robolectric android-all jar; Google's download server is blocked here, so the files
   that need Play Services and Health Services were not), with a planted error caught. NOT built for a watch or seen
   on one: the redraw is from the code, not a photo. Needs a watch rebuild on his machine.
+- [x] **AN EASY WALK NO LONGER TAKES OVER A WEIGHTS DAY (27 Nov 2026; his walk before the gym, logged, then "Count this as today's workout instead of Upper Pull & Core?" with "Count it as today's workout" / "Not today": he tapped yes "because it seemed like the only option that would actually log the walk without losing it", and the app then read as trained. "A cardio session shouldn't necessarily overtake a weight session or the wording needs to be different").**
+  HIS RULING, from three options: **"Only ask after real work"** (over always asking with clearer words, and over never
+  asking). The question is asked only after a timer circuit, or 20+ minutes at Steady or Hard; anything less is kept as
+  extra and the card says so: "Logged today: ✓ Walk · 19 min. Saved as extra. Upper Pull & Core is still on for
+  today." The question itself now says the log is safe and what each button does: "Saved either way. Did this replace
+  Upper Pull & Core today?" with "Yes, it replaced it" / "No, I'll still train". The coach's cardio card offers "Count
+  it as today's workout" by the same rule (`couldReplaceASession`, one function). CSCS, mine, the line: Steady is RPE
+  5 (cardio-effort's own bands), 20 minutes is a conditioning session; an easy walk is movement, not a substitute for
+  resistance training; a log with no effort counts as easy. The why-sheet has the line. `test:circuit-log` (11 new
+  checks), `verify:circuit-log` §D (3 new); 8 mutations, 8 caught. His own day today stays swapped (nothing rewrites a
+  swap he tapped); "Train it anyway" trains it. The why-sheet line needs the `chat-gemini` deploy.
 - [x] **THE WATCH'S HEART RATE ON THE PHONE KEPT GOING BLANK AND RAN 5 SECONDS BEHIND (27 Nov 2026, his first walk recorded on the watch: "the heart rate seems to drop occasionally, quite often ... my Samsung watch generally doesn't drop out that much ... about a 5-second delay", then "when the watch screen is off ... I think that might also be happening").**
   MEASURED IN THE CODE, three causes, all ours. (1) The watch sent its readings in 5-second batches, and the phone
   drew a reading only while it was under 5 seconds old, so the newest reading in each batch went stale before the
