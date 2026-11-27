@@ -31,10 +31,12 @@ function fakeFrom(table: string) {
   const exec = () => {
     db[table] ??= []
     if (op === 'insert') { const rows = payload.map(r => ({ id: `r${Math.random()}`, ...r })); db[table].push(...rows); return { data: rows[0] ?? null, error: null } }
+    if (op === 'update') { const hit = db[table].filter(r => filters.every(f => f(r))); for (const r of hit) Object.assign(r, payload[0]); return { data: hit.map(r => ({ ...r })), error: null } }
     return { data: db[table].filter(r => filters.every(f => f(r))).map(r => ({ ...r })), error: null }
   }
   const api: Record<string, unknown> = {
     select: () => api, insert: (r: Row | Row[]) => { op = 'insert'; payload = Array.isArray(r) ? r : [r]; return api },
+    update: (r: Row) => { op = 'update'; payload = [r]; return api },
     eq: (c: string, v: unknown) => { filters.push(r => r[c] === v); return api },
     gte: (c: string, v: unknown) => { filters.push(r => String(r[c]) >= String(v)); return api },
     lte: (c: string, v: unknown) => { filters.push(r => String(r[c]) <= String(v)); return api },
@@ -153,6 +155,19 @@ async function main() {
   const late = Date.now() - 60 * 60_000
   await applyWatchEvents([{ id: 'h2', type: 'hr', samples: [[late, 120], [late + 1000, 121], [late + 2000, 119]] }], ctx)
   check('a batch that waited on the watch is kept at its own time but is never "live"', strap.liveHeartRate() === null && strap.strapReadingsBetween(new Date(late - 1000), new Date(late + 5000))?.max === 121, { live: strap.liveHeartRate(), sum: strap.strapReadingsBetween(new Date(late - 1000), new Date(late + 5000)) })
+  // CALORIES FOR A WEIGHTS SESSION (his request 27 Nov 2026, "my watch was on the weight session ... it didn't log any
+  // calories burned"): kept with the day's session, and on the phone first when there is no row (or no column) yet.
+  const cal = await import('../src/lib/session-calories')
+  const r0 = await applyWatchEvents([{ id: 'l1', type: 'lift-end', date: '2026-11-27', kcal: 241.6, startedAt: 1, endedAt: 2 }], ctx)
+  check('the watch\'s calories for a weights session with no session row yet are kept on the phone and shown', r0.logged === 1 && (await cal.readSessionCalories('p1', '2026-11-27')) === 242)
+  db.workout_sessions = [{ id: 'ws1', profile_id: 'p1', date: '2026-11-27' }]
+  const shown = await cal.readSessionCalories('p1', '2026-11-27')
+  check('...and once the session row exists it is saved to it', shown === 242 && db.workout_sessions[0].active_kcal === 242, db.workout_sessions[0])
+  await applyWatchEvents([{ id: 'l2', type: 'lift-end', date: '2026-11-27', kcal: 0 }, { id: 'l3', type: 'lift-end', date: '2026-11-27', kcal: 99999 }], ctx)
+  check('...a count of nothing, or an impossible one, is not kept', db.workout_sessions[0].active_kcal === 242)
+  const mainKcal = strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/MainActivity.java'))
+  check('the watch sends a weights session\'s calories when he ends it', /private void endLift\(\) \{[\s\S]{0,500}e\.put\("type", "lift-end"\);[\s\S]{0,120}e\.put\("kcal", Math\.round\(l\.kcal\)\);[\s\S]{0,200}PhoneLink\.send\(this, e\);/.test(mainKcal))
+  check('the session summary shows them, from the session\'s own record', /readSessionCalories\(who, day\)/.test(strip(read('src/components/exercise/SessionSummaryDialog.tsx'))) && /data-testid="summary-calories"/.test(read('src/components/exercise/SessionSummaryDialog.tsx')))
 
   rec.writeRecording(null)
   const startedAt = Date.parse('2026-11-27T09:00:00')

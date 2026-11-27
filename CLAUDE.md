@@ -1887,6 +1887,10 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   to drop ... quite often"): the watch sends every second, and every 5 seconds with its screen off. `test:strap-live`,
   `test:watch-app`. Needs a watch rebuild
 
+- **A weights session's calories come from the watch: his ruling 27 Nov 2026, "Yes, with the database step"**: End workout
+  on the watch sends its count, kept with the day's session and shown on the summary ("· from your watch"); never a
+  food target change. `test:watch-app`, `verify:finish-check` 3e2. Needs migration 20261127150000 and a phone and watch
+  rebuild
 - **A Galaxy Watch app: his "Go in the watch with your recommendations" and his vision, 27 Nov 2026** ("Track workouts
   steps and heart rate. On a weight workout see 'next exercise 3x10 bench press @100kg' then start rest from watch, start
   next set"): `android/wear` (same app id and key). Cardio on the wrist (clock, heart rate and zone, steps on foot, End,

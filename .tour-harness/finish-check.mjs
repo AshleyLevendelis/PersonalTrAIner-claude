@@ -90,6 +90,7 @@ await until(`[...document.querySelectorAll('[role="dialog"] h2')].some(h => /^Se
 await wait(500)
 const c2 = await summary()
 check(`2d. THE FRACTION IS PLANNED OVER PLANNED: "${H.sets}/${N}"`, c2?.sets === `${H.sets}/${N}`, c2?.sets)
+check('2e0. a session with no calories from the watch says none', !!c2 && !/Calories/.test(c2.text), c2?.text)
 check('2e. ...labelled "Planned sets", with the extra set BESIDE it: "+1 extra"', c2?.setsLabel === 'Planned sets' && c2?.extra === '+1 extra', { label: c2?.setsLabel, extra: c2?.extra })
 const expectedKg = (H.sets + 1) * 30 * 8 * 2
 const volumeTile = (c2?.tiles ?? []).find(t => /Volume$/i.test(t)) ?? ''
@@ -162,7 +163,7 @@ const working = plan.filter(p => !p.prep)
 const last = working[working.length - 1]
 await beforeLoad(`window.__seedDb = (db, ctx) => {
   const plan = ${J(working)}
-  db.workout_sessions.push({ id: 'ws-today', profile_id: ctx.profileId, date: ctx.today, split_type: 'training', day: null, week_number: null, duration_minutes: 45, is_completed: false, started_at: ctx.today + 'T10:00:00' })
+  db.workout_sessions.push({ id: 'ws-today', active_kcal: 241, profile_id: ctx.profileId, date: ctx.today, split_type: 'training', day: null, week_number: null, duration_minutes: 45, is_completed: false, started_at: ctx.today + 'T10:00:00' })
   let k = 0
   window.__seededTimes = []
   plan.forEach((ex, e) => { for (let s = 1; s <= ex.sets; s++) {
@@ -186,6 +187,8 @@ await until(`[...document.querySelectorAll('[role="dialog"] h2')].some(h => /^Se
 await wait(500)
 check('3d. NO QUESTION: with nothing left the sheet does not appear', (await sheet()) === null)
 const c3 = await summary()
+// CALORIES FROM THE WATCH (his request 27 Nov 2026), read off the session's own record: this session has 241.
+check('3e2. the watch\'s calories for the session are on the card', /Calories 241 · from your watch/.test(c3?.text ?? ''), c3?.text)
 check(`3e. the card opens at once: "${N}/${N}" planned sets, and no extras`, c3?.sets === `${N}/${N}` && c3?.setsLabel === 'Planned sets' && c3?.extra === null, { sets: c3?.sets, label: c3?.setsLabel, extra: c3?.extra })
 // THE DRIVER'S OWN ARITHMETIC, with a literal ten: every gap between one set
 // and the next, none counted for more than ten minutes; the last gap runs to

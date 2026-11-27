@@ -728,7 +728,21 @@ public class MainActivity extends Activity {
     }
 
     private void endLift() {
-        if (WorkoutService.LIVE.running) WorkoutService.end(this);
+        WorkoutService.Live l = WorkoutService.LIVE;
+        // ITS CALORIES GO TO THE PHONE (his request 27 Nov 2026: "my watch was on the weight session ... it didn't log
+        // any calories burned"), kept with the day's session and shown on its summary.
+        if (l.running && l.kcal > 0) {
+            try {
+                JSONObject e = new JSONObject();
+                e.put("type", "lift-end");
+                e.put("date", TodayStore.today());
+                e.put("kcal", Math.round(l.kcal));
+                e.put("startedAt", l.startedAt);
+                e.put("endedAt", System.currentTimeMillis());
+                PhoneLink.send(this, e);
+            } catch (Exception ignored) { /* our own object */ }
+        }
+        if (l.running) WorkoutService.end(this);
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         showHome();
     }

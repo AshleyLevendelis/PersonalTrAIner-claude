@@ -13,6 +13,7 @@ import { readingFor, type SessionPRHit } from '@/lib/pr-engine'
 import { personalBest, BEST_SET_QUALIFIER, noSetsButCardio, extraSetsNote } from '@/lib/coach-voice'
 import type { DoubleProgressionRecommendation } from '@/lib/progression-engine'
 import { useEffect, useState } from 'react'
+import { readSessionCalories, subscribeSessionCalories } from '@/lib/session-calories'
 import { recordSessionEffort, readSessionEffort, effortWord, EFFORT_MIN, EFFORT_MAX } from '@/lib/session-feel'
 
 export interface SessionSummaryData {
@@ -58,6 +59,17 @@ export function SessionSummaryDialog({
   /** Whose session and which day, for the 1-10 effort row (his ruling 18 Nov 2026, "Build the 1–10"). */
   effortFor?: { profileId: string; date: string }
 }) {
+  // The watch's calories for this session (his request 27 Nov 2026), read when the card opens and again when they land.
+  const [calories, setCalories] = useState<number | null>(null)
+  const who = effortFor?.profileId, day = effortFor?.date
+  useEffect(() => {
+    if (!open || !who || !day) return
+    let live = true
+    const load = () => { void readSessionCalories(who, day).then(k => { if (live) setCalories(k) }) }
+    load()
+    const off = subscribeSessionCalories(load)
+    return () => { live = false; off() }
+  }, [open, who, day])
   const progressionLines = (data?.progressions ?? []).filter((entry): entry is readonly [string, { note: string; didProgress: boolean }] => entry[1] != null)
 
   return (
@@ -113,6 +125,13 @@ export function SessionSummaryDialog({
                 )}
               </div>
             </div>
+
+            {/* CALORIES FROM THE WATCH (his request 27 Nov 2026): for information, never a food target change. */}
+            {calories != null && (
+              <p className="text-[0.75rem] text-muted-foreground" data-testid="summary-calories">
+                Calories <span className="tabular-mono font-semibold text-foreground">{calories.toLocaleString()}</span> · from your watch
+              </p>
+            )}
 
             {/* A WARM-UP MOVE LEFT UNDONE IS NAMED (his report 27 Nov 2026): the fraction counts working sets only, so a
                 full one beside an untouched warm-up move read as everything done. "Not logged", never "skipped". */}

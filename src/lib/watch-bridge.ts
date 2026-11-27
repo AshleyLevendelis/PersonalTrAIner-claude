@@ -95,6 +95,9 @@ export async function applyWatchEvents(events: readonly unknown[], ctx: WatchCon
         const rec = await import('./recording-store')
         // Shown running on the phone; never over a workout already open there.
         if (!rec.readRecording()) { rec.writeRecording({ activity: e.activity, startedAt: new Date(num(e.startedAt)!).toISOString() }); out.started++ }
+      } else if (e.type === 'lift-end' && typeof e.date === 'string') {
+        // A WEIGHTS SESSION ENDED ON THE WATCH (his request 27 Nov 2026): its calories, kept with the day's session.
+        if (await (await import('./session-calories')).saveSessionCalories(ctx.profileId, e.date, e.kcal)) out.logged++
       } else if (e.type === 'cardio-end') {
         if (await logWatchCardio(e, ctx)) out.logged++
       } else if ((e.type === 'set' || e.type === 'set-undo') && typeof e.name === 'string' && num(e.setNumber) != null && typeof e.date === 'string') {
