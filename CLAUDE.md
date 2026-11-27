@@ -636,6 +636,10 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   **And all of a lift's warm-ups in one tap: his ruling 2 Nov 2026, "One tap for all"**, from three options (over one
   tap each and over unrecorded warm-ups): "Log all N warm-ups" logs every open row as written; the boxes stay.
   `verify:warmups-one-tap`, `measure:tap-count` (26 → 23 taps for a 19-set session)
+- **The next set's reps copy the set just done: his ruling 27 Nov 2026, "Copy the last set"** (over the bottom and the
+  middle of the range; it REVERSES the bottom-of-range blank for a row whose weight is carried): capped at the top of the
+  range, never when the nudge moved the weight; the box, the tick, the Log set button and the watch read one rule.
+  `test:set-row`, `verify:set-nudge` 2c-2d. **And the watch follows the phone's next set** (`verify:watch-sets` 2f)
 - **The next set moves with the reps just done: his ruling 23 Nov 2026, "1"** (over a question after every set and over
   leaving it): 3+ reps over the range's top moves the next set up one step, 2+ under its bottom down about 5%, with a
   line saying why; no tap, the once-per-lift question stays. Not in a testing week, deload, first session back, or a
