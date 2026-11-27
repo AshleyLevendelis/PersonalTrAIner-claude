@@ -2,6 +2,7 @@
 
 Newest first. One line each.
 
+- [x] **HOME'S CARD TITLE ON A SWAPPED DAY IS THE ACTIVITY'S NAME, NOT ITS WHOLE LOG LINE (27 Nov 2026, his screenshot after the walk: "Swapped for Walk · 19 min · Easy · 1.69 km" in the card's big type over three lines, the same line again under the week strip).** The title read the day's full logged line before the activity's name. It now reads the name ("Swapped for Walk"); the minutes, effort and distance stay on the line under the strip. `verify:qa-training` T9a2 (new; fixture `swapped=1&oldwalk=1`, a logged walk as the swap), 1 mutation, caught.
 - [x] **THE WATCH'S WEIGHT SESSION, TIGHTENED TO HIS MOCK WITH BIG BUTTONS (28 Nov 2026, his "tighten it to match my mock" and "the buttons need to be big enough to press with shaky sweaty hands in a gym").**
   A redraw of the session screens from the code on main showed them crowded on a round 225dp face: the main button half
   off the bottom (a scroll to reach it), the reps and weight chips touching the curve, "42.5 kg" wrapping on the weight

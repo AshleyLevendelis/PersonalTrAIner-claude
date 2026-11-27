@@ -602,7 +602,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   // A DAY SHE SWAPPED FOR SOMETHING ELSE (whole-app QA walk, 7 Nov 2026): Exercise said she had swapped today for
   // Muay Thai while Home still invited her to start the session. The swap is said here too, and Start is not offered
   // on a day she has already replaced; Exercise keeps its own way to train it anyway.
-  const swappedFor = todayCell?.state === 'swapped' ? (todayCell.swappedLine || todayCell.swappedForActivity || 'something else') : null
+  // THE TITLE IS THE ACTIVITY'S NAME, NOT ITS WHOLE LINE (his screenshot 27 Nov 2026: "Swapped for Walk · 19 min · Easy
+  // · 1.69 km" filled the card in big type, and the same line sat under the strip). The details stay on that line.
+  const swappedFor = todayCell?.state === 'swapped' ? (todayCell.swappedForActivity || todayCell.swappedLine || 'something else') : null
   // ...AND A DAY SHE SAID SHE MISSED, OR MADE A REST DAY (QA walk, 10 Nov 2026): Exercise said so with "Train it
   // anyway" while Home still showed the full session and its Start button. Said here too, and Start is not offered.
   const declaredToday = todayCell?.state === 'missed' || todayCell?.state === 'rest_chosen' || todayCell?.state === 'paused' ? todayCell.state : null

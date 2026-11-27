@@ -118,13 +118,15 @@ check('T2a. the set is saved', t2tapped && t2.sets === setsBefore + 1, { t2tappe
 check('T2b. ...and the day stays finished: no "Finish session" (it did not reopen), no "Start session"', t2.finished === true && t2.finishBtn === false && t2.start === false, t2)
 
 console.log('\nT9. A day she swapped for something else: Home says so and offers no Start\n')
-await open('swapped=1', 'dashboard')
+await open('swapped=1&oldwalk=1', 'dashboard')
 const t9 = await ev(`(() => ({
   title: document.querySelector('[data-home-title]')?.textContent ?? null,
   start: !!document.querySelector('[data-home-cta]'),
   strip: [...document.querySelectorAll('[aria-label]')].map(e => e.getAttribute('aria-label')).find(t => /swapped for/.test(t || '')) ?? null,
 }))()`)
-check('T9a. Home names the swap, the same activity the strip names', !!t9.title && /^Swapped for /.test(t9.title) && !!t9.strip && t9.strip.endsWith(t9.title.replace(/^Swapped for /, '')), t9)
+check('T9a. Home names the swap, the same activity the strip names', !!t9.title && /^Swapped for /.test(t9.title) && !!t9.strip && t9.strip.includes(t9.title.replace(/^Swapped for /, '')), t9)
+// His screenshot, 27 Nov 2026: the whole logged line ("Walk · 19 min · Easy · 1.69 km") was the card's title.
+check('T9a2. ...by its name only: the minutes and effort are not in the big title (the strip has them)', t9.title === 'Swapped for Walk' && /Walk · 5 min/.test(t9.strip ?? ''), t9)
 check('T9b. ...and does not invite her to start the session she replaced', t9.start === false, t9)
 await shoot('qa-t9-swapped-home')
 await open('', 'dashboard')
