@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { handleReportEmail, buildReportEmail, REASON_WORDS } from '../supabase/functions/_shared/report-email'
+import { handleReportEmail, buildReportEmail, buildInactiveWarningEmail, REASON_WORDS } from '../supabase/functions/_shared/report-email'
 import { REPORT_REASONS } from '../src/lib/reply-reports'
 
 const ROOT = join(import.meta.dirname ?? process.cwd(), '..')
@@ -67,6 +67,26 @@ async function main() {
       && /x-report-email-secret/.test(readFileSync(join(ROOT, 'supabase/functions/report-email/index.ts'), 'utf8')))
     const deploy = readFileSync(join(ROOT, 'scripts/deploy-functions.mjs'), 'utf8')
     check('the deploy turns off the sign-in check for it (the database has no sign-in)', /NO_JWT = new Set\([^)]*'report-email'/.test(deploy))
+  }
+
+  // THE WARNING BEFORE AN UNUSED ACCOUNT IS DELETED (his ruling 26 Nov 2026). It goes to the PERSON, never to Ashley,
+  // names the day in words, and says the one thing that stops it.
+  console.log('\n9. The inactive-account warning goes to the person, with the day and how to keep the account')
+  {
+    const w = { kind: 'inactive_warning', email: 'sam@example.test', name: 'Sam', delete_on: '2027-01-15' }
+    const m = buildInactiveWarningEmail(w)!
+    check('the subject names the day in words', m?.subject === 'Your Personal TrAIner account will be deleted on 15 January 2027', m?.subject)
+    check('...the body greets them by name, says what goes, and how to keep it (open the app, with its address)',
+      /^Hi Sam,/.test(m?.text ?? '') && /plan, logs, meals and chat/.test(m?.text ?? '') && /open the app before then: https:\/\/personal-tr-a-iner-claude-yco8\.vercel\.app/.test(m?.text ?? ''), m?.text)
+    check('...with no name, a plain "Hi,"', /^Hi,\n/.test(buildInactiveWarningEmail({ ...w, name: null })?.text ?? ''))
+    check('no address, a malformed one, or no day: no email', buildInactiveWarningEmail({ ...w, email: '' }) === null
+      && buildInactiveWarningEmail({ ...w, email: 'not-an-address' }) === null && buildInactiveWarningEmail({ ...w, delete_on: 'soon' }) === null)
+    sent.length = 0
+    const ok = await handleReportEmail('s3cret', w, deps())
+    const body = sent[0] ? JSON.parse(sent[0].init.body) : null
+    check('sent once, to THEM and not to the owner', ok.status === 200 && sent.length === 1 && body?.to?.length === 1 && body.to[0] === 'sam@example.test', body)
+    check('...a malformed warning sends nothing', (await handleReportEmail('s3cret', { ...w, email: 'x' }, deps())).status === 400 && sent.length === 1)
+    check('...and without the secret, nothing', (await handleReportEmail('wrong', w, deps())).status === 401 && sent.length === 1)
   }
 
   console.log(`\n${ran} checks ran.`)

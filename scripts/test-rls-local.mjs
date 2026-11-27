@@ -41,7 +41,9 @@ const PROFILE_LEGACY = 'cccccccc-0000-4000-8000-000000000003'
 const SESSION_A = 'dddddddd-0000-4000-8000-000000000001'
 
 let failures = 0
+let ran = 0
 const check = (name, ok, detail) => {
+  ran++
   if (ok) console.log(`  ok: ${name}`)
   else { failures++; console.error(`  FAIL: ${name}${detail !== undefined ? ` — ${JSON.stringify(detail)}` : ''}`) }
 }
@@ -340,7 +342,8 @@ try {
     // A RECORD, NOT A DRAFT (22 Nov 2026): a reported coach reply is kept for Ashley to review, so its sender can read
     // and delete it but never rewrite it after sending. Named here, so a table cannot become append-only by forgetting
     // its update policy: everything else must carry all four, and these exactly the three and no update.
-    const APPEND_ONLY = ['coach_reply_reports']
+    // The tester toolkit's two tables (25 Nov 2026) are records of the same kind: what happened, and what a tester said.
+    const APPEND_ONLY = ['coach_reply_reports', 'tester_events', 'tester_reports']
     const wrong = expectScoped
       .map(t => ({ table: t, policies: Number(counts.get(t) ?? 0) }))
       .filter(r => r.policies !== (APPEND_ONLY.includes(r.table) ? 3 : 4))
@@ -423,9 +426,107 @@ try {
     psql(`DELETE FROM own_workouts WHERE id = 'plan-a1';`, asB)
     check('...nor change or delete his', psql(`SELECT name FROM own_workouts WHERE id = 'plan-a1';`, asA) === 'Push')
   }
+
+  // HOW LONG TESTER DATA IS KEPT (his ruling 26 Nov 2026, "Activity 90 days, reports 1 year"). Rows either side of
+  // each limit, so a wrong interval on either table, or the two swapped, fails here.
+  console.log('\n12. Tester data is deleted after its limit, and not before')
+  {
+    psql(`DELETE FROM tester_events; DELETE FROM tester_reports;`)
+    psql(`INSERT INTO tester_events (profile_id, session_id, at, kind, created_at) VALUES
+      ('${PROFILE_A}', 's', now(), 'tap', now() - interval '91 days'),
+      ('${PROFILE_A}', 's', now(), 'tap', now() - interval '89 days'),
+      ('${PROFILE_A}', 's', now(), 'tap', now() - interval '200 days');`)
+    psql(`INSERT INTO tester_reports (profile_id, area, note, created_at) VALUES
+      ('${PROFILE_A}', 'other', 'old', now() - interval '366 days'),
+      ('${PROFILE_A}', 'other', 'recent', now() - interval '200 days');`)
+    const out = psql(`SELECT events_deleted || ' ' || reports_deleted FROM prune_tester_data();`)
+    check('the clean-up deletes 2 old activity rows and 1 old report', out === '2 1', out)
+    const leftE = psql(`SELECT count(*) FROM tester_events WHERE created_at > now() - interval '90 days';`)
+    const allE = psql(`SELECT count(*) FROM tester_events;`)
+    check('...keeps activity from inside 90 days, and only that', leftE === '1' && allE === '1', { leftE, allE })
+    const leftR = psql(`SELECT string_agg(note, ',') FROM tester_reports;`)
+    check('...keeps a report from 200 days ago (a report is kept a year)', leftR === 'recent', leftR)
+    const anonRun = expectRefused(`SELECT * FROM prune_tester_data();`, { role: 'anon' })
+    check('nobody signed out can run it', anonRun !== null && /permission/i.test(anonRun), anonRun)
+    const userRun = expectRefused(`SELECT * FROM prune_tester_data();`, { role: 'authenticated', uid: UID_A })
+    check('...nor anybody signed in', userRun !== null && /permission/i.test(userRun), userRun)
+  }
+
+  // AN UNUSED ACCOUNT IS DELETED AFTER TWO YEARS, EMAIL FIRST (his ruling 26 Nov 2026). Eight people, each on one side
+  // of one rule, run twice: first with no way to send email (nobody with an address may be warned, so nobody with an
+  // address is deleted unwarned), then with the email set up (a stub that records what it was asked to send).
+  console.log('\n13. An unused account is warned, then deleted; nobody is deleted unwarned')
+  {
+    const U = n => `33333333-0000-4000-8000-${String(n).padStart(12, '0')}`
+    const P = n => `44444444-0000-4000-8000-${String(n).padStart(12, '0')}`
+    const people = [
+      // [n, email, last active (days ago), warned (days ago) or null]
+      [1, 'one@example.test', 701, null],   // 23+ months idle: to be warned (deletion day = two years from last use)
+      [2, 'two@example.test', 800, 30],     // warned a month ago: deleted
+      [3, 'three@example.test', 800, 10],   // warned 10 days ago: kept for now
+      [4, null, 740, null],                 // no email, 2+ years: deleted, nobody to warn
+      [5, 'five@example.test', 100, null],  // in use: untouched
+      [6, 'six@example.test', 5, 40],       // came back after the warning: kept, warning void
+      [8, 'eight@example.test', 800, null], // 2+ years but never warned: warned, never deleted unwarned
+      [9, null, 400, null],                 // no email, idle over a year but under two: kept
+      [11, 'eleven@example.test', 800, 900], // warned in an EARLIER lapse, came back, idle again: that warning is void
+    ]
+    psql(people.map(([n, email]) => `INSERT INTO auth.users (id, email) VALUES ('${U(n)}', ${email ? `'${email}'` : 'NULL'});`).join('\n'))
+    const profile = (pid, uid, active, warned) => `INSERT INTO fitness_profiles (id, owner_id, age, gender, height_cm, weight_kg, activity_level, fitness_goal, training_days, preferred_time, display_name, last_active_on, inactive_warned_on)
+      VALUES ('${pid}','${uid}',30,'female',170,70,'moderate','muscle_gain','["mon"]','morning','Name${pid.slice(-2)}', current_date - ${active}, ${warned == null ? 'NULL' : `current_date - ${warned}`});`
+    psql(people.map(([n, , active, warned]) => profile(P(n), U(n), active, warned)).join('\n'))
+    // 7: an old plan left behind by "New Plan" (800 days idle) beside the plan the same person uses today.
+    psql(`INSERT INTO auth.users (id, email) VALUES ('${U(7)}', 'seven@example.test');` + profile(P(7), U(7), 800, null)
+      + profile('44444444-0000-4000-8000-000000000017', U(7), 0, null)
+      // ...and a second old plan of theirs, 23 months idle: not deletable yet, and never warned about (they are here)
+      + profile(P(10), U(7), 710, null))
+    psql(`INSERT INTO chat_messages (profile_id, role, content) VALUES ('${P(2)}','user','two says hi');`)
+    const has = pid => psql(`SELECT count(*) FROM fitness_profiles WHERE id = '${pid}';`) === '1'
+    const user = uid => psql(`SELECT count(*) FROM auth.users WHERE id = '${uid}';`) === '1'
+
+    const first = psql(`SELECT warned || ' ' || deleted FROM prune_inactive_accounts();`)
+    check('with no email set up: nobody warned; deleted are the warned-a-month-ago, the no-email and the old plan', first === '0 3', first)
+    check('...the warned account and its sign-in are gone, and its messages with it',
+      !has(P(2)) && !user(U(2)) && psql(`SELECT count(*) FROM chat_messages WHERE content = 'two says hi';`) === '0')
+    check('...the account with no email address is gone', !has(P(4)) && !user(U(4)))
+    check('...the old plan is gone, but its owner and the plan they use are not',
+      !has(P(7)) && user(U(7)) && has('44444444-0000-4000-8000-000000000017'))
+    check('...an account idle 2+ years and never warned is NOT deleted', has(P(8)) && user(U(8)))
+    check('...nor one warned only 10 days ago, nor one in use, nor one that came back', has(P(3)) && has(P(5)) && has(P(6)))
+    check('...nor one with no email idle under two years', has(P(9)))
+    check('...nor one whose only warning was before they came back', has(P(11)))
+    check('...nor the 23-month-old second plan of somebody still here', has(P(10)))
+    check('...and with no email to send, nobody is marked as warned',
+      psql(`SELECT count(*) FROM fitness_profiles WHERE id IN ('${P(1)}','${P(8)}') AND inactive_warned_on IS NOT NULL;`) === '0')
+
+    psql(`
+      CREATE SCHEMA IF NOT EXISTS vault;
+      CREATE TABLE vault.decrypted_secrets (name text, decrypted_secret text);
+      INSERT INTO vault.decrypted_secrets VALUES ('project_url', 'https://example.test'), ('report_email_secret', 's3cret');
+      CREATE SCHEMA IF NOT EXISTS net;
+      CREATE TABLE net.calls (url text, headers jsonb, body jsonb);
+      CREATE FUNCTION net.http_post(url text, headers jsonb, body jsonb) RETURNS bigint LANGUAGE sql AS $f$
+        INSERT INTO net.calls VALUES (url, headers, body) RETURNING 1::bigint
+      $f$;
+    `)
+    const notReady = psql(`SELECT warned || ' ' || deleted FROM prune_inactive_accounts();`)
+    check('with email set up but not yet able to reach anyone: still nobody warned or deleted', notReady === '0 0', notReady)
+    psql(`INSERT INTO vault.decrypted_secrets VALUES ('inactive_warning_ready', 'yes');`)
+    const second = psql(`SELECT warned || ' ' || deleted FROM prune_inactive_accounts();`)
+    check('with email set up: the three idle accounts with addresses are warned (one again after coming back), nobody deleted', second === '3 0', second)
+    const sent = psql(`SELECT string_agg(body->>'email' || '=' || (body->>'delete_on')::date::text, ',' ORDER BY body->>'email') FROM net.calls WHERE body->>'kind' = 'inactive_warning';`)
+    const expect = psql(`SELECT 'eight@example.test=' || (current_date + 28)::text || ',eleven@example.test=' || (current_date + 28)::text || ',one@example.test=' || ((current_date - 701) + interval '2 years')::date::text;`)
+    check('...each email names its own deletion day (two years from last use, and never sooner than 28 days)', sent === expect && new Set(sent?.split(',').map(x => x.split('=')[1])).size === 2, { sent, expect })
+    check('...no email about the old plan of somebody still using the app, nor to anyone else', psql(`SELECT count(*) FROM net.calls;`) === '3')
+    const third = psql(`SELECT warned || ' ' || deleted FROM prune_inactive_accounts();`)
+    check('...and the next day nobody is warned twice', third === '0 0', third)
+    check('nobody signed out can run it', /permission/i.test(expectRefused(`SELECT * FROM prune_inactive_accounts();`, { role: 'anon' }) ?? ''))
+    check('...nor anybody signed in', /permission/i.test(expectRefused(`SELECT * FROM prune_inactive_accounts();`, { role: 'authenticated', uid: UID_A }) ?? ''))
+  }
 } finally {
   stop()
 }
 
+console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }
 console.log('\nAll local RLS checks passed — against a database that actually ran them.')

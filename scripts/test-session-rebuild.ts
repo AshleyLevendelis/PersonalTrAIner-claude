@@ -2,6 +2,7 @@ import { generateMesocycle, resetRandomSource, setRandomSource } from '../src/li
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { rebuildDayAroundMainLift } from '../src/lib/session-rebuild'
 import { isMainLiftSlot } from '../src/lib/mesocycle-edit'
+import { groupExercises, mainLiftGroupIndex } from '../src/lib/session-derive'
 import type { UserProfile, MesocycleWeek, Exercise } from '../src/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -310,6 +311,29 @@ console.log('\n7. Today only — the rest of the block is not touched')
     JSON.stringify(names(MESO, WEEK)) === JSON.stringify(BEFORE_NAMES),
     { now: names(MESO, WEEK), atStart: BEFORE_NAMES })
   check('...not even its set counts', JSON.stringify(dayOf(MESO, WEEK).exercises.map(e => e.sets)) === JSON.stringify(BEFORE_SETS))
+}
+
+// ---- A DAY WITH NO TIER-1 SLOT KEEPS ITS LABELLED MAIN LIFT (25 Nov 2026) ----------------------------------------
+// Read by slot tier alone, a bodyweight day had no main lift, so "keep the main lift and rebuild around it" kept
+// nothing and rebuilt the lift the day is labelled with. Found by the main-lift trace.
+{
+  console.log('\nA bodyweight day: the lift labelled main is kept, the rest rebuilt')
+  const bwProfile = { ...profile, equipment_access: 'bodyweight', training_style: 'hybrid' } as unknown as UserProfile
+  console.log = () => {}
+  setRandomSource(seededRngFromKey('session-rebuild-bodyweight'))
+  const BW = generateMesocycle(bwProfile)
+  resetRandomSource()
+  console.log = quiet
+  const labelOf = (ex: Exercise[]) => { const g = groupExercises(ex); const gi = mainLiftGroupIndex(g, ex); return gi >= 0 && g[gi].kind === 'single' ? g[gi].ex.name : null }
+  const w1 = BW[0]
+  const day = w1.days.find(d => d.exercises.length > 2 && !d.exercises.some(isMainLiftSlot) && !!labelOf(d.exercises))
+  check('the fixture has a bodyweight day with no tier-1 slot and a labelled main lift (the case binds)', !!day, w1.days.map(d => d.focus))
+  const label = day ? labelOf(day.exercises) : null
+  const r = day ? await rebuildDayAroundMainLift({ mesocycle: BW, profile: bwProfile, weekNumber: w1.week_number, dayName: day.day, exclusions: [] }) : null
+  const after = r?.mesocycle.find(w => w.week_number === w1.week_number)?.days.find(d => d.day === day?.day)
+  check('the labelled main lift is still on the day, in its place', !!label && !!after && after.exercises.findIndex(e => e.name === label) === day!.exercises.findIndex(e => e.name === label), { label, after: after?.exercises.map(e => e.name) })
+  check('...it is never one of the lifts replaced', !!r && !(r.replaced ?? []).some(x => JSON.stringify(x).includes(`"${label}"`)), r?.replaced)
+  check('...and something else on the day was rebuilt (the rebuild still happened)', (r?.replaced?.length ?? 0) > 0, r?.replaced)
 }
 
 finish()

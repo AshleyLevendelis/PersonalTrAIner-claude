@@ -43,3 +43,30 @@ export async function savePlanPause(profileId: string, since: string | null): Pr
   if (isMissingColumnError(error, 'plan_paused_since')) return 'not-yet'
   throw error
 }
+
+/**
+ * HELPING TEST THE APP (tester toolkit, his rulings 25 Nov 2026): the date they agreed, or null when they stop. Said,
+ * never assumed: 'not-yet' is the database not having the column (migration 20261125150000 is run by hand), and the
+ * screen says testing is not switched on yet rather than recording someone the database cannot mark as agreeing.
+ */
+export async function saveTesterConsent(profileId: string, on: boolean): Promise<{ result: 'saved' | 'not-yet'; since: string | null }> {
+  const since = on ? new Date().toISOString() : null
+  const { error } = await supabase.from('fitness_profiles').update({ tester_since: since }).eq('id', profileId)
+  if (!error) return { result: 'saved', since }
+  if (isMissingColumnError(error, 'tester_since')) return { result: 'not-yet', since: null }
+  throw error
+}
+
+/**
+ * TODAY IS A DAY THE APP WAS USED (his ruling 26 Nov 2026: an account unused for two years is deleted, with an email a
+ * month before; migration 20261126130000). Written once a day, on the first open, and never waited on. A failure
+ * costs nothing today (the next open writes it again), and before the migration the column is simply not there.
+ */
+export async function markProfileActive(profileId: string, today: string, lastActiveOn: string | null): Promise<void> {
+  if (lastActiveOn === today) return
+  try {
+    await supabase.from('fitness_profiles').update({ last_active_on: today }).eq('id', profileId)
+  } catch {
+    // Best effort: see above.
+  }
+}

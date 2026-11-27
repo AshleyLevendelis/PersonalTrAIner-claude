@@ -73,6 +73,8 @@ import {
 } from '@/lib/onboarding-draft-store'
 import type { UserProfile } from '@/lib/types'
 import { buildOnboardingIntro } from '@/lib/first-run-intro'
+import { isUnderMinimumAge } from '@/lib/minimum-age'
+import { UnderAgeScreen } from './UnderAgeScreen'
 
 // ---------------------------------------------------------------------------
 // THE onboarding. Ashley's call: one way in, the conversation — the
@@ -1981,6 +1983,8 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
 
   const handleGenerate = () => {
     if (!readyToGenerate) return
+    // 16 and over (minimum-age.ts): the stop screen is drawn instead of the summary, and this holds it anyway.
+    if (isUnderMinimumAge(values.age)) return
     // Stamp the draft as a chat-path completion BEFORE handing off: App.tsx
     // flushes queued context facts/goals only for a completing draft, so a
     // draft abandoned mid-conversation can never attach its facts to a
@@ -2234,6 +2238,18 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     ?? (!confirmed.has('displayName') ? 'displayName' : openSlotsInOrder(confirmed, values)[0] ?? null)
   const sectionLabel = setupSectionOf(sectionKey)
   const stepNow = Math.max(1, Math.min(requiredCount, answeredCount + 1))
+
+  // THE APP IS FOR 16 AND OVER (his ruling 26 Nov 2026): an age under 16, however it was given (the card, typed, or set
+  // by the coach), replaces the conversation with the stop screen, and no profile is ever made from it. The one way
+  // back is a wrong birthday: the age is cleared and asked again.
+  if (isUnderMinimumAge(values.age)) {
+    return (
+      <UnderAgeScreen onFix={() => {
+        setValues(v => ({ ...v, age: '', dateOfBirth: '' } as OnboardingSlotValues))
+        handleEditSlot('age')
+      }} />
+    )
+  }
 
   const composerBottomStyle = isKeyboardOpen
     ? { bottom: insetPx }

@@ -217,13 +217,15 @@ console.log('\n5b. Refusal: what a user is allowed to decline')
 // unconfirmedOptionalSlots until confirmed, and confirmed only came from a
 // value that validated — so declining meant never reaching Generate. These
 // assert the escape hatch exists AND that it stops exactly where it should.
-const BODY_METRICS: SlotKey[] = ['age', 'heightCm', 'weightKg', 'gender']
+// AGE LEFT THIS LIST ON 26 NOV 2026 (his ruling, "Must answer"): the app is for 16 and over, and a birthday that can be
+// skipped is a check an under-16 steps round. Height, weight and sex stay declinable.
+const BODY_METRICS: SlotKey[] = ['heightCm', 'weightKg', 'gender']
 for (const key of BODY_METRICS) {
   check(`${key} can be declined`, canDeclineSlot(getSlotDef(key)!, fresh))
 }
 const SAFETY_AND_ESSENTIAL: SlotKey[] = [
   'fitnessGoal', 'trainingDays', 'equipment', 'trainingExperience',
-  'sessionDuration', 'trainingStyle', 'recoveryCapacity',
+  'sessionDuration', 'trainingStyle', 'recoveryCapacity', 'age',
 ]
 for (const key of SAFETY_AND_ESSENTIAL) {
   check(`${key} can NOT be declined`, !canDeclineSlot(getSlotDef(key)!, fresh))

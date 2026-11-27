@@ -19,6 +19,7 @@ import {
   computeOffPlanWork,
   normalizeWarmup,
   computeSessionSummary,
+  dayAnchorExercise,
 } from '../src/lib/session-derive'
 import { computeSessionPRs, type PRRecord } from '../src/lib/pr-engine'
 import { isSessionStale, SESSION_STALE_INACTIVITY_MS, type ActiveSessionRecord } from '../src/lib/active-session-store'
@@ -364,6 +365,16 @@ function main() {
   check('true just past the 6h boundary', isSessionStale(baseRecord, justOver, '2026-01-05') === true)
   check('true when the record\'s date is no longer "today", regardless of recency', isSessionStale(baseRecord, baseRecord.lastActivityIso, '2026-01-06') === true)
   check('false for a non-running record', isSessionStale({ ...baseRecord, status: 'finished' }, justOver, '2026-01-05') === false)
+
+  // ---- no main lift on trunk work (25 Nov 2026) ----------------------------
+  console.log('\n[23] a day of trunk work and carries has no main lift; a compound beside them is still found')
+  {
+    const mk = (name: string) => ({ name, sets: 3, reps: '10', rest_seconds: 60 } as unknown as Exercise)
+    const coreDay = ['Russian Twist', 'Cable Woodchops', 'Pallof Press', 'Overhead Carry'].map(mk)
+    check('a Conditioning & Core day of twists, woodchops, a Pallof press and a carry has no main lift', dayAnchorExercise(coreDay) === undefined, dayAnchorExercise(coreDay)?.name)
+    const withSquat = [...coreDay, mk('Goblet Squats')]
+    check('...and with a goblet squat on it, the squat is the main lift (the detector still finds one)', dayAnchorExercise(withSquat)?.name === 'Goblet Squats', dayAnchorExercise(withSquat)?.name)
+  }
 
   if (failures > 0) {
     console.error(`\n${failures} check(s) FAILED.`)
