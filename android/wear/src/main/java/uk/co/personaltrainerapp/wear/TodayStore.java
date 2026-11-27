@@ -33,11 +33,25 @@ final class TodayStore {
         double step = 2.5; // the implement's notch, from the phone (2.5 a bar or a stack, 2 a dumbbell)
     }
 
+    /** The day's planned cardio session, run on the wrist (IntervalFlow) and logged under `activity`, the plan's name. */
+    static final class Cardio {
+        String activity;  // exactly what the phone logs it under, so the day reads done
+        String name;      // "Assault Bike Rounds"
+        String effort;    // "Hard", or "" for none
+        String line;      // "4 × 3 min hard · 1 min rest"
+        int minutes;
+        int rounds;       // 0: a steady session of `minutes`
+        int workSeconds;
+        int restSeconds;
+        boolean onFoot;   // steps and distance (the phone's tracksSteps)
+    }
+
     static final class Session {
         String date;
         String title;
         int estimatedMax; // 0: no zones
         final List<Exercise> exercises = new ArrayList<>();
+        Cardio cardio;    // null: no cardio planned
     }
 
     static String today() { return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date()); }
@@ -81,9 +95,23 @@ final class TodayStore {
             s.date = o.optString("date");
             s.title = o.optString("title", "Today's session");
             s.estimatedMax = o.optInt("estimatedMax", 0);
+            JSONObject cj = o.optJSONObject("cardio");
+            if (cj != null && cj.optInt("minutes", 0) > 0) {
+                Cardio k = new Cardio();
+                k.activity = cj.optString("activity");
+                k.name = cj.optString("name", k.activity);
+                k.effort = cj.isNull("effort") ? "" : cj.optString("effort", "");
+                k.line = cj.optString("line", "");
+                k.minutes = cj.optInt("minutes");
+                k.rounds = Math.max(0, cj.optInt("rounds", 0));
+                k.workSeconds = Math.max(0, cj.optInt("workSeconds", 0));
+                k.restSeconds = Math.max(0, cj.optInt("restSeconds", 0));
+                k.onFoot = cj.optBoolean("onFoot", false);
+                if (!k.activity.isEmpty()) s.cardio = k;
+            }
             JSONArray arr = o.optJSONArray("exercises");
-            if (arr == null || arr.length() == 0) return null;
-            for (int i = 0; i < arr.length(); i++) {
+            if ((arr == null || arr.length() == 0) && s.cardio == null) return null;
+            if (arr != null) for (int i = 0; i < arr.length(); i++) {
                 JSONObject e = arr.getJSONObject(i);
                 Exercise x = new Exercise();
                 x.id = e.optString("id");

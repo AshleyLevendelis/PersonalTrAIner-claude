@@ -134,7 +134,7 @@ public class MainActivity extends Activity {
         column.removeAllViews();
         clearLive();
         TodayStore.Session s = TodayStore.read(this);
-        if (s != null) {
+        if (s != null && !s.exercises.isEmpty()) {
             int done = 0, total = 0;
             for (TodayStore.Exercise x : s.exercises) { done += TodayStore.done(this, x); total += x.sets; }
             ring.set(total > 0 ? done / (float) total : 0f, MINT);
@@ -142,7 +142,17 @@ public class MainActivity extends Activity {
             title(s.title, 21, true, 2);
             text(done + " of " + total + " sets done", 13, MUTED, 4);
             button(done >= total ? "Session done" : "Start session", true, 0, v -> startLift());
-        } else {
+        }
+        // THE DAY'S PLANNED CARDIO (27 Nov 2026): the session the phone's card shows, run on the wrist.
+        if (s != null && s.cardio != null) {
+            TodayStore.Cardio k = s.cardio;
+            if (s.exercises.isEmpty()) ring.set(0f, MINT);
+            kicker(s.exercises.isEmpty() ? "TODAY" : "TODAY'S CARDIO", MINT, s.exercises.isEmpty() ? 0 : 16);
+            title(k.name, 21, true, 2);
+            text(k.line, 13, MUTED, 4);
+            button("Start " + (k.rounds > 0 ? "intervals" : "session"), true, 0, v -> startPlannedCardio(k));
+        }
+        if (s == null) {
             ring.set(0f, MINT);
             kicker("PERSONAL TRAINER", MINT, 0);
             text("Open Exercise in the phone app once, and your sessions for the week ahead come to your watch.", 13, MUTED, 6);
@@ -157,6 +167,24 @@ public class MainActivity extends Activity {
     }
 
     // ---------------------------------------------------------------- CARDIO
+
+    /** The planned session: logged under the plan's own name; its rounds or minutes run and buzz in the service. */
+    private void startPlannedCardio(TodayStore.Cardio k) {
+        if (!hasHeartPermission()) { askPermissions(); return; }
+        WorkoutService.startPlanned(this, k);
+        WorkoutService.LIVE.activity = k.activity;
+        WorkoutService.LIVE.startedAt = System.currentTimeMillis();
+        showCardio();
+    }
+
+    private boolean planned() { return WorkoutService.LIVE.pMinutes > 0; }
+
+    private IntervalFlow.Phase phaseNow() {
+        WorkoutService.Live l = WorkoutService.LIVE;
+        return IntervalFlow.at(SystemClock.elapsedRealtime() - l.pStartedAt, l.pRounds, l.pWork, l.pRest, l.pMinutes);
+    }
+
+    private TextView phaseKicker, phaseLine;
 
     private void startCardio(String activity) {
         if (!hasHeartPermission()) { askPermissions(); return; }
@@ -183,8 +211,13 @@ public class MainActivity extends Activity {
         column.removeAllViews();
         clearLive();
         ring.set(0f, WatchStyle.HEART);
-        kicker(WorkoutService.LIVE.activity.toUpperCase(Locale.UK), MINT, 0);
+        boolean p = planned();
+        String head = p && !WorkoutService.LIVE.display.isEmpty() ? WorkoutService.LIVE.display : WorkoutService.LIVE.activity;
+        kicker(head.toUpperCase(Locale.UK), MINT, 0);
+        // A planned session: WORK / REST over a countdown of this round, and where in the session he is.
+        phaseKicker = p ? kicker("", MINT, 4) : null;
         clock = mono("0:00", 54, WatchStyle.NUM, 2);
+        phaseLine = p ? text("", 13, MUTED, 2) : null;
         heartRow(6);
         LinearLayout stats = row(12);
         LinearLayout a = stat(stats), b;
@@ -217,7 +250,7 @@ public class MainActivity extends Activity {
         clearLive();
         WorkoutService.Live l = WorkoutService.LIVE;
         long ms = System.currentTimeMillis() - l.startedAt;
-        kicker(l.activity.toUpperCase(Locale.UK), MINT, 0);
+        kicker((l.display.isEmpty() ? l.activity : l.display).toUpperCase(Locale.UK), MINT, 0);
         mono(duration(ms), 40, WatchStyle.NUM, 2);
         int zone = WorkoutService.mostlyZone();
         ring.set(zone / 5f, WatchStyle.HEART);
@@ -609,8 +642,20 @@ public class MainActivity extends Activity {
     private void redrawLive() {
         WorkoutService.Live l = WorkoutService.LIVE;
         int zone = liveZone(l);
-        if (screen == Screen.CARDIO && clock != null) {
+        if (screen == Screen.CARDIO && clock != null && planned() && phaseKicker != null) {
+            IntervalFlow.Phase ph = phaseNow();
+            phaseKicker.setText(IntervalFlow.kicker(ph, l.effort));
+            phaseKicker.setTextColor(ph.work || ph.done ? MINT : WatchStyle.VIOLET);
+            phaseLine.setText(IntervalFlow.line(ph, l.pMinutes));
+            // Done: the clock shows the whole session, and End logs it; otherwise this round's time left.
+            clock.setText(ph.done ? duration(System.currentTimeMillis() - l.startedAt) : duration(ph.leftMs + 999));
+            ring.set(ph.done ? 1f : ph.phaseMs > 0 ? 1f - ph.leftMs / (float) ph.phaseMs : 0f, ph.work || ph.done ? MINT : WatchStyle.VIOLET);
+        } else if (screen == Screen.CARDIO && clock != null) {
             clock.setText(duration(System.currentTimeMillis() - l.startedAt));
+            // The edge carries the zone, zone N of 5 in the heart's colour.
+            ring.set(zone / 5f, WatchStyle.HEART);
+        }
+        if (screen == Screen.CARDIO && statA != null) {
             if (l.steps >= 0) {
                 statA.setText(String.format(Locale.UK, "%,d", l.steps)); statALabel.setText("STEPS");
                 statB.setText(String.format(Locale.UK, "%.2f", Math.max(0, l.distanceM) / 1000)); statBLabel.setText("KM");
@@ -618,8 +663,6 @@ public class MainActivity extends Activity {
                 statA.setText(l.kcal > 0 ? String.format(Locale.UK, "%d", Math.round(l.kcal)) : "–"); statALabel.setText("KCAL");
                 statB.setText(l.maxBpm > 0 ? String.valueOf(l.maxBpm) : "–"); statBLabel.setText("MAX ♥");
             }
-            // The edge carries the zone, zone N of 5 in the heart's colour.
-            ring.set(zone / 5f, WatchStyle.HEART);
         }
         drawHeart(l, zone);
         if (screen == Screen.REST && restClock != null) {

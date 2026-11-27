@@ -26,6 +26,7 @@ const dir = mkdtempSync(join(tmpdir(), 'watch-flow-'))
 const src = join(dir, 'src', PKG)
 mkdirSync(src, { recursive: true })
 copyFileSync(`android/wear/src/main/java/${PKG}/LiftFlow.java`, join(src, 'LiftFlow.java'))
+copyFileSync(`android/wear/src/main/java/${PKG}/IntervalFlow.java`, join(src, 'IntervalFlow.java'))
 // The watch's exercise record, fields only (the real TodayStore reads Android's storage, which a JDK does not have).
 writeFileSync(join(src, 'TodayStore.java'), `package uk.co.personaltrainerapp.wear;
 final class TodayStore {
@@ -119,6 +120,26 @@ public final class FlowCheck {
         out("rest.floor", LiftFlow.nudgeRestMs(10_000, -1));
         out("rest.cap", LiftFlow.nudgeRestMs(595_000, 1));
         out("rest.warn", LiftFlow.warnBeforeMs(90_000) + "," + LiftFlow.warnBeforeMs(20_000));
+        // A PLANNED CARDIO SESSION (IntervalFlow): 4 x 3 min work, 1 min rest; and a steady 20 min.
+        IntervalFlow.Phase pa = IntervalFlow.at(0, 4, 180, 60, 16);
+        out("iv.start", pa.round + "," + pa.work + "," + pa.leftMs + "," + IntervalFlow.kicker(pa, "Hard") + "|" + IntervalFlow.line(pa, 16));
+        IntervalFlow.Phase b = IntervalFlow.at(200_000, 4, 180, 60, 16);
+        out("iv.rest", b.round + "," + b.work + "," + b.leftMs + "," + IntervalFlow.kicker(b, "Hard") + "|" + IntervalFlow.line(b, 16));
+        IntervalFlow.Phase c = IntervalFlow.at(240_000, 4, 180, 60, 16);
+        out("iv.round2", c.round + "," + c.work);
+        out("iv.total", IntervalFlow.totalMs(4, 180, 60, 16));
+        out("iv.done", IntervalFlow.at(900_000, 4, 180, 60, 16).done + "," + IntervalFlow.at(899_999, 4, 180, 60, 16).done);
+        IntervalFlow.Phase d = IntervalFlow.at(60_000, 0, 0, 0, 20);
+        out("iv.steady", d.work + "," + d.leftMs + "," + IntervalFlow.kicker(d, "Easy") + "|" + IntervalFlow.line(d, 20));
+        StringBuilder bz = new StringBuilder();
+        for (IntervalFlow.Buzz z : IntervalFlow.buzzes(3, 60, 30, 4)) bz.append(z.atMs / 1000).append(z.kind.charAt(0)).append(' ');
+        out("iv.buzz", bz.toString().trim());
+        StringBuilder bz2 = new StringBuilder();
+        for (IntervalFlow.Buzz z : IntervalFlow.buzzes(2, 30, 5, 2)) bz2.append(z.atMs / 1000).append(z.kind.charAt(0)).append(' ');
+        out("iv.buzzShortRest", bz2.toString().trim());
+        StringBuilder bz3 = new StringBuilder();
+        for (IntervalFlow.Buzz z : IntervalFlow.buzzes(0, 0, 0, 20)) bz3.append(z.atMs / 1000).append(z.kind.charAt(0)).append(' ');
+        out("iv.buzzSteady", bz3.toString().trim());
         out("duration.65s", LiftFlow.duration(65_000));
         out("duration.1h", LiftFlow.duration(3_723_000));
     }
@@ -127,7 +148,7 @@ public final class FlowCheck {
 
 let lines: string[] = []
 try {
-  const files = ['LiftFlow.java', 'TodayStore.java', 'FlowCheck.java'].map(f => join(src, f))
+  const files = ['LiftFlow.java', 'IntervalFlow.java', 'TodayStore.java', 'FlowCheck.java'].map(f => join(src, f))
   execFileSync('javac', ['-encoding', 'UTF-8', '-d', join(dir, 'out'), ...files], { stdio: 'pipe' })
   lines = execFileSync('java', ['-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-cp', join(dir, 'out'), 'uk.co.personaltrainerapp.wear.FlowCheck'], { encoding: 'utf8' }).trim().split('\n')
 } catch (e) {
@@ -179,6 +200,16 @@ console.log('\n8. The rest')
 check('+15s adds fifteen seconds', is('rest.plus', '75000'))
 check('−15s never goes below zero, +15s never past ten minutes', is('rest.floor', '0') && is('rest.cap', '600000'))
 check('a short buzz 10s before the end, on a rest of 30s or more only', is('rest.warn', '10000,0'))
+console.log('\n9. A planned cardio session on the wrist (IntervalFlow)')
+check('it opens on round 1 of work, the whole 3 minutes left, "WORK" and "Round 1 of 4"', is('iv.start', '1,true,180000,WORK|Round 1 of 4'))
+check('20s into the rest: "REST", 40s left, and what comes next', is('iv.rest', '1,false,40000,REST|Next: round 2 of 4'))
+check('a minute\'s rest later it is round 2 of work', is('iv.round2', '2,true'))
+check('the session is 4 × 3 min with three rests between (no rest after the last): 15 min', is('iv.total', '900000'))
+check('...and it is done at 15 minutes, not a moment before', is('iv.done', 'true,false'))
+check('a steady session counts its minutes down under its effort', is('iv.steady', 'true,1140000,EASY|20 min session'))
+check('the buzzes: rest at each round\'s end, 3-2-1 before work after a rest of 10s or more, work, and the end', is('iv.buzz', '60r 87c 88c 89c 90w 150r 177c 178c 179c 180w 240e'), got['iv.buzz'])
+check('...no countdown after a rest under 10s', is('iv.buzzShortRest', '30r 35w 65e'), got['iv.buzzShortRest'])
+check('...and a steady session buzzes once, at its end', is('iv.buzzSteady', '1200e'))
 check('times read as the app prints them (1:05, 1:02:03)', is('duration.65s', '1:05') && is('duration.1h', '1:02:03'))
 
 console.log(`\n${ran} checks ran`)

@@ -67,6 +67,8 @@ public class WorkoutService extends Service {
     static final String EXTRA_REST_NEXT = "restNext";  // what comes next, for the notification
     static final String EXTRA_KIND = "kind";         // "cardio" or "lift"
     static final String EXTRA_ACTIVITY = "activity"; // "Walk", "Run", "Bike", "Other", or the session's name
+    // A PLANNED CARDIO SESSION (27 Nov 2026): its rounds, or minutes, run here so the buzzes come with the screen off.
+    static final String EXTRA_ROUNDS = "rounds", EXTRA_WORK = "work", EXTRA_REST = "rest", EXTRA_MINUTES = "minutes", EXTRA_ON_FOOT = "onFoot";
     private static final String CHANNEL = "workout";
     private static final int NOTIFICATION_ID = 41;
     /** A reading counts for the time until the next one, never longer (the phone's LONGEST_HOLD_MS): a gap is not effort. */
@@ -95,6 +97,11 @@ public class WorkoutService extends Service {
         long restEndsAt;      // on the elapsed clock; 0: no rest running
         long restTotalMs;
         String restAfterId;   // the exercise whose set was logged last
+        // A planned cardio session's program (IntervalFlow): minutes 0 = none, a free workout
+        int pRounds, pWork, pRest, pMinutes;
+        long pStartedAt;      // on the elapsed clock
+        String effort = "";
+        String display = "";  // the plan's short name for the screens ("Assault Bike Rounds"); "" for a free workout
     }
     static final Live LIVE = new Live();
     private static Runnable onChange;
@@ -107,7 +114,19 @@ public class WorkoutService extends Service {
     private int estimatedMax;
 
     static void start(Context c, String kind, String activity) {
+        LIVE.pMinutes = 0; LIVE.pRounds = 0; LIVE.display = "";
         Intent i = new Intent(c, WorkoutService.class).setAction(ACTION_START).putExtra(EXTRA_KIND, kind).putExtra(EXTRA_ACTIVITY, activity);
+        ContextCompat.startForegroundService(c, i);
+    }
+
+    /** The day's planned cardio: logged under its plan name, with its rounds or minutes run and buzzed here. */
+    static void startPlanned(Context c, TodayStore.Cardio k) {
+        LIVE.pRounds = k.rounds; LIVE.pWork = k.workSeconds; LIVE.pRest = k.restSeconds; LIVE.pMinutes = k.minutes;
+        LIVE.pStartedAt = SystemClock.elapsedRealtime(); LIVE.effort = k.effort == null ? "" : k.effort;
+        LIVE.display = k.name == null ? "" : k.name;
+        Intent i = new Intent(c, WorkoutService.class).setAction(ACTION_START).putExtra(EXTRA_KIND, "cardio").putExtra(EXTRA_ACTIVITY, k.activity)
+                .putExtra(EXTRA_ROUNDS, k.rounds).putExtra(EXTRA_WORK, k.workSeconds).putExtra(EXTRA_REST, k.restSeconds)
+                .putExtra(EXTRA_MINUTES, k.minutes).putExtra(EXTRA_ON_FOOT, k.onFoot);
         ContextCompat.startForegroundService(c, i);
     }
 
@@ -122,6 +141,31 @@ public class WorkoutService extends Service {
     }
 
     private PowerManager.WakeLock restLock;
+    private boolean onFootPlanned;
+    private final java.util.List<Runnable> programBuzzes = new java.util.ArrayList<>();
+
+    /** Every buzz of a planned session, on time with the screen off (the CPU held for the session plus a minute). */
+    private void scheduleProgram() {
+        Live l = LIVE;
+        long total = IntervalFlow.totalMs(l.pRounds, l.pWork, l.pRest, l.pMinutes);
+        if (restLock == null) {
+            restLock = getSystemService(PowerManager.class).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "pt:rest");
+            restLock.setReferenceCounted(false);
+        }
+        restLock.acquire(total + 60_000L);
+        long since = SystemClock.elapsedRealtime() - l.pStartedAt;
+        for (IntervalFlow.Buzz b : IntervalFlow.buzzes(l.pRounds, l.pWork, l.pRest, l.pMinutes)) {
+            long in = b.atMs - since;
+            if (in < 0) continue;
+            long[] pattern = "work".equals(b.kind) ? new long[] { 0, 600 }
+                : "rest".equals(b.kind) ? new long[] { 0, 150, 120, 150 }
+                : "count".equals(b.kind) ? new long[] { 0, 60 }
+                : new long[] { 0, 500, 200, 500 };
+            Runnable r = () -> { vibrate(pattern); changed(); if ("end".equals(b.kind)) releaseRestLock(); };
+            programBuzzes.add(r);
+            main.postDelayed(r, in);
+        }
+    }
     private final Runnable warnBuzz = () -> vibrate(new long[] { 0, 120 });
     private final Runnable endBuzz = () -> { vibrate(new long[] { 0, 400, 200, 400 }); releaseRestLock(); showRunning(); changed(); };
 
@@ -160,7 +204,9 @@ public class WorkoutService extends Service {
             String kind = intent.getStringExtra(EXTRA_KIND);
             String activity = intent.getStringExtra(EXTRA_ACTIVITY);
             goForeground(activity);
+            onFootPlanned = intent.getBooleanExtra(EXTRA_ON_FOOT, false);
             begin(kind == null ? "cardio" : kind, activity == null ? "Workout" : activity);
+            if (intent.getIntExtra(EXTRA_MINUTES, 0) > 0) scheduleProgram();
         } else if (ACTION_END.equals(action)) {
             finish();
         } else if (ACTION_REST.equals(action)) {
@@ -203,7 +249,7 @@ public class WorkoutService extends Service {
         l.running = true; l.kind = kind; l.activity = activity; l.startedAt = System.currentTimeMillis();
         l.bpm = 0; l.bpmAt = 0; l.maxBpm = 0; l.sumBpm = 0; l.readings = 0; l.lastZoneAt = 0; l.lastZone = 0;
         java.util.Arrays.fill(l.zoneMs, 0);
-        boolean onFoot = "cardio".equals(kind) && ("Walk".equals(activity) || "Run".equals(activity));
+        boolean onFoot = "cardio".equals(kind) && ("Walk".equals(activity) || "Run".equals(activity) || onFootPlanned);
         l.steps = onFoot ? 0 : -1; l.distanceM = onFoot ? 0 : -1; l.kcal = 0;
         estimatedMax = TodayStore.estimatedMax(this);
         changed();
@@ -241,9 +287,11 @@ public class WorkoutService extends Service {
     /** Walk, run and bike are the watch's own kinds; anything else is a general workout, a lifting session weights. */
     private static ExerciseType exerciseTypeFor(String kind, String activity) {
         if ("lift".equals(kind)) return ExerciseType.WEIGHTLIFTING;
-        if ("Walk".equals(activity)) return ExerciseType.WALKING;
-        if ("Run".equals(activity)) return ExerciseType.RUNNING;
-        if ("Bike".equals(activity)) return ExerciseType.BIKING;
+        // A planned session is named by the plan ("Easy jog", "Assault Bike Rounds"): read by its words.
+        String a = activity == null ? "" : activity.toLowerCase(java.util.Locale.UK);
+        if (a.matches(".*\\b(run|jog|sprint).*")) return ExerciseType.RUNNING;
+        if (a.matches(".*\\b(walk|hik).*")) return ExerciseType.WALKING;
+        if (a.matches(".*\\b(bike|cycl|spin).*")) return ExerciseType.BIKING;
         return ExerciseType.WORKOUT;
     }
 
@@ -302,6 +350,9 @@ public class WorkoutService extends Service {
         if (l.lastZone > 0) l.zoneMs[l.lastZone - 1] += Math.min(System.currentTimeMillis() - l.lastZoneAt, LONGEST_HOLD_MS);
         l.running = false;
         l.restEndsAt = 0;
+        for (Runnable r : programBuzzes) main.removeCallbacks(r);
+        programBuzzes.clear();
+        l.pMinutes = 0; l.pRounds = 0;
         main.removeCallbacks(warnBuzz);
         main.removeCallbacks(endBuzz);
         releaseRestLock();

@@ -124,4 +124,23 @@ await wait(3500)
 check('5e. a set undone before the phone saw it is never saved, and nothing is left waiting', before6 != null && (await heroSets()) === before6 && (await ev(`JSON.parse(localStorage.getItem('fitplan_watch_sets') || '[]').length`)) === 0, { before6, now: await heroSets() })
 await shoot('watch-sets-undone')
 
+console.log('\n  6. PLANNED CARDIO GOES TO THE WATCH (27 Nov 2026)')
+// The week the GENERATOR builds with two cardio days (?cardio-day); its sessions are read off the payload, never written here.
+await go('&cardio-day&health=android')
+await until(() => ev(`!!document.querySelector('[data-testid="home-so-far"]')`), v => v === true, 120)
+await wait(1500)
+if (await ev(`!!(${btn('/^Not now$/')})`)) { await clickAt(btn('/^Not now$/')); await wait(500) }
+await ev(`location.hash = '#/tab/exercise'`); await wait(3000)
+const sentC = await until(lastSent, v => !!v && (!!v.cardio || (v.days ?? []).some(d => d.cardio)), 40)
+const cardios = [...(sentC?.cardio ? [sentC.cardio] : []), ...((sentC?.days ?? []).filter(d => d.cardio).map(d => d.cardio))]
+check('6a. the planned cardio sessions of the coming days are sent to the watch', cardios.length > 0, sentC)
+check('6b. ...each with its rounds (work and rest) or its minutes, and the card\'s line', cardios.length > 0 && cardios.every(c => c.minutes > 0 && (c.rounds === 0 || (c.workSeconds > 0 && c.rounds >= 2)) && typeof c.line === 'string' && c.line.length > 0), cardios)
+// The phone's own card for that date names the same session: open the day on the strip and read it.
+const aheadDay = (sentC?.days ?? []).find(d => d.cardio)
+if (aheadDay) { await clickAt(`document.querySelector('[data-strip-date="${aheadDay.date}"]')`); await wait(1200) }
+const dayText = aheadDay ? await ev(`document.body.innerText`) : ''
+check('6c. ...the same session the phone shows for that date, by name', !!aheadDay && dayText.includes(aheadDay.cardio.name), { day: aheadDay?.date, name: aheadDay?.cardio?.name })
+check('6d. ...and the activity it is logged under is the plan\'s, which names it', !!aheadDay && aheadDay.cardio.activity.startsWith(aheadDay.cardio.name), aheadDay?.cardio)
+await shoot('watch-sets-cardio')
+
 await finish('verify:watch-sets PASSED')

@@ -1849,6 +1849,10 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
 - **Tester data is kept 90 days (activity) and 1 year (reports): his ruling 26 Nov 2026** (over 30 days and over a year for
   everything): a nightly clean-up only the database can run. `test:rls-local` §12. Needs migration 20261126120000
 ### His requests of 27 Nov 2026
+- **Planned cardio runs on the watch** (his "plans integrate well", UX mine): today's and the week ahead's planned cardio
+  are sent to the watch; Start runs the rounds (WORK / REST, the round, buzzes at each change, 3-2-1 before work, screen
+  off) or the minutes, and End logs it under the plan's name so the day reads done. `IntervalFlow.java`,
+  `test:watch-flow`, `test:watch-app`, `verify:watch-sets` §6. Needs a watch rebuild
 - **The watch on the gym floor: his "best in class ... how a user would want to use it in the gym", and his ruling
   "Adjust reps and weight"** (REVERSES "no weight typed on the watch"): reps and weight are chips with − / + and the
   bezel, sent only where changed; the rest buzzes from the workout service with the screen off (10s before, at the end,

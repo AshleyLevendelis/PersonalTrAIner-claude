@@ -191,3 +191,33 @@ export function withTodayChange<P extends Pick<PlannedActivity, 'activity' | 'du
   if (change.minutes != null && Number.isFinite(change.minutes) && change.minutes >= TODAY_MINUTES_MIN && change.minutes <= TODAY_MINUTES_MAX) return { ...planned, duration: Math.round(change.minutes) }
   return planned
 }
+
+/**
+ * THE PLANNED CARDIO SESSION AS THE WATCH RUNS IT (27 Nov 2026, his "plans integrate well" with the watch): its name,
+ * the exact activity string the phone logs it under (so the day reads done when the watch logs it), its effort, and
+ * the rounds as the timer runs them, or minutes for a steady session (rounds 0). Read off the plan, nothing new.
+ */
+export interface WatchCardio {
+  activity: string
+  name: string
+  effort: string | null
+  minutes: number
+  rounds: number
+  workSeconds: number
+  restSeconds: number
+  /** "4 × 3 min hard · 1 min rest", "20 min easy": the line the phone's card prints. */
+  line: string
+}
+
+export function watchCardioOf(planned: (Pick<PlannedActivity, 'activity' | 'duration' | 'targetRpe' | 'rounds'> & { reason?: string }) | null | undefined): WatchCardio | null {
+  if (!planned || !planned.activity) return null
+  const row = plannedSessionRow(planned)
+  const r = plannedRoundsOf(planned)
+  const minutes = r ? sessionMinutesFor(planned.duration, r) : planned.duration
+  if (!(minutes > 0)) return null
+  return {
+    activity: planned.activity, name: row.name, effort: row.effort, minutes,
+    rounds: r?.rounds ?? 0, workSeconds: r?.workSeconds ?? 0, restSeconds: r?.restSeconds ?? 0,
+    line: `${row.dose} ${row.doseWord}${row.rest ? ` · ${row.rest} rest` : ''}`,
+  }
+}

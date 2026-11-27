@@ -119,6 +119,7 @@ import { describeDayGap, dayGapCanAddPress } from '@/lib/day-gap-note'
 import type { Exercise, WorkoutDay, MesocycleWeek, UserProfile, PlannedActivity } from '@/lib/types'
 import type { LoadSource } from './LoadChip'
 import { isPhoneApp } from '@/lib/steps-store'
+import { watchCardioOf } from '@/lib/planned-rounds'
 import type { WatchRow, WatchDay } from '@/lib/watch-session'
 // THE WATCH'S PART OF THIS TAB, downloaded only in the phone app (watch-session.ts says what it does).
 // Ambient: nobody tapped for it, so a missing file draws nothing (and reloads onto a new version, as every part does).
@@ -1581,10 +1582,11 @@ export function TodayPanel({
     if (!isPhoneApp()) return []
     if (stripOffset !== 0) return watchAheadKept.current
     const days = stripWeek.days
-      .filter(d => d.date > today && !!d.session && d.session.exercises.length > 0 && !d.movedTo && !d.swappedForActivity && !d.markedMissed && !d.deliberateRest)
+      .filter(d => d.date > today && !!d.session && (d.session.exercises.length > 0 || !!d.session.plannedActivity) && !d.movedTo && !d.swappedForActivity && !d.markedMissed && !d.deliberateRest)
       .map(d => ({
         date: d.date,
         title: d.session!.focus?.trim() || 'Session',
+        cardio: watchCardioOf(d.session!.plannedActivity),
         rows: d.session!.exercises.map(ex => {
           const { rowEx } = liveRowExercise(ex, { progressedLoads: {}, progressedAddedLoads: {}, layoff: NO_LAYOFF, profile })
           const entry = getExerciseEntry(rowEx.name)
@@ -1599,6 +1601,11 @@ export function TodayPanel({
     watchAheadKept.current = days
     return days
   })()
+
+  // TODAY'S PLANNED CARDIO FOR THE WATCH (27 Nov 2026): the session the card shows, its rounds or minutes. Not on a day
+  // moved away or swapped for something else; the watch logs it under the plan's own name, so the day reads done.
+  const watchTodayCardio = isPhoneApp() && !peekDay && !isMovedAway && !todayCell?.swappedForActivity
+    ? watchCardioOf(workout?.plannedActivity) : null
 
   /** The line on screen is the week's note — so the week row must not print it again, and its chevron opens the rest. */
   const lineIsWeekNote = coachLine?.source === 'fallback' && todayNudge?.source === 'week-note'
@@ -2118,7 +2125,7 @@ export function TodayPanel({
           </p>
           {watchRows && (
             <Suspense fallback={null}>
-              <WatchLink rows={watchRows} days={watchAhead} listEl={listEl} today={today} logs={logs}
+              <WatchLink rows={watchRows} cardio={watchTodayCardio} days={watchAhead} listEl={listEl} today={today} logs={logs}
                 title={workout!.focus?.trim() || 'Today\'s session'} age={profile?.age ?? null}
                 noZones={(profile?.health_conditions ?? []).length > 0} />
             </Suspense>
@@ -2277,10 +2284,10 @@ export function TodayPanel({
 
       {/* A DAY WITH NO SESSION OF ITS OWN STILL SENDS THE WATCH THE WEEK AHEAD (27 Nov 2026): a rest day is when he
           is most likely to have the phone in his hand and not open Exercise tomorrow. */}
-      {!watchRows && isPhoneApp() && watchAhead.length > 0 && !peekDay && (
+      {!watchRows && isPhoneApp() && (watchAhead.length > 0 || !!watchTodayCardio) && !peekDay && (
         <Suspense fallback={null}>
-          <WatchLink rows={[]} days={watchAhead} listEl={null} today={today} logs={logs}
-            title="" age={profile?.age ?? null} noZones={(profile?.health_conditions ?? []).length > 0} />
+          <WatchLink rows={[]} cardio={watchTodayCardio} days={watchAhead} listEl={null} today={today} logs={logs}
+            title={workout?.focus?.trim() || 'Cardio'} age={profile?.age ?? null} noZones={(profile?.health_conditions ?? []).length > 0} />
         </Suspense>
       )}
 

@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { watchTodayPayload, waitingWatchSets, subscribeWatchSets, dropWatchSets, tickForWatchSet, watchSetNeedsFill, deleteForWatchUndo, type WatchRow, type WatchSet, type WatchDay } from '@/lib/watch-session'
 import { estimatedMaxHeartRate } from '@/lib/heart-series'
+import type { WatchCardio } from '@/lib/planned-rounds'
 
 type NeedYou = { set: WatchSet; why: 'typed' | 'missing' | 'refused' | 'undo' }
 
@@ -27,8 +28,10 @@ function typeInto(id: string | undefined, value: string): boolean {
   return true
 }
 
-export default function WatchLink({ rows, days, listEl, today, logs, title, age, noZones }: {
+export default function WatchLink({ rows, cardio, days, listEl, today, logs, title, age, noZones }: {
   rows: WatchRow[]
+  /** Today's planned cardio session, for the watch to run (rounds or minutes). */
+  cardio?: WatchCardio | null
   /** The sessions of the days ahead (the strip's), so the watch has them with the phone in the locker. */
   days?: readonly WatchDay[]
   listEl: HTMLElement | null
@@ -40,7 +43,7 @@ export default function WatchLink({ rows, days, listEl, today, logs, title, age,
   /** A health condition is ticked: the watch shows heart rate, never a zone (the phone's own rule). */
   noZones: boolean
 }) {
-  const payload = watchTodayPayload({ date: today, title, estimatedMax: noZones ? null : estimatedMaxHeartRate(age), rows, days })
+  const payload = watchTodayPayload({ date: today, title, estimatedMax: noZones ? null : estimatedMaxHeartRate(age), rows, cardio, days })
   useEffect(() => {
     if (payload) void import('@/lib/watch-bridge').then(m => m.publishToday(payload)).catch(() => {})
   }, [payload])

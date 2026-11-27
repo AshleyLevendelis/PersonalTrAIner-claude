@@ -11,6 +11,8 @@
 // be typed) waits and is said, never guessed.
 // ---------------------------------------------------------------------------
 import { splitLoadDisplay } from './load-prescription'
+import type { WatchCardio } from './planned-rounds'
+import { tracksSteps } from './cardio-kinds'
 
 export interface WatchRow {
   id: string
@@ -43,7 +45,10 @@ export function watchLoadText(row: Pick<WatchRow, 'suggestedLoad' | 'addedLoadKg
 }
 
 /** A day ahead, as the strip holds it: its date, its session's name and its rows at the plan's own weights. */
-export interface WatchDay { date: string; title: string; rows: WatchRow[] }
+export interface WatchDay { date: string; title: string; rows: WatchRow[]; cardio?: WatchCardio | null }
+
+/** The cardio as the watch reads it, with whether it is on foot (steps and distance, the phone's own rule). */
+const watchCardio = (c: WatchCardio | null | undefined) => (c ? { ...c, onFoot: tracksSteps(c.activity) } : undefined)
 
 const watchExercise = (r: WatchRow, done: number) => ({
   id: r.id,
@@ -67,16 +72,18 @@ const watchExercise = (r: WatchRow, done: number) => ({
  * weights, and the watch sends a reps or weight number only where he changed it, so a number from days ago never
  * overrides the phone's own on the set it saves.
  */
-export function watchTodayPayload(p: { date: string; title: string; estimatedMax: number | null; rows: WatchRow[]; days?: readonly WatchDay[] }): string | null {
-  const ahead = (p.days ?? []).filter(d => d.date > p.date && d.rows.length > 0)
-  if (p.rows.length === 0 && ahead.length === 0) return null
+export function watchTodayPayload(p: { date: string; title: string; estimatedMax: number | null; rows: WatchRow[]; cardio?: WatchCardio | null; days?: readonly WatchDay[] }): string | null {
+  const ahead = (p.days ?? []).filter(d => d.date > p.date && (d.rows.length > 0 || !!d.cardio))
+  if (p.rows.length === 0 && !p.cardio && ahead.length === 0) return null
   return JSON.stringify({
     v: 1,
     date: p.date,
     title: p.title,
     estimatedMax: p.estimatedMax ?? 0,
     exercises: p.rows.map(r => watchExercise(r, r.done)),
-    ...(ahead.length ? { days: ahead.map(d => ({ date: d.date, title: d.title, exercises: d.rows.map(r => watchExercise(r, 0)) })) } : {}),
+    // A PLANNED CARDIO SESSION (27 Nov 2026): the watch runs its rounds or minutes and logs it under this exact name.
+    ...(p.cardio ? { cardio: watchCardio(p.cardio) } : {}),
+    ...(ahead.length ? { days: ahead.map(d => ({ date: d.date, title: d.title, exercises: d.rows.map(r => watchExercise(r, 0)), ...(d.cardio ? { cardio: watchCardio(d.cardio) } : {}) })) } : {}),
   })
 }
 

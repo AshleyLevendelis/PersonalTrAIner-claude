@@ -101,6 +101,19 @@ async function main() {
   check('a rest day still sends the week ahead (and no session for today)', restDay?.exercises?.length === 0 && restDay?.days?.[0]?.date === '2026-11-28', restDay)
   const todayStoreSrc = strip(read("android/wear/src/main/java/uk/co/personaltrainerapp/wear/TodayStore.java"))
   check('the watch reads today\'s session out of the week ahead when today\'s own is not the one sent', /JSONObject o = dayFor\(new JSONObject\(raw\), today\(\)\)/.test(todayStoreSrc) && /if \(date\.equals\(sent\.optString\("date"\)\)\) return sent;/.test(todayStoreSrc) && /sent\.optJSONArray\("days"\)/.test(todayStoreSrc))
+  // A PLANNED CARDIO SESSION (27 Nov 2026): sent with today and with the days ahead, under the plan's own name.
+  const { watchCardioOf } = await import('../src/lib/planned-rounds')
+  const bike = watchCardioOf({ activity: 'Assault Bike Rounds', duration: 16, targetRpe: 8, rounds: { rounds: 4, workSeconds: 180, restSeconds: 60 } } as never)
+  check('a rounds session goes to the watch as its rounds, work and rest, its name and the card\'s line', bike?.activity === 'Assault Bike Rounds' && bike.rounds === 4 && bike.workSeconds === 180 && bike.restSeconds === 60 && bike.minutes === 16 && /4 × 3 min hard · 1 min rest/.test(bike.line), bike)
+  const jog = watchCardioOf({ activity: 'Easy jog', duration: 20, targetRpe: 3 } as never)
+  check('a steady session goes as its minutes (no rounds)', jog?.rounds === 0 && jog.minutes === 20 && jog.effort === 'Easy', jog)
+  check('no planned session, nothing', watchCardioOf(null) === null)
+  const cj = JSON.parse(watchTodayPayload({ date: '2026-11-27', title: 'Conditioning', estimatedMax: null, rows: [], cardio: jog,
+    days: [{ date: '2026-11-29', title: 'Bike', rows: [], cardio: bike }] }) ?? 'null')
+  check('a cardio-only day is sent (no exercises), with "on foot" for a jog', cj?.cardio?.activity === 'Easy jog' && cj.cardio.onFoot === true && cj.exercises.length === 0, cj?.cardio)
+  check('...and a cardio day ahead rides with today, not on foot for the bike', cj?.days?.[0]?.cardio?.rounds === 4 && cj.days[0].cardio.onFoot === false, cj?.days)
+  const tsSrc = strip(read("android/wear/src/main/java/uk/co/personaltrainerapp/wear/TodayStore.java"))
+  check('the watch reads the planned cardio, and a day with only cardio is a session', /JSONObject cj = o\.optJSONObject\("cardio"\)/.test(tsSrc) && /if \(\(arr == null \|\| arr\.length\(\) == 0\) && s\.cardio == null\) return null;/.test(tsSrc))
   check('nothing to send with no rows', watchTodayPayload({ date: 'd', title: 't', estimatedMax: null, rows: [] }) === null)
 
   console.log('\n2. The watch\'s events on the phone')
@@ -194,7 +207,7 @@ async function main() {
   // ONLY WHERE HE CHANGED THEM: unchanged, the phone saves its own number, the right one even for a session that came
   // days ago with the week ahead.
   check('a watch set carries his reps and his weight ("kg") only where he changed them from the plan', /if \(reps != LiftFlow\.plannedReps\(x\.reps\)\) e\.put\("reps", reps\)/.test(mainSrc) && /if \(x\.kg >= 0 && kg != x\.kg\) e\.put\("kg", kg\)/.test(mainSrc) && !/put\("weight/.test(mainSrc))
-  check('steps and distance only on foot (walk, run), as the phone records them', /onFoot = "cardio"\.equals\(kind\) && \("Walk"\.equals\(activity\) \|\| "Run"\.equals\(activity\)\)/.test(service))
+  check('steps and distance only on foot (walk, run, or a planned session the phone calls on foot), as the phone records them', /onFoot = "cardio"\.equals\(kind\) && \("Walk"\.equals\(activity\) \|\| "Run"\.equals\(activity\) \|\| onFootPlanned\)/.test(service))
   const main = strip(read(`${W}MainActivity.java`))
   // HIS FLOW, 27 Nov 2026 ("One tap, with options"): the words and the order come from LiftFlow, which
   // test:watch-flow RUNS; these hold that the screens draw what it decides rather than words of their own.
@@ -217,6 +230,11 @@ async function main() {
   // before (LiftFlow.warnBeforeMs) and at the end; the screen only shows it.
   check('the rest buzzes from the workout service, early and at the end, with the CPU kept awake', /restLock\.acquire\(left \+ 15_000L\)/.test(service) && /main\.postDelayed\(warnBuzz, left - warn\)/.test(service) && /main\.postDelayed\(endBuzz, left\)/.test(service) && /LiftFlow\.warnBeforeMs\(LIVE\.restTotalMs\)/.test(service))
   check('...and the screen never buzzes itself (no second buzz)', !/vibrate\(/.test(main))
+  // A PLANNED CARDIO SESSION RUNS IN THE SERVICE: every buzz of IntervalFlow scheduled with the CPU held, under the plan's name.
+  check('a planned session\'s buzzes are IntervalFlow\'s, scheduled in the service with the CPU kept awake', /IntervalFlow\.buzzes\(l\.pRounds, l\.pWork, l\.pRest, l\.pMinutes\)/.test(service) && /restLock\.acquire\(total \+ 60_000L\)/.test(service) && /main\.postDelayed\(r, in\)/.test(service))
+  check('...it starts from the watch\'s home under the plan\'s own activity name (so the phone marks the day done)', /button\("Start " \+ \(k\.rounds > 0 \? "intervals" : "session"\), true, 0, v -> startPlannedCardio\(k\)\)/.test(main) && /WorkoutService\.startPlanned\(this, k\)/.test(main) && /putExtra\(EXTRA_ACTIVITY, k\.activity\)/.test(service))
+  check('...and its screen reads IntervalFlow: WORK / REST, the round, this round\'s time left', /IntervalFlow\.kicker\(ph, l\.effort\)/.test(main) && /IntervalFlow\.line\(ph, l\.pMinutes\)/.test(main) && /duration\(ph\.leftMs \+ 999\)/.test(main))
+  check('...and ending a workout cancels every buzz still to come', /for \(Runnable r : programBuzzes\) main\.removeCallbacks\(r\);/.test(service))
   check('End is tapped twice, so a sleeve does not end a run', /now - endArmedAt < 3000/.test(main))
 
   console.log('\n4. The watch app\'s settings')
