@@ -2,6 +2,31 @@
 
 Newest first. One line each.
 
+- [x] **THREE FIXES FROM THE GYM DRY RUN (28 Nov 2026, his "fix the superset, swap and summary issues";
+  `docs/audits/gym-dry-run-2026-11-28.md`).** (1) THE SUPERSET DID NOT ALTERNATE: the card said "alternate — no rest
+  between" and the Log button ran every set of A1, resting between them, before A2. Now a pair goes in rounds: whoever
+  has done the fewest sets is "now" (a tie to A1), and the rest starts only when the round is complete; a set that
+  leaves a partner owing the round stops any rest that was running. A member with more sets finishes alone with its
+  own rest (`superset-turn.ts`, read by Exercise's "now", the row that opens, and the rest). CSCS, mine: a superset is
+  trained in rounds with the rest after the round; warm-ups are not rounds ("ramp A1 first" stands). (2) "JUST TODAY"
+  ON A SWAP CHANGED ANOTHER DAY: the week-balance pass trimmed a set of last Monday's press (a day already gone) while
+  the button said "Only this session changes". A just-today swap now runs the settling tail without the balance pass,
+  the addition's rule of 7 Nov 2026 (CSCS: one session that reverts next week is not worth re-balancing a week for);
+  the whole-block swap keeps it, and the sheet's "I'll also trim..." line now sits under "Whole block", read off a
+  whole-block trial. The coach's swap card trials the scope asked for, so it follows. (3) ONE SHORT SET AND THE MAIN
+  LIFT LEFT "NEXT SESSION": the last-session read drops marked warm-ups, yet `workingSetsOf` still inferred build-up,
+  so a back-off set (47.5 x 9, then 40 x 7, 37.5 x 9) was thrown away, the squat counted 1 working set of 3, and the
+  progression engine returned nothing. Now a set logged AFTER the first top-weight set is always working (a build-up
+  comes before the top set); the old inference still runs on what comes before it. CSCS: a back-off set is a working
+  set, so the squat now says "Held at 47.5kg — short of 9 reps". VERIFIED: `test:gym-dry-run-fixes` (new, 14 checks;
+  the swap section searches four profiles for a case where whole-block balancing binds before trusting its zero).
+  Every check that reads the five changed files was run: 75 pass, and the 10 that fail (audit-fixes, finish-check,
+  kit-list, offline-ready, overlay-artifacts, profile-groups, rebuild-honours, silent-writes; two more were run under
+  the wrong names and pass) fail identically on untouched main 953fff3a. NOT FIXED, NAMED: a lift swapped in that
+  another day of the week already holds is matched to one weight across both (the one-weight rule), so a just-today
+  swap can lower that other day's copy by a notch (2 of 327 swaps in the check); his call whether today should take
+  the other day's price instead. The watch's own lifting flow (`LiftFlow.java`) keeps its own order and was not changed.
+
 - [x] **THE WATCH'S HEART RATE ON THE PHONE KEPT GOING BLANK AND RAN 5 SECONDS BEHIND (27 Nov 2026, his first walk recorded on the watch: "the heart rate seems to drop occasionally, quite often ... my Samsung watch generally doesn't drop out that much ... about a 5-second delay", then "when the watch screen is off ... I think that might also be happening").**
   MEASURED IN THE CODE, three causes, all ours. (1) The watch sent its readings in 5-second batches, and the phone
   drew a reading only while it was under 5 seconds old, so the newest reading in each batch went stale before the

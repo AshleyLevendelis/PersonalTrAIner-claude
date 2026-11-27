@@ -146,7 +146,17 @@ export function workingSetsOf(sets: ExerciseSetLog[], ctx: WorkingSetContext = {
   const share = prescribed.length > 1 ? Math.min(...prescribed) / Math.max(...prescribed) : DEFAULT_WORKING_FLOOR
   const floorKg = top * Math.max(0, Math.min(DEFAULT_WORKING_FLOOR, share) - FLOOR_ROUNDING_TOLERANCE)
 
+  // A BUILD-UP COMES BEFORE THE TOP SET, NEVER AFTER IT (gym dry run, 28 Nov 2026). The last-session read drops the
+  // marked warm-up rows, so this inference ran even on sessions that had marked theirs, and a back-off set (47.5 x 9,
+  // then 40 x 7 and 37.5 x 9 as the app itself lowered it) was thrown away as build-up: the squat then counted one
+  // working set of three and "Next session" said nothing about the main lift. A set logged after the first set at the
+  // top weight is work done at a lower weight, so it is working whatever it weighs (CSCS: a back-off set is a working
+  // set). Order is the set number, the order the rows were laid out and logged.
+  const ordered = [...sets].sort((a, b) => (a.set_number ?? 0) - (b.set_number ?? 0))
+  const firstTop = ordered.find(s => s.weight_kg >= top)
+  const afterTop = (s: ExerciseSetLog) => !!firstTop && (s.set_number ?? 0) > (firstTop.set_number ?? 0)
   const working = sets.filter(s => {
+    if (afterTop(s)) return true
     if (s.weight_kg < floorKg) return false
     if (ctx.repRangeLow != null && s.weight_kg < top && s.reps_completed < ctx.repRangeLow) return false
     return true

@@ -416,7 +416,6 @@ export function SwapDialog({
                 2026: until then a swap said nothing at all about the week it
                 landed in, and re-ran none of the passes that keep it sane. */}
             {impact?.cost && <p className="text-xs text-[color:var(--role-warn-text)]" data-testid="swap-balance-cost">{impact.cost}</p>}
-            {impact?.balancing && <p className="text-xs text-muted-foreground" data-testid="swap-balancing">{impact.balancing}</p>}
             <button
               className="w-full text-left rounded-md border p-3 hover:bg-accent hover:border-primary/30 transition-colors disabled:opacity-50"
               disabled={busy}
@@ -439,6 +438,9 @@ export function SwapDialog({
                   ? ' Main lift — this resets to a conservative starting weight so you can find it fresh, rather than inheriting a number that belonged to a different movement.'
                   : ' Loads recompute for the new movement right away.'}
               </p>
+              {/* The evening-out is the whole block's alone (gym dry run, 28 Nov 2026): a just-today swap moves no
+                  other day, so the sentence sits under the choice that does it. */}
+              {impact?.balancing && <p className="text-xs text-muted-foreground mt-1" data-testid="swap-balancing">{impact.balancing}</p>}
             </button>
             {/* FOR GOOD IS A DIFFERENT THING, offered beside it (her 10 Oct ruling):
                 a block swap ends when the next block changes exercises; a ban does not. */}

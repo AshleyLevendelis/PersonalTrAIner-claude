@@ -18,6 +18,7 @@ import { carriedWeightFor } from '@/lib/set-row'
 import { isExternallyLoaded, splitLoadDisplay, plateStepKg, loadingMode } from '@/lib/load-prescription'
 import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkingLoadKg, cardLoadFor, type DoubleProgressionRecommendation, type WorkingSetContext } from '@/lib/progression-engine'
 import { groupExercises, isConditioningDay, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, summaryAsItStands, normalizeWarmup, plannedSetProgress, type ExerciseGroup } from '@/lib/session-derive'
+import { supersetTurn, restAfterSupersetSet, type SupersetMember } from '@/lib/superset-turn'
 import { sessionNudge } from '@/lib/session-nudge'
 import { TrainerNudge } from '@/components/TrainerNudge'
 import { reconnectingLine } from '@/lib/coach-voice'
@@ -2353,7 +2354,7 @@ function ExerciseList({
   onSetCompleted: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
 }) {
   // `status` from the session, by name: a bare `status` here type-checks as the browser's own window.status.
-  const { setsFor, restLabel, status: sessionStatus } = useActiveSession()
+  const { setsFor, restLabel, status: sessionStatus, dismissRest } = useActiveSession()
   // User overrides only — the default expanded state (which exercise is
   // "current") is recomputed fresh every render from live logs below, so a
   // completed exercise's row auto-advances to the next incomplete one
@@ -2401,14 +2402,32 @@ function ExerciseList({
   const recentExIndex = restLabel ? workout.exercises.findIndex(ex => ex.name === restLabel) : -1
   // A FINISHED SESSION HAS NO "NOW" (1 Nov 2026, whole-app test #6): finished short, the main lift still wore the
   // NOW marker as if she were mid-set.
-  const currentExIndex = sessionStatus === 'finished' ? -1
+  const lastOrNow = sessionStatus === 'finished' ? -1
     : recentExIndex >= 0 && partway(recentExIndex)
       ? recentExIndex
       : flatExIndexes.find(partway) ?? firstIncompleteExIndex
+  // A SUPERSET GOES IN ROUNDS (gym dry run, 28 Nov 2026): inside a pair the "now" is whoever has done the fewest sets,
+  // so the button goes A1, A2, A1, A2 as the card's "alternate" says (superset-turn.ts).
+  const supersetMembersOf = (exIndex: number): SupersetMember[] | null => {
+    const g = groups.find(x => x.kind === 'superset' && x.members.some(m => m.exIndex === exIndex))
+    if (!g || g.kind !== 'superset') return null
+    return g.members.map(m => ({ exIndex: m.exIndex, sets: m.ex.sets, logged: setsFor(m.ex.id ?? getExerciseId(m.ex.name), m.ex.name).length }))
+  }
+  const currentExIndex = lastOrNow == null || lastOrNow < 0 ? lastOrNow
+    : (() => { const members = supersetMembersOf(lastOrNow); return members ? supersetTurn(members) ?? lastOrNow : lastOrNow })()
+  // ...and its rest comes after the round, never between the two: a set that leaves a partner still owing this
+  // round's set stops any rest that was running, so he goes straight across.
+  const onSetCompletedInRounds: typeof onSetCompleted = (exerciseName, setNumber, ...rest) => {
+    const exIndex = workout.exercises.findIndex(ex => ex.name === exerciseName)
+    const members = setNumber > 0 && exIndex >= 0 ? supersetMembersOf(exIndex) : null
+    if (members && !restAfterSupersetSet(members, exIndex, setNumber)) { dismissRest(); return }
+    onSetCompleted(exerciseName, setNumber, ...rest)
+  }
 
   const findsWeight = (name: string) => !easesWeights(layoff) && !!progressionNotes[name]?.findWeight
   const rowProps = (ex: WorkoutDay['exercises'][number], exIndex: number) => {
-    const defaultExpanded = exIndex === firstIncompleteExIndex
+    // The member whose turn it is is open too, so its tick is there for the button to press.
+    const defaultExpanded = exIndex === firstIncompleteExIndex || (exIndex === currentExIndex && supersetMembersOf(exIndex) != null)
     // THE TOUR'S ANCHOR (22 Nov 2026): the main lift, opened for the effort stop so its question is on screen.
     const tourAnchor = exIndex === tourAnchorIndex
     const expanded = (exIndex in expandOverrides ? expandOverrides[exIndex] : defaultExpanded) || (tourAnchor && tourStage === TOUR_OPENS.effort)
@@ -2451,7 +2470,7 @@ function ExerciseList({
       canMoveUp: exIndex > 0,
       canMoveDown: exIndex < workout.exercises.length - 1,
       banBusy: banBusy === ex.name,
-      onSetCompleted,
+      onSetCompleted: onSetCompletedInRounds,
       expanded,
       onToggleExpanded: () => setExpandOverrides(prev => ({ ...prev, [exIndex]: !expanded })),
       // "01", "02" in the order the session is done, supersets included.
