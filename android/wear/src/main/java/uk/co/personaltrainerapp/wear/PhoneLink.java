@@ -53,8 +53,12 @@ final class PhoneLink {
             // FOLDED INTO THE LAST WAITING HEART RATE MESSAGE when it is of the same workout and is not the one that may
             // be on its way (the first): the send loop only ever takes the first, so the last is safe to change.
             JSONObject merged = box.length() >= 2 ? fold(box.optString(box.length() - 1), event) : null;
-            if (merged != null) box.put(box.length() - 1, merged.toString());
-            else box.put(event.toString());
+            boolean folded = false;
+            if (merged != null) {
+                try { box.put(box.length() - 1, merged.toString()); folded = true; }
+                catch (Exception e) { /* not folded: it goes as its own message instead */ }
+            }
+            if (!folded) box.put(event.toString());
             while (box.length() > MAX_WAITING) box.remove(0);
             write(app, box);
         }

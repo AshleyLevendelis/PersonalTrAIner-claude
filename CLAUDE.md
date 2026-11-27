@@ -3471,6 +3471,10 @@ old — the commands were right and the context was missing.
   different gate that required the two to sit within 200 characters of each
   other. It was red at the branch head for a day. Re-run at least the gates that
   touch what the fix touched, and say which.
+- **AN OFFLINE WATCH COMPILE CANNOT SEE AN UNCAUGHT EXCEPTION WITHOUT `-XDshould-stop.ifError=FLOW`.** 27 Nov 2026:
+  compiled here without the androidx/Google libraries, javac stops before its exception checks, so "no new errors" was
+  true and his build failed on an uncaught `JSONException`. With the flag it reports the line. Use it on every watch
+  compile here, and treat the watch build on his PC as the proof.
 - **`npx tsc --noEmit` COVERS `src` ONLY.** `tsconfig.json` is
   `include: ["src"]`, so nothing type-checks `scripts/`. Measured 16 Sep 2026: a
   duplicate `const` in a gate passed `tsc` clean and was caught by esbuild when

@@ -425,6 +425,7 @@ async function main() {
   const link = strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/PhoneLink.java'))
   check('heart rate waiting for the phone is folded into the LAST waiting message, never the first (it may be on its way)',
     /JSONObject merged = box\.length\(\) >= 2 \? fold\(box\.optString\(box\.length\(\) - 1\), event\) : null;/.test(link)
+    && /try \{ box\.put\(box\.length\(\) - 1, merged\.toString\(\)\); folded = true; \}\s*catch \(Exception e\)[^}]*\}\s*\}\s*if \(!folded\) box\.put\(event\.toString\(\)\);/.test(link)
     && /if \(!"hr"\.equals\(t\.optString\("type"\)\) \|\| t\.optBoolean\("final"\)\) return null;/.test(link)
     && /t\.optLong\("startedAt"\) != next\.optLong\("startedAt"\)/.test(link)
     && /t\.put\("id", next\.getString\("id"\)\);/.test(link))
