@@ -8,7 +8,9 @@
 //   2. sets ticked on the watch are saved by the rows' own ticks: the session counts them, at the row's weight, and
 //      the watch is sent the new count;
 //   3. a set the list cannot place is said, with Dismiss, never guessed;
-//   4. the watch's heart rate shows live beside the gear.
+//   4. the watch's heart rate shows live beside the gear;
+//   5. (his "Adjust reps and weight", 27 Nov 2026) a set done differently on the watch is saved with HIS reps and
+//      weight, through the row's own boxes; and "Undo set N" on the watch deletes that set from the list.
 // WHAT THIS DOES NOT PROVE: anything on a watch, or the Bluetooth link itself (his phone and watch only).
 // PORT 9677.
 // ---------------------------------------------------------------------------
@@ -55,6 +57,8 @@ const rowWeight = await (async () => {
   return w
 })()
 check('1f. THE WEIGHT THE WATCH SHOWS IS THE ONE THE ROW WOULD SAVE', !!target && rowWeight != null && parseFloat(target.load) === parseFloat(rowWeight), { watch: target?.load, row: rowWeight })
+check('1h. the week ahead rides with today: later dates only, each with its exercises', Array.isArray(sent?.days) && sent.days.length > 0 && sent.days.every(d => d.date > sent.date && d.exercises.length > 0), sent?.days?.map(d => [d.date, d.exercises.length]))
+check('1g. ...sent as a number to step, with the implement\'s notch', !!target && target.kg === parseFloat(rowWeight) && target.step > 0, target)
 await shoot('watch-sets-sent')
 
 console.log('\n  2. SETS TICKED ON THE WATCH')
@@ -87,5 +91,37 @@ await clickAt(`[...document.querySelectorAll('[data-testid="watch-sets-waiting"]
 await wait(600)
 check('3c. Dismiss takes it away', !!said && (await ev(`!document.querySelector('[data-testid="watch-sets-waiting"]')`)) === true)
 check('3d. and no more sets were saved by it', after != null && (await heroSets()) === after)
+
+console.log('\n  4. A SET DONE DIFFERENTLY ON THE WATCH (his "Adjust reps and weight")')
+const lighter = Math.max(0, parseFloat(rowWeight) - (target?.step ?? 2.5))
+const before4 = await heroSets()
+await ev(`(() => { window.__watchInbox = ${JSON.stringify([
+  { id: 'w4', type: 'set', date: sent?.date, exerciseId: target?.id, name: target?.name, setNumber: 3, reps: 7, kg: 'LIGHTER', at: now + 10 },
+]).replace('"LIGHTER"', String(lighter))}; window.__watchWake && window.__watchWake() })()`)
+const after4 = await until(heroSets, v => v === (before4 ?? 0) + 1, 40)
+const set3 = await until(() => ev(`(window.__fakeDb?.exercise_set_logs ?? []).filter(r => r.exercise_name === ${JSON.stringify(target?.name ?? '')} && !r.is_warmup && r.set_number === 3).map(r => ({ reps: r.reps_completed, kg: r.weight_kg }))[0] ?? null`), v => !!v, 30)
+check('4a. the set is saved', before4 != null && after4 === before4 + 1, { before4, after4 })
+check('4b. WITH HIS NUMBERS: 7 reps at the lighter weight, not the plan\'s', set3?.reps === 7 && Math.abs((set3?.kg ?? -1) - lighter) < 0.01, { set3, lighter })
+await shoot('watch-sets-his-numbers')
+
+console.log('\n  5. UNDO ON THE WATCH')
+await ev(`(() => { window.__watchInbox = ${JSON.stringify([
+  { id: 'u3', type: 'set-undo', date: sent?.date, exerciseId: target?.id, name: target?.name, setNumber: 3, at: now + 20 },
+])}; window.__watchWake && window.__watchWake() })()`)
+const after5 = await until(heroSets, v => v === (after4 ?? 0) - 1, 40)
+check('5a. the undone set comes off the list: the session counts one fewer', after4 != null && after5 === after4 - 1, { after4, after5 })
+const gone = await until(() => ev(`(window.__fakeDb?.exercise_set_logs ?? []).some(r => r.exercise_name === ${JSON.stringify(target?.name ?? '')} && !r.is_warmup && r.set_number === 3)`), v => v === false, 20)
+check('5b. ...and from the log itself', gone === false, gone)
+check('5c. sets 1 and 2 are untouched', (await ev(`(window.__fakeDb?.exercise_set_logs ?? []).filter(r => r.exercise_name === ${JSON.stringify(target?.name ?? '')} && !r.is_warmup).length`)) === 2)
+check('5d. nothing is left waiting or said', (await ev(`!document.querySelector('[data-testid="watch-sets-waiting"]')`)) === true)
+// Logged and undone on the watch before the phone ever saw it: the two arrive together and nothing is saved.
+const before6 = await heroSets()
+await ev(`(() => { window.__watchInbox = ${JSON.stringify([
+  { id: 'w5', type: 'set', date: sent?.date, exerciseId: target?.id, name: target?.name, setNumber: 3, reps: 5, at: now + 30 },
+  { id: 'u5', type: 'set-undo', date: sent?.date, exerciseId: target?.id, name: target?.name, setNumber: 3, at: now + 31 },
+])}; window.__watchWake && window.__watchWake() })()`)
+await wait(3500)
+check('5e. a set undone before the phone saw it is never saved, and nothing is left waiting', before6 != null && (await heroSets()) === before6 && (await ev(`JSON.parse(localStorage.getItem('fitplan_watch_sets') || '[]').length`)) === 0, { before6, now: await heroSets() })
+await shoot('watch-sets-undone')
 
 await finish('verify:watch-sets PASSED')

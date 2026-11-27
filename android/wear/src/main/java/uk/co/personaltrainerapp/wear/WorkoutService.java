@@ -12,7 +12,10 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.os.SystemClock;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -59,6 +62,9 @@ public class WorkoutService extends Service {
     private static final String TAG = "PtWorkout";
     static final String ACTION_START = "uk.co.personaltrainerapp.wear.START";
     static final String ACTION_END = "uk.co.personaltrainerapp.wear.END";
+    static final String ACTION_REST = "uk.co.personaltrainerapp.wear.REST";
+    static final String EXTRA_REST_ENDS = "restEnds";  // on the elapsed clock; 0 cancels
+    static final String EXTRA_REST_NEXT = "restNext";  // what comes next, for the notification
     static final String EXTRA_KIND = "kind";         // "cardio" or "lift"
     static final String EXTRA_ACTIVITY = "activity"; // "Walk", "Run", "Bike", "Other", or the session's name
     private static final String CHANNEL = "workout";
@@ -84,6 +90,11 @@ public class WorkoutService extends Service {
         int maxBpm;
         long sumBpm;
         int readings;
+        // THE REST, held by the service so it runs and buzzes with the screen off (27 Nov 2026, the gym-floor review:
+        // the arm drops, the screen sleeps, and a buzz from the screen's own timer never came).
+        long restEndsAt;      // on the elapsed clock; 0: no rest running
+        long restTotalMs;
+        String restAfterId;   // the exercise whose set was logged last
     }
     static final Live LIVE = new Live();
     private static Runnable onChange;
@@ -104,6 +115,43 @@ public class WorkoutService extends Service {
         c.startService(new Intent(c, WorkoutService.class).setAction(ACTION_END));
     }
 
+    /** Start, move or (endsAt 0) cancel the rest: a short buzz LiftFlow.warnBeforeMs before the end, a long one at it. */
+    static void rest(Context c, long endsAt, long totalMs, String afterId, String next) {
+        LIVE.restEndsAt = endsAt; LIVE.restTotalMs = totalMs; if (afterId != null) LIVE.restAfterId = afterId;
+        c.startService(new Intent(c, WorkoutService.class).setAction(ACTION_REST).putExtra(EXTRA_REST_ENDS, endsAt).putExtra(EXTRA_REST_NEXT, next));
+    }
+
+    private PowerManager.WakeLock restLock;
+    private final Runnable warnBuzz = () -> vibrate(new long[] { 0, 120 });
+    private final Runnable endBuzz = () -> { vibrate(new long[] { 0, 400, 200, 400 }); releaseRestLock(); showRunning(); changed(); };
+
+    private void scheduleRest(long endsAt, String next) {
+        main.removeCallbacks(warnBuzz);
+        main.removeCallbacks(endBuzz);
+        long left = endsAt - SystemClock.elapsedRealtime();
+        if (endsAt <= 0 || left <= 0) { releaseRestLock(); showRunning(); return; }
+        // The CPU stays awake for the rest (a few minutes at most) so the buzz is on time with the screen off.
+        if (restLock == null) {
+            restLock = getSystemService(PowerManager.class).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "pt:rest");
+            restLock.setReferenceCounted(false);
+        }
+        restLock.acquire(left + 15_000L);
+        long warn = LiftFlow.warnBeforeMs(LIVE.restTotalMs);
+        if (warn > 0 && left > warn) main.postDelayed(warnBuzz, left - warn);
+        main.postDelayed(endBuzz, left);
+        // The watch's own workout notification counts the rest down, and a tap on it opens the app.
+        notify(LIVE.activity, next == null || next.isEmpty() ? "Rest" : next, System.currentTimeMillis() + left);
+    }
+
+    private void releaseRestLock() { if (restLock != null && restLock.isHeld()) restLock.release(); }
+
+    private void showRunning() { notify(LIVE.activity, "Workout running", 0); }
+
+    private void vibrate(long[] pattern) {
+        Vibrator v = getSystemService(Vibrator.class);
+        if (v != null && v.hasVibrator()) v.vibrate(VibrationEffect.createWaveform(pattern, -1));
+    }
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? null : intent.getAction();
@@ -115,6 +163,8 @@ public class WorkoutService extends Service {
             begin(kind == null ? "cardio" : kind, activity == null ? "Workout" : activity);
         } else if (ACTION_END.equals(action)) {
             finish();
+        } else if (ACTION_REST.equals(action)) {
+            if (LIVE.running) scheduleRest(intent.getLongExtra(EXTRA_REST_ENDS, 0), intent.getStringExtra(EXTRA_REST_NEXT));
         }
         return START_NOT_STICKY;
     }
@@ -124,16 +174,28 @@ public class WorkoutService extends Service {
         if (nm.getNotificationChannel(CHANNEL) == null) {
             nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Workout", NotificationManager.IMPORTANCE_LOW));
         }
-        PendingIntent open = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE);
-        Notification n = new NotificationCompat.Builder(this, CHANNEL)
-                .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(activity)
-                .setContentText("Workout running")
-                .setOngoing(true)
-                .setContentIntent(open)
-                .build();
+        Notification n = notification(activity, "Workout running", 0);
         int type = Build.VERSION.SDK_INT >= 34 ? ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH : 0;
         ServiceCompat.startForeground(this, NOTIFICATION_ID, n, type);
+    }
+
+    /** The ongoing notification; with countdownTo set (wall clock) it counts the rest down. */
+    private Notification notification(String title, String text, long countdownTo) {
+        PendingIntent open = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE);
+        NotificationCompat.Builder b = new NotificationCompat.Builder(this, CHANNEL)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setContentIntent(open);
+        if (countdownTo > 0) b.setWhen(countdownTo).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true);
+        return b.build();
+    }
+
+    private void notify(String title, String text, long countdownTo) {
+        if (!LIVE.running) return;
+        getSystemService(NotificationManager.class).notify(NOTIFICATION_ID, notification(title, text, countdownTo));
     }
 
     private void begin(String kind, String activity) {
@@ -239,6 +301,10 @@ public class WorkoutService extends Service {
         Live l = LIVE;
         if (l.lastZone > 0) l.zoneMs[l.lastZone - 1] += Math.min(System.currentTimeMillis() - l.lastZoneAt, LONGEST_HOLD_MS);
         l.running = false;
+        l.restEndsAt = 0;
+        main.removeCallbacks(warnBuzz);
+        main.removeCallbacks(endBuzz);
+        releaseRestLock();
         changed();
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE);
         stopSelf();

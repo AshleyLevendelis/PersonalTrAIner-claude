@@ -15,10 +15,10 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
-import android.os.VibrationEffect;
-import android.os.Vibrator;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.InputDevice;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
@@ -40,12 +40,15 @@ import java.util.Locale;
  *  HOME    today's session from the phone (when it sent one for today) and the cardio choices.
  *  CARDIO  the clock, heart rate with its zone, and on foot steps and distance; End, tapped twice.
  *  LOGGED  after End: "Mostly zone 3 · Steady" and Log it, or Easy / Steady / Hard with no zone; the phone logs it.
- *  LIFT    "Next" exercise, "3 × 10 @ 100 kg", "Set 2 of 3", heart rate; "Set done · rest 1:30" ticks the set (sent to
- *          the phone, which saves it as its own tick does) and starts the rest.
- *  REST    the countdown, what comes next, a buzz when it ends, and Start next set (which also ends it early).
+ *  LIFT    "Next exercise up" / "Next set", the exercise, its reps and weight as numbers to tap, "Set 2 of 3", heart
+ *          rate; "Log set · rest 1:30" logs the set (the phone saves it as its own tick does) and starts the rest.
+ *  REST    the countdown (held and buzzed by WorkoutService, so it works with the screen off), −15s / +15s, what comes
+ *          next, Next set or Next exercise, and Undo for the set just logged.
+ *  EDIT    one number, its − and +, and the bezel; LIST every exercise, to take them in any order.
  *
  * Decisions (docs/plans/watch-app.md, his "go with your recommendations"): a workout starts on the watch; the cardio
- * screen holds nothing that needs reading mid-stride; no weight is typed on the watch, the phone's number is ticked.
+ * screen holds nothing that needs reading mid-stride. REVERSED 27 Nov 2026 by his "Adjust reps and weight": the plan's
+ * reps and weight are the default and one tap logs them, and a set that went differently is changed on the watch.
  *
  * THE LOOK (27 Nov 2026, his "the watch needs to look more high end"): the app's own colours, fonts and icons
  * (WatchStyle), and a ring round the screen's edge (RingView) carrying the progress: sets done, the rest running down,
@@ -60,16 +63,12 @@ public class MainActivity extends Activity {
         if (a != null) a.runOnUiThread(() -> { if (a.screen == Screen.HOME) a.showHome(); });
     }
 
-    private enum Screen { HOME, CARDIO, LOGGED, LIFT, REST, DONE }
+    private enum Screen { HOME, CARDIO, LOGGED, LIFT, REST, DONE, EDIT, LIST }
     private Screen screen = Screen.HOME;
     private final Handler main = new Handler(Looper.getMainLooper());
     private LinearLayout column;
 
-    // Rest, held here: the deadline on the watch's clock that elapses, never the wall clock.
-    private long restEndsAt;
-    /** The exercise whose set was logged last: the rest screen says whether the next set is more of it or a new one. */
-    private String restAfterId;
-    private boolean restBuzzed;
+    // The rest itself is held by WorkoutService (LIVE.restEndsAt, on the elapsed clock), which buzzes with the screen off.
     private long endArmedAt;
 
     private static final int MINT = WatchStyle.MINT;
@@ -106,7 +105,11 @@ public class MainActivity extends Activity {
         WorkoutService.setOnChange(this::onLive);
         PhoneLink.flush(this);
         if (WorkoutService.LIVE.running) {
-            if ("lift".equals(WorkoutService.LIVE.kind)) { if (screen != Screen.REST) showLift(); }
+            if ("lift".equals(WorkoutService.LIVE.kind)) {
+                // Back from a dark screen mid-rest: the rest is still counting in the service.
+                if (resting() && WorkoutService.LIVE.restEndsAt > SystemClock.elapsedRealtime()) showRest();
+                else if (screen != Screen.EDIT && screen != Screen.LIST) showLift();
+            }
             else showCardio();
         } else if (screen != Screen.LOGGED && screen != Screen.DONE) {
             showHome();
@@ -142,7 +145,7 @@ public class MainActivity extends Activity {
         } else {
             ring.set(0f, MINT);
             kicker("PERSONAL TRAINER", MINT, 0);
-            text("Today's session shows here once you open Exercise in the phone app today.", 13, MUTED, 6);
+            text("Open Exercise in the phone app once, and your sessions for the week ahead come to your watch.", 13, MUTED, 6);
         }
         kicker("CARDIO", MINT, 18);
         tile(R.drawable.ic_walk, "Walk", "Steps · heart rate", v -> startCardio("Walk"));
@@ -168,7 +171,6 @@ public class MainActivity extends Activity {
     private TextView heartBpm, heartZone;
     private LinearLayout heartRow;
     private TextView endButton;
-    private long restTotalMs;
 
     private void clearLive() {
         clock = null; nextLine = null; restClock = null; statA = null; statB = null; statALabel = null; statBLabel = null;
@@ -257,6 +259,13 @@ public class MainActivity extends Activity {
     }
 
     // ---------------------------------------------------------------- LIFT
+    //
+    // THE GYM FLOOR (27 Nov 2026, his "best in class ... think how a user would want to use it in the gym"): the
+    // phone is in the locker, hands are chalky, the screen sleeps between sets. So: one big tap logs the set and
+    // starts the rest (his "One tap, with options"); the reps and the weight are the plan's and change with a tap on
+    // the number, − / + or the bezel (his "Adjust reps and weight"); the rest buzzes from the workout service with the
+    // screen off, 10s before and at the end, and moves ±15s; the last set can be undone; "All exercises" takes them in
+    // any order (the bench is taken). The decisions are LiftFlow's, which test:watch-flow runs.
 
     private void startLift() {
         TodayStore.Session s = TodayStore.read(this);
@@ -268,29 +277,21 @@ public class MainActivity extends Activity {
         showLift();
     }
 
-    /** Today's sets done and moved on from, as this watch keeps them: what LiftFlow decides with. */
+    /** Today's sets done, moved on from and picked, as this watch keeps them: what LiftFlow decides with. */
     private final LiftFlow.State state = new LiftFlow.State() {
         @Override public int done(TodayStore.Exercise x) { return TodayStore.done(MainActivity.this, x); }
         @Override public boolean skipped(TodayStore.Exercise x) { return TodayStore.skipped(MainActivity.this, x); }
+        @Override public String chosen() { return TodayStore.chosen(MainActivity.this); }
     };
 
     private TodayStore.Exercise nextExercise(TodayStore.Session s) { return LiftFlow.next(s.exercises, state); }
 
     private TodayStore.Exercise exerciseAfter(TodayStore.Session s, TodayStore.Exercise x) { return LiftFlow.after(s.exercises, x, state); }
 
-    /** "Next exercise": leave x's remaining sets (the phone keeps them open) and go straight to what comes after. */
-    private void moveOn(TodayStore.Exercise x) {
-        TodayStore.skip(this, x);
-        restEndsAt = 0;
-        showLift();
-    }
-
-    /** Sets done today, of all the session's sets: the ring on the lifting screens. */
-    private float sessionFraction(TodayStore.Session s) {
-        if (s == null) return 0f;
-        int done = 0, total = 0;
-        for (TodayStore.Exercise x : s.exercises) { done += TodayStore.done(this, x); total += x.sets; }
-        return total > 0 ? done / (float) total : 0f;
+    private TodayStore.Exercise find(TodayStore.Session s, String id) {
+        if (s == null || id == null) return null;
+        for (TodayStore.Exercise e : s.exercises) if (e.id.equals(id)) return e;
+        return null;
     }
 
     private void showLift() {
@@ -306,19 +307,92 @@ public class MainActivity extends Activity {
         // "Next exercise up is ..." on a new exercise's first set; "Next set" on the rest of it.
         kicker(LiftFlow.liftKicker(setNumber), MINT, 0);
         title(x.name, 20, false, 2);
-        prescriptionRow(x, 6);
+        doneRow(x, 8);
         setDots(x, setNumber, 8);
-        heartRow(8);
+        heartRow(6);
         // ONE TAP logs the set AND starts the rest (his ruling 27 Nov 2026, "One tap, with options").
         button(LiftFlow.logLabel(x), true, R.drawable.ic_check, v -> setDone(s, x));
         if (exerciseAfter(s, x) != null) quiet("Next exercise", v -> moveOn(x));
+        quiet("All exercises", v -> showList());
         quiet("End workout", v -> endLift());
         redrawLive();
     }
 
+    /**
+     * The set as he will do it: two chips, "10 reps" and "100 kg", each opening its own − / + screen. A number he has
+     * changed from the plan shows in violet. With no weight to change (bodyweight), the load is shown, not a chip.
+     */
+    private void doneRow(TodayStore.Exercise x, int topDp) {
+        LinearLayout r = row(topDp);
+        int reps = TodayStore.reps(this, x);
+        boolean repsChanged = reps != LiftFlow.plannedReps(x.reps);
+        chip(r, LiftFlow.repsText(reps, x.reps), repsChanged, v -> showEdit(x, false));
+        if (x.kg >= 0) {
+            double kg = TodayStore.kg(this, x);
+            TextView at = inline(r, "@", 16, MUTED, WatchStyle.medium(this));
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) at.getLayoutParams();
+            lp.leftMargin = dp(6); lp.rightMargin = dp(6);
+            chip(r, LiftFlow.loadWith(x.load, kg), kg != x.kg, v -> showEdit(x, true));
+        } else if (x.load != null && !x.load.isEmpty()) {
+            TextView load = inline(r, "  " + x.load, 16, MUTED, WatchStyle.semibold(this));
+            load.setGravity(Gravity.CENTER_VERTICAL);
+        }
+    }
+
+    /** A number to tap: monospaced, in an outlined pill, violet once changed from the plan. */
+    private void chip(LinearLayout parent, String value, boolean changed, View.OnClickListener onClick) {
+        TextView t = new TextView(this);
+        t.setText(value);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        t.setTypeface(WatchStyle.mono(this));
+        t.setTextColor(changed ? WatchStyle.VIOLET : FG);
+        t.setGravity(Gravity.CENTER);
+        t.setMinHeight(dp(44));
+        t.setPadding(dp(12), 0, dp(12), 0);
+        t.setBackground(WatchStyle.ghostPill(dp(22), dp(1.5f)));
+        t.setClickable(true);
+        t.setOnClickListener(onClick);
+        parent.addView(t, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+    }
+
+    /** A small outlined button in a row ("−15s", "+15s"). */
+    private void small(LinearLayout parent, String label, View.OnClickListener onClick) {
+        TextView t = new TextView(this);
+        t.setText(label);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        t.setTypeface(WatchStyle.semibold(this));
+        t.setTextColor(FG);
+        t.setGravity(Gravity.CENTER);
+        t.setMinHeight(dp(40));
+        t.setMinWidth(dp(64));
+        t.setBackground(WatchStyle.ghostPill(dp(20), dp(1.5f)));
+        t.setClickable(true);
+        t.setOnClickListener(onClick);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.leftMargin = dp(4); lp.rightMargin = dp(4);
+        parent.addView(t, lp);
+    }
+
+    /** A big round − or + (52dp, a gloved thumb's size). */
+    private void round(LinearLayout parent, String label, View.OnClickListener onClick) {
+        TextView t = new TextView(this);
+        t.setText(label);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26);
+        t.setTypeface(WatchStyle.bold(this));
+        t.setTextColor(FG);
+        t.setGravity(Gravity.CENTER);
+        t.setBackground(WatchStyle.ghostPill(dp(26), dp(1.5f)));
+        t.setClickable(true);
+        t.setOnClickListener(onClick);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(56), dp(56));
+        lp.leftMargin = dp(10); lp.rightMargin = dp(10);
+        parent.addView(t, lp);
+    }
+
     private void setDone(TodayStore.Session s, TodayStore.Exercise x) {
         int setNumber = TodayStore.done(this, x) + 1;
-        restAfterId = x.id;
+        int reps = TodayStore.reps(this, x);
+        double kg = TodayStore.kg(this, x);
         TodayStore.tick(this, x);
         try {
             JSONObject e = new JSONObject();
@@ -327,38 +401,174 @@ public class MainActivity extends Activity {
             e.put("exerciseId", x.id);
             e.put("name", x.name);
             e.put("setNumber", setNumber);
+            // What he did, ONLY where he changed it (his "Adjust reps and weight"): unchanged, the phone saves its own
+            // number for the set, which is the right one even when this session came days ago with the week ahead.
+            if (reps != LiftFlow.plannedReps(x.reps)) e.put("reps", reps);
+            if (x.kg >= 0 && kg != x.kg) e.put("kg", kg);
             e.put("at", System.currentTimeMillis());
             PhoneLink.send(this, e);
         } catch (Exception ignored) { /* our own object */ }
+        WorkoutService.LIVE.restAfterId = x.id;
         TodayStore.Session after = TodayStore.read(this);
         if (after == null || nextExercise(after) == null) { showSessionDone(); return; }
         if (x.restSeconds <= 0) { showLift(); return; }
-        restEndsAt = SystemClock.elapsedRealtime() + x.restSeconds * 1000L;
-        restTotalMs = x.restSeconds * 1000L;
-        restBuzzed = false;
+        startRest(x.restSeconds * 1000L, x.restSeconds * 1000L, after);
         showRest();
     }
+
+    /** The rest runs in the workout service, so it counts and buzzes with the screen off. */
+    private void startRest(long leftMs, long totalMs, TodayStore.Session s) {
+        TodayStore.Exercise next = s == null ? null : nextExercise(s);
+        boolean same = next != null && next.id.equals(WorkoutService.LIVE.restAfterId);
+        String line = next == null ? "" : LiftFlow.restLine(next, TodayStore.done(this, next) + 1, same);
+        WorkoutService.rest(this, leftMs > 0 ? SystemClock.elapsedRealtime() + leftMs : 0, totalMs, null, line);
+    }
+
+    private void endRest() {
+        WorkoutService.rest(this, 0, 0, null, null);
+        showLift();
+    }
+
+    private boolean resting() { return WorkoutService.LIVE.restEndsAt > 0; }
 
     private void showRest() {
         screen = Screen.REST;
         column.removeAllViews();
         clearLive();
         kicker("REST", WatchStyle.VIOLET, 0);
-        restClock = mono("", 60, WatchStyle.NUM, 2);
+        restClock = mono("", 56, WatchStyle.NUM, 2);
+        // −15s / +15s: a set that needs longer, or a shorter rest on an easy accessory.
+        LinearLayout nudge = row(4);
+        small(nudge, "−15s", v -> nudgeRest(-1));
+        small(nudge, "+15s", v -> nudgeRest(1));
         TodayStore.Session s = TodayStore.read(this);
         TodayStore.Exercise x = s == null ? null : nextExercise(s);
         // More of the same exercise, or a new one: the line and the button say which (his "Next set", "Next exercise").
-        boolean same = x != null && x.id.equals(restAfterId);
+        boolean same = x != null && x.id.equals(WorkoutService.LIVE.restAfterId);
         if (x != null) {
             int setNumber = TodayStore.done(this, x) + 1;
-            nextLine = text(LiftFlow.restLine(x, setNumber, same), 13, MUTED, 4);
+            nextLine = text(LiftFlow.restLine(x, setNumber, same), 13, MUTED, 6);
         }
-        heartRow(8);
-        button(LiftFlow.restButton(same), true, 0, v -> { restEndsAt = 0; showLift(); });
+        heartRow(6);
+        button(LiftFlow.restButton(same), true, 0, v -> endRest());
         // Moving on early, mid-exercise: skips the rest AND this exercise's remaining sets.
         if (same && exerciseAfter(s, x) != null) quiet("Next exercise", v -> moveOn(x));
+        TodayStore.Exercise last = find(s, WorkoutService.LIVE.restAfterId);
+        if (last != null && TodayStore.done(this, last) > 0) quiet("Undo set " + TodayStore.done(this, last), v -> undoLast(s, last));
         redrawLive();
         tick();
+    }
+
+    private void nudgeRest(int dir) {
+        long left = Math.max(0, WorkoutService.LIVE.restEndsAt - SystemClock.elapsedRealtime());
+        long next = LiftFlow.nudgeRestMs(left, dir);
+        long total = Math.max(WorkoutService.LIVE.restTotalMs + dir * 15_000L, next);
+        startRest(next, total, TodayStore.read(this));
+        redrawLive();
+    }
+
+    /**
+     * Undo the last set: one fewer on the watch, and a "set-undo" to the phone, which takes the set off its list (or
+     * out of the queue if it never got there). Back to that set, rest cancelled.
+     */
+    private void undoLast(TodayStore.Session s, TodayStore.Exercise x) {
+        int setNumber = TodayStore.done(this, x);
+        TodayStore.untick(this, x);
+        TodayStore.choose(this, x);
+        try {
+            JSONObject e = new JSONObject();
+            e.put("type", "set-undo");
+            e.put("date", s.date);
+            e.put("exerciseId", x.id);
+            e.put("name", x.name);
+            e.put("setNumber", setNumber);
+            e.put("at", System.currentTimeMillis());
+            PhoneLink.send(this, e);
+        } catch (Exception ignored) { /* our own object */ }
+        endRest();
+    }
+
+    // ---------------------------------------------------------------- EDIT: one number, − / + and the bezel
+
+    private TodayStore.Exercise editing;
+    private boolean editingKg;
+    private TextView editValue;
+
+    private void showEdit(TodayStore.Exercise x, boolean kg) {
+        screen = Screen.EDIT;
+        editing = x; editingKg = kg;
+        column.removeAllViews();
+        clearLive();
+        kicker(kg ? "WEIGHT" : (LiftFlow.timed(x.reps) ? "TIME" : "REPS"), MINT, 0);
+        text(x.name, 13, MUTED, 2);
+        editValue = mono("", 44, WatchStyle.NUM, 6);
+        LinearLayout r = row(8);
+        round(r, "−", v -> stepEdit(-1));
+        round(r, "+", v -> stepEdit(1));
+        button("Done", true, 0, v -> showLift());
+        quiet("Back to the plan", v -> {
+            if (editingKg) TodayStore.setKg(this, x, x.kg); else TodayStore.setReps(this, x, LiftFlow.plannedReps(x.reps));
+            drawEdit();
+        });
+        drawEdit();
+    }
+
+    private void drawEdit() {
+        if (editing == null || editValue == null) return;
+        editValue.setText(editingKg ? LiftFlow.loadWith(editing.load, TodayStore.kg(this, editing))
+            : LiftFlow.repsText(TodayStore.reps(this, editing), editing.reps));
+    }
+
+    private void stepEdit(int dir) {
+        if (editing == null) return;
+        if (editingKg) TodayStore.setKg(this, editing, LiftFlow.stepKg(TodayStore.kg(this, editing), dir, editing.step));
+        else TodayStore.setReps(this, editing, LiftFlow.stepReps(TodayStore.reps(this, editing), dir, editing.reps));
+        drawEdit();
+    }
+
+    /** The bezel (the Galaxy Watch's touch bezel and a crown send the same events) turns the number being changed. */
+    @Override
+    public boolean dispatchGenericMotionEvent(MotionEvent ev) {
+        if (screen == Screen.EDIT && ev.getAction() == MotionEvent.ACTION_SCROLL
+                && ev.isFromSource(InputDevice.SOURCE_ROTARY_ENCODER)) {
+            float delta = -ev.getAxisValue(MotionEvent.AXIS_SCROLL);
+            if (delta != 0) stepEdit(delta > 0 ? 1 : -1);
+            return true;
+        }
+        return super.dispatchGenericMotionEvent(ev);
+    }
+
+    // ---------------------------------------------------------------- LIST: any order
+
+    private void showList() {
+        screen = Screen.LIST;
+        column.removeAllViews();
+        clearLive();
+        TodayStore.Session s = TodayStore.read(this);
+        kicker("ALL EXERCISES", MINT, 0);
+        if (s != null) for (TodayStore.Exercise e : s.exercises) {
+            int done = TodayStore.done(this, e);
+            boolean finished = done >= e.sets;
+            String sub = finished ? "Done" : (TodayStore.skipped(this, e) ? "Moved on · " : "") + done + " of " + e.sets + " sets · " + LiftFlow.prescription(e);
+            tile(finished ? R.drawable.ic_check : R.drawable.ic_lift, e.name, sub, finished ? null : v -> { TodayStore.choose(this, e); showLift(); });
+        }
+        quiet("Back", v -> showLift());
+    }
+
+    /** "Next exercise": leave x's remaining sets (the phone keeps them open) and go straight to what comes after. */
+    private void moveOn(TodayStore.Exercise x) {
+        TodayStore.skip(this, x);
+        TodayStore.chooseNone(this);
+        WorkoutService.rest(this, 0, 0, null, null);
+        showLift();
+    }
+
+    /** Sets done today, of all the session's sets: the ring on the lifting screens. */
+    private float sessionFraction(TodayStore.Session s) {
+        if (s == null) return 0f;
+        int done = 0, total = 0;
+        for (TodayStore.Exercise x : s.exercises) { done += TodayStore.done(this, x); total += x.sets; }
+        return total > 0 ? done / (float) total : 0f;
     }
 
     private void showSessionDone() {
@@ -374,11 +584,11 @@ public class MainActivity extends Activity {
         text(movedOn ? "Sets you moved on from stay open on your phone. Your phone saves the rest as its own ticks."
             : "Every set is ticked. Your phone saves them as its own ticks.", 13, MUTED, 4);
         button("End workout", true, 0, v -> endLift());
+        if (movedOn) quiet("All exercises", v -> showList());
     }
 
     private void endLift() {
         if (WorkoutService.LIVE.running) WorkoutService.end(this);
-        restEndsAt = 0;
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         showHome();
     }
@@ -413,15 +623,17 @@ public class MainActivity extends Activity {
         }
         drawHeart(l, zone);
         if (screen == Screen.REST && restClock != null) {
-            long left = restEndsAt - SystemClock.elapsedRealtime();
+            // The service buzzes (10s before and at the end, screen on or off); the screen only shows it.
+            WorkoutService.Live live = WorkoutService.LIVE;
+            long left = live.restEndsAt - SystemClock.elapsedRealtime();
             if (left <= 0) {
                 restClock.setText("Go");
                 restClock.setTextColor(MINT);
                 ring.set(1f, MINT);
-                if (!restBuzzed) { restBuzzed = true; buzz(); }
             } else {
                 restClock.setText(duration(left + 999));
-                ring.set(restTotalMs > 0 ? left / (float) restTotalMs : 0f, WatchStyle.VIOLET);
+                restClock.setTextColor(WatchStyle.NUM);
+                ring.set(live.restTotalMs > 0 ? left / (float) live.restTotalMs : 0f, WatchStyle.VIOLET);
             }
         }
     }
@@ -440,11 +652,6 @@ public class MainActivity extends Activity {
         heartBpm.setText(fresh ? String.valueOf(l.bpm) : "–");
         heartZone.setVisibility(zone > 0 ? View.VISIBLE : View.GONE);
         heartZone.setText("ZONE " + zone);
-    }
-
-    private void buzz() {
-        Vibrator v = getSystemService(Vibrator.class);
-        if (v != null && v.hasVibrator()) v.vibrate(VibrationEffect.createWaveform(new long[] { 0, 400, 200, 400 }, -1));
     }
 
     // ---------------------------------------------------------------- permissions
@@ -653,8 +860,9 @@ public class MainActivity extends Activity {
         t.setGravity(Gravity.CENTER_VERTICAL);
         t.setPadding(dp(12), dp(10), dp(14), dp(10));
         t.setBackground(WatchStyle.tile(dp(24), dp(1)));
-        t.setClickable(true);
-        t.setOnClickListener(onClick);
+        t.setClickable(onClick != null);
+        if (onClick != null) t.setOnClickListener(onClick);
+        else t.setAlpha(0.6f);
         ImageView ic = new ImageView(this);
         ic.setImageResource(icon);
         ic.setImageTintList(android.content.res.ColorStateList.valueOf(MINT));

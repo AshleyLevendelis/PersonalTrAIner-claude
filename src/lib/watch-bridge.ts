@@ -97,8 +97,17 @@ export async function applyWatchEvents(events: readonly unknown[], ctx: WatchCon
         if (!rec.readRecording()) { rec.writeRecording({ activity: e.activity, startedAt: new Date(num(e.startedAt)!).toISOString() }); out.started++ }
       } else if (e.type === 'cardio-end') {
         if (await logWatchCardio(e, ctx)) out.logged++
-      } else if (e.type === 'set' && typeof e.name === 'string' && num(e.setNumber) != null && typeof e.date === 'string') {
-        queueWatchSet({ id: String(e.id ?? `${e.date}:${e.exerciseId}:${e.setNumber}`), date: e.date, exerciseId: String(e.exerciseId ?? ''), name: e.name, setNumber: num(e.setNumber)!, at: num(e.at) ?? Date.now() })
+      } else if ((e.type === 'set' || e.type === 'set-undo') && typeof e.name === 'string' && num(e.setNumber) != null && typeof e.date === 'string') {
+        const undo = e.type === 'set-undo'
+        const reps = num(e.reps), kg = num(e.kg)
+        queueWatchSet({
+          id: String(e.id ?? `${e.date}:${e.exerciseId}:${e.setNumber}${undo ? ':undo' : ''}`), date: e.date, exerciseId: String(e.exerciseId ?? ''),
+          name: e.name, setNumber: num(e.setNumber)!, at: num(e.at) ?? Date.now(),
+          // What he did on the watch (his "Adjust reps and weight"): a believable count and weight, else the plan's.
+          ...(!undo && reps != null && reps >= 1 && reps <= 600 ? { reps: Math.round(reps) } : {}),
+          ...(!undo && kg != null && kg >= 0 && kg <= 500 ? { kg } : {}),
+          ...(undo ? { undo: true } : {}),
+        })
         out.sets++
       }
     } catch { /* one bad event never stops the rest */ }

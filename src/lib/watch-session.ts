@@ -22,6 +22,15 @@ export interface WatchRow {
   addedLoadKg?: number | null
   restSeconds: number
   done: number
+  /** The implement's notch in kg (plateStepKg): what one − / + on the watch moves the weight by. */
+  stepKg?: number
+}
+
+/** The planned weight as a number for the watch's − / + ("~100kg" is 100), or null when there is none to change (BW). */
+function watchKg(row: Pick<WatchRow, 'suggestedLoad'>): number | null {
+  const parts = splitLoadDisplay((row.suggestedLoad ?? '').trim())
+  const n = parts ? Number(parts.value) : NaN
+  return Number.isFinite(n) ? n : null
 }
 
 /** "100 kg", "4 kg per hand", "BW", "BW + 10 kg", or "" for none: the figure the row prints, without its "~". */
@@ -33,30 +42,55 @@ export function watchLoadText(row: Pick<WatchRow, 'suggestedLoad' | 'addedLoadKg
   return raw.replace(/^~/, '')
 }
 
-/** The JSON the watch reads (android/wear TodayStore). Null when there is nothing to send. */
-export function watchTodayPayload(p: { date: string; title: string; estimatedMax: number | null; rows: WatchRow[] }): string | null {
-  if (p.rows.length === 0) return null
+/** A day ahead, as the strip holds it: its date, its session's name and its rows at the plan's own weights. */
+export interface WatchDay { date: string; title: string; rows: WatchRow[] }
+
+const watchExercise = (r: WatchRow, done: number) => ({
+  id: r.id,
+  name: r.name,
+  sets: r.sets,
+  reps: r.reps,
+  load: watchLoadText(r),
+  restSeconds: r.restSeconds,
+  done: Math.min(done, r.sets),
+  // His ruling 27 Nov 2026, "Adjust reps and weight": the watch steps the weight from here, a notch at a time.
+  kg: watchKg(r),
+  step: r.stepKg ?? 2.5,
+})
+
+/**
+ * The JSON the watch reads (android/wear TodayStore). Null when there is nothing to send.
+ *
+ * THE WEEK AHEAD RIDES WITH TODAY (27 Nov 2026, the gym-floor review): the watch had a session only once Exercise was
+ * opened that very day, so a phone left in the locker meant an empty watch. Every open now also sends the coming days'
+ * sessions at the plan's own weights; the watch picks today's by its date. Today's own entry keeps today's exact
+ * weights, and the watch sends a reps or weight number only where he changed it, so a number from days ago never
+ * overrides the phone's own on the set it saves.
+ */
+export function watchTodayPayload(p: { date: string; title: string; estimatedMax: number | null; rows: WatchRow[]; days?: readonly WatchDay[] }): string | null {
+  const ahead = (p.days ?? []).filter(d => d.date > p.date && d.rows.length > 0)
+  if (p.rows.length === 0 && ahead.length === 0) return null
   return JSON.stringify({
     v: 1,
     date: p.date,
     title: p.title,
     estimatedMax: p.estimatedMax ?? 0,
-    exercises: p.rows.map(r => ({
-      id: r.id,
-      name: r.name,
-      sets: r.sets,
-      reps: r.reps,
-      load: watchLoadText(r),
-      restSeconds: r.restSeconds,
-      done: Math.min(r.done, r.sets),
-    })),
+    exercises: p.rows.map(r => watchExercise(r, r.done)),
+    ...(ahead.length ? { days: ahead.map(d => ({ date: d.date, title: d.title, exercises: d.rows.map(r => watchExercise(r, 0)) })) } : {}),
   })
 }
 
 // ---------------------------------------------------------------------------
 // The sets ticked on the watch, waiting for the Exercise tab.
 // ---------------------------------------------------------------------------
-export interface WatchSet { id: string; date: string; exerciseId: string; name: string; setNumber: number; at: number }
+export interface WatchSet {
+  id: string; date: string; exerciseId: string; name: string; setNumber: number; at: number
+  /** What he did, from the watch (his "Adjust reps and weight"); absent from a watch before 27 Nov 2026. */
+  reps?: number
+  kg?: number
+  /** "Undo set N" on the watch: the set comes off the queue, or off today's list if the phone already saved it. */
+  undo?: boolean
+}
 
 const KEY = 'fitplan_watch_sets'
 const listeners = new Set<() => void>()
@@ -73,11 +107,50 @@ function write(sets: WatchSet[]): void {
   for (const l of listeners) l()
 }
 
-/** A set from the watch, kept once (the watch may send it again). */
+const sameSet = (a: WatchSet, b: WatchSet) => a.date === b.date && a.exerciseId === b.exerciseId && a.setNumber === b.setNumber
+
+/**
+ * A set from the watch, kept once (the watch may send it again). An UNDO is kept behind the set it undoes, whether or
+ * not that set is still here: only the Exercise tab knows whether it already pressed the set's tick (WatchLink drops
+ * an unpressed pair, and deletes a pressed one from the list). Taking the pair off here was a race: a set saved a
+ * moment ago is still in this queue until its save is confirmed.
+ */
 export function queueWatchSet(s: WatchSet): void {
   const all = waitingWatchSets()
-  if (all.some(x => x.id === s.id || (x.date === s.date && x.exerciseId === s.exerciseId && x.setNumber === s.setNumber))) return
+  if (all.some(x => x.id === s.id)) return
+  // An undo is only ever a repeat by its id (above): the same set number can be logged and undone twice in a session.
+  if (s.undo) { write([...all, s].sort((a, b) => a.at - b.at)); return }
+  // The same set again after an undo (logged, undone, logged again) waits behind the undo: the old one comes off the
+  // list first, then this one is saved with its own numbers.
+  if (all.some(x => !x.undo && sameSet(x, s) && !all.some(u => u.undo && sameSet(u, s) && u.at >= x.at))) return
   write([...all, s].sort((a, b) => a.at - b.at))
+}
+
+/**
+ * The boxes a watch set must fill before its tick is pressed, so the phone saves what he did (his "Adjust reps and
+ * weight"): null when the tick already holds his numbers. A bodyweight tick ("BW") takes no weight.
+ */
+export function watchSetNeedsFill(tick: HTMLElement, s: Pick<WatchSet, 'reps' | 'kg'>): { reps?: string; kg?: string } | null {
+  const want: { reps?: string; kg?: string } = {}
+  if (s.reps != null && Number(tick.dataset.nextReps) !== s.reps) want.reps = String(s.reps)
+  if (s.kg != null && tick.dataset.nextWeight !== 'BW' && Number(tick.dataset.nextWeight) !== s.kg) want.kg = String(s.kg)
+  return want.reps != null || want.kg != null ? want : null
+}
+
+/**
+ * The receipt's delete for an undone set: "Delete set N", then "Confirm delete set N" (the list asks twice). Null when
+ * the list holds no saved set of that number (nothing left to undo).
+ */
+export function deleteForWatchUndo(root: ParentNode, s: Pick<WatchSet, 'name' | 'setNumber'>): HTMLElement | null {
+  const rows = [...root.querySelectorAll<HTMLElement>('[data-exercise-name]')].filter(r => r.dataset.exerciseName === s.name)
+  for (const row of rows) {
+    const buttons = [...row.querySelectorAll<HTMLElement>('button[aria-label]')]
+    const confirm = buttons.find(b => b.getAttribute('aria-label') === `Confirm delete set ${s.setNumber}`)
+    if (confirm) return confirm
+    const del = buttons.find(b => b.getAttribute('aria-label') === `Delete set ${s.setNumber}`)
+    if (del) return del
+  }
+  return null
 }
 
 /** Taken off once saved (or found already saved), or once its day has passed. */
@@ -96,7 +169,7 @@ export function subscribeWatchSets(l: () => void): () => void {
  * row already holds it, "typed" when its weight is still to be typed (the tick would refuse), "missing" when the row
  * is not on the list, and the row's own header to open it when it is closed (a closed row draws no ticks).
  */
-export function tickForWatchSet(root: ParentNode, s: Pick<WatchSet, 'name' | 'setNumber'>): { tick: HTMLElement } | { opener: HTMLElement } | { state: 'saved' | 'typed' | 'missing' } {
+export function tickForWatchSet(root: ParentNode, s: Pick<WatchSet, 'name' | 'setNumber' | 'kg'>): { tick: HTMLElement } | { opener: HTMLElement } | { state: 'saved' | 'typed' | 'missing' } {
   const rows = [...root.querySelectorAll<HTMLElement>('[data-exercise-name]')].filter(r => r.dataset.exerciseName === s.name)
   if (rows.length === 0) return { state: 'missing' }
   if (!rows.some(r => r.querySelector('[data-set-tick]'))) {
@@ -106,7 +179,8 @@ export function tickForWatchSet(root: ParentNode, s: Pick<WatchSet, 'name' | 'se
   const label = `Set ${s.setNumber}`
   for (const row of rows) {
     const open = [...row.querySelectorAll<HTMLElement>('[data-set-tick="open"]')].find(t => t.dataset.nextSet === label)
-    if (open) return open.dataset.nextWeight === '' ? { state: 'typed' } : { tick: open }
+    // A weight still to be typed is typed from the watch's number when it sent one; with none, it waits for him.
+    if (open) return open.dataset.nextWeight === '' && s.kg == null ? { state: 'typed' } : { tick: open }
   }
   // No open tick of that name: saved already when a saved tick says "Set N" (its spoken label: "Set 2 saved").
   const named = new RegExp(`^Set ${s.setNumber}(?![,\\d])`)

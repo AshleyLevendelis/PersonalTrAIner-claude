@@ -42,7 +42,9 @@ public final class FlowCheck {
     static final LiftFlow.State st = new LiftFlow.State() {
         public int done(TodayStore.Exercise x) { return done.getOrDefault(x.id, 0); }
         public boolean skipped(TodayStore.Exercise x) { return skipped.contains(x.id); }
+        public String chosen() { return chosen; }
     };
+    static String chosen;
     static TodayStore.Exercise ex(String id, String name, int sets, String reps, String load, int rest) {
         TodayStore.Exercise x = new TodayStore.Exercise();
         x.id = id; x.name = name; x.sets = sets; x.reps = reps; x.load = load; x.restSeconds = rest; return x;
@@ -91,6 +93,32 @@ public final class FlowCheck {
         // The phone had already logged all of Bench: the watch starts at the next exercise.
         done.clear(); skipped.clear(); done.put("bench", 3);
         lift("phoneAhead", all);
+        // "All exercises": he picks Curl first (the bench is taken); Bench comes back once Curl is done.
+        done.clear(); skipped.clear(); chosen = "curl";
+        lift("picked", all);
+        done.put("curl", 2);
+        lift("pickedDone", all);
+        chosen = null;
+        // Undo: the phone still counts 3 until it deletes the set; the watch shows 2, then follows the phone again.
+        out("undo.held", LiftFlow.doneCount(3, 2, 2, 3));
+        out("undo.none", LiftFlow.doneCount(2, 3, -1, 3));
+        out("undo.capped", LiftFlow.doneCount(1, 5, -1, 3));
+        // His reps and weight (his ruling "Adjust reps and weight").
+        out("reps.planned", LiftFlow.plannedReps("8-12"));
+        out("reps.down", LiftFlow.stepReps(8, -1, "8-12"));
+        out("reps.floor", LiftFlow.stepReps(1, -1, "10"));
+        out("reps.timed", LiftFlow.timed("30s") + "," + LiftFlow.timed("8-12") + "," + LiftFlow.timed("45 s"));
+        out("reps.timedStep", LiftFlow.stepReps(30, 1, "30s"));
+        out("reps.text", LiftFlow.repsText(1, "10") + "|" + LiftFlow.repsText(8, "10") + "|" + LiftFlow.repsText(35, "30s"));
+        out("kg.down", LiftFlow.kgText(LiftFlow.stepKg(100, -1, 2.5)));
+        out("kg.dumbbell", LiftFlow.kgText(LiftFlow.stepKg(20, 1, 2)));
+        out("kg.floor", LiftFlow.kgText(LiftFlow.stepKg(1, -1, 2.5)));
+        out("kg.load", LiftFlow.loadWith("100 kg", 97.5) + "|" + LiftFlow.loadWith("20 kg per hand", 18));
+        // The rest: ±15s, never below zero or above ten minutes; the early buzz only on a rest of 30s or more.
+        out("rest.plus", LiftFlow.nudgeRestMs(60_000, 1));
+        out("rest.floor", LiftFlow.nudgeRestMs(10_000, -1));
+        out("rest.cap", LiftFlow.nudgeRestMs(595_000, 1));
+        out("rest.warn", LiftFlow.warnBeforeMs(90_000) + "," + LiftFlow.warnBeforeMs(20_000));
         out("duration.65s", LiftFlow.duration(65_000));
         out("duration.1h", LiftFlow.duration(3_723_000));
     }
@@ -130,6 +158,27 @@ check('the session ends once every exercise is done or moved on from', is('end.e
 
 console.log('\n4. The phone wins')
 check('sets the phone already logged are skipped on the watch', is('phoneAhead.exercise', 'Cable Row'))
+console.log('\n5. Any order ("All exercises")')
+check('a picked exercise comes first, out of the plan\'s order', is('picked.exercise', 'Curl') && is('picked.kicker', 'NEXT EXERCISE UP'))
+check('...and once it is done the plan\'s order resumes', is('pickedDone.exercise', 'Bench Press'))
+
+console.log('\n6. Undo')
+check('an undone set is held off the count until the phone has deleted it', is('undo.held', '2'))
+check('with no undo waiting, the higher of the phone\'s and the watch\'s counts', is('undo.none', '3'))
+check('never more than the sets prescribed', is('undo.capped', '3'))
+
+console.log('\n7. Reps and weight as done (his "Adjust reps and weight")')
+check('the planned count is the first of a range, as the phone\'s box saves it', is('reps.planned', '8'))
+check('a rep step is one, never below one', is('reps.down', '7') && is('reps.floor', '1'))
+check('a held exercise counts in seconds, stepped in fives', is('reps.timed', 'true,false,true') && is('reps.timedStep', '35'))
+check('the count reads as words ("1 rep", "8 reps", "35s")', is('reps.text', '1 rep|8 reps|35s'))
+check('the weight steps by the implement\'s notch (2.5 a bar, 2 a dumbbell), never below zero', is('kg.down', '97.5') && is('kg.dumbbell', '22') && is('kg.floor', '0'))
+check('the load keeps its words ("97.5 kg", "18 kg per hand")', is('kg.load', '97.5 kg|18 kg per hand'))
+
+console.log('\n8. The rest')
+check('+15s adds fifteen seconds', is('rest.plus', '75000'))
+check('−15s never goes below zero, +15s never past ten minutes', is('rest.floor', '0') && is('rest.cap', '600000'))
+check('a short buzz 10s before the end, on a rest of 30s or more only', is('rest.warn', '10000,0'))
 check('times read as the app prints them (1:05, 1:02:03)', is('duration.65s', '1:05') && is('duration.1h', '1:02:03'))
 
 console.log(`\n${ran} checks ran`)

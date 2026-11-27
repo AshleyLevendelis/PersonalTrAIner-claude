@@ -1826,6 +1826,11 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   `generate-meals` deploy for the writer's half
 
 ### His requests of 27 Nov 2026
+- **The watch on the gym floor: his "best in class ... how a user would want to use it in the gym", and his ruling
+  "Adjust reps and weight"** (REVERSES "no weight typed on the watch"): reps and weight are chips with − / + and the
+  bezel, sent only where changed; the rest buzzes from the workout service with the screen off (10s before, at the end,
+  ±15s); Undo set N; All exercises in any order; the week ahead is sent with today so the watch works with the phone in
+  the locker. `test:watch-flow`, `test:watch-app`, `verify:watch-sets`. Needs a watch rebuild
 - **The watch's lifting flow: his words "next exercise up is ..., Log set, Next set, Start rest timer, Next set, Next
   exercise", and his ruling "One tap, with options"**: Log set saves the set and starts the rest; the rest offers Next
   set, or Next exercise after an exercise's last set; Next exercise moves on early (kept on the watch, the phone keeps
