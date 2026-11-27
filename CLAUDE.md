@@ -1875,6 +1875,9 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   live to a phone app (Samsung's design): a strap, a broadcast app on the watch, or our own watch app. A watch that syncs
   late now fills heart rate too, never over a strap's. `test:recorded-activity` §8, `verify:record-activity` A10-A10d,
   B3a-B3b, D0-D5. Needs a phone app rebuild. NOT on a real phone yet
+  **A watch reading stays on screen 15 seconds, a strap's 5** (his first watch walk, 27 Nov 2026, "the heart rate seems
+  to drop ... quite often"): the watch sends every second, and every 5 seconds with its screen off. `test:strap-live`,
+  `test:watch-app`. Needs a watch rebuild
 
 - **A Galaxy Watch app: his "Go in the watch with your recommendations" and his vision, 27 Nov 2026** ("Track workouts
   steps and heart rate. On a weight workout see 'next exercise 3x10 bench press @100kg' then start rest from watch, start

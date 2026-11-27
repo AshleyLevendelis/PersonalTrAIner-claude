@@ -26,6 +26,7 @@ import androidx.health.services.client.ExerciseClient;
 import androidx.health.services.client.ExerciseUpdateCallback;
 import androidx.health.services.client.HealthServices;
 import androidx.health.services.client.data.Availability;
+import androidx.health.services.client.data.BatchingMode;
 import androidx.health.services.client.data.CumulativeDataPoint;
 import androidx.health.services.client.data.DataPointContainer;
 import androidx.health.services.client.data.DataType;
@@ -73,7 +74,10 @@ public class WorkoutService extends Service {
     private static final int NOTIFICATION_ID = 41;
     /** A reading counts for the time until the next one, never longer (the phone's LONGEST_HOLD_MS): a gap is not effort. */
     private static final long LONGEST_HOLD_MS = 5 * 60 * 1000;
-    private static final long BATCH_MS = 5000;
+    /** Every reading goes to the phone within a second (was five: the phone's number ran five seconds behind the wrist). */
+    private static final long BATCH_MS = 1000;
+    /** How long a reading stays on screen through a sensor skip: the phone's WATCH_STALE_MS (strap-live.ts). */
+    static final long HR_HOLD_MS = 15_000;
 
     /** What the screens draw. Read on the main thread only. */
     static final class Live {
@@ -281,11 +285,19 @@ public class WorkoutService extends Service {
                 if (!caps.getSupportedExerciseTypes().contains(use)) { Log.w(TAG, "no supported exercise type"); return; }
                 Set<DataType<?, ?>> supported = caps.getExerciseTypeCapabilities(use).getSupportedDataTypes();
                 want.retainAll(supported);
-                ExerciseConfig config = new ExerciseConfig.Builder(use)
+                ExerciseConfig.Builder builder = new ExerciseConfig.Builder(use)
                         .setDataTypes(want)
                         .setIsAutoPauseAndResumeEnabled(false)
-                        .setIsGpsEnabled(false)
-                        .build();
+                        .setIsGpsEnabled(false);
+                // HEART RATE EVERY FIVE SECONDS WITH THE SCREEN OFF (27 Nov 2026, his first walk: "when the watch screen
+                // is off ... I think that might also be happening"). Left alone, the watch holds its readings back while
+                // the screen is off and hands them over in long batches, so the phone's number went blank between them.
+                // This override exists for exactly this, an app showing heart rate live on another device; it costs
+                // battery, so only while a workout runs, and only where the watch says it can.
+                if (caps.getSupportedBatchingModeOverrides().contains(BatchingMode.HEART_RATE_5_SECONDS)) {
+                    builder.setBatchingModeOverrides(java.util.Collections.singleton(BatchingMode.HEART_RATE_5_SECONDS));
+                }
+                ExerciseConfig config = builder.build();
                 // An exercise left running by an earlier crash makes a new start fail: end it, then start once more.
                 Futures.addCallback(exercise.startExerciseAsync(config), new FutureCallback<Void>() {
                     @Override public void onSuccess(Void r) {}

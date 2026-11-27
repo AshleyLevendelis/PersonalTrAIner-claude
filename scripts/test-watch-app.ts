@@ -311,7 +311,13 @@ async function main() {
   const ringSrc = strip(read(`${W}RingView.java`))
   check('progress lives on the edge ring: sets in mint, rest in violet, the zone in the heart\'s colour', /ring\.set\(sessionFraction\(s\), MINT\)/.test(main) && /ring\.set\(live\.restTotalMs > 0 \? left \/ \(float\) live\.restTotalMs : 0f, WatchStyle\.VIOLET\)/.test(main) && /ring\.set\(zone \/ 5f, WatchStyle\.HEART\)/.test(main) && /drawArc/.test(ringSrc))
   check('numbers are monospaced, so the clock does not shuffle', /clock = mono\(/.test(main) && /restClock = mono\(/.test(main) && /heartBpm = inline\(heartRow, "–", 22, FG, WatchStyle\.mono\(this\)\)/.test(main))
-  check('a stale heart rate shows a dash, never its last number', /heartBpm\.setText\(fresh \? String\.valueOf\(l\.bpm\) : "–"\)/.test(main) && /System\.currentTimeMillis\(\) - l\.bpmAt <= 5000/.test(main))
+  check('a stale heart rate shows a dash, never its last number', /heartBpm\.setText\(fresh \? String\.valueOf\(l\.bpm\) : "–"\)/.test(main) && /System\.currentTimeMillis\(\) - l\.bpmAt <= WorkoutService\.HR_HOLD_MS/.test(main))
+  const svcHr = strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/WorkoutService.java'))
+  const holdMs = Number(/HR_HOLD_MS = ([\d_]+)L?;/.exec(svcHr)?.[1]?.replace(/_/g, ''))
+  check('the watch holds a reading through a sensor skip exactly as long as the phone does', holdMs === strap.WATCH_STALE_MS, { holdMs })
+  check('with the screen off the watch is asked for heart rate every five seconds, where it says it can (his walk, 27 Nov 2026)',
+    /if \(caps\.getSupportedBatchingModeOverrides\(\)\.contains\(BatchingMode\.HEART_RATE_5_SECONDS\)\) \{\s*builder\.setBatchingModeOverrides\(java\.util\.Collections\.singleton\(BatchingMode\.HEART_RATE_5_SECONDS\)\);/.test(svcHr) && /ExerciseConfig config = builder\.build\(\);/.test(svcHr))
+  check('readings go to the phone every second, never five (the phone ran behind the wrist)', Number(/BATCH_MS = (\d+);/.exec(svcHr)?.[1]) <= 1000)
 
   console.log(`\n${ran} checks ran`)
   if (failures > 0) { console.error(`${failures} failure(s)`); process.exit(1) }
