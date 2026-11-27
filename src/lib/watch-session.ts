@@ -88,7 +88,7 @@ export function watchNowFrom(next: { set: string; name: string; weight: string; 
   return { id: row.id, ...(reps > 0 ? { reps } : {}), ...(next.weight && Number.isFinite(kg) && kg > 0 ? { kg } : {}) }
 }
 
-export function watchTodayPayload(p: { date: string; title: string; estimatedMax: number | null; rows: WatchRow[]; cardio?: WatchCardio | null; days?: readonly WatchDay[]; now?: { id: string; reps?: number; kg?: number } | null }): string | null {
+export function watchTodayPayload(p: { date: string; title: string; estimatedMax: number | null; rows: WatchRow[]; cardio?: WatchCardio | null; days?: readonly WatchDay[]; now?: { id: string; reps?: number; kg?: number } | null; finished?: boolean }): string | null {
   const ahead = (p.days ?? []).filter(d => d.date > p.date && (d.rows.length > 0 || !!d.cardio))
   if (p.rows.length === 0 && !p.cardio && ahead.length === 0) return null
   return JSON.stringify({
@@ -98,6 +98,8 @@ export function watchTodayPayload(p: { date: string; title: string; estimatedMax
     estimatedMax: p.estimatedMax ?? 0,
     exercises: p.rows.map(r => watchExercise(r, r.done)),
     ...(p.now ? { now: p.now } : {}),
+    // FINISHED ON THE PHONE: the watch ends its weights workout (27 Nov 2026, the battery).
+    ...(p.finished ? { finished: true } : {}),
     // A PLANNED CARDIO SESSION (27 Nov 2026): the watch runs its rounds or minutes and logs it under this exact name.
     ...(p.cardio ? { cardio: watchCardio(p.cardio) } : {}),
     ...(ahead.length ? { days: ahead.map(d => ({ date: d.date, title: d.title, exercises: d.rows.map(r => watchExercise(r, 0)), ...(d.cardio ? { cardio: watchCardio(d.cardio) } : {}) })) } : {}),

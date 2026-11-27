@@ -74,6 +74,12 @@ final class TodayStore {
         e.apply();
     }
 
+    /** The phone says today's weights session is finished (its payload for today carries "finished"). */
+    static boolean finishedToday(String json) {
+        try { JSONObject o = new JSONObject(json); return today().equals(o.optString("date")) && o.optBoolean("finished", false); }
+        catch (Exception e) { return false; }
+    }
+
     /** The exercise the phone is on today, or null. */
     static String nowId(Context c) { Session s = read(c); return s == null ? null : s.nowId; }
 

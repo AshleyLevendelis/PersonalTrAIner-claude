@@ -125,6 +125,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        WorkoutService.appVisible = true;
         open = new WeakReference<>(this);
         WorkoutService.setOnChange(this::onLive);
         PhoneLink.flush(this);
@@ -160,6 +161,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
+        WorkoutService.appVisible = false;
         WorkoutService.setOnChange(null);
     }
 
@@ -375,7 +377,8 @@ public class MainActivity extends Activity {
 
     private void showLift() {
         screen = Screen.LIFT;
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        // THE SCREEN SLEEPS BETWEEN SETS (27 Nov 2026, his "the app is draining my watch battery fast"): it was held on for
+        // the whole session. The rest buzzes from the service with the screen off, and a lift of the wrist wakes it.
         column.removeAllViews();
         hideEdge();
         clearLive();

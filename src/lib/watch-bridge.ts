@@ -91,6 +91,7 @@ export async function applyWatchEvents(events: readonly unknown[], ctx: WatchCon
       if (e.type === 'hr' && Array.isArray(e.samples)) {
         const samples = (e.samples as unknown[]).filter((s): s is [number, number] => Array.isArray(s) && s.length === 2 && num(s[0]) != null && num(s[1]) != null)
         if (samples.length) out.readings += (await import('./strap-live')).onWatchReadings(samples)
+        await (await import('./session-calories')).noteWatchRunningKcal(ctx.profileId, e)
       } else if (e.type === 'cardio-start' && typeof e.activity === 'string' && num(e.startedAt) != null) {
         const rec = await import('./recording-store')
         // Shown running on the phone; never over a workout already open there, and never one already logged (a late
@@ -123,6 +124,25 @@ export async function applyWatchEvents(events: readonly unknown[], ctx: WatchCon
   return out
 }
 
+/** The watch's figures into a log of the same workout the phone already made: only what that log is missing. */
+async function fillFromWatch(profileId: string, date: string, e: Ev, startMs: number): Promise<void> {
+  try {
+    const { supabase } = await import('./supabase')
+    const { lateFill } = await import('./activity-recording')
+    const { data } = await supabase.from('cardio_logs').select('*').eq('user_id', profileId).eq('date', date)
+    type Row = { id?: string; activity_name?: string | null; started_at?: string | null; steps?: number | null; distance_km?: number | null; active_kcal?: number | null; kcal_estimated?: boolean | null; avg_heart_rate?: number | null; max_heart_rate?: number | null }
+    const row = ((data ?? []) as Row[]).find(r => r.activity_name === e.activity && r.started_at != null && Math.abs(Date.parse(r.started_at) - startMs) < 120_000)
+    if (!row?.id) return
+    const km = num(e.distanceM)
+    const update = lateFill(row, {
+      minutes: 0, steps: num(e.steps), distanceKm: km != null && km >= 10 ? Math.round(km / 10) / 100 : null,
+      kcal: num(e.kcal), kcalEstimated: false,
+      avgHeartRate: num(e.avgBpm), maxHeartRate: num(e.maxBpm),
+    })
+    if (update) await supabase.from('cardio_logs').update(update).eq('id', row.id).eq('user_id', profileId)
+  } catch { /* the phone's own late fill still runs */ }
+}
+
 /** A cardio workout ended on the watch, logged once. False when it was already logged or could not be. */
 async function logWatchCardio(e: Ev, ctx: WatchContext): Promise<boolean> {
   const startMs = num(e.startedAt), endMs = num(e.endedAt)
@@ -136,7 +156,13 @@ async function logWatchCardio(e: Ev, ctx: WatchContext): Promise<boolean> {
   const store = await import('./recording-store')
   const open = store.readRecording()
   const ours = open && open.activity === e.activity && Math.abs(Date.parse(open.startedAt) - startMs) < 120_000
-  if (already) { if (ours) store.writeRecording(null); return false }
+  if (already) {
+    if (ours) store.writeRecording(null)
+    // ENDED ON THE PHONE FIRST (27 Nov 2026): the log is there, so the watch's own figures fill what it lacks (its
+    // calories over none or an estimate, steps, distance, heart rate), never over a figure it already has.
+    await fillFromWatch(ctx.profileId, date, e, startMs)
+    return false
+  }
   const recording = { activity: e.activity, startedAt: new Date(startMs).toISOString(), endedAt: new Date(endMs).toISOString() }
   const { gatherFigures, logRecording } = await import('./activity-recording')
   const { recordingFigures } = await import('./activity-figures')

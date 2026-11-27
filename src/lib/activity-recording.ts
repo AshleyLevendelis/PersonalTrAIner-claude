@@ -165,8 +165,12 @@ export async function gatherFigures(r: Recording, body: BodyForEstimate, now: Da
 }
 
 /** Write the recording down as a cardio log, with the effort he tapped. Null when nothing was saved. */
-export function logRecording(p: { profileId: string; date: string; recording: Recording; figures: RecordingFigures; effort: EffortKey }): CardioLogView | null {
+export function logRecording(p: { profileId: string; date: string; recording: Recording; figures: RecordingFigures; effort: EffortKey; watchKcal?: number | null }): CardioLogView | null {
   const end = p.recording.endedAt ?? new Date().toISOString()
+  // THE WATCH'S OWN COUNT, when the watch app was running this workout (27 Nov 2026): over none, or over the app's
+  // estimate; never over a device figure the phone already read.
+  const useWatch = p.watchKcal != null && p.watchKcal > 0 && (p.figures.kcal == null || p.figures.kcalEstimated)
+  if (useWatch) p = { ...p, figures: { ...p.figures, kcal: p.watchKcal!, kcalEstimated: false } }
   const view = saveCardioLog({
     userId: p.profileId,
     date: p.date,

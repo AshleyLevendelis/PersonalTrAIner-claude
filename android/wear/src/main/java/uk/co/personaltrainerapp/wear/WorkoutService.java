@@ -74,14 +74,27 @@ public class WorkoutService extends Service {
     private static final int NOTIFICATION_ID = 41;
     /** A reading counts for the time until the next one, never longer (the phone's LONGEST_HOLD_MS): a gap is not effort. */
     private static final long LONGEST_HOLD_MS = 5 * 60 * 1000;
-    /** Every reading goes to the phone within a second (was five: the phone's number ran five seconds behind the wrist). */
-    private static final long BATCH_MS = 1000;
+    /**
+     * How often readings go to the phone: every second while the app is on screen (the phone's number keeps up with the
+     * wrist), every ten with it away or the screen off (27 Nov 2026, his "draining my watch battery fast": a Bluetooth
+     * message a second for a whole session). The phone holds a watch reading 15 seconds (WATCH_STALE_MS).
+     */
+    private static final long BATCH_VISIBLE_MS = 1000;
+    private static final long BATCH_HIDDEN_MS = 10_000;
+    /** The watch app is on screen (MainActivity's resume and pause). */
+    static volatile boolean appVisible;
+    /**
+     * A WEIGHTS WORKOUT LEFT RUNNING ENDS ITSELF (27 Nov 2026, the battery): a session finished on the phone and never on
+     * the watch kept the heart rate sensor and the workout going for hours. No set or rest for this long ends it.
+     */
+    static final long LIFT_IDLE_END_MS = 90 * 60 * 1000;
     /** How long a reading stays on screen through a sensor skip: the phone's WATCH_STALE_MS (strap-live.ts). */
     static final long HR_HOLD_MS = 15_000;
 
     /** What the screens draw. Read on the main thread only. */
     static final class Live {
         boolean running;
+        long lastActionAt; // elapsedRealtime of the last start, set or rest (a weights workout ends itself when idle)
         String kind = "";
         String activity = "";
         long startedAt;
@@ -118,6 +131,7 @@ public class WorkoutService extends Service {
     private int estimatedMax;
 
     static void start(Context c, String kind, String activity) {
+        LIVE.lastActionAt = SystemClock.elapsedRealtime();
         LIVE.pMinutes = 0; LIVE.pRounds = 0; LIVE.display = "";
         Intent i = new Intent(c, WorkoutService.class).setAction(ACTION_START).putExtra(EXTRA_KIND, kind).putExtra(EXTRA_ACTIVITY, activity);
         ContextCompat.startForegroundService(c, i);
@@ -140,6 +154,7 @@ public class WorkoutService extends Service {
 
     /** Start, move or (endsAt 0) cancel the rest: a short buzz LiftFlow.warnBeforeMs before the end, a long one at it. */
     static void rest(Context c, long endsAt, long totalMs, String afterId, String next) {
+        LIVE.lastActionAt = SystemClock.elapsedRealtime();
         LIVE.restEndsAt = endsAt; LIVE.restTotalMs = totalMs; if (afterId != null) LIVE.restAfterId = afterId;
         c.startService(new Intent(c, WorkoutService.class).setAction(ACTION_REST).putExtra(EXTRA_REST_ENDS, endsAt).putExtra(EXTRA_REST_NEXT, next));
     }
@@ -294,7 +309,9 @@ public class WorkoutService extends Service {
                 // the screen is off and hands them over in long batches, so the phone's number went blank between them.
                 // This override exists for exactly this, an app showing heart rate live on another device; it costs
                 // battery, so only while a workout runs, and only where the watch says it can.
-                if (caps.getSupportedBatchingModeOverrides().contains(BatchingMode.HEART_RATE_5_SECONDS)) {
+                // CARDIO ONLY (27 Nov 2026, the battery): Google's own note says this costs battery; a weights session's
+                // heart rate on the phone can wait for the watch's ordinary batches.
+                if ("cardio".equals(kind) && caps.getSupportedBatchingModeOverrides().contains(BatchingMode.HEART_RATE_5_SECONDS)) {
                     builder.setBatchingModeOverrides(java.util.Collections.singleton(BatchingMode.HEART_RATE_5_SECONDS));
                 }
                 ExerciseConfig config = builder.build();
@@ -341,6 +358,10 @@ public class WorkoutService extends Service {
             if (kcal != null) LIVE.kcal = kcal.getTotal();
             sendBatch(false);
             changed();
+            if ("lift".equals(LIVE.kind) && LIVE.running && SystemClock.elapsedRealtime() - LIVE.lastActionAt > LIFT_IDLE_END_MS) {
+                Log.i(TAG, "weights workout idle, ending it");
+                end(WorkoutService.this);
+            }
         }
         @Override public void onLapSummaryReceived(@NonNull ExerciseLapSummary summary) {}
         @Override public void onRegistered() {}
@@ -361,11 +382,18 @@ public class WorkoutService extends Service {
     /** Heart rate goes to the phone every few seconds, as one event. */
     private void sendBatch(boolean force) {
         long now = SystemClock.elapsedRealtime();
-        if (pending.length() == 0 || (!force && now - lastBatchAt < BATCH_MS)) return;
+        if (pending.length() == 0 || (!force && now - lastBatchAt < (appVisible ? BATCH_VISIBLE_MS : BATCH_HIDDEN_MS))) return;
         lastBatchAt = now;
         try {
             JSONObject e = new JSONObject();
             e.put("type", "hr");
+            // WHAT THE WORKOUT HAS COUNTED SO FAR rides with its heart rate (27 Nov 2026, his "didn't log any calories"):
+            // a session ended on the phone, never on the watch, still has the watch's calories.
+            e.put("kind", LIVE.kind);
+            e.put("activity", LIVE.activity);
+            e.put("startedAt", LIVE.startedAt);
+            e.put("date", TodayStore.today());
+            if (LIVE.kcal > 0) e.put("kcal", Math.round(LIVE.kcal));
             e.put("samples", new JSONArray(pending.toString()));
             PhoneLink.send(this, e);
         } catch (Exception ignored) { /* our own object */ }

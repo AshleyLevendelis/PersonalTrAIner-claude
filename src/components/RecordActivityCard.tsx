@@ -17,6 +17,7 @@ import { isPhoneApp } from '@/lib/steps-store'
 import { pairedStrap, liveHeartSource, useLiveHeartRate } from '@/lib/strap-live'
 import { startLiveSteps, useLiveSteps, useLiveStepsState } from '@/lib/live-steps'
 import { readWatchHeart } from '@/lib/watch-workouts'
+import { watchCardioKcalFor } from '@/lib/session-calories'
 
 // ---------------------------------------------------------------------------
 // A CARDIO WORKOUT BEING RECORDED (his request 25 Nov 2026; MOVED TO EXERCISE 27 Nov 2026 on his words: "it's under
@@ -218,7 +219,8 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
 
   const log = (effort: EffortKey, byZone: number | null = null) => {
     if (!figures) return
-    const view = logRecording({ profileId, date, recording: rec, figures, effort })
+    // The watch app's own count for this workout, when it ran it (27 Nov 2026: his walk had no calories).
+    const view = logRecording({ profileId, date, recording: rec, figures, effort, watchKcal: watchCardioKcalFor(rec.activity, rec.startedAt) })
     if (!view) { setError("That didn't save. Try again in a moment."); return }
     setLogged({ view, samples: samples ?? [], start, end, name, zone: byZone })
     onLogged?.(view)

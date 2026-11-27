@@ -2133,7 +2133,7 @@ export function TodayPanel({
             <Suspense fallback={null}>
               <WatchLink rows={watchRows} cardio={watchTodayCardio} days={watchAhead} listEl={listEl} today={today} logs={logs}
                 title={workout!.focus?.trim() || 'Today\'s session'} age={profile?.age ?? null}
-                noZones={(profile?.health_conditions ?? []).length > 0} />
+                noZones={(profile?.health_conditions ?? []).length > 0} finished={status === 'finished'} />
             </Suspense>
           )}
           <div ref={setListEl} data-today-exercises>
