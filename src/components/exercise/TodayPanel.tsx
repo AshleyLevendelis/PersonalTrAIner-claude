@@ -119,7 +119,7 @@ import { describeDayGap, dayGapCanAddPress } from '@/lib/day-gap-note'
 import type { Exercise, WorkoutDay, MesocycleWeek, UserProfile, PlannedActivity } from '@/lib/types'
 import type { LoadSource } from './LoadChip'
 import { isPhoneApp } from '@/lib/steps-store'
-import { watchCardioOf } from '@/lib/planned-rounds'
+import { watchCardioOf, withTodayChange, readTodayChange, subscribeTodayChange } from '@/lib/planned-rounds'
 import type { WatchRow, WatchDay } from '@/lib/watch-session'
 // THE WATCH'S PART OF THIS TAB, downloaded only in the phone app (watch-session.ts says what it does).
 // Ambient: nobody tapped for it, so a missing file draws nothing (and reloads onto a new version, as every part does).
@@ -1604,8 +1604,14 @@ export function TodayPanel({
 
   // TODAY'S PLANNED CARDIO FOR THE WATCH (27 Nov 2026): the session the card shows, its rounds or minutes. Not on a day
   // moved away or swapped for something else; the watch logs it under the plan's own name, so the day reads done.
-  const watchTodayCardio = isPhoneApp() && !peekDay && !isMovedAway && !todayCell?.swappedForActivity
-    ? watchCardioOf(workout?.plannedActivity) : null
+  // With TODAY'S CHANGE made on the card (fewer rounds, shorter), so the wrist runs what the card says; logged under the
+  // plan's name either way.
+  const [todayChangeSeen, setTodayChangeSeen] = useState(0)
+  useEffect(() => subscribeTodayChange(() => setTodayChangeSeen(n => n + 1)), [])
+  void todayChangeSeen
+  const plannedToday = workout?.plannedActivity
+  const watchTodayCardio = isPhoneApp() && !peekDay && !isMovedAway && !todayCell?.swappedForActivity && plannedToday
+    ? watchCardioOf(withTodayChange(plannedToday, readTodayChange(profileId ?? 'anon', today, plannedToday.activity))) : null
 
   /** The line on screen is the week's note — so the week row must not print it again, and its chevron opens the rest. */
   const lineIsWeekNote = coachLine?.source === 'fallback' && todayNudge?.source === 'week-note'

@@ -168,6 +168,29 @@ export function plannedSessionRow(planned: Pick<PlannedActivity, 'activity' | 'd
  */
 export interface TodayChange { rounds?: PlannedRounds; minutes?: number }
 
+/**
+ * WHERE TODAY'S CHANGE IS KEPT: on the phone, for that person, date and session, never in the plan. One place, read by
+ * the card and by the watch link (27 Nov 2026: the watch runs what the card says, so 6 × 3 changed on the phone is
+ * 6 × 3 on the wrist), and every write is announced so a screen showing it can read it again.
+ */
+const todayChangeKey = (who: string, date: string, activity: string) => `planned-today-change:${who}:${date}:${activity}`
+const TODAY_CHANGE_EVENT = 'planned-today-change'
+
+export function readTodayChange(who: string, date: string, activity: string): TodayChange | null {
+  try { const raw = localStorage.getItem(todayChangeKey(who, date, activity)); return raw ? JSON.parse(raw) as TodayChange : null } catch { return null }
+}
+
+export function writeTodayChange(who: string, date: string, activity: string, c: TodayChange | null): void {
+  const key = todayChangeKey(who, date, activity)
+  try { if (c) localStorage.setItem(key, JSON.stringify(c)); else localStorage.removeItem(key) } catch { /* kept for this visit only */ }
+  try { window.dispatchEvent(new Event(TODAY_CHANGE_EVENT)) } catch { /* no window: nothing listens */ }
+}
+
+export function subscribeTodayChange(cb: () => void): () => void {
+  window.addEventListener(TODAY_CHANGE_EVENT, cb)
+  return () => window.removeEventListener(TODAY_CHANGE_EVENT, cb)
+}
+
 const TODAY_REST_STEPS = REST_STEPS.filter(s => s >= 5)
 const TODAY_MINUTES_MIN = 5
 const TODAY_MINUTES_MAX = 240

@@ -3,7 +3,7 @@ import { Clock, Heart, Minus, Pencil, Plus } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { splitActivity } from '@/lib/cardio-lines'
 import { effortForRpe, effortLabel } from '@/lib/cardio-effort'
-import { plannedRoundsOf, plannedSessionRow, sessionMinutesFor, stepTodayMinutes, stepTodayRounds, withTodayChange, type TodayChange } from '@/lib/planned-rounds'
+import { plannedRoundsOf, plannedSessionRow, sessionMinutesFor, stepTodayMinutes, stepTodayRounds, withTodayChange, readTodayChange, writeTodayChange, type TodayChange } from '@/lib/planned-rounds'
 import { clock } from '@/lib/round-setup'
 import { blockShape } from '@/lib/timer-engine'
 import type { PlannedActivity } from '@/lib/types'
@@ -47,19 +47,14 @@ function Stat({ value, unit, label, color, testid }: { value: string; unit?: str
 // tab change keeps it and tomorrow starts from the plan; the plan itself is never written.
 // ---------------------------------------------------------------------------
 
-const changeKey = (who: string, date: string, activity: string) => `planned-today-change:${who}:${date}:${activity}`
-
-function readChange(key: string): TodayChange | null {
-  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as TodayChange : null } catch { return null }
-}
-
 function useTodayChange(activity: string): [TodayChange | null, (c: TodayChange | null) => void] {
   const { profileId, date } = useActiveSession()
-  const key = changeKey(profileId ?? 'anon', date, activity)
-  const [state, setState] = useState<{ key: string; change: TodayChange | null }>(() => ({ key, change: readChange(key) }))
-  const change = state.key === key ? state.change : readChange(key)
+  const who = profileId ?? 'anon'
+  const key = `${who}:${date}:${activity}`
+  const [state, setState] = useState<{ key: string; change: TodayChange | null }>(() => ({ key, change: readTodayChange(who, date, activity) }))
+  const change = state.key === key ? state.change : readTodayChange(who, date, activity)
   const set = (c: TodayChange | null) => {
-    try { if (c) localStorage.setItem(key, JSON.stringify(c)); else localStorage.removeItem(key) } catch { /* kept for this visit only */ }
+    writeTodayChange(who, date, activity, c)
     setState({ key, change: c })
   }
   return [change, set]
