@@ -308,7 +308,7 @@ const toolsOffer = await ev(`(() => {
   return o ? o.innerText.replace(/\\s+/g, ' ').trim() : null
 })()`)
 check('31. Tools offers to count the logged block as today\'s workout',
-  !!toolsOffer && /Skipping rope · 2 × 10s, 5s rest/.test(toolsOffer) && /instead of /.test(toolsOffer), toolsOffer)
+  !!toolsOffer && /Skipping rope · 2 × 10s, 5s rest/.test(toolsOffer) && /Did this replace /.test(toolsOffer), toolsOffer)
 await shoot('round-circuit-offer')
 check('32. counting it', await ev(`(() => { const b = document.querySelector('[data-testid="circuit-offer-yes"]'); if (!b) return false; b.click(); return true })()`))
 await wait(1500)

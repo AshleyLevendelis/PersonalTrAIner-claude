@@ -769,6 +769,10 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   the week ("Session 2 of 4" → "0 of 3"). It counts in the week's "N of M" and the streak; the day still reads swapped.
   A swap with nothing logged stays out of both. It REPLACES the 9 Oct CSCS rule that kept a logged swap transparent.
   `test:history-streak`, `test:workout-scenarios`, `verify:circuit-log` 7b-7c, `verify:history-streak`
+- **Cardio is asked about as today's workout only after real work: his ruling 27 Nov 2026, "Only ask after real work"**
+  (his walk before the gym took over the weights day): a timer circuit or 20+ min at Steady/Hard is asked "Saved either
+  way. Did this replace X today?"; an easy walk is "Saved as extra. X is still on for today." Screen and coach, one
+  rule (`couldReplaceASession`). `test:circuit-log`, `verify:circuit-log` §D
 - **Log extra cardio already done, as extra, with distance** — both surfaces since 22 Oct 2026 (Sam live test).
   His words: a past-tense run on a lifting day is logged as additional work with effort, and "count it as today's
   workout" is the option, never the default. Distance is a real field (his ruling, 22 Oct, "a proper field"). A

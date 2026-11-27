@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { useCardioLogsToday } from './CardioSetRow'
-import { circuitOfferFor } from '@/lib/circuit'
+import { cardioExtraNote, circuitOfferFor } from '@/lib/circuit'
 import { setSwappedForActivity } from '@/lib/daily-tracking'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
 import type { WorkoutDay } from '@/lib/types'
@@ -45,13 +45,29 @@ export function CircuitOffer({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const offer = circuitOfferFor({
+  const input = {
     dayState: day?.state,
     sessionFocus: session?.focus ?? null,
     sessionHasExercises: (session?.exercises.length ?? 0) > 0,
     workingSetsToday,
     logs,
-  })
+  }
+  const offer = circuitOfferFor(input)
+  // AN EASY WALK IS NOT ASKED ABOUT (his ruling 27 Nov 2026, "Only ask after real work"): it is kept as extra and the
+  // session stays on, and the card says both, so nobody wonders whether the walk was lost.
+  const extra = offer ? null : cardioExtraNote(input)
+  // Not put away by "No, I'll still train": it asks nothing, it only says the walk was kept.
+  if (extra && profileId) {
+    return (
+      <InsightBanner tone="ai" className="flex-col" data-testid="cardio-extra-note">
+        <span className="text-sm">Logged today:</span>
+        <ul className="mt-1 space-y-0.5 text-sm">
+          {extra.lines.map((line, i) => <li key={i} className="font-semibold">✓ {line}</li>)}
+        </ul>
+        <p className="mt-2 text-sm">{extra.sentence}</p>
+      </InsightBanner>
+    )
+  }
   if (!offer || !profileId || dismissed) return null
 
   const countIt = async () => {
@@ -73,14 +89,15 @@ export function CircuitOffer({
       <ul className="mt-1 space-y-0.5 text-sm" data-testid="circuit-offer-blocks">
         {offer.lines.map((line, i) => <li key={i} className="font-semibold">{line}</li>)}
       </ul>
-      <p className="mt-2 text-sm">Count this as today&apos;s workout instead of {offer.sessionFocus}?</p>
+      {/* THE WORDS SAY WHAT EACH BUTTON DOES (his walk, 27 Nov 2026: "Not today" read as losing the walk). */}
+      <p className="mt-2 text-sm">Saved either way. Did this replace {offer.sessionFocus} today?</p>
       {error && <p className="mt-1 text-xs text-destructive" data-testid="circuit-offer-error">{error}</p>}
       <div className="mt-2 flex flex-wrap gap-2">
         <Button size="sm" disabled={busy} onClick={countIt} data-testid="circuit-offer-yes">
-          {busy ? 'Saving…' : "Count it as today's workout"}
+          {busy ? 'Saving…' : 'Yes, it replaced it'}
         </Button>
         <Button size="sm" variant="ghost" disabled={busy} onClick={notToday} data-testid="circuit-offer-no">
-          Not today
+          No, I&apos;ll still train
         </Button>
       </div>
     </InsightBanner>
