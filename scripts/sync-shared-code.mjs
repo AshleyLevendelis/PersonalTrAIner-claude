@@ -80,10 +80,13 @@ export function renderSharedCopy(sourcePath, sourceText) {
 /** One { source, copy, fresh, expected, actual, problems } per shared file, for the tree on disk. */
 export function sharedSyncStates(root = ROOT) {
   return SHARED_FILES.map(({ source, copy }) => {
-    const text = readFileSync(join(root, source), 'utf8')
+    // LINE ENDINGS NEVER MAKE A COPY STALE (27 Nov 2026): on Windows git checks files out with CRLF, so an identical
+    // copy compared byte for byte read as stale and every deploy refused. Both sides are read as LF.
+    const lf = (t) => t.replace(/\r\n/g, '\n')
+    const text = lf(readFileSync(join(root, source), 'utf8'))
     const expected = renderSharedCopy(source, text)
     let actual = ''
-    try { actual = readFileSync(join(root, copy), 'utf8') } catch { /* missing reads as stale */ }
+    try { actual = lf(readFileSync(join(root, copy), 'utf8')) } catch { /* missing reads as stale */ }
     return { source, copy, fresh: actual === expected, expected, actual, problems: denoProblems(text) }
   })
 }
