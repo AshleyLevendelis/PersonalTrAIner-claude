@@ -15,39 +15,14 @@
 // the first chip, and its swatch shows the CURRENT theme's accent, so it
 // changes as the theme does.
 // ---------------------------------------------------------------------------
-import { Check, RotateCcw, AlertTriangle, Monitor } from 'lucide-react'
+import { Check, RotateCcw, AlertTriangle } from 'lucide-react'
 import type { GlowLevel } from '@/lib/appearance-store'
-import { DEFAULT_APPEARANCE, isLightTheme } from '@/lib/appearance-store'
+import { DEFAULT_APPEARANCE } from '@/lib/appearance-store'
 import {
-  THEME_PREVIEWS, ACCENT_PREVIEWS, ACCENT_ORDER, DARK_THEME_ORDER, LIGHT_THEME_ORDER,
+  THEME_PREVIEWS, ACCENT_PREVIEWS, ACCENT_ORDER, THEME_ORDER, THEME_INKS,
   resolveAccentColor, contrastRatio, CONTRAST_FLOOR,
 } from '@/lib/appearance-palette'
 import type { ThemeName } from '@/lib/appearance-store'
-
-/**
- * What "Match system" resolves to. Two themes, because the OS tells us one
- * bit — light or dark — and the honest answer to one bit is the default of
- * each kind, not a guess at which of the six darks somebody would want.
- */
-const SYSTEM_DARK: ThemeName = 'nightshift'
-const SYSTEM_LIGHT: ThemeName = 'daylight'
-
-/**
- * --primary-foreground per theme, mirrored for the preview. It used to be
- * `t.light ? white : canvas`, a guess that was wrong for both Frost (white on
- * cobalt, not near-black) and every dark theme (its own ink, not its canvas).
- * The gate asserts these against index.css.
- */
-const THEME_INK: Record<ThemeName, string> = {
-  nightshift: '#08281F', graphite: '#08281F', ember: '#2A1300', field: '#1B2600',
-  midnight: '#04213F', rosewood: '#3A0A16',
-  daylight: '#08281F', linen: '#2A1300', frost: '#FFFFFF',
-}
-
-function systemTheme(): ThemeName {
-  if (typeof window === 'undefined' || !window.matchMedia) return SYSTEM_DARK
-  return window.matchMedia('(prefers-color-scheme: light)').matches ? SYSTEM_LIGHT : SYSTEM_DARK
-}
 import type { AppearanceController } from '@/hooks/useAppearance'
 
 const GLOW_LEVELS: GlowLevel[] = ['off', 'subtle', 'full']
@@ -89,7 +64,7 @@ function HomePreview({ theme, accent, glow }: { theme: ThemeName; accent: typeof
       <p className="mt-2.5 text-[0.9375rem] font-semibold" style={{ color: t.text }}>Full Body Power</p>
       <p className="text-[0.6875rem]" style={{ color: t.muted }}>6 exercises · ~52 min</p>
       <div className="mt-2 flex h-[30px] items-center justify-center rounded-[9px] text-[0.75rem] font-semibold"
-        style={{ background: a, color: THEME_INK[theme], boxShadow: halo }}>
+        style={{ background: a, color: THEME_INKS[theme].primaryForeground, boxShadow: halo }}>
         Start session
       </div>
       <div className="mt-2.5 flex items-baseline gap-1.5">
@@ -116,19 +91,12 @@ function HomePreview({ theme, accent, glow }: { theme: ThemeName; accent: typeof
 export function AppearanceSection({ appearance }: { appearance: AppearanceController }) {
   const { theme, accent, glow } = appearance
   const t = THEME_PREVIEWS[theme]
-  // TWO COLOURS, not one, since the fill/text split. `resolved` is the button
-  // and the glow sample; `ink` is what a link, a PR value and the active tab
-  // label are actually printed in. The guard measures the INK: a filled button
-  // is judged by the ink on it, and measuring the fill against the canvas is
-  // what pushed Daylight into one over-darkened colour doing neither job.
+  // The colour a button, a link and the glow sample are painted in. Every theme is dark (27 Nov 2026), so the fill
+  // and the words are one colour again; the guard still measures it, and stays quiet on every shipped pair.
   const resolved = resolveAccentColor(theme, accent)
-  const ink = resolveAccentColor(theme, accent, /* forText */ true)
-  const ratio = contrastRatio(ink, t.canvas)
+  const ratio = contrastRatio(resolved, t.canvas)
   const lowContrast = ratio < CONTRAST_FLOOR
-  const glowClamped = isLightTheme(theme) && glow === 'full'
-  // What the preview and the sample dot must show — the glow actually applied,
-  // not the glow stored, or Daylight would preview a halo it will not paint.
-  const effectiveGlow: GlowLevel = glowClamped ? 'subtle' : glow
+  const effectiveGlow: GlowLevel = glow
   const isDefault = theme === DEFAULT_APPEARANCE.theme && accent === DEFAULT_APPEARANCE.accent && glow === DEFAULT_APPEARANCE.glow
 
   return (
@@ -150,38 +118,14 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
           <p className="mt-0.5 text-xs text-muted-foreground">
             Sets canvas, surfaces and text. Complete stays green and attention stays amber in every theme, so status never depends on your pick.
           </p>
-          {/* MATCH SYSTEM, first. It is not a tenth theme — it sets the
-              default of whichever kind the phone is in, and says which, so
-              nobody has to work out what it did. */}
-          <button
-            type="button"
-            onClick={() => appearance.setTheme(systemTheme())}
-            className="hit-slop-44 mt-3 inline-flex min-h-[38px] items-center gap-2 rounded-full px-3 text-[0.75rem]"
-            style={{ background: 'var(--surface-raised)' }}
-          >
-            <Monitor className="size-3.5" />
-            Match system
-            <span className="text-[color:var(--muted-foreground)]">
-              · {THEME_PREVIEWS[systemTheme()].label}
-            </span>
-          </button>
-
-          {[
-            { label: 'Dark', names: DARK_THEME_ORDER },
-            { label: 'Light', names: LIGHT_THEME_ORDER },
-          ].map(group => (
-          <div key={group.label}>
-          <p className="ds-label mt-3">{group.label}</p>
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            {group.names.map(name => {
+          {/* FIVE CARDS, ONE ROW OF THREE AND ONE OF TWO: Nightshift and the four violet themes of 27 Nov 2026. */}
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {THEME_ORDER.map(name => {
               const p = THEME_PREVIEWS[name]
               const active = theme === name
               // Each card previews the theme WITH the accent currently chosen,
               // so the pair is judged together rather than one at a time.
               const cardAccent = resolveAccentColor(name, accent)
-              // The card's tick and bar are fills; its NAME is words, and on
-              // a light card the fill step is what washes out.
-              const cardInk = resolveAccentColor(name, accent, /* forText */ true)
               return (
                 <button
                   key={name}
@@ -196,10 +140,10 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
                   }}
                 >
                   <span className="flex items-center justify-between">
-                    <span className="text-[0.75rem] font-semibold" style={{ color: active ? cardInk : p.text }}>{p.label}</span>
+                    <span className="text-[0.75rem] font-semibold" style={{ color: active ? cardAccent : p.text }}>{p.label}</span>
                     {active && (
                       <span className="flex size-[14px] shrink-0 items-center justify-center rounded-full" style={{ background: cardAccent }}>
-                        <Check className="size-2" style={{ color: p.light ? '#FFFFFF' : p.canvas }} />
+                        <Check className="size-2" style={{ color: p.canvas }} />
                       </span>
                     )}
                   </span>
@@ -213,8 +157,6 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
               )
             })}
           </div>
-          </div>
-          ))}
         </div>
 
         {/* ACTION COLOUR — names visible, not aria-label-only. A row of
@@ -232,7 +174,7 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
               // promise a brightness the words never have. 'theme' has no
               // colour of its own, so its swatch borrows the theme's and
               // moves when the theme does.
-              const swatch = resolveAccentColor(theme, value, /* forText */ true)
+              const swatch = resolveAccentColor(theme, value)
               const glowRgb = a.glowRgb ?? '255,255,255'
               return (
                 <button
@@ -272,7 +214,6 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
           <p className="text-sm font-medium">Glow</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Halos on the action button, active states and key numbers
-            {glowClamped && <span className="text-[color:var(--role-warn-text)]"> — clamped to subtle on {t.label}</span>}
           </p>
           <div className="mt-3 flex items-center gap-2">
             <div className="flex flex-1 gap-[3px] rounded-xl bg-background p-[3px]">

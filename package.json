@@ -654,6 +654,7 @@
     "verify:warmups-one-tap": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/warmups-one-tap.mjs",
     "verify:warmup-rest": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/warmup-rest.mjs",
     "verify:home-day-named": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/home-day-named.mjs",
+    "verify:appearance-themes": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/appearance-themes.mjs",
     "verify:small-print": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/small-print.mjs",
     "verify:timer-chip": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/timer-chip.mjs",
     "verify:profile-sheet-top": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-sheet-top.mjs",
@@ -779,6 +780,7 @@
     "test:peek-recovery": "tsx scripts/test-peek-recovery.ts",
     "test:cardio-remove": "tsx scripts/test-cardio-remove.ts",
     "verify:cardio-remove": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/cardio-remove.mjs",
+    "test:watch-flow": "tsx scripts/test-watch-flow.ts",
     "test:watch-app": "tsx scripts/test-watch-app.ts",
     "verify:watch-sets": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/watch-sets.mjs"
   },

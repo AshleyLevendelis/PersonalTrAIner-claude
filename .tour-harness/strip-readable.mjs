@@ -6,10 +6,9 @@
 // letter is in its unselected state. The dot and the dash still say which days train. PORT 9555.
 // ---------------------------------------------------------------------------
 import { startDriver } from './driver-kit.mjs'
-// A THEME IS SET THE WAY THE APP SETS IT (applyAppearance): the name AND the light-canvas flag the light themes carry,
-// or every token keyed on the flag (warning text, the light red) is measured at its dark value. Mirrors LIGHT_THEMES.
+// A THEME IS SET THE WAY THE APP SETS IT (applyAppearance): by name. Every theme is dark since 27 Nov 2026.
 
-const THEMES = ['nightshift', 'ember', 'field', 'graphite', 'daylight', 'midnight', 'rosewood', 'linen', 'frost']
+const THEMES = ['nightshift', 'ruby', 'amethyst', 'sapphire', 'emerald']
 const d = await startDriver({ port: 9555, page: 'app-boot.html', name: 'strip-readable' })
 const { ev, check, until, wait, go, clickAt, shoot, finish } = d
 
@@ -40,7 +39,7 @@ const MEASURE = String.raw`(() => {
 })()`
 const results = {}
 for (const t of THEMES) {
-  await ev(`(() => { const h = document.documentElement; h.setAttribute('data-theme', ${JSON.stringify(t)}); if (${JSON.stringify(['daylight', 'linen', 'frost'].includes(t))}) h.setAttribute('data-canvas', 'light'); else h.removeAttribute('data-canvas') })()`); await wait(300)
+  await ev(`(() => { const h = document.documentElement; h.setAttribute('data-theme', ${JSON.stringify(t)}) })()`); await wait(300)
   results[t] = await ev(MEASURE)
 }
 check('3. the strip has its seven letters, rest days among them', (results.nightshift ?? []).length === 7 && results.nightshift.some(x => x.rest), results.nightshift)
@@ -48,6 +47,6 @@ for (const t of THEMES) {
   const low = (results[t] ?? []).filter(x => x.ratio < 4.5)
   check(`4. ${t}: every day's letter reads at 4.5:1 or better`, (results[t] ?? []).length === 7 && low.length === 0, low)
 }
-await ev(`(() => { const h = document.documentElement; h.setAttribute('data-theme', 'frost'); h.setAttribute('data-canvas', 'light') })()`); await wait(300)
-await shoot('strip-readable-frost')
+await ev(`(() => { const h = document.documentElement; h.setAttribute('data-theme', 'ruby') })()`); await wait(300)
+await shoot('strip-readable-ruby')
 await finish('verify:strip-readable PASSED')

@@ -471,10 +471,9 @@ console.log('\n[9] It follows the theme and the accent')
 const themes = await page(`
   const names = [...new Set([...document.styleSheets].flatMap(sh => { try { return [...sh.cssRules] } catch { return [] } }).flatMap(r => (r.selectorText || '').split(',').map(x => x.trim().match(/^\\[data-theme="([a-z]+)"\\]$/)?.[1])).filter(Boolean))]
   const out = []
-  for (const [theme, accent] of [...names.map(n => [n, 'theme']), ['nightshift', 'sky'], ['daylight', 'coral']]) {
+  for (const [theme, accent] of [...names.map(n => [n, 'theme']), ['nightshift', 'sky'], ['emerald', 'coral']]) {
     const el = document.documentElement
     el.setAttribute('data-theme', theme); el.setAttribute('data-accent', accent)
-    if (['daylight', 'linen', 'frost'].includes(theme)) el.setAttribute('data-canvas', 'light'); else el.removeAttribute('data-canvas')
     // Past the chip's 150ms colour transition, or the border is read mid-fade.
     await new Promise(r => setTimeout(r, 260))
     const d = document.createElement('div'); document.body.appendChild(d)
@@ -484,16 +483,16 @@ const themes = await page(`
     const svg = q('[data-testid="grocery-ring"] svg'), arc = q('[data-testid="grocery-ring-arc"]')
     out.push({ theme, accent, chip: chip ? getComputedStyle(chip).borderTopColor === want.border : false, ring: svg ? getComputedStyle(svg).filter === want.filter : false, arc: arc ? getComputedStyle(arc).stroke === want.primary : false })
   }
-  document.documentElement.setAttribute('data-theme', 'nightshift'); document.documentElement.setAttribute('data-accent', 'theme'); document.documentElement.removeAttribute('data-canvas')
+  document.documentElement.setAttribute('data-theme', 'nightshift'); document.documentElement.setAttribute('data-accent', 'theme')
   return out
 `)
 console.log('      ' + themes.map(t => `${t.theme}/${t.accent} ${t.chip && t.ring && t.arc ? 'ok' : 'NO'}`).join(', '))
-check('every theme, and two accent overrides, were tried (11 today)', themes.length >= 11, themes.length)
-check('...and in each, the active chip, the ring\'s glow and its arc come from that accent', themes.length >= 11 && themes.every(t => t.chip && t.ring && t.arc), themes.filter(t => !(t.chip && t.ring && t.arc)))
-await page(`document.documentElement.setAttribute('data-theme', 'daylight'); document.documentElement.setAttribute('data-canvas', 'light'); return true`)
+check('every theme, and two accent overrides, were tried (7 today: five themes since 27 Nov 2026)', themes.length >= 7, themes.length)
+check('...and in each, the active chip, the ring\'s glow and its arc come from that accent', themes.length >= 7 && themes.every(t => t.chip && t.ring && t.arc), themes.filter(t => !(t.chip && t.ring && t.arc)))
+await page(`document.documentElement.setAttribute('data-theme', 'sapphire'); return true`)
 await wait(200)
-await shoot('grocery-light')
-await page(`document.documentElement.setAttribute('data-theme', 'nightshift'); document.documentElement.removeAttribute('data-canvas'); return true`)
+await shoot('grocery-sapphire')
+await page(`document.documentElement.setAttribute('data-theme', 'nightshift'); return true`)
 
 console.log('\n[10] The tab bar\'s icons say what is behind them')
 const icons = await page(`const nav = q('nav[aria-label="Primary"]'); return nav ? [...nav.querySelectorAll('button')].map(b => ({ label: b.textContent.trim(), icon: [...(b.querySelector('svg')?.classList ?? [])].find(c => /^lucide-/.test(c) && c !== 'lucide') ?? null })) : []`)

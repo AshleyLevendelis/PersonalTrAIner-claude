@@ -15,7 +15,7 @@ import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { useDeadlineTick } from '@/hooks/useDeadlineTick'
 import { exerciseCoachLine } from '@/lib/exercise-coach-line'
 import { carriedWeightFor } from '@/lib/set-row'
-import { isExternallyLoaded, splitLoadDisplay } from '@/lib/load-prescription'
+import { isExternallyLoaded, splitLoadDisplay, plateStepKg, loadingMode } from '@/lib/load-prescription'
 import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkingLoadKg, cardLoadFor, type DoubleProgressionRecommendation, type WorkingSetContext } from '@/lib/progression-engine'
 import { groupExercises, isConditioningDay, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, summaryAsItStands, normalizeWarmup, plannedSetProgress, type ExerciseGroup } from '@/lib/session-derive'
 import { sessionNudge } from '@/lib/session-nudge'
@@ -119,7 +119,8 @@ import { describeDayGap, dayGapCanAddPress } from '@/lib/day-gap-note'
 import type { Exercise, WorkoutDay, MesocycleWeek, UserProfile, PlannedActivity } from '@/lib/types'
 import type { LoadSource } from './LoadChip'
 import { isPhoneApp } from '@/lib/steps-store'
-import type { WatchRow } from '@/lib/watch-session'
+import { watchCardioOf, withTodayChange, readTodayChange, subscribeTodayChange } from '@/lib/planned-rounds'
+import type { WatchRow, WatchDay } from '@/lib/watch-session'
 // THE WATCH'S PART OF THIS TAB, downloaded only in the phone app (watch-session.ts says what it does).
 // Ambient: nobody tapped for it, so a missing file draws nothing (and reloads onto a new version, as every part does).
 const WatchLink = lazyWithReload(() => import('./WatchLink'), { ambient: true })
@@ -1567,9 +1568,50 @@ export function TodayPanel({
           id, name: rowEx.name, sets: rowEx.sets, reps: rowEx.reps,
           suggestedLoad: rowEx.suggested_load, addedLoadKg: rowEx.suggested_added_load_kg ?? null,
           restSeconds: parseRestSeconds(rowEx.rest ?? '60s'), done: setsFor(id, ex.name).length,
+          // The notch the watch's − / + moves the weight by (his "Adjust reps and weight"): the implement's own.
+          stepKg: (() => { const entry = getExerciseEntry(rowEx.name); return entry ? plateStepKg(loadingMode(entry)) : undefined })(),
         }
       })
     : null
+
+  // THE WEEK AHEAD FOR THE WATCH (27 Nov 2026, the gym-floor review): the strip's next six days with a session, at the
+  // plan's own weights, so the watch has tomorrow's session with the phone in the locker. Read off the strip only
+  // while it shows the days from today (paging it back must not send the watch an older week).
+  const watchAheadKept = useRef<WatchDay[]>([])
+  const watchAhead: WatchDay[] = (() => {
+    if (!isPhoneApp()) return []
+    if (stripOffset !== 0) return watchAheadKept.current
+    const days = stripWeek.days
+      .filter(d => d.date > today && !!d.session && (d.session.exercises.length > 0 || !!d.session.plannedActivity) && !d.movedTo && !d.swappedForActivity && !d.markedMissed && !d.deliberateRest)
+      .map(d => ({
+        date: d.date,
+        title: d.session!.focus?.trim() || 'Session',
+        cardio: watchCardioOf(d.session!.plannedActivity),
+        rows: d.session!.exercises.map(ex => {
+          const { rowEx } = liveRowExercise(ex, { progressedLoads: {}, progressedAddedLoads: {}, layoff: NO_LAYOFF, profile })
+          const entry = getExerciseEntry(rowEx.name)
+          return {
+            id: ex.id ?? getExerciseId(ex.name), name: rowEx.name, sets: rowEx.sets, reps: rowEx.reps,
+            suggestedLoad: rowEx.suggested_load, addedLoadKg: rowEx.suggested_added_load_kg ?? null,
+            restSeconds: parseRestSeconds(rowEx.rest ?? '60s'), done: 0,
+            stepKg: entry ? plateStepKg(loadingMode(entry)) : undefined,
+          }
+        }),
+      }))
+    watchAheadKept.current = days
+    return days
+  })()
+
+  // TODAY'S PLANNED CARDIO FOR THE WATCH (27 Nov 2026): the session the card shows, its rounds or minutes. Not on a day
+  // moved away or swapped for something else; the watch logs it under the plan's own name, so the day reads done.
+  // With TODAY'S CHANGE made on the card (fewer rounds, shorter), so the wrist runs what the card says; logged under the
+  // plan's name either way.
+  const [todayChangeSeen, setTodayChangeSeen] = useState(0)
+  useEffect(() => subscribeTodayChange(() => setTodayChangeSeen(n => n + 1)), [])
+  void todayChangeSeen
+  const plannedToday = workout?.plannedActivity
+  const watchTodayCardio = isPhoneApp() && !peekDay && !isMovedAway && !todayCell?.swappedForActivity && plannedToday
+    ? watchCardioOf(withTodayChange(plannedToday, readTodayChange(profileId ?? 'anon', today, plannedToday.activity))) : null
 
   /** The line on screen is the week's note — so the week row must not print it again, and its chevron opens the rest. */
   const lineIsWeekNote = coachLine?.source === 'fallback' && todayNudge?.source === 'week-note'
@@ -2089,7 +2131,7 @@ export function TodayPanel({
           </p>
           {watchRows && (
             <Suspense fallback={null}>
-              <WatchLink rows={watchRows} listEl={listEl} today={today} logs={logs}
+              <WatchLink rows={watchRows} cardio={watchTodayCardio} days={watchAhead} listEl={listEl} today={today} logs={logs}
                 title={workout!.focus?.trim() || 'Today\'s session'} age={profile?.age ?? null}
                 noZones={(profile?.health_conditions ?? []).length > 0} />
             </Suspense>
@@ -2245,6 +2287,15 @@ export function TodayPanel({
           !peekWorkout && !isRestDay && !isActiveRecovery && workout && (status === 'running' || (status === 'idle' && !heroStartInView)) ? 96 : 12
         }px)`}
       />
+
+      {/* A DAY WITH NO SESSION OF ITS OWN STILL SENDS THE WATCH THE WEEK AHEAD (27 Nov 2026): a rest day is when he
+          is most likely to have the phone in his hand and not open Exercise tomorrow. */}
+      {!watchRows && isPhoneApp() && (watchAhead.length > 0 || !!watchTodayCardio) && !peekDay && (
+        <Suspense fallback={null}>
+          <WatchLink rows={[]} cardio={watchTodayCardio} days={watchAhead} listEl={null} today={today} logs={logs}
+            title={workout?.focus?.trim() || 'Cardio'} age={profile?.age ?? null} noZones={(profile?.health_conditions ?? []).length > 0} />
+        </Suspense>
+      )}
 
       {/* STEPS MOVED TO HOME, 6 Sep 2026 — design_handoff_app_polish's
           "Today so far" grid, which logs them in place. The row is REMOVED

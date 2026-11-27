@@ -223,431 +223,166 @@
   --hero-wash: rgba(156, 141, 255, .20);
 }
 
-/* Theme: Ember — warm dark · amber.
- * RETUNED: #15100C was a muddy near-black-brown that read as a failed
- * Graphite rather than a warm canvas. Warmed and lifted; the accent moves
- * from a washed #FF9A54 to a fuller amber. */
-[data-theme="ember"] {
-  --background: #171210;
-  --foreground: #F7EFE7;
-  --card: #261913;
-  --card-foreground: #F7EFE7;
-  --popover: #261913;
-  --popover-foreground: #F7EFE7;
-  --secondary: #3A2618;
-  --secondary-foreground: #F7EFE7;
-  --muted: #261913;
-  --muted-foreground: #B5A292;
-  --accent: #3A2618;
-  --accent-foreground: #F7EFE7;
-  --border: #5A3E28;
-  --input: #261913;
-  --text-tertiary: #DCC9B7;
-  --text-dim: #5A3E28;
-  --surface-deep: #1E1512;
-  --surface-raised: rgba(90, 62, 40, .32);
-  --line-emphasis: #6B4A30;
-  --hairline: rgba(247, 239, 231, .11);
-  --grain-rgb: 247, 239, 231;
-  --theme-primary: #FF8A3D;
-  --theme-primary-2: #E85F14;
-  --theme-glow-rgb: 255, 138, 61;
+/* THE FOUR THAT REPLACED EIGHT — Ashley, 27 Nov 2026: "keep Nightshift, replace the other themes with the purplish
+ * background with red, purple, blue or green accents", and from two mock-ups, "B: each leans": every canvas is
+ * Nightshift's violet nudged toward its own accent. All dark, so the light-canvas rules went with Daylight, Linen and
+ * Frost. Every token below is held to the seven floors by test:appearance. */
+/* Theme: Ruby — wine violet · red */
+[data-theme="ruby"] {
+  --background: #1E1430;
+  --foreground: #F8F0FA;
+  --card: #2A1C40;
+  --card-foreground: #F8F0FA;
+  --popover: #2A1C40;
+  --popover-foreground: #F8F0FA;
+  --secondary: #34224E;
+  --secondary-foreground: #F8F0FA;
+  --muted: #2A1C40;
+  --muted-foreground: #B39AC0;
+  --accent: #34224E;
+  --accent-foreground: #F8F0FA;
+  --border: #4E3462;
+  --input: #2A1C40;
+  --text-tertiary: #D6C4DE;
+  --text-dim: #4E3462;
+  --surface-deep: #261A3A;
+  --surface-raised: rgba(110, 70, 130, .28);
+  --line-emphasis: #5A3A72;
+  --hairline: rgba(248, 240, 250, .11);
+  --grain-rgb: 248, 240, 250;
+  --theme-primary: #FF5C7A;
+  --theme-primary-2: #E8405F;
+  --theme-glow-rgb: 255, 92, 122;
   --primary-text: var(--theme-primary);
-  --primary-foreground: #2A1300;
-  --num-hero: #FFF1E4;
-  --role-ai-bg: rgba(255, 138, 61, .10);
-  --role-ai-border: rgba(255, 138, 61, .25);
-  --role-ai-text: #FFD9BD;
+  --primary-foreground: #2A0610;
+  --num-hero: #FFE8EE;
+  --role-ai-bg: rgba(139, 123, 255, .10);
+  --role-ai-border: rgba(139, 123, 255, .25);
+  --role-ai-text: #E2D9FB;
+  --hero-wash: rgba(255, 92, 122, .14);
 }
 
-/* Theme: Field — khaki · military green. */
-[data-theme="field"] {
-  --background: #141810;
-  --foreground: #F1F4E9;
-  --card: #1F2618;
-  --card-foreground: #F1F4E9;
-  --popover: #1F2618;
-  --popover-foreground: #F1F4E9;
-  --secondary: #2C3422;
-  --secondary-foreground: #F1F4E9;
-  --muted: #1F2618;
-  --muted-foreground: #A6AF92;
-  --accent: #2C3422;
-  --accent-foreground: #F1F4E9;
-  --border: #465234;
-  --input: #1F2618;
-  --text-tertiary: #CBD3B7;
-  --text-dim: #465234;
-  --surface-deep: #1A1E14;
-  --surface-raised: rgba(70, 82, 52, .34);
-  --line-emphasis: #55643C;
-  --hairline: rgba(241, 244, 233, .11);
-  --grain-rgb: 241, 244, 233;
-  /* RETUNED, and this is the one that mattered: the old #D6DF6B sat in the
-   * same hue family as its own canvas, so the single element that must read
-   * as "tap this" was the one closest to the background. Higher-chroma lime
-   * separates it. */
-  --theme-primary: #C6F24E;
-  --theme-primary-2: #8FBE1F;
-  --theme-glow-rgb: 198, 242, 78;
-  --primary-text: var(--theme-primary);
-  --primary-foreground: #1B2600;
-  --num-hero: #F4FBDD;
-  --role-ai-bg: rgba(198, 242, 78, .08);
-  --role-ai-border: rgba(198, 242, 78, .22);
-  --role-ai-text: #E3F0B8;
-}
-
-/* Theme: Graphite — near-black · violet. (Values keep; the SUBTITLE was
- * wrong, saying "purple · grey" while the swatches showed near-black +
- * violet. Corrected in ProfileScreen's theme card copy.) */
-[data-theme="graphite"] {
-  --background: #121216;
-  --foreground: #F1F0F5;
-  --card: #1D1D24;
-  --card-foreground: #F1F0F5;
-  --popover: #1D1D24;
-  --popover-foreground: #F1F0F5;
-  --secondary: #2A2A34;
-  --secondary-foreground: #F1F0F5;
-  --muted: #1D1D24;
-  --muted-foreground: #9B9AA8;
-  --accent: #2A2A34;
-  --accent-foreground: #F1F0F5;
-  --border: #35333F;
-  --input: #1D1D24;
-  --text-tertiary: #C4C1D2;
-  --text-dim: #35333F;
-  --surface-deep: #17171C;
-  --surface-raised: rgba(53, 51, 63, .34);
-  --line-emphasis: #444154;
-  --hairline: rgba(241, 240, 245, .11);
-  --grain-rgb: 241, 240, 245;
+/* Theme: Amethyst — deep violet · purple */
+[data-theme="amethyst"] {
+  --background: #1B1240;
+  --foreground: #F6F2FF;
+  --card: #261A55;
+  --card-foreground: #F6F2FF;
+  --popover: #261A55;
+  --popover-foreground: #F6F2FF;
+  --secondary: #301F68;
+  --secondary-foreground: #F6F2FF;
+  --muted: #261A55;
+  --muted-foreground: #A496D6;
+  --accent: #301F68;
+  --accent-foreground: #F6F2FF;
+  --border: #4A3999;
+  --input: #261A55;
+  --text-tertiary: #C9BDF0;
+  --text-dim: #4A3999;
+  --surface-deep: #211650;
+  --surface-raised: rgba(90, 64, 170, .28);
+  --line-emphasis: #5A44B8;
+  --hairline: rgba(246, 242, 255, .11);
+  --grain-rgb: 246, 242, 255;
   --theme-primary: #B49BFF;
-  --theme-primary-2: #7C5AE0;
-  --theme-glow-rgb: 155, 125, 245;
+  --theme-primary-2: #8B6CF0;
+  --theme-glow-rgb: 180, 155, 255;
   --primary-text: var(--theme-primary);
-  --primary-foreground: #08281F;
-  --num-hero: #F3EEFF;
-  --role-ai-bg: rgba(180, 155, 255, .10);
-  --role-ai-border: rgba(180, 155, 255, .25);
-  --role-ai-text: #DDD3FF;
+  --primary-foreground: #1A0B45;
+  --num-hero: #F1ECFF;
+  --role-ai-bg: rgba(139, 123, 255, .10);
+  --role-ai-border: rgba(139, 123, 255, .25);
+  --role-ai-text: #E0D8FF;
+  --hero-wash: rgba(180, 155, 255, .18);
 }
 
-/* Theme: Daylight — paper · deep mint. THE FIRST LIGHT CANVAS.
- * Every other theme is dark, which is fine indoors and useless in a sunlit
- * gym or on a midday run. Derived by the same lightness/alpha relationships
- * as Nightshift, inverted: the text tokens become the dark end, the surface
- * tints stay violet-family so the app still reads as itself. */
-[data-theme="daylight"] {
-  --background: #F4F2FA;
-  --foreground: #15122B;
-  --card: #FFFFFF;
-  --card-foreground: #15122B;
-  --popover: #FFFFFF;
-  --popover-foreground: #15122B;
-  --secondary: #E9E6F3;
-  --secondary-foreground: #15122B;
-  --muted: #EFEDF7;
-  --muted-foreground: #5C5680;
-  --accent: #E9E6F3;
-  --accent-foreground: #15122B;
-  --border: #D3CDE4;
-  --input: #FFFFFF;
-  --text-tertiary: #3A3462;
-  --text-dim: #B3ADCB;
-  --surface-deep: #E9E6F3;
-  --surface-raised: rgba(90, 80, 150, .10);
-  --line-emphasis: #C6BFDE;
-  --hairline: rgba(21, 18, 43, .14);
-  /* Inverted with the canvas: grain is a dark speckle on paper, not a light
-   * one, or the texture disappears entirely. */
-  --grain-rgb: 21, 18, 43;
-  /* THE ACCENT SPLITS IN TWO HERE, and that is the whole fix. #19B894 is the
-   * FILL — a button you have to find on paper. #00705B is the same hue taken
-   * down until it holds as WORDS at 11-13px, which is what "Nutrition >", a
-   * PR value and the active tab label actually are. The previous single
-   * value (#008C72) was a compromise between the two jobs and did neither:
-   * 3.8:1 as text, under the 4.5 floor for body copy. */
-  --theme-primary: #19B894;
-  --theme-primary-2: #0E9C7C;
-  --theme-glow-rgb: 25, 184, 148;
-  --primary-text: #00705B;
-  --primary-foreground: #08281F;
-  --num-hero: #0F3D33;
-  --role-ai-bg: rgba(124, 90, 224, .10);
-  --role-ai-border: rgba(124, 90, 224, .22);
-  --role-ai-text: #3F2E8C;
-  /* .08, not .14: the same violet that reads as depth over a dark canvas
-   * reads as a stain over paper, and .14 was still a stain. */
-  --hero-wash: rgba(156, 141, 255, .08);
-}
-
-/* Accent override — replaces just the accent hue regardless of theme.
- * "theme" (the default) intentionally defines nothing here, so the
- * per-theme --theme-primary/-2/-glow-rgb set above simply shows through.
- * That pass-through is the whole mechanism behind the "Match theme" chip.
- *
- * Each accent declares three stops rather than two. The bright/deep pair is
- * what a dark canvas uses; --accent-dark is the same hue taken down far
- * enough to hold its own against paper, where the bright end washes out. */
-/* Theme: Midnight — navy · sky. */
-[data-theme="midnight"] {
-  --background: #0E1626;
-  --foreground: #EEF3FB;
-  --card: #16223A;
-  --card-foreground: #EEF3FB;
-  --popover: #16223A;
-  --popover-foreground: #EEF3FB;
-  --secondary: #1C2C48;
-  --secondary-foreground: #EEF3FB;
-  --muted: #16223A;
-  --muted-foreground: #8E9FBC;
-  --accent: #1C2C48;
-  --accent-foreground: #EEF3FB;
-  --border: #2B3A58;
-  --input: #16223A;
-  --text-tertiary: #C2CFE3;
-  --text-dim: #2B3A58;
-  --surface-deep: #121C30;
-  --surface-raised: rgba(60, 84, 130, .28);
-  --line-emphasis: #34496F;
-  --hairline: rgba(238, 243, 251, .11);
-  --grain-rgb: 238, 243, 251;
+/* Theme: Sapphire — navy violet · blue */
+[data-theme="sapphire"] {
+  --background: #141838;
+  --foreground: #F1F4FF;
+  --card: #1D234C;
+  --card-foreground: #F1F4FF;
+  --popover: #1D234C;
+  --popover-foreground: #F1F4FF;
+  --secondary: #252D5E;
+  --secondary-foreground: #F1F4FF;
+  --muted: #1D234C;
+  --muted-foreground: #939FD0;
+  --accent: #252D5E;
+  --accent-foreground: #F1F4FF;
+  --border: #37408A;
+  --input: #1D234C;
+  --text-tertiary: #C0C8EA;
+  --text-dim: #37408A;
+  --surface-deep: #181D44;
+  --surface-raised: rgba(60, 74, 150, .28);
+  --line-emphasis: #4150A0;
+  --hairline: rgba(241, 244, 255, .11);
+  --grain-rgb: 241, 244, 255;
   --theme-primary: #6FB7FF;
-  --theme-primary-2: #2E7FE0;
+  --theme-primary-2: #3E8EF0;
   --theme-glow-rgb: 111, 183, 255;
   --primary-text: var(--theme-primary);
   --primary-foreground: #04213F;
   --num-hero: #E6F1FF;
-  --role-ai-bg: rgba(111, 183, 255, .10);
-  --role-ai-border: rgba(111, 183, 255, .25);
-  --role-ai-text: #CFE2FF;
+  --role-ai-bg: rgba(139, 123, 255, .10);
+  --role-ai-border: rgba(139, 123, 255, .25);
+  --role-ai-text: #DAD5FA;
   --hero-wash: rgba(111, 183, 255, .16);
 }
 
-/* Theme: Rosewood — plum · coral. */
-[data-theme="rosewood"] {
-  --background: #1C1018;
-  --foreground: #FBEFF4;
-  --card: #2A1824;
-  --card-foreground: #FBEFF4;
-  --popover: #2A1824;
-  --popover-foreground: #FBEFF4;
-  --secondary: #382030;
-  --secondary-foreground: #FBEFF4;
-  --muted: #2A1824;
-  --muted-foreground: #B899A9;
-  --accent: #382030;
-  --accent-foreground: #FBEFF4;
-  --border: #4E2F42;
-  --input: #2A1824;
-  --text-tertiary: #E0C7D3;
-  --text-dim: #4E2F42;
-  --surface-deep: #23141E;
-  --surface-raised: rgba(110, 60, 90, .30);
-  --line-emphasis: #5E3A50;
-  --hairline: rgba(251, 239, 244, .11);
-  --grain-rgb: 251, 239, 244;
-  --theme-primary: #FF8FA3;
-  --theme-primary-2: #E85A78;
-  --theme-glow-rgb: 255, 143, 163;
+/* Theme: Emerald — slate violet · green */
+[data-theme="emerald"] {
+  --background: #151B34;
+  --foreground: #F0F5FA;
+  --card: #1D2546;
+  --card-foreground: #F0F5FA;
+  --popover: #1D2546;
+  --popover-foreground: #F0F5FA;
+  --secondary: #242E56;
+  --secondary-foreground: #F0F5FA;
+  --muted: #1D2546;
+  --muted-foreground: #95A2C8;
+  --accent: #242E56;
+  --accent-foreground: #F0F5FA;
+  --border: #354378;
+  --input: #1D2546;
+  --text-tertiary: #C0C9E2;
+  --text-dim: #354378;
+  --surface-deep: #19203E;
+  --surface-raised: rgba(60, 80, 140, .28);
+  --line-emphasis: #3F4E8C;
+  --hairline: rgba(240, 245, 250, .11);
+  --grain-rgb: 240, 245, 250;
+  --theme-primary: #5EE08A;
+  --theme-primary-2: #34C46A;
+  --theme-glow-rgb: 94, 224, 138;
   --primary-text: var(--theme-primary);
-  --primary-foreground: #3A0A16;
-  --num-hero: #FFEEF3;
-  --role-ai-bg: rgba(255, 143, 163, .10);
-  --role-ai-border: rgba(255, 143, 163, .25);
-  --role-ai-text: #FFD3DC;
-  --hero-wash: rgba(255, 143, 163, .14);
+  --primary-foreground: #052A14;
+  --num-hero: #E6FCEE;
+  --role-ai-bg: rgba(139, 123, 255, .10);
+  --role-ai-border: rgba(139, 123, 255, .25);
+  --role-ai-text: #DAD5FA;
+  --hero-wash: rgba(94, 224, 138, .14);
 }
 
-/* Theme: Linen — cream · amber. THE SECOND LIGHT CANVAS. */
-[data-theme="linen"] {
-  --background: #F7F2EA;
-  --foreground: #231A12;
-  --card: #FFFDF9;
-  --card-foreground: #231A12;
-  --popover: #FFFDF9;
-  --popover-foreground: #231A12;
-  --secondary: #EEE6DA;
-  --secondary-foreground: #231A12;
-  --muted: #F1EBE1;
-  --muted-foreground: #6E5E4E;
-  --accent: #EEE6DA;
-  --accent-foreground: #231A12;
-  --border: #D9CDBD;
-  --input: #FFFDF9;
-  --text-tertiary: #4A3B2D;
-  --text-dim: #C4B5A3;
-  --surface-deep: #EEE6DA;
-  --surface-raised: rgba(120, 90, 60, .10);
-  --line-emphasis: #CDBDA8;
-  --hairline: rgba(35, 26, 18, .13);
-  --grain-rgb: 35, 26, 18;
-  --theme-primary: #F0843F;
-  --theme-primary-2: #D8651E;
-  --theme-glow-rgb: 240, 132, 63;
-  --primary-text: #9A3F0B;
-  --primary-foreground: #2A1300;
-  --num-hero: #3A1E0C;
-  --role-ai-bg: rgba(154, 63, 11, .08);
-  --role-ai-border: rgba(154, 63, 11, .20);
-  --role-ai-text: #7A3A12;
-  --hero-wash: rgba(240, 132, 63, .08);
-}
+/* Each accent is two stops: the bright end for fills and words, the deep end for the gradient's far side. Every
+ * theme is dark since 27 Nov 2026, so the paper steps (--accent-dark, --accent-text, --accent-on) and the light-canvas
+ * rules went with the three light themes. */
+[data-accent="mint"]   { --accent-bright: #5BE9C2; --accent-deep: #3ED3AA; --theme-glow-rgb: 91, 233, 194; }
+[data-accent="coral"]  { --accent-bright: #FF7A6B; --accent-deep: #E8493A; --theme-glow-rgb: 255, 122, 107; }
+[data-accent="violet"] { --accent-bright: #B49BFF; --accent-deep: #7C5AE0; --theme-glow-rgb: 155, 125, 245; }
+[data-accent="sky"]    { --accent-bright: #6FB7FF; --accent-deep: #2E7FE0; --theme-glow-rgb: 111, 183, 255; }
+[data-accent="lime"]   { --accent-bright: #C6F24E; --accent-deep: #8FBE1F; --theme-glow-rgb: 198, 242, 78; }
+[data-accent="amber"]  { --accent-bright: #FF8A3D; --accent-deep: #E85F14; --theme-glow-rgb: 255, 138, 61; }
+[data-accent="rose"]   { --accent-bright: #FF8FA3; --accent-deep: #E85A78; --theme-glow-rgb: 255, 143, 163; }
+[data-accent="gold"]   { --accent-bright: #FFD166; --accent-deep: #E6B02E; --theme-glow-rgb: 255, 209, 102; }
 
-/* Theme: Frost — ice · cobalt. THE THIRD LIGHT CANVAS. */
-[data-theme="frost"] {
-  --background: #EEF3F8;
-  --foreground: #0F1B2D;
-  --card: #FFFFFF;
-  --card-foreground: #0F1B2D;
-  --popover: #FFFFFF;
-  --popover-foreground: #0F1B2D;
-  --secondary: #E1E9F1;
-  --secondary-foreground: #0F1B2D;
-  --muted: #E7EEF5;
-  --muted-foreground: #56697F;
-  --accent: #E1E9F1;
-  --accent-foreground: #0F1B2D;
-  --border: #C9D6E4;
-  --input: #FFFFFF;
-  --text-tertiary: #2F4260;
-  --text-dim: #A9B8CA;
-  --surface-deep: #E1E9F1;
-  --surface-raised: rgba(60, 90, 130, .10);
-  --line-emphasis: #B9C9DA;
-  --hairline: rgba(15, 27, 45, .13);
-  --grain-rgb: 15, 27, 45;
-  --theme-primary: #2569D0;
-  --theme-primary-2: #1B57B8;
-  --theme-glow-rgb: 37, 105, 208;
-  --primary-text: #1A5FBF;
-  /* WHITE, not the near-black every other theme uses: cobalt is dark enough
-   * that dark ink on it fails, which is why --primary-foreground had to stop
-   * being a single global value. */
-  --primary-foreground: #FFFFFF;
-  --num-hero: #0C2A4A;
-  --role-ai-bg: rgba(26, 95, 191, .08);
-  --role-ai-border: rgba(26, 95, 191, .20);
-  --role-ai-text: #1E4D8F;
-  --hero-wash: rgba(37, 105, 208, .08);
-}
-
-/* Each accent now declares FOUR stops, and the fourth is the point of this
- * round. bright/deep is what a dark canvas uses. --accent-dark is the same
- * hue taken down far enough to hold as a FILL on paper. --accent-text is
- * taken down further still, because a fill only has to be found and a word
- * has to be read: the two jobs stopped agreeing at 11-13px, which is where
- * the light theme was failing.
- *
- * --accent-on is the ink printed ON that fill. It splits by hue rather than
- * by canvas: white reads on sky/violet/coral/rose, near-black on
- * mint/lime/gold/amber. */
-[data-accent="mint"]   { --accent-bright: #5BE9C2; --accent-deep: #3ED3AA; --accent-dark: #19B894; --accent-text: #00705B; --accent-on: #08281F; --theme-glow-rgb: 91, 233, 194; }
-[data-accent="coral"]  { --accent-bright: #FF7A6B; --accent-deep: #E8493A; --accent-dark: #E8493A; --accent-text: #B32A1D; --accent-on: #FFFFFF; --theme-glow-rgb: 255, 122, 107; }
-[data-accent="violet"] { --accent-bright: #B49BFF; --accent-deep: #7C5AE0; --accent-dark: #7C5AE0; --accent-text: #5A3FC4; --accent-on: #FFFFFF; --theme-glow-rgb: 155, 125, 245; }
-[data-accent="sky"]    { --accent-bright: #6FB7FF; --accent-deep: #2E7FE0; --accent-dark: #2569D0; --accent-text: #1A5FBF; --accent-on: #FFFFFF; --theme-glow-rgb: 111, 183, 255; }
-[data-accent="lime"]   { --accent-bright: #C6F24E; --accent-deep: #8FBE1F; --accent-dark: #7FAF12; --accent-text: #4E7300; --accent-on: #08281F; --theme-glow-rgb: 198, 242, 78; }
-[data-accent="amber"]  { --accent-bright: #FF8A3D; --accent-deep: #E85F14; --accent-dark: #F0843F; --accent-text: #9A3F0B; --accent-on: #08281F; --theme-glow-rgb: 255, 138, 61; }
-[data-accent="rose"]   { --accent-bright: #FF8FA3; --accent-deep: #E85A78; --accent-dark: #E85A78; --accent-text: #B7264B; --accent-on: #FFFFFF; --theme-glow-rgb: 255, 143, 163; }
-[data-accent="gold"]   { --accent-bright: #FFD166; --accent-deep: #E6B02E; --accent-dark: #D9A21E; --accent-text: #7A5600; --accent-on: #08281F; --theme-glow-rgb: 255, 209, 102; }
-
-/* ONE rule pair, keyed off the canvas being light — not one rule per theme x
- * accent. A light theme added later inherits the dark-step behaviour for
- * every accent without a line of CSS, which is the point of the flag. */
 [data-accent]:not([data-accent="theme"]) {
   --theme-primary: var(--accent-bright);
   --theme-primary-2: var(--accent-deep);
   --primary-text: var(--accent-bright);
-}
-[data-canvas="light"][data-accent]:not([data-accent="theme"]) {
-  --theme-primary: var(--accent-dark);
-  --theme-primary-2: var(--accent-dark);
-  --primary-text: var(--accent-text);
-  /* The theme's own --primary-foreground is tuned for the theme's own accent.
-   * Override it with the accent's, or picking Sky on Linen prints near-black
-   * on cobalt. */
-  --primary-foreground: var(--accent-on);
-}
-
-/* ---------------------------------------------------------------------------
- * LIGHT CANVAS BEHAVIOUR — the rules that are about paper, not about a hue.
- *
- * A halo is a bloom of light. On a dark canvas it reads as the thing glowing;
- * on paper it is a grey smudge around the letters, and at 11-13px it is the
- * difference between crisp and hazy. So TEXT shadows go entirely, while BOX
- * glows stay (the CTA still needs to look tappable) at the subtle clamp
- * resolveGlow already applies for a light theme.
- *
- * Keyed off the canvas flag, not a theme name, so a light theme added later
- * inherits all of it without a line of CSS.
- * ------------------------------------------------------------------------- */
-/* --role-warn-text IS THE SAME BUG AS --role-ai-text, ONE TOKEN OVER, and the
- * handoff does not cover it. #FFD9A6 is a pale amber tuned for a dark canvas;
- * on paper it measures 1.20:1 — Home's "no meals logged yet" line was
- * effectively invisible on the theme this round exists to fix. No colour is
- * invented here: this is the handoff's own amber accent TEXT step
- * (--accent-text for amber, #9A3F0B), which is the value it specifies for
- * amber-family words on a light canvas. Measures 6.1:1 on all three.
- *
- * Flagged rather than folded in silently — the right long-term shape is
- * per-theme role-warn tints, the same move --role-ai just made, and that is
- * a designer's call about hue, not mine. */
-/* --destructive ON PAPER, the same bug a third time (2 Nov 2026, the UX pass): #FF5C7A is tuned for a dark canvas and
- * "Delete everything" / "Start a new plan…" measured 2.7:1 on the three light themes. The handoff's own rose TEXT
- * step (--accent-text for rose, #B7264B), as --role-warn-text above uses amber's: 4.5:1 or better on all three, and
- * the destructive fill keeps its white text readable too. verify:small-print. */
-[data-canvas="light"] {
-  --destructive: #B7264B;
-  --role-warn-text: #9A3F0B;
-  --role-ai-accent: #6A58E8;
-  --role-ai-label: #5644C9;
-}
-
-[data-canvas="light"] .glow-text,
-[data-canvas="light"] .glow-mint,
-[data-canvas="light"] .glow-mint-lg,
-[data-canvas="light"] .glow-violet,
-[data-canvas="light"] .glow-warn {
-  text-shadow: none;
-}
-
-/* The CTA keeps depth, as a drop shadow rather than a halo — a halo under a
- * button on paper looks like a printing fault. */
-[data-canvas="light"] .glow-mint-box {
-  box-shadow: 0 6px 16px rgba(var(--glow-rgb), .25);
-}
-[data-canvas="light"] .glow-violet-soft {
-  box-shadow: none;
-}
-/* .glow-bloom-once is `both`-filled, so its END state is what the CTA wears
- * at rest — overriding the class alone would not reach it. Its own keyframe
- * lands on the same flat shadow instead. */
-[data-canvas="light"] .glow-bloom-once {
-  animation-name: dsBloomInLight;
-}
-@keyframes dsBloomInLight {
-  0% { opacity: 0; transform: scale(.96); box-shadow: 0 0 0 rgba(var(--glow-rgb), 0); }
-  100% { opacity: 1; transform: scale(1); box-shadow: 0 6px 16px rgba(var(--glow-rgb), calc(.25 * var(--glow-strength))); }
-}
-/* Same reason as .glow-bloom-once above: on paper a halo under a button
- * reads as a printing fault, so the unread pulse breathes the CTA's flat
- * drop shadow instead of a glow, and the ring drops its halo and does the
- * whole job with its border. Both still scale with --glow-strength. */
-[data-canvas="light"] .chat-unread {
-  animation-name: chatUnreadPulseLight;
-}
-@keyframes chatUnreadPulseLight {
-  0%, 100% { box-shadow: 0 6px 16px rgba(var(--glow-rgb), calc(.25 * var(--glow-strength))); }
-  50% { box-shadow: 0 8px 26px rgba(var(--glow-rgb), calc(.55 * var(--glow-strength))); }
-}
-[data-canvas="light"] .chat-unread-ring {
-  animation-name: chatUnreadRingLight;
-}
-@keyframes chatUnreadRingLight {
-  0%, 100% { border-color: rgba(var(--glow-rgb), calc(.45 * var(--glow-strength))); }
-  50% { border-color: rgba(var(--glow-rgb), calc(.95 * var(--glow-strength))); }
 }
 
 /* ONE UNREAD INDICATOR AT A TIME (7 Sep 2026).
@@ -1189,6 +924,5 @@ html body[data-scroll-locked] {
 }
 
 /* THE BROWSER'S OWN CONTROLS FOLLOW THE THEME (QA walk, 10 Nov 2026): on the dark themes the date picker's calendar
-   icon was black on near-black. A dark scheme by default; the three light themes say light. */
+   icon was black on near-black. Every theme is dark (27 Nov 2026), so one dark scheme. */
 :root { color-scheme: dark; }
-[data-theme="daylight"], [data-theme="linen"], [data-theme="frost"] { color-scheme: light; }

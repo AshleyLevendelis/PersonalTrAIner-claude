@@ -168,6 +168,29 @@ export function plannedSessionRow(planned: Pick<PlannedActivity, 'activity' | 'd
  */
 export interface TodayChange { rounds?: PlannedRounds; minutes?: number }
 
+/**
+ * WHERE TODAY'S CHANGE IS KEPT: on the phone, for that person, date and session, never in the plan. One place, read by
+ * the card and by the watch link (27 Nov 2026: the watch runs what the card says, so 6 × 3 changed on the phone is
+ * 6 × 3 on the wrist), and every write is announced so a screen showing it can read it again.
+ */
+const todayChangeKey = (who: string, date: string, activity: string) => `planned-today-change:${who}:${date}:${activity}`
+const TODAY_CHANGE_EVENT = 'planned-today-change'
+
+export function readTodayChange(who: string, date: string, activity: string): TodayChange | null {
+  try { const raw = localStorage.getItem(todayChangeKey(who, date, activity)); return raw ? JSON.parse(raw) as TodayChange : null } catch { return null }
+}
+
+export function writeTodayChange(who: string, date: string, activity: string, c: TodayChange | null): void {
+  const key = todayChangeKey(who, date, activity)
+  try { if (c) localStorage.setItem(key, JSON.stringify(c)); else localStorage.removeItem(key) } catch { /* kept for this visit only */ }
+  try { window.dispatchEvent(new Event(TODAY_CHANGE_EVENT)) } catch { /* no window: nothing listens */ }
+}
+
+export function subscribeTodayChange(cb: () => void): () => void {
+  window.addEventListener(TODAY_CHANGE_EVENT, cb)
+  return () => window.removeEventListener(TODAY_CHANGE_EVENT, cb)
+}
+
 const TODAY_REST_STEPS = REST_STEPS.filter(s => s >= 5)
 const TODAY_MINUTES_MIN = 5
 const TODAY_MINUTES_MAX = 240
@@ -190,4 +213,34 @@ export function withTodayChange<P extends Pick<PlannedActivity, 'activity' | 'du
   if (change.rounds && isSensibleRoundConfig(change.rounds)) return { ...planned, rounds: { ...change.rounds }, duration: roundsMinutes(change.rounds) }
   if (change.minutes != null && Number.isFinite(change.minutes) && change.minutes >= TODAY_MINUTES_MIN && change.minutes <= TODAY_MINUTES_MAX) return { ...planned, duration: Math.round(change.minutes) }
   return planned
+}
+
+/**
+ * THE PLANNED CARDIO SESSION AS THE WATCH RUNS IT (27 Nov 2026, his "plans integrate well" with the watch): its name,
+ * the exact activity string the phone logs it under (so the day reads done when the watch logs it), its effort, and
+ * the rounds as the timer runs them, or minutes for a steady session (rounds 0). Read off the plan, nothing new.
+ */
+export interface WatchCardio {
+  activity: string
+  name: string
+  effort: string | null
+  minutes: number
+  rounds: number
+  workSeconds: number
+  restSeconds: number
+  /** "4 × 3 min hard · 1 min rest", "20 min easy": the line the phone's card prints. */
+  line: string
+}
+
+export function watchCardioOf(planned: (Pick<PlannedActivity, 'activity' | 'duration' | 'targetRpe' | 'rounds'> & { reason?: string }) | null | undefined): WatchCardio | null {
+  if (!planned || !planned.activity) return null
+  const row = plannedSessionRow(planned)
+  const r = plannedRoundsOf(planned)
+  const minutes = r ? sessionMinutesFor(planned.duration, r) : planned.duration
+  if (!(minutes > 0)) return null
+  return {
+    activity: planned.activity, name: row.name, effort: row.effort, minutes,
+    rounds: r?.rounds ?? 0, workSeconds: r?.workSeconds ?? 0, restSeconds: r?.restSeconds ?? 0,
+    line: `${row.dose} ${row.doseWord}${row.rest ? ` · ${row.rest} rest` : ''}`,
+  }
 }

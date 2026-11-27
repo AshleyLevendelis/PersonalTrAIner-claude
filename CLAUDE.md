@@ -1849,6 +1849,25 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
 - **Tester data is kept 90 days (activity) and 1 year (reports): his ruling 26 Nov 2026** (over 30 days and over a year for
   everything): a nightly clean-up only the database can run. `test:rls-local` §12. Needs migration 20261126120000
 ### His requests of 27 Nov 2026
+- **Planned cardio runs on the watch** (his "plans integrate well", UX mine): today's and the week ahead's planned cardio
+  are sent to the watch; Start runs the rounds (WORK / REST, the round, buzzes at each change, 3-2-1 before work, screen
+  off) or the minutes, and End logs it under the plan's name so the day reads done. `IntervalFlow.java`,
+  `test:watch-flow`, `test:watch-app`, `verify:watch-sets` §6. Needs a watch rebuild
+- **The watch on the gym floor: his "best in class ... how a user would want to use it in the gym", and his ruling
+  "Adjust reps and weight"** (REVERSES "no weight typed on the watch"): reps and weight are chips with − / + and the
+  bezel, sent only where changed; the rest buzzes from the workout service with the screen off (10s before, at the end,
+  ±15s); Undo set N; All exercises in any order; the week ahead is sent with today so the watch works with the phone in
+  the locker. `test:watch-flow`, `test:watch-app`, `verify:watch-sets`. Needs a watch rebuild
+- **The watch's lifting flow: his words "next exercise up is ..., Log set, Next set, Start rest timer, Next set, Next
+  exercise", and his ruling "One tap, with options"**: Log set saves the set and starts the rest; the rest offers Next
+  set, or Next exercise after an exercise's last set; Next exercise moves on early (kept on the watch, the phone keeps
+  those sets open). `LiftFlow.java`, `test:watch-flow` (runs it with the JDK), `test:watch-app`. Needs a watch rebuild
+- **Nightshift plus four violet themes: his words "keep the nightshift theme ... replace the current themes with the
+  purplish background with red ... purple ... blue or green", and his pick "B: each leans"**: Ruby, Amethyst, Sapphire and
+  Emerald, each on Nightshift's violet nudged toward its colour; the other eight themes, the three light ones among them,
+  are gone, and with them "Match system" and every light-canvas rule. A saved retired theme opens on its accent's new one.
+  The "81 theme x accent pairs" figures in this file are now 45, with no named shortfalls. `test:appearance`,
+  `verify:appearance-themes`, `verify:chat-bubbles`
 - **Live while a recorded workout runs: his words "While the exercise is running I should be able to see my heart rate
   and the zone and steps if applicable"**: heart rate with its zone ("♥ 150 · Zone 4", narrowing the strap's "never a
   zone" for this card), steps on foot from the phone's own step counter (Android, the "Physical activity" permission;
@@ -1863,7 +1882,10 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   the zone or effort tap, logged on the phone once); lifting one exercise at a time, Set done starts the rest, a buzz,
   Start next set; no weight typed on the watch. The phone saves a watch set by pressing the row's own tick on Exercise,
   and its heart rate goes into the strap's store. `test:watch-app`, `verify:watch-sets`, `docs/plans/watch-app.md`.
-  NOT compiled or run on a watch yet (his machine)
+  Compiled first time and installed on his Galaxy Watch 7 (Wear OS 6), 27 Nov 2026; he said "it worked" (relayed)
+  **And it looks like the app (his "the watch needs to look more high end", 27 Nov 2026)**: the app's own colours (held
+  equal to its tokens), fonts and icons, mint glow pills, and a ring round the edge for sets, rest and the heart rate's
+  zone. `test:watch-app` §5, `docs/design/watch/watch-look-2026-11-27.png`
 - **A logged activity can be taken off after its Undo has gone: his report 27 Nov 2026** ("I accidentally added a walk
   today. Remove it"): the row offers Remove and leaves "Walk · 5 min · Easy removed · Undo"; the coach has
   `propose_cardio_remove` (the card names the log, Apply, Undo), and its exercise removal aimed at a log becomes that

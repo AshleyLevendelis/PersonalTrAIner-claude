@@ -5,10 +5,9 @@
 // background up the tree), on the whole app (app-boot.html), theme by theme. PORT 9543.
 // ---------------------------------------------------------------------------
 import { startDriver } from './driver-kit.mjs'
-// A THEME IS SET THE WAY THE APP SETS IT (applyAppearance): the name AND the light-canvas flag the light themes carry,
-// or every token keyed on the flag (warning text, the light red) is measured at its dark value. Mirrors LIGHT_THEMES.
+// A THEME IS SET THE WAY THE APP SETS IT (applyAppearance): by name. Every theme is dark since 27 Nov 2026.
 
-const THEMES = ['nightshift', 'ember', 'field', 'graphite', 'daylight', 'midnight', 'rosewood', 'linen', 'frost']
+const THEMES = ['nightshift', 'ruby', 'amethyst', 'sapphire', 'emerald']
 const d = await startDriver({ port: 9543, page: 'app-boot.html', name: 'nutrition-readable' })
 const { ev, check, until, wait, go, clickAt, shoot, finish } = d
 
@@ -32,14 +31,14 @@ const MEASURE = String.raw`(() => {
 })()`
 const results = {}
 for (const t of THEMES) {
-  await ev(`(() => { const h = document.documentElement; h.setAttribute('data-theme', ${JSON.stringify(t)}); if (${JSON.stringify(['daylight', 'linen', 'frost'].includes(t))}) h.setAttribute('data-canvas', 'light'); else h.removeAttribute('data-canvas') })()`); await wait(300)
+  await ev(`(() => { const h = document.documentElement; h.setAttribute('data-theme', ${JSON.stringify(t)}) })()`); await wait(300)
   results[t] = await ev(MEASURE)
 }
 check('2. the line is on Nutrition', !!results.nightshift && /filtered, not verified/.test(results.nightshift.text), results.nightshift)
 for (const t of THEMES) check(`3. ${t}: the allergy line reads at 4.5:1 or better`, (results[t]?.ratio ?? 0) >= 4.5, results[t])
 await shoot('nutrition-readable')
 // THE WATER BUTTONS (same test): "+250 ml" and "+500 ml" were 84x40, under the 44px floor.
-await ev(`(() => { const h = document.documentElement; h.setAttribute('data-theme', 'nightshift'); h.removeAttribute('data-canvas') })()`)
+await ev(`(() => { const h = document.documentElement; h.setAttribute('data-theme', 'nightshift') })()`)
 // RE-ANCHORED 12 Nov 2026 (Nutrition Week 3d): the water quick-add opens from the rings card's "+ Water".
 await clickAt(`document.querySelector('[data-water-add]')`); await wait(600)
 const water = await ev(`[...document.querySelectorAll('button')].filter(b => /^\\+\\s?(250|500)\\s?ml$/i.test(b.textContent.trim())).map(b => Math.round(b.getBoundingClientRect().height))`)

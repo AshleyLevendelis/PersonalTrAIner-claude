@@ -6,10 +6,9 @@
 // and held to 4.5:1, theme by theme. A disabled control is left out: it is meant to look unavailable. PORT 9557.
 // ---------------------------------------------------------------------------
 import { startDriver } from './driver-kit.mjs'
-// A THEME IS SET THE WAY THE APP SETS IT (applyAppearance): the name AND the light-canvas flag the light themes carry,
-// or every token keyed on the flag (warning text, the light red) is measured at its dark value. Mirrors LIGHT_THEMES.
+// A THEME IS SET THE WAY THE APP SETS IT (applyAppearance): by name. Every theme is dark since 27 Nov 2026.
 
-const THEMES = ['nightshift', 'ember', 'field', 'graphite', 'daylight', 'midnight', 'rosewood', 'linen', 'frost']
+const THEMES = ['nightshift', 'ruby', 'amethyst', 'sapphire', 'emerald']
 const d = await startDriver({ port: 9557, page: 'app-boot.html', name: 'small-print' })
 const { ev, check, until, wait, go, clickAt, shoot, finish } = d
 
@@ -43,7 +42,7 @@ const MEASURE = String.raw`((root) => {
 const lowIn = async (root) => {
   const by = {}
   for (const t of THEMES) {
-    await ev(`(() => { const h = document.documentElement; h.setAttribute('data-theme', ${JSON.stringify(t)}); if (${JSON.stringify(['daylight', 'linen', 'frost'].includes(t))}) h.setAttribute('data-canvas', 'light'); else h.removeAttribute('data-canvas') })()`); await wait(250)
+    await ev(`(() => { const h = document.documentElement; h.setAttribute('data-theme', ${JSON.stringify(t)}) })()`); await wait(250)
     // THE RESTING COLOUR, not one mid-fade (10 Nov 2026): a button's colour eases when the theme changes, and once the
     // page also told the browser which scheme it is in, the outline buttons were read part-way between the dark
     // theme's red and the light one's (223,68,101: neither). Wait for every running transition to land first.
@@ -51,7 +50,7 @@ const lowIn = async (root) => {
     const all = await ev(`${MEASURE}(${JSON.stringify(root)})`)
     by[t] = { n: (all ?? []).length, low: (all ?? []).filter(x => x.ratio < 4.5) }
   }
-  await ev(`(() => { const h = document.documentElement; h.setAttribute('data-theme', 'nightshift'); h.removeAttribute('data-canvas') })()`); await wait(250)
+  await ev(`(() => { const h = document.documentElement; h.setAttribute('data-theme', 'nightshift') })()`); await wait(250)
   return by
 }
 const report = (screen, by) => {

@@ -17,11 +17,16 @@
     <!-- The buzz when a rest ends. -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Health Services lives in its own package; without this Android 11+ can hide it from the app. -->
+    <queries>
+        <package android:name="com.google.android.wearable.healthservices" />
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:theme="@android:style/Theme.DeviceDefault">
+        android:theme="@style/WatchTheme">
 
         <!-- Not standalone: it needs the phone app, which holds the plan and the log. -->
         <meta-data android:name="com.google.android.wearable.standalone" android:value="false" />

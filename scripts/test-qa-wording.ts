@@ -3,14 +3,14 @@
  *   1. An ingredient line as a cook says it: "3 eggs", "7 corn tortillas", "2 garlic cloves" (was "3 whole egg").
  *   2. Extra work's badge: "1 set", "2 sets" (was "1 sets").
  *   3. A bodyweight session's summary: no "0kg" volume.
- *   5. The date picker's icon is drawn for the theme (a dark colour scheme, light on the light themes).
+ *   5. The date picker's icon is drawn for the theme (a dark colour scheme; every theme is dark).
  *   4. Fresh potatoes, sweet potatoes, plantain and yam are produce on the shopping list, not dry goods.
  * (The meal day's "345 kcal under" is test:day-verdict's.)
  */
 import { readFileSync } from 'fs'
 import { kitchenLine } from '../src/lib/portion-scaler'
 import { resolveGroceryTarget } from '../src/lib/grocery-store'
-import { LIGHT_THEME_ORDER } from '../src/lib/appearance-palette'
+import { THEME_ORDER } from '../src/lib/appearance-palette'
 
 let ran = 0, failures = 0
 function check(label: string, ok: boolean, extra?: unknown) {
@@ -51,9 +51,9 @@ check('...while plantain chips, cereal, rice and pasta stay dry goods', dry.ever
 
 console.log('\n5. The browser\'s own controls (the date picker) follow the theme')
 const css = readFileSync('src/index.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
-const lightRule = /((?:\[data-theme="[a-z]+"\],?\s*)+)\{\s*color-scheme:\s*light;?\s*\}/.exec(css)?.[1] ?? ''
 check('the page is a dark scheme by default', /:root\s*\{\s*color-scheme:\s*dark;?\s*\}/.test(css))
-check('...and every light theme says light (derived from the app\'s own list of light themes)', LIGHT_THEME_ORDER.length > 0 && LIGHT_THEME_ORDER.every(t => lightRule.includes(`[data-theme="${t}"]`)), { lightRule, LIGHT_THEME_ORDER })
+// Every theme is dark since 27 Nov 2026 (the three light themes went), so no theme may switch the scheme to light.
+check('...and no theme switches it to light', THEME_ORDER.length > 0 && !/color-scheme:\s*light/.test(css))
 
 console.log('\n6. Profile\'s small controls have a 44 px tap area (the reply-speed and Appearance chips were 38 px)')
 const small: string[] = []
