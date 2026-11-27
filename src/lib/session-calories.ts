@@ -65,3 +65,38 @@ export function subscribeSessionCalories(l: () => void): () => void {
   listeners.add(l)
   return () => { listeners.delete(l) }
 }
+
+// ---------------------------------------------------------------------------
+// THE WATCH'S RUNNING COUNT (27 Nov 2026, the two gaps after "didn't log any calories burned"): each heart rate batch
+// carries what the watch's workout has counted so far. A weights session keeps it as the session's calories as it goes
+// (sent to the database at most once a minute), so ending on the phone alone still has them; a cardio workout keeps its
+// latest count, so a walk ended on the phone takes the watch's figure, not an estimate or nothing.
+// ---------------------------------------------------------------------------
+const CARDIO_KEY = 'fitplan_watch_cardio_kcal'
+const SEND_EVERY_MS = 60_000
+let lastSentAt = 0
+
+/** One heart rate batch's running count, filed by the workout it belongs to. */
+export async function noteWatchRunningKcal(profileId: string, e: Record<string, unknown>, now = Date.now()): Promise<void> {
+  const kcal = sessionKcal(e.kcal)
+  const startedAt = typeof e.startedAt === 'number' && Number.isFinite(e.startedAt) ? e.startedAt : null
+  if (kcal == null || startedAt == null) return
+  if (e.kind === 'lift' && typeof e.date === 'string') {
+    keep(profileId, e.date, kcal)
+    listeners.forEach(l => l())
+    if (now - lastSentAt >= SEND_EVERY_MS) { lastSentAt = now; if (await send(profileId, e.date, kcal)) keep(profileId, e.date, null) }
+  } else if (e.kind === 'cardio' && typeof e.activity === 'string') {
+    try { localStorage.setItem(CARDIO_KEY, JSON.stringify({ activity: e.activity, startedAt, kcal })) } catch { /* the end event still carries it */ }
+  }
+}
+
+/** The watch's count for a workout of this name started within two minutes of `startedAtIso`, or null. */
+export function watchCardioKcalFor(activity: string, startedAtIso: string): number | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(CARDIO_KEY) ?? 'null') as { activity?: string; startedAt?: number; kcal?: number } | null
+    const start = Date.parse(startedAtIso)
+    if (!v || typeof v.startedAt !== 'number' || !Number.isFinite(start)) return null
+    if ((v.activity ?? '').trim().toLowerCase() !== activity.trim().toLowerCase() || Math.abs(v.startedAt - start) >= 120_000) return null
+    return sessionKcal(v.kcal)
+  } catch { return null }
+}

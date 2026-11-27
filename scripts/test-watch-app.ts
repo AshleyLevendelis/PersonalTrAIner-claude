@@ -195,6 +195,37 @@ async function main() {
   const r3b = await applyWatchEvents([{ ...end, id: 'c3b', startedAt: startedAt + 5 * 3600_000, endedAt: startedAt + 5 * 3600_000 + 30 * 60_000 }], ctx)
   check('A SECOND WALK THE SAME DAY IS LOGGED (his report 27 Nov 2026: "it doesn\'t get added")',
     r3b.logged === 1 && (await getCardioLogsForDateMerged('p1', '2026-11-27')).filter(l => l.activity_name === 'Walk').length === 2)
+
+  // THE TWO CALORIE GAPS (27 Nov 2026, after "didn't log any calories burned").
+  const calMod = await import('../src/lib/session-calories')
+  // (1) A weights session ended on the phone only: the watch's running count rides with its heart rate.
+  db.workout_sessions = [{ id: 'ws2', profile_id: 'p1', date: '2026-11-28' }]
+  await applyWatchEvents([{ id: 'hrk1', type: 'hr', samples: [[Date.now(), 120]], kind: 'lift', activity: '', startedAt: 1, date: '2026-11-28', kcal: 87.4 }], ctx)
+  check('a weights session\'s running count from the watch is the session\'s calories, ended on the watch or not',
+    (await calMod.readSessionCalories('p1', '2026-11-28')) === 87 && db.workout_sessions[0].active_kcal === 87, db.workout_sessions[0])
+  // (2) A walk the watch app runs and the phone ends: its count is the log's calories, never over a device figure.
+  const walkStart = Date.parse('2026-11-27T19:00:00')
+  await applyWatchEvents([{ id: 'hrk2', type: 'hr', samples: [[Date.now(), 110]], kind: 'cardio', activity: 'Walk', startedAt: walkStart, date: '2026-11-27', kcal: 96 }], ctx)
+  check('...a walk the watch is running is known by its count, matched by name and start', calMod.watchCardioKcalFor('Walk', new Date(walkStart + 30_000).toISOString()) === 96
+    && calMod.watchCardioKcalFor('Run', new Date(walkStart).toISOString()) === null && calMod.watchCardioKcalFor('Walk', new Date(walkStart + 10 * 60_000).toISOString()) === null)
+  const ar = await import('../src/lib/activity-recording')
+  const fig = (kcal: number | null, est = false) => ({ minutes: 20, steps: null, distanceKm: null, kcal, kcalEstimated: est, avgHeartRate: null, maxHeartRate: null })
+  const recW = { activity: 'Walk', startedAt: new Date(walkStart).toISOString(), endedAt: new Date(walkStart + 20 * 60_000).toISOString() }
+  const vNone = ar.logRecording({ profileId: 'p1', date: '2026-11-27', recording: recW, figures: fig(null), effort: 'easy', watchKcal: 96 })
+  const vEst = ar.logRecording({ profileId: 'p1', date: '2026-11-27', recording: recW, figures: fig(70, true), effort: 'easy', watchKcal: 96 })
+  const vDev = ar.logRecording({ profileId: 'p1', date: '2026-11-27', recording: recW, figures: fig(110), effort: 'easy', watchKcal: 96 })
+  check('...a walk ended on the phone takes the watch\'s count over none and over an estimate, never over the phone\'s own device figure',
+    vNone?.active_kcal === 96 && vNone?.kcal_estimated === false && vEst?.active_kcal === 96 && vDev?.active_kcal === 110, [vNone?.active_kcal, vEst?.active_kcal, vDev?.active_kcal])
+  // (3) Ended on the phone first, then on the watch: the watch's figures fill what the log lacks.
+  const lateStart = Date.parse('2026-11-27T21:00:00')
+  db.cardio_logs.push({ id: 'phone-walk', user_id: 'p1', date: '2026-11-27', activity_name: 'Walk', duration_minutes: 25, intensity_rpe: 3, started_at: new Date(lateStart).toISOString(), completed_at: new Date(lateStart + 25 * 60_000).toISOString(), active_kcal: null, steps: null })
+  await applyWatchEvents([{ id: 'late-end', type: 'cardio-end', activity: 'Walk', startedAt: lateStart, endedAt: lateStart + 25 * 60_000, effort: 'easy', kcal: 131, steps: 2900 }], ctx)
+  const filledRow = db.cardio_logs.find(r => r.id === 'phone-walk')
+  check('...a walk ended on the phone and then on the watch gets the watch\'s calories and steps, once', filledRow?.active_kcal === 131 && filledRow?.steps === 2900
+    && db.cardio_logs.filter(r => r.activity_name === 'Walk' && r.started_at === new Date(lateStart).toISOString()).length === 1, filledRow)
+  const svcK = strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/WorkoutService.java'))
+  check('the watch sends its running count with every heart rate batch', /e\.put\("type", "hr"\);[\s\S]{0,300}e\.put\("kind", LIVE\.kind\);[\s\S]{0,200}if \(LIVE\.kcal > 0\) e\.put\("kcal", Math\.round\(LIVE\.kcal\)\);/.test(svcK))
+  check('the phone\'s recorder hands the watch\'s count to the log', /watchKcal: watchCardioKcalFor\(rec\.activity, rec\.startedAt\)/.test(read('src/components/RecordActivityCard.tsx')))
   rec.writeRecording({ activity: 'Bike', startedAt: new Date().toISOString() })
   await applyWatchEvents([{ ...end, id: 'c4', activity: 'Run', startedAt: startedAt + 3 * 3600_000, endedAt: startedAt + 3.5 * 3600_000 }], ctx)
   check('logging a watch workout leaves a different open workout on the phone as it was', rec.readRecording()?.activity === 'Bike')

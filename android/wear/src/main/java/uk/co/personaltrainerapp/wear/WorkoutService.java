@@ -366,6 +366,13 @@ public class WorkoutService extends Service {
         try {
             JSONObject e = new JSONObject();
             e.put("type", "hr");
+            // WHAT THE WORKOUT HAS COUNTED SO FAR rides with its heart rate (27 Nov 2026, his "didn't log any calories"):
+            // a session ended on the phone, never on the watch, still has the watch's calories.
+            e.put("kind", LIVE.kind);
+            e.put("activity", LIVE.activity);
+            e.put("startedAt", LIVE.startedAt);
+            e.put("date", TodayStore.today());
+            if (LIVE.kcal > 0) e.put("kcal", Math.round(LIVE.kcal));
             e.put("samples", new JSONArray(pending.toString()));
             PhoneLink.send(this, e);
         } catch (Exception ignored) { /* our own object */ }
