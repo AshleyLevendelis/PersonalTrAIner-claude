@@ -203,6 +203,12 @@ async function main() {
   await applyWatchEvents([{ id: 'hrk1', type: 'hr', samples: [[Date.now(), 120]], kind: 'lift', activity: '', startedAt: 1, date: '2026-11-28', kcal: 87.4 }], ctx)
   check('a weights session\'s running count from the watch is the session\'s calories, ended on the watch or not',
     (await calMod.readSessionCalories('p1', '2026-11-28')) === 87 && db.workout_sessions[0].active_kcal === 87, db.workout_sessions[0])
+  // THE LAST COUNT IS SAVED AT ONCE (27 Nov 2026, the watch leftovers): a running count waits a minute between saves,
+  // and the workout's final one, marked by the watch, never does.
+  await applyWatchEvents([{ id: 'hrk1b', type: 'hr', samples: [], kind: 'lift', activity: '', startedAt: 1, date: '2026-11-28', kcal: 101 }], ctx)
+  const held = db.workout_sessions[0].active_kcal
+  await applyWatchEvents([{ id: 'hrk1c', type: 'hr', samples: [], kind: 'lift', activity: '', startedAt: 1, date: '2026-11-28', kcal: 104, final: true }], ctx)
+  check('a running count inside the minute waits, and the watch\'s final count is saved at once', held === 87 && db.workout_sessions[0].active_kcal === 104, { held, now: db.workout_sessions[0].active_kcal })
   // (2) A walk the watch app runs and the phone ends: its count is the log's calories, never over a device figure.
   const walkStart = Date.parse('2026-11-27T19:00:00')
   await applyWatchEvents([{ id: 'hrk2', type: 'hr', samples: [[Date.now(), 110]], kind: 'cardio', activity: 'Walk', startedAt: walkStart, date: '2026-11-27', kcal: 96 }], ctx)
@@ -395,11 +401,48 @@ async function main() {
   const mainB = strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/MainActivity.java'))
   check('the watch app says when it is on screen', /super\.onResume\(\);\s*WorkoutService\.appVisible = true;/.test(mainB) && /super\.onPause\(\);\s*WorkoutService\.appVisible = false;/.test(mainB))
   check('the screen is never held on for a weights session (the rest buzzes with it off)', !/addFlags\(WindowManager\.LayoutParams\.FLAG_KEEP_SCREEN_ON\)/.test(mainB))
-  check('a weights workout with no set or rest for 90 minutes ends itself', msOf('LIFT_IDLE_END_MS') === 0 ? /LIFT_IDLE_END_MS = 90 \* 60 \* 1000;/.test(svcHr) && /"lift"\.equals\(LIVE\.kind\) && LIVE\.running && SystemClock\.elapsedRealtime\(\) - LIVE\.lastActionAt > LIFT_IDLE_END_MS\) \{[\s\S]{0,120}end\(WorkoutService\.this\);/.test(svcHr) && /static void rest\([^)]*\) \{\s*LIVE\.lastActionAt = SystemClock\.elapsedRealtime\(\);/.test(svcHr) : false)
+  check('a weights workout with no set or rest for 90 minutes ends itself', msOf('LIFT_IDLE_END_MS') === 0 ? /LIFT_IDLE_END_MS = 90 \* 60 \* 1000;/.test(svcHr) && /long idle = SystemClock\.elapsedRealtime\(\) - LIVE\.lastActionAt;\s*if \("lift"\.equals\(LIVE\.kind\) && LIVE\.running && idle > LIFT_IDLE_END_MS\) \{[\s\S]{0,120}endAt\(WorkoutService\.this, System\.currentTimeMillis\(\) - idle\);/.test(svcHr) && /static void rest\([^)]*\) \{\s*LIVE\.lastActionAt = SystemClock\.elapsedRealtime\(\);/.test(svcHr) : false)
   const listenerSrc = strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/TodayListenerService.java'))
   check('a session finished on the phone ends the watch\'s weights workout', /if \(WorkoutService\.LIVE\.running && "lift"\.equals\(WorkoutService\.LIVE\.kind\) && TodayStore\.finishedToday\(json\)\) WorkoutService\.end\(this\);/.test(listenerSrc)
     && JSON.parse(watchTodayPayload({ date: '2026-11-27', title: 't', estimatedMax: null, rows: [{ id: 'a', name: 'A', sets: 1, reps: '5', suggestedLoad: '', restSeconds: 60, done: 1 }] as never, finished: true }) ?? '{}').finished === true
     && /finished=\{status === 'finished'\}/.test(read('src/components/exercise/TodayPanel.tsx')))
+
+  // THE WATCH LEFTOVERS (27 Nov 2026).
+  // (1) The cardio tail: a workout ends when End is tapped, and the watch's last readings, held back until then, still
+  // reach the phone.
+  const mainT = strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/MainActivity.java'))
+  check('the logged walk ends when End was tapped, not when Log was', /e\.put\("endedAt", l\.endedAt > 0 \? l\.endedAt : System\.currentTimeMillis\(\)\);/.test(mainT)
+    && /long ms = \(l\.endedAt > 0 \? l\.endedAt : System\.currentTimeMillis\(\)\) - l\.startedAt;/.test(mainT)
+    && /static void endAt\(Context c, long wallMs\) \{\s*if \(LIVE\.running && LIVE\.endedAt == 0\) LIVE\.endedAt = wallMs;/.test(svcHr))
+  check('...the service listens on after End until the watch hands over its last readings (or a few seconds pass)',
+    /if \(finishing && update\.getExerciseStateInfo\(\)\.getState\(\)\.isEnded\(\)\) \{ main\.removeCallbacks\(stopNow\); stopNow\.run\(\); return; \}/.test(svcHr)
+    && /finishing = true;[\s\S]{0,160}endExerciseAsync\(\)[\s\S]{0,120}main\.postDelayed\(stopNow, LAST_READINGS_WAIT_MS\);/.test(svcHr)
+    && !/private void finish\(\) \{[\s\S]{0,400}clearUpdateCallbackAsync/.test(svcHr))
+  check('...a reading after End is not part of the workout, and the last message goes even empty, marked final',
+    /if \(l\.endedAt > 0 && at > l\.endedAt\) return;/.test(svcHr) && /pending\.length\(\) == 0 && !\(force && finishing\)/.test(svcHr) && /if \(finishing\) e\.put\("final", true\);/.test(svcHr))
+  check('...the zone that held the most counts the last reading up to End', /long upTo = l\.endedAt > 0 \? l\.endedAt : System\.currentTimeMillis\(\);\s*if \(l\.lastZone > 0 && upTo > l\.lastZoneAt\) ms\[l\.lastZone - 1\] \+=/.test(svcHr))
+  // (2) The outbox: heart rate folded while the phone is away, one send at a time, and sent when the phone is back.
+  const link = strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/PhoneLink.java'))
+  check('heart rate waiting for the phone is folded into the LAST waiting message, never the first (it may be on its way)',
+    /JSONObject merged = box\.length\(\) >= 2 \? fold\(box\.optString\(box\.length\(\) - 1\), event\) : null;/.test(link)
+    && /if \(!"hr"\.equals\(t\.optString\("type"\)\) \|\| t\.optBoolean\("final"\)\) return null;/.test(link)
+    && /t\.optLong\("startedAt"\) != next\.optLong\("startedAt"\)/.test(link)
+    && /t\.put\("id", next\.getString\("id"\)\);/.test(link))
+  check('...one send at a time, and whatever arrives as a send finishes goes too', /if \(!SENDING\.compareAndSet\(false, true\)\) return;/.test(link) && /finally \{\s*SENDING\.set\(false\);\s*\}/.test(link) && /if \(sentAll && waiting\(app\) > 0\) flush\(app\);/.test(link))
+  check('...and the phone sending "today" (its app opened) sends whatever waited', /PhoneLink\.flush\(this\);\s*MainActivity\.refreshIfOpen\(\);/.test(strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/TodayListenerService.java'))))
+  // (3) On the watch face while it runs.
+  check('a running workout is an ongoing activity: its icon on the watch face, its clock or the rest counting down',
+    /new OngoingActivity\.Builder\(this, NOTIFICATION_ID, b\)[\s\S]{0,120}setStaticIcon\(iconFor\(LIVE\.kind, LIVE\.activity\)\)[\s\S]{0,400}\.apply\(this\);[\s\S]{0,200}return b\.build\(\);/.test(svcHr)
+    && /new Status\.TimerPart\(LIVE\.restEndsAt\)/.test(svcHr) && /new Status\.StopwatchPart\(/.test(svcHr)
+    && /implementation "androidx\.wear:wear-ongoing:/.test(read('android/wear/build.gradle')))
+  check('...posted again once the workout has begun, so the face\'s clock counts from its start', /begin\(kind == null[^;]*;\s*showRunning\(\);/.test(svcHr))
+  // (4) The two cramped screens.
+  const pad = Number(/leftMargin = -dp\((\d+)\);/.exec(mainT)?.[1])
+  check('the − / + row stays clear of the ring: out by 8dp a side at most', pad > 0 && pad <= 8, { pad })
+  check('...and is drawn whole: the edit screen lets the row reach into the side padding, every other screen clips there again',
+    /private void showEdit\([^)]*\) \{[\s\S]{0,900}column\.setClipToPadding\(false\);\s*LinearLayout r = row\(8\);/.test(mainT)
+    && /private void hideEdge\(\) \{\s*column\.setClipToPadding\(true\);/.test(mainT))
+  check('"Session done" says it in one short line', /text\(movedOn \? "Sets you moved on from stay open on your phone\." : "Every set is on your phone\.", 13, MUTED, 4\);/.test(mainT))
 
   console.log(`\n${ran} checks ran`)
   if (failures > 0) { console.error(`${failures} failure(s)`); process.exit(1) }

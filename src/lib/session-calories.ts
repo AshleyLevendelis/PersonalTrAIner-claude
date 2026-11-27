@@ -84,7 +84,8 @@ export async function noteWatchRunningKcal(profileId: string, e: Record<string, 
   if (e.kind === 'lift' && typeof e.date === 'string') {
     keep(profileId, e.date, kcal)
     listeners.forEach(l => l())
-    if (now - lastSentAt >= SEND_EVERY_MS) { lastSentAt = now; if (await send(profileId, e.date, kcal)) keep(profileId, e.date, null) }
+    // The workout's LAST count (the watch marks it, 27 Nov 2026) is saved at once, never held back a minute.
+    if (e.final === true || now - lastSentAt >= SEND_EVERY_MS) { lastSentAt = now; if (await send(profileId, e.date, kcal)) keep(profileId, e.date, null) }
   } else if (e.kind === 'cardio' && typeof e.activity === 'string') {
     try { localStorage.setItem(CARDIO_KEY, JSON.stringify({ activity: e.activity, startedAt, kcal })) } catch { /* the end event still carries it */ }
   }
