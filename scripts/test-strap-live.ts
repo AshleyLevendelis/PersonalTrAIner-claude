@@ -19,7 +19,7 @@ const store = new Map<string, string>()
 import { setSupabaseClient } from '../src/lib/supabase'
 import {
   pairStrap, pairedStrap, connectPairedStrap, flushStrapReadings, forgetStrap, liveHeartRate, onStrapValue, strapState, strapReadingsBetween,
-  __resetStrapForTests, STALE_MS, type StrapAdapter,
+  __resetStrapForTests, STALE_MS, WATCH_STALE_MS, onWatchReadings, liveHeartSource, type StrapAdapter,
 } from '../src/lib/strap-live'
 import { fillHeartFromStrap } from '../src/lib/health-heart'
 
@@ -67,6 +67,12 @@ async function main() {
   check('the link dropping clears the live number and says so', liveHeartRate() === null && strapState() === 'lost')
   await connectPairedStrap()
   check('...and the strap is connected again on the next open', connects.length === 2 && strapState() === 'connected', connects)
+  // A WATCH's reading is held through a sensor skip (his first watch walk, 27 Nov 2026); a strap's is not (above).
+  const wAt = Date.now() + 50
+  onWatchReadings([[wAt, 131]], wAt)
+  check('a watch reading is still shown 10s on, through a sensor skip (a strap\'s is gone at 6s)',
+    liveHeartRate(wAt + 10_000) === 131 && liveHeartSource(wAt + 10_000) === 'watch' && WATCH_STALE_MS > STALE_MS, { at10: liveHeartRate(wAt + 10_000) })
+  check(`...and gone ${WATCH_STALE_MS / 1000 + 1}s on with nothing new (a watch taken off shows nothing)`, liveHeartRate(wAt + WATCH_STALE_MS + 1000) === null && liveHeartSource(wAt + WATCH_STALE_MS + 1000) === null)
 
   console.log('\n2. The readings stay on the phone, through the app closing')
   // A strap sends in time order; a fresh store so these come after nothing newer.

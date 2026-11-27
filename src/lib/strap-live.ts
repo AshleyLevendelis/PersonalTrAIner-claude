@@ -34,6 +34,15 @@ export interface StrapAdapter {
 const PAIRED_KEY = 'fitplan_heart_strap'
 const READINGS_KEY = 'fitplan_heart_strap_readings'
 export const STALE_MS = 5000
+/**
+ * A WATCH reading stays live longer than a strap's (27 Nov 2026, his first walk with the watch: "the heart rate seems to
+ * drop occasionally, quite often", where Samsung's own app does not). A watch's optical sensor skips readings for a few
+ * seconds whenever the arm moves or the fit slips, and Samsung Health shows the last number through those gaps rather
+ * than a blank. Fifteen seconds bridges a skip; a watch taken off or a lost link still shows nothing within it. A strap
+ * keeps STALE_MS: it sends every second over its own radio, so a five-second silence is out of range, not a skip.
+ */
+export const WATCH_STALE_MS = 15_000
+function staleAfter(from: 'strap' | 'watch'): number { return from === 'watch' ? WATCH_STALE_MS : STALE_MS }
 const KEEP_MS = 4 * 3600 * 1000
 
 function testAdapter(): StrapAdapter | null | undefined {
@@ -142,7 +151,7 @@ export function onStrapValue(v: DataView, at: Date = new Date()): void {
 // recommendations"). The watch reads its sensor about once a second during a workout and sends a few seconds at a time
 // (watch-bridge.ts); a batch that waited on the watch arrives later with its own times. Each reading is kept exactly as
 // a strap's is, so a session's figure, its graph and its zones read the watch with no change; only a reading newer
-// than STALE_MS is live. A strap's live number is not overwritten by an older watch batch.
+// than WATCH_STALE_MS is live. A strap's live number is not overwritten by an older watch batch.
 // ---------------------------------------------------------------------------
 const WATCH_SEEN_KEY = 'fitplan_watch_heart_seen'
 
@@ -172,7 +181,7 @@ export function hasOwnReadings(now: number = Date.now()): boolean {
 
 /** Where the live number comes from, or null when none is live. */
 export function liveHeartSource(now: number = Date.now()): 'strap' | 'watch' | null {
-  return live && now - live.at <= STALE_MS ? live.from : null
+  return live && now - live.at <= staleAfter(live.from) ? live.from : null
 }
 
 /** Writes the readings to the phone now: when the app goes to the back, where it may be closed. */
@@ -251,7 +260,7 @@ function subscribe(l: () => void): () => void {
 
 /** The live number, or null when there is none worth showing (no strap, out of range, older than STALE_MS). */
 export function liveHeartRate(now: number = Date.now()): number | null {
-  return live && now - live.at <= STALE_MS ? live.bpm : null
+  return live && now - live.at <= staleAfter(live.from) ? live.bpm : null
 }
 
 export function useLiveHeartRate(): number | null {

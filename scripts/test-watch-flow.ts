@@ -150,7 +150,7 @@ let lines: string[] = []
 try {
   const files = ['LiftFlow.java', 'IntervalFlow.java', 'TodayStore.java', 'FlowCheck.java'].map(f => join(src, f))
   execFileSync('javac', ['-encoding', 'UTF-8', '-d', join(dir, 'out'), ...files], { stdio: 'pipe' })
-  lines = execFileSync('java', ['-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-cp', join(dir, 'out'), 'uk.co.personaltrainerapp.wear.FlowCheck'], { encoding: 'utf8' }).trim().split('\n')
+  lines = execFileSync('java', ['-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-cp', join(dir, 'out'), 'uk.co.personaltrainerapp.wear.FlowCheck'], { encoding: 'utf8' }).trim().split(/\r?\n/)
 } catch (e) {
   console.error(`  could not compile or run the watch's flow with the JDK: ${String((e as { stderr?: Buffer }).stderr ?? e).slice(0, 400)}`)
 }

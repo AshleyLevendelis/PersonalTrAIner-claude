@@ -703,15 +703,15 @@ public class MainActivity extends Activity {
 
     /** The live zone, or 0: none when the phone shows none, the reading is stale, or nothing is running. */
     private int liveZone(WorkoutService.Live l) {
-        if (!l.running || l.bpm <= 0 || System.currentTimeMillis() - l.bpmAt > 5000) return 0;
+        if (!l.running || l.bpm <= 0 || System.currentTimeMillis() - l.bpmAt > WorkoutService.HR_HOLD_MS) return 0;
         return Zones.zoneOf(l.bpm, TodayStore.estimatedMax(this));
     }
 
-    /** "♥ 142  ZONE 3"; no zone when the phone shows none; a dash, never a stale number (the phone's five seconds). */
+    /** "♥ 142  ZONE 3"; no zone when the phone shows none; a dash, never a stale number (the phone's fifteen seconds for a watch). */
     private void drawHeart(WorkoutService.Live l, int zone) {
         if (heartRow == null) return;
         heartRow.setVisibility(l.running ? View.VISIBLE : View.INVISIBLE);
-        boolean fresh = l.bpm > 0 && System.currentTimeMillis() - l.bpmAt <= 5000;
+        boolean fresh = l.bpm > 0 && System.currentTimeMillis() - l.bpmAt <= WorkoutService.HR_HOLD_MS;
         heartBpm.setText(fresh ? String.valueOf(l.bpm) : "–");
         heartZone.setVisibility(zone > 0 ? View.VISIBLE : View.GONE);
         heartZone.setText("ZONE " + zone);
