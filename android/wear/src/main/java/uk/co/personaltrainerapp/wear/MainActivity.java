@@ -116,6 +116,23 @@ public class MainActivity extends Activity {
         }
     }
 
+    /**
+     * BACK STEPS BACK A SCREEN, never out of a workout (27 Nov 2026 review): from a number or the list to the set; from
+     * the ended workout it stays, because leaving there would lose the log; from a running workout to Home (it keeps
+     * running). Only Home lets the watch close the app. Swipe-to-close is off in the theme for the same reason.
+     */
+    @Override
+    public void onBackPressed() {
+        switch (screen) {
+            case EDIT: case LIST: showLift(); return;
+            case LOGGED:
+                android.widget.Toast.makeText(this, "Log it, or tap Don't log it", android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            case LIFT: case REST: case CARDIO: case DONE: showHome(); return;
+            default: super.onBackPressed();
+        }
+    }
+
     @Override
     protected void onPause() {
         super.onPause();
@@ -170,7 +187,7 @@ public class MainActivity extends Activity {
 
     /** The planned session: logged under the plan's own name; its rounds or minutes run and buzz in the service. */
     private void startPlannedCardio(TodayStore.Cardio k) {
-        if (!hasHeartPermission()) { askPermissions(); return; }
+        if (!hasHeartPermission()) { askForHeart(); return; }
         WorkoutService.startPlanned(this, k);
         WorkoutService.LIVE.activity = k.activity;
         WorkoutService.LIVE.startedAt = System.currentTimeMillis();
@@ -187,7 +204,7 @@ public class MainActivity extends Activity {
     private TextView phaseKicker, phaseLine;
 
     private void startCardio(String activity) {
-        if (!hasHeartPermission()) { askPermissions(); return; }
+        if (!hasHeartPermission()) { askForHeart(); return; }
         WorkoutService.start(this, "cardio", activity);
         // The service flips LIVE.running on its own thread of events; draw the running screen now.
         WorkoutService.LIVE.activity = activity;
@@ -304,7 +321,7 @@ public class MainActivity extends Activity {
         TodayStore.Session s = TodayStore.read(this);
         if (s == null) { showHome(); return; }
         if (!WorkoutService.LIVE.running && nextExercise(s) != null) {
-            if (!hasHeartPermission()) { askPermissions(); return; }
+            if (!hasHeartPermission()) { askForHeart(); return; }
             WorkoutService.start(this, "lift", s.title);
         }
         showLift();
@@ -618,6 +635,9 @@ public class MainActivity extends Activity {
             : "Every set is ticked. Your phone saves them as its own ticks.", 13, MUTED, 4);
         button("End workout", true, 0, v -> endLift());
         if (movedOn) quiet("All exercises", v -> showList());
+        // The last set of the session can be undone too (27 Nov 2026 review): it is the one most often mis-tapped.
+        TodayStore.Exercise last = find(s, WorkoutService.LIVE.restAfterId);
+        if (last != null && TodayStore.done(this, last) > 0) quiet("Undo set " + TodayStore.done(this, last), v -> undoLast(s, last));
     }
 
     private void endLift() {
@@ -708,7 +728,22 @@ public class MainActivity extends Activity {
         return Build.VERSION.SDK_INT >= 36 ? "android.permission.health.READ_HEART_RATE" : Manifest.permission.BODY_SENSORS;
     }
 
+    /**
+     * Start was tapped without the heart-rate permission: ask, and if the watch will no longer ask (he said "don't ask
+     * again"), say where to switch it on rather than doing nothing (27 Nov 2026 review).
+     */
+    private void askForHeart() {
+        if (asked && !shouldShowRequestPermissionRationale(heartPermission())) {
+            android.widget.Toast.makeText(this, "Heart rate is off for this app. Switch it on in the watch's Settings, Apps, Personal TrAIner, Permissions.", android.widget.Toast.LENGTH_LONG).show();
+            return;
+        }
+        askPermissions();
+    }
+
+    private boolean asked;
+
     private void askPermissions() {
+        asked = true;
         List<String> want = new ArrayList<>();
         want.add(heartPermission());
         want.add(Manifest.permission.ACTIVITY_RECOGNITION);

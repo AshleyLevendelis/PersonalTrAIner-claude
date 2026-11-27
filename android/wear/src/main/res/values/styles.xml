@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The system's own watch look, with swipe-to-close OFF: a swipe mid-workout closed the app and could lose a
+         workout just ended (27 Nov 2026 review). Back steps back a screen instead (MainActivity.onBackPressed). -->
+    <style name="WatchTheme" parent="@android:style/Theme.DeviceDefault">
+        <item name="android:windowSwipeToDismiss">false</item>
+    </style>
+</resources>

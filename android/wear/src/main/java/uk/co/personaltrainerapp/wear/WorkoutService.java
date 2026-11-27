@@ -193,7 +193,10 @@ public class WorkoutService extends Service {
 
     private void vibrate(long[] pattern) {
         Vibrator v = getSystemService(Vibrator.class);
-        if (v != null && v.hasVibrator()) v.vibrate(VibrationEffect.createWaveform(pattern, -1));
+        if (v == null || !v.hasVibrator()) return;
+        // AS AN ALARM, so Do Not Disturb, Bedtime or Theatre mode does not swallow the end of his rest (27 Nov 2026).
+        if (Build.VERSION.SDK_INT >= 33) v.vibrate(VibrationEffect.createWaveform(pattern, -1), android.os.VibrationAttributes.createForUsage(android.os.VibrationAttributes.USAGE_ALARM));
+        else v.vibrate(VibrationEffect.createWaveform(pattern, -1));
     }
 
     @Override
@@ -211,6 +214,7 @@ public class WorkoutService extends Service {
             finish();
         } else if (ACTION_REST.equals(action)) {
             if (LIVE.running) scheduleRest(intent.getLongExtra(EXTRA_REST_ENDS, 0), intent.getStringExtra(EXTRA_REST_NEXT));
+            else stopSelf(); // no workout running: never leave a plain service behind
         }
         return START_NOT_STICKY;
     }
@@ -271,14 +275,30 @@ public class WorkoutService extends Service {
                 want.add(DataType.HEART_RATE_BPM);
                 want.add(DataType.CALORIES_TOTAL);
                 if (onFoot) { want.add(DataType.STEPS_TOTAL); want.add(DataType.DISTANCE_TOTAL); }
-                Set<DataType<?, ?>> supported = caps.getExerciseTypeCapabilities(type).getSupportedDataTypes();
+                // A TYPE THIS WATCH DOES NOT LIST is asked for as a general workout: asking for its capabilities would
+                // throw here, on the main thread, and take the app down (27 Nov 2026 review).
+                ExerciseType use = caps.getSupportedExerciseTypes().contains(type) ? type : ExerciseType.WORKOUT;
+                if (!caps.getSupportedExerciseTypes().contains(use)) { Log.w(TAG, "no supported exercise type"); return; }
+                Set<DataType<?, ?>> supported = caps.getExerciseTypeCapabilities(use).getSupportedDataTypes();
                 want.retainAll(supported);
-                ExerciseConfig config = new ExerciseConfig.Builder(type)
+                ExerciseConfig config = new ExerciseConfig.Builder(use)
                         .setDataTypes(want)
                         .setIsAutoPauseAndResumeEnabled(false)
                         .setIsGpsEnabled(false)
                         .build();
-                Futures.addCallback(exercise.startExerciseAsync(config), logFailure("start"), ContextCompat.getMainExecutor(WorkoutService.this));
+                // An exercise left running by an earlier crash makes a new start fail: end it, then start once more.
+                Futures.addCallback(exercise.startExerciseAsync(config), new FutureCallback<Void>() {
+                    @Override public void onSuccess(Void r) {}
+                    @Override public void onFailure(@NonNull Throwable t) {
+                        Log.w(TAG, "start, ending any earlier exercise and trying once more", t);
+                        Futures.addCallback(exercise.endExerciseAsync(), new FutureCallback<Void>() {
+                            @Override public void onSuccess(Void r) {
+                                if (LIVE.running) Futures.addCallback(exercise.startExerciseAsync(config), logFailure("start again"), ContextCompat.getMainExecutor(WorkoutService.this));
+                            }
+                            @Override public void onFailure(@NonNull Throwable t2) { Log.w(TAG, "end before restart", t2); }
+                        }, ContextCompat.getMainExecutor(WorkoutService.this));
+                    }
+                }, ContextCompat.getMainExecutor(WorkoutService.this));
             }
             @Override public void onFailure(@NonNull Throwable t) { Log.w(TAG, "capabilities", t); }
         }, ContextCompat.getMainExecutor(this));

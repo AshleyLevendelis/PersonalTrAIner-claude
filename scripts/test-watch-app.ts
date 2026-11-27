@@ -250,6 +250,19 @@ async function main() {
   check('a planned session\'s buzzes are IntervalFlow\'s, scheduled in the service with the CPU kept awake', /IntervalFlow\.buzzes\(l\.pRounds, l\.pWork, l\.pRest, l\.pMinutes\)/.test(service) && /restLock\.acquire\(total \+ 60_000L\)/.test(service) && /main\.postDelayed\(r, in\)/.test(service))
   check('...it starts from the watch\'s home under the plan\'s own activity name (so the phone marks the day done)', /button\("Start " \+ \(k\.rounds > 0 \? "intervals" : "session"\), true, 0, v -> startPlannedCardio\(k\)\)/.test(main) && /WorkoutService\.startPlanned\(this, k\)/.test(main) && /putExtra\(EXTRA_ACTIVITY, k\.activity\)/.test(service))
   check('...and its screen reads IntervalFlow: WORK / REST, the round, this round\'s time left', /IntervalFlow\.kicker\(ph, l\.effort\)/.test(main) && /IntervalFlow\.line\(ph, l\.pMinutes\)/.test(main) && /duration\(ph\.leftMs \+ 999\)/.test(main))
+  // THE REVIEW OF 27 NOV 2026, before his first gym test (an independent read of the watch code, findings fixed):
+  const manifest = read('android/wear/src/main/AndroidManifest.xml')
+  const styles = read('android/wear/src/main/res/values/styles.xml')
+  check('swipe-to-close is off (a swipe mid-workout closed the app)', /android:theme="@style\/WatchTheme"/.test(manifest) && /<item name="android:windowSwipeToDismiss">false<\/item>/.test(styles))
+  const back = /public void onBackPressed\(\) \{[\s\S]*?\n    \}/.exec(main)?.[0] ?? ''
+  check('Back steps back a screen: a number or the list to the set, never out of an ended workout', /case EDIT: case LIST: showLift\(\); return;/.test(back) && /case LOGGED:[\s\S]*?return;/.test(back) && !/case LOGGED:[^;]*super/.test(back), back.slice(0, 300))
+  check('Health Services is declared, so Android does not hide it', /<package android:name="com\.google\.android\.wearable\.healthservices" \/>/.test(manifest))
+  check('a buzz is an alarm, so Do Not Disturb does not swallow it', /VibrationAttributes\.USAGE_ALARM/.test(service))
+  check('a workout type the watch does not list falls back to a general workout (no crash)', /ExerciseType use = caps\.getSupportedExerciseTypes\(\)\.contains\(type\) \? type : ExerciseType\.WORKOUT;/.test(service) && /getExerciseTypeCapabilities\(use\)/.test(service))
+  check('a start that fails ends any earlier exercise and tries once more', /exercise\.endExerciseAsync\(\), new FutureCallback<Void>\(\)[\s\S]{0,200}exercise\.startExerciseAsync\(config\)/.test(service))
+  check('the last set of a session can be undone from "Session done"', /private void showSessionDone\(\) \{[\s\S]*?quiet\("Undo set " \+ TodayStore\.done\(this, last\), v -> undoLast\(s, last\)\)/.test(main))
+  check('a rest asked of a service with no workout stops it', /if \(LIVE\.running\) scheduleRest\([^)]*\)[^;]*;\s*else stopSelf\(\);/.test(service))
+  check('a denied heart-rate permission says where to switch it on', /if \(!hasHeartPermission\(\)\) \{ askForHeart\(\); return; \}/.test(main) && /Switch it on in the watch's Settings/.test(main))
   check('...and ending a workout cancels every buzz still to come', /for \(Runnable r : programBuzzes\) main\.removeCallbacks\(r\);/.test(service))
   check('End is tapped twice, so a sleeve does not end a run', /now - endArmedAt < 3000/.test(main))
 
@@ -271,7 +284,7 @@ async function main() {
   check('the phone keeps exactly its seven health reads: none added for the watch', JSON.stringify(kept) === JSON.stringify(SEVEN), kept)
   check('the phone listens for the watch\'s messages only on its own paths', /MESSAGE_RECEIVED/.test(pm) && /android:pathPrefix="\/pt\/"/.test(pm))
   check('the phone app registers the watch plugin', /registerPlugin\(WatchBridgePlugin\.class\)/.test(read(`${P}MainActivity.java`)))
-  check('permissions are asked when he starts a workout, not on install alone', /if \(!hasHeartPermission\(\)\) \{ askPermissions\(\); return; \}/.test(main))
+  check('permissions are asked when he starts a workout, not on install alone', /if \(!hasHeartPermission\(\)\) \{ askForHeart\(\); return; \}/.test(main))
   const bridge = strip(read('src/lib/watch-bridge.ts'))
   check('the plugin is loaded inside the Android phone app only, by a dynamic import', /await import\('@capacitor\/core'\)/.test(bridge) && /getPlatform\(\) !== 'android'/.test(bridge) && !/^import .*@capacitor/m.test(bridge))
   check('the phone shows the watch\'s live number as the watch\'s', /liveHeartSource\(\) === 'watch' \? 'Heart rate live from your watch\.'/.test(read('src/components/RecordActivityCard.tsx')))
