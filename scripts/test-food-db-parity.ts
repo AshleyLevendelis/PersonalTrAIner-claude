@@ -239,6 +239,21 @@ console.log('\n6. One lookup, and a dish is a miss for the diet check too')
   check('the diet rules call the one lookup, and there is no second "as stored" one', /\blookupIngredient\(/.test(dietSrc) && !/AsStored/.test(dietSrc) && typeof (app as Record<string, unknown>).lookupIngredientAsStored === 'undefined')
 }
 
+console.log('\n9. A Windows checkout is never stale for its line endings alone (27 Nov 2026: every deploy on his PC refused)')
+{
+  const { mkdtempSync, mkdirSync, writeFileSync: wf, readFileSync: rf } = await import('fs')
+  const { tmpdir } = await import('os')
+  const tmp = mkdtempSync(join(tmpdir(), 'crlf-'))
+  for (const st of states) for (const f of [st.source, st.copy]) {
+    const d = join(tmp, f); mkdirSync(dirname(d), { recursive: true })
+    wf(d, rf(join(ROOT, f), 'utf8').replace(/\n/g, '\r\n'))
+  }
+  const crlf = sharedSyncStates(tmp) as SyncState[]
+  check('every copy checked out with Windows line endings still reads as up to date', crlf.length === states.length && crlf.every(x => x.fresh), crlf.filter(x => !x.fresh).map(x => x.copy))
+  const d = join(tmp, states[0].copy); wf(d, rf(d, 'utf8') + '// edited\r\n')
+  check('...and a real change to a copy is still stale', (sharedSyncStates(tmp) as SyncState[])[0].fresh === false)
+}
+
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.error(`${failures} check(s) failed`); process.exit(1) }
 console.log('One food database: the coach reads what the app reads.\n')
