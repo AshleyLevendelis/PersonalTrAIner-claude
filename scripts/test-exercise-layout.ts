@@ -107,8 +107,9 @@ console.log('\n3. The tick says what it would save, by the save path\'s own fall
   check('the tick carries the next-set facts', tickAt >= 0)
   check('the save path falls back to defaultWeightFor on a blank box', /input\.weight \|\| defaultWeightFor\(ref\)/.test(save))
   check('...and so does the tick\'s weight — one fallback, read twice', /data-next-weight=\{[^\n]*input\.weight \|\| defaultWeightFor\(ref\)/.test(tick), tick.slice(0, 300))
-  check('the tick\'s reps take the box, then last time, then the prescription — the save path\'s order',
-    /data-next-reps=\{[^}]*input\.reps \|\| \(ghost \? String\(ghost\.reps_completed\) : defaultRepsFor\(ref\)\)/.test(tick))
+  // RE-ANCHORED 27 Nov 2026 (his "Copy the last set"): one rule, blankRepsFor, for the tick, the box and the save.
+  check('the tick\'s reps take the box, then the one blank-reps rule — the save path\'s order',
+    /data-next-reps=\{[^}]*input\.reps \|\| blankRepsFor\(ref\)/.test(tick) && /input\.reps \|\| blankRepsFor\(ref\)/.test(save))
   const unguarded = ['set', 'weight', 'unit', 'reps', 'weight-box'].filter(k => !new RegExp(`data-next-${k}=\\{!isSaved && !drop \\?`).test(tick))
   check('a saved row and a drop row describe nothing (a drop is offered from its parent) — every attribute guarded',
     unguarded.length === 0, unguarded)

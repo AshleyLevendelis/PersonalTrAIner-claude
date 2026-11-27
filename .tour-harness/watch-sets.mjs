@@ -81,6 +81,14 @@ const local = await ev(`(() => { try { return JSON.stringify(Object.entries(loca
 check('2d. saved at the weight the row prints (the phone\'s number, never the watch\'s)', rows.length === 2 && rows.every(r => Math.abs(r.kg - parseFloat(rowWeight)) < 0.01), { rows, rowWeight, local })
 const resent = await until(lastSent, v => v?.exercises?.find(x => x.name === target?.name)?.done === 2, 30)
 check('2e. the watch is sent the new count', resent?.exercises?.find(x => x.name === target?.name)?.done === 2)
+// THE WATCH IS TOLD WHERE THE PHONE IS (his gym report 27 Nov 2026: "the watch and phone disagree"): the lift and the
+// reps of the phone's own Log set button ride with the session, so both name the same set.
+const withNow = await until(lastSent, v => !!v?.now?.id, 30)
+const dock = await ev(`[...document.querySelectorAll('button')].map(b => b.innerText.replace(/\\s+/g, ' ')).find(t => /^Log set \\d/.test(t)) ?? ''`)
+const nowEx = withNow?.exercises?.find(x => x.id === withNow?.now?.id) ?? null
+const dockReps = Number((/× (\d+)$/.exec(dock) ?? [])[1])
+check('2f. the watch is sent the phone\'s next set: the lift its Log set button names, and its reps', !!nowEx && !!dock
+  && dock.toLowerCase().includes(nowEx.name.split(' ').slice(-1)[0].toLowerCase().replace(/s$/, '')) && (withNow.now.reps === undefined ? !dockReps : withNow.now.reps === dockReps), { now: withNow?.now, name: nowEx?.name, dock })
 await shoot('watch-sets-saved')
 
 console.log('\n  3. A SET THE LIST CANNOT PLACE')

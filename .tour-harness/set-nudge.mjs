@@ -97,6 +97,12 @@ console.log('\n[2] Set 1 inside the range: nothing moves')
   const after = t.name ? ((await read(t.name)) ?? NOTHING) : NOTHING
   check('2a. set 2 keeps set 1\'s weight', start > 0 && after.weights[1] === start, { start, w: after.weights })
   check('2b. no line', after.nudge === null, after.nudge)
+  // HIS "COPY THE LAST SET" (27 Nov 2026, T-Bar Row 9-11: set 1 at 11, set 2 offered 9): set 2's reps follow set 1,
+  // in the box and on the Log set button.
+  const set2Reps = await ev(`(() => { const b = [...((${cardExpr('__NAME__')})?.querySelectorAll('input') ?? [])].filter(i => /^setgrid-reps-/.test(i.id))[1]; return b ? Number(b.value || b.placeholder) : null })()`.replace('__NAME__', t.name))
+  const lo = (card.range ?? [0, 0])[0]
+  check('2c. set 2\'s reps copy set 1 (the top of the range), not the bottom', hi > lo && set2Reps === hi, { set2Reps, lo, hi })
+  check('2d. ...and the Log set button promises the same reps', new RegExp(`× ${hi}$`).test(after.dock), after.dock)
 }
 
 console.log('\n[3] Set 1 well under the range: set 2 comes down')

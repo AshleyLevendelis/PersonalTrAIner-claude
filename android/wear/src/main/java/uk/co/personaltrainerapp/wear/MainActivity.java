@@ -57,10 +57,12 @@ import java.util.Locale;
 public class MainActivity extends Activity {
     private static WeakReference<MainActivity> open = new WeakReference<>(null);
 
-    /** Today's session changed on the phone: redraw the home screen if it is showing. */
+    /** Today's session changed on the phone: redraw the home or lift screen if it is showing. */
     static void refreshIfOpen() {
         MainActivity a = open.get();
-        if (a != null) a.runOnUiThread(() -> { if (a.screen == Screen.HOME) a.showHome(); });
+        // THE LIFT SCREEN FOLLOWS THE PHONE TOO (27 Nov 2026, his gym report): it was drawn once and kept, so a set or a swap
+        // on the phone left it naming another exercise. A rest, an edit and the list are left as they are.
+        if (a != null) a.runOnUiThread(() -> { if (a.screen == Screen.HOME) a.showHome(); else if (a.screen == Screen.LIFT) a.showLift(); });
     }
 
     private enum Screen { HOME, CARDIO, LOGGED, LIFT, REST, DONE, EDIT, LIST }
@@ -358,6 +360,7 @@ public class MainActivity extends Activity {
         @Override public int done(TodayStore.Exercise x) { return TodayStore.done(MainActivity.this, x); }
         @Override public boolean skipped(TodayStore.Exercise x) { return TodayStore.skipped(MainActivity.this, x); }
         @Override public String chosen() { return TodayStore.chosen(MainActivity.this); }
+        @Override public String now() { return TodayStore.nowId(MainActivity.this); }
     };
 
     private TodayStore.Exercise nextExercise(TodayStore.Session s) { return LiftFlow.next(s.exercises, state); }
@@ -404,30 +407,34 @@ public class MainActivity extends Activity {
     private void setLine(TodayStore.Exercise x, int topDp) {
         LinearLayout r = row(topDp);
         int reps = TodayStore.reps(this, x);
-        TextView sets = inline(r, x.sets + " ×", 22, MUTED, WatchStyle.mono(this));
+        String count = LiftFlow.countText(reps, x.reps);
+        double kg = x.kg >= 0 ? TodayStore.kg(this, x) : 0;
+        String[] load = x.kg >= 0 ? LiftFlow.loadParts(x.load, kg) : null;
+        // ONE LINE, sized to fit (his gym photo, 27 Nov 2026: "40kg" wrapped a letter a line).
+        int sp = LiftFlow.setLineSp(x.sets, count, load == null ? "" : load[0], load == null ? null : load[1]);
+        TextView sets = inline(r, x.sets + " ×", sp - 4, MUTED, WatchStyle.mono(this));
         ((LinearLayout.LayoutParams) sets.getLayoutParams()).rightMargin = dp(2);
-        tapNumber(r, LiftFlow.countText(reps, x.reps), null, reps != LiftFlow.plannedReps(x.reps) ? WatchStyle.VIOLET : FG, v -> showEdit(x, false));
-        if (x.kg >= 0) {
-            double kg = TodayStore.kg(this, x);
-            String[] load = LiftFlow.loadParts(x.load, kg);
+        tapNumber(r, count, null, reps != TodayStore.plannedReps(x) ? WatchStyle.VIOLET : FG, sp, v -> showEdit(x, false));
+        if (load != null) {
             inline(r, "@", 15, MUTED, WatchStyle.medium(this));
-            tapNumber(r, load[0], load[1], kg != x.kg ? WatchStyle.VIOLET : MINT, v -> showEdit(x, true));
+            tapNumber(r, load[0], load[1], kg != TodayStore.plannedKg(x) ? WatchStyle.VIOLET : MINT, sp, v -> showEdit(x, true));
         } else if (x.load != null && !x.load.isEmpty()) {
-            TextView load = inline(r, " " + x.load, 15, MUTED, WatchStyle.semibold(this));
-            load.setGravity(Gravity.CENTER_VERTICAL);
+            TextView bw = inline(r, " " + x.load, 15, MUTED, WatchStyle.semibold(this));
+            bw.setGravity(Gravity.CENTER_VERTICAL);
         }
     }
 
     /** A number to tap in the set line: monospaced, its unit half size, underlined so it reads as something to press. */
-    private void tapNumber(LinearLayout parent, String value, String unit, int color, View.OnClickListener onClick) {
+    private void tapNumber(LinearLayout parent, String value, String unit, int color, int sp, View.OnClickListener onClick) {
         TextView t = new TextView(this);
         SpannableString text = new SpannableString(unit == null ? value : value + unit);
         if (unit != null) text.setSpan(new android.text.style.RelativeSizeSpan(0.5f), value.length(), text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         t.setText(text);
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
         t.setTypeface(WatchStyle.mono(this));
         t.setTextColor(color);
         t.setGravity(Gravity.CENTER);
+        t.setSingleLine(true);
         t.setMinHeight(dp(48));
         t.setPadding(dp(5), 0, dp(5), 0);
         t.setBackground(WatchStyle.tapUnderline(dp(2), dp(9), dp(10)));
@@ -506,8 +513,8 @@ public class MainActivity extends Activity {
             e.put("setNumber", setNumber);
             // What he did, ONLY where he changed it (his "Adjust reps and weight"): unchanged, the phone saves its own
             // number for the set, which is the right one even when this session came days ago with the week ahead.
-            if (reps != LiftFlow.plannedReps(x.reps)) e.put("reps", reps);
-            if (x.kg >= 0 && kg != x.kg) e.put("kg", kg);
+            if (reps != TodayStore.plannedReps(x)) e.put("reps", reps);
+            if (x.kg >= 0 && kg != TodayStore.plannedKg(x)) e.put("kg", kg);
             e.put("at", System.currentTimeMillis());
             PhoneLink.send(this, e);
         } catch (Exception ignored) { /* our own object */ }
@@ -627,7 +634,7 @@ public class MainActivity extends Activity {
         edge("Done", R.drawable.ic_check, v -> showLift());
         // Below the Done button's edge, reached with the bezel: never half-showing behind it.
         TextView back = quiet("Back to the plan", v -> {
-            if (editingKg) TodayStore.setKg(this, x, x.kg); else TodayStore.setReps(this, x, LiftFlow.plannedReps(x.reps));
+            if (editingKg) TodayStore.setKg(this, x, TodayStore.plannedKg(x)); else TodayStore.setReps(this, x, TodayStore.plannedReps(x));
             drawEdit();
         });
         ((LinearLayout.LayoutParams) back.getLayoutParams()).topMargin = dp(36);
@@ -899,6 +906,7 @@ public class MainActivity extends Activity {
         t.setTextColor(color);
         t.setTypeface(face);
         t.setIncludeFontPadding(false);
+        t.setSingleLine(true);
         parent.addView(t, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         return t;
     }

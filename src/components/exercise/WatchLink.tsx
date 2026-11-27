@@ -12,8 +12,9 @@
 //    deletes that set with the receipt's own delete (asked twice, as the list asks).
 // ---------------------------------------------------------------------------
 import { useEffect, useRef, useState } from 'react'
-import { watchTodayPayload, waitingWatchSets, subscribeWatchSets, dropWatchSets, tickForWatchSet, watchSetNeedsFill, deleteForWatchUndo, type WatchRow, type WatchSet, type WatchDay } from '@/lib/watch-session'
+import { watchTodayPayload, watchNowFrom, waitingWatchSets, subscribeWatchSets, dropWatchSets, tickForWatchSet, watchSetNeedsFill, deleteForWatchUndo, type WatchRow, type WatchSet, type WatchDay } from '@/lib/watch-session'
 import { estimatedMaxHeartRate } from '@/lib/heart-series'
+import { readNextSet } from '@/lib/next-set-label'
 import type { WatchCardio } from '@/lib/planned-rounds'
 
 type NeedYou = { set: WatchSet; why: 'typed' | 'missing' | 'refused' | 'undo' }
@@ -43,7 +44,19 @@ export default function WatchLink({ rows, cardio, days, listEl, today, logs, tit
   /** A health condition is ticked: the watch shows heart rate, never a zone (the phone's own rule). */
   noZones: boolean
 }) {
-  const payload = watchTodayPayload({ date: today, title, estimatedMax: noZones ? null : estimatedMaxHeartRate(age), rows, cardio, days })
+  // THE PHONE'S NEXT SET, read off the list's own Log set facts and kept as text so a redraw that changes nothing sends
+  // nothing (his gym report 27 Nov 2026: the watch and phone named different lifts and numbers).
+  const [nowJson, setNowJson] = useState('')
+  useEffect(() => {
+    if (!listEl) return
+    const read = () => setNowJson(JSON.stringify(watchNowFrom(readNextSet(listEl), rows)))
+    read()
+    const watcher = new MutationObserver(read)
+    watcher.observe(listEl, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-next-set', 'data-next-reps', 'data-next-weight', 'data-set-tick'] })
+    return () => watcher.disconnect()
+  }, [listEl, rows])
+  const now = nowJson ? (JSON.parse(nowJson) as ReturnType<typeof watchNowFrom>) : null
+  const payload = watchTodayPayload({ date: today, title, estimatedMax: noZones ? null : estimatedMaxHeartRate(age), rows, cardio, days, now })
   useEffect(() => {
     if (payload) void import('@/lib/watch-bridge').then(m => m.publishToday(payload)).catch(() => {})
   }, [payload])

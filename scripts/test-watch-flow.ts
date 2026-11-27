@@ -44,8 +44,10 @@ public final class FlowCheck {
         public int done(TodayStore.Exercise x) { return done.getOrDefault(x.id, 0); }
         public boolean skipped(TodayStore.Exercise x) { return skipped.contains(x.id); }
         public String chosen() { return chosen; }
+        public String now() { return now; }
     };
     static String chosen;
+    static String now;
     static TodayStore.Exercise ex(String id, String name, int sets, String reps, String load, int rest) {
         TodayStore.Exercise x = new TodayStore.Exercise();
         x.id = id; x.name = name; x.sets = sets; x.reps = reps; x.load = load; x.restSeconds = rest; return x;
@@ -119,6 +121,22 @@ public final class FlowCheck {
         out("count.text", LiftFlow.countText(8, "8-12") + "|" + LiftFlow.countText(35, "30s"));
         out("load.parts", String.join(",", LiftFlow.loadParts("100 kg", 97.5)) + "|" + String.join(",", LiftFlow.loadParts("16 kg (single side)", 14))
             + "|" + String.join(",", LiftFlow.loadParts("20 kg per hand", 18)) + "|" + String.join(",", LiftFlow.loadParts("", 40)));
+        // One line across the face (his gym photo, 27 Nov 2026: "40kg" wrapped a letter a line): short at 26, longer smaller.
+        // THE PHONE'S EXERCISE LEADS (his gym report 27 Nov 2026: "the watch and phone disagree"): a fresh three-exercise
+        // day with the phone on the second, nothing picked on the watch: the watch is on the second too; a pick wins.
+        {
+            done.clear(); skipped.clear(); chosen = null;
+            List<TodayStore.Exercise> day = Arrays.asList(ex("a", "Prone Y-T Raises", 2, "10", "", 20), ex("b", "Chin-Ups", 3, "7-9", "BW", 60), ex("c", "T-Bar Row", 2, "9-11", "35 kg", 60));
+            now = "b";
+            String follows = name(LiftFlow.next(day, st));
+            chosen = "c";
+            String picked = name(LiftFlow.next(day, st));
+            chosen = null; done.put("b", 3);
+            String doneThen = name(LiftFlow.next(day, st));
+            out("now.lead", follows + "|" + picked + "|" + doneThen);
+            now = null; done.clear();
+        }
+        out("line.sp", LiftFlow.setLineSp(3, "10", "40", "kg") + "," + LiftFlow.setLineSp(3, "12", "102.5", "kg") + "," + LiftFlow.setLineSp(4, "120s", "102.5", "kg"));
         // The rest: ±15s, never below zero or above ten minutes; the early buzz only on a rest of 30s or more.
         out("rest.plus", LiftFlow.nudgeRestMs(60_000, 1));
         out("rest.floor", LiftFlow.nudgeRestMs(10_000, -1));
@@ -203,6 +221,8 @@ check('the load keeps its words ("97.5 kg", "18 kg per hand")', is('kg.load', '9
 check('the set line prints the count alone ("8", "35s")', is('count.text', '8|35s'), got['count.text'])
 check('the weight splits into the number he taps, its unit, and its other words ("single side", "per hand")',
   is('load.parts', '97.5,kg,|14,kg,single side|18,kg,per hand|40,kg,'), got['load.parts'])
+  check('the watch is on the PHONE\'s exercise; his own pick still wins; a finished one falls back to the plan\'s order', got['now.lead'] === 'Chin-Ups|T-Bar Row|Prone Y-T Raises', got['now.lead'])
+  check('the set line fits on one line: 26sp for "3 × 10 @ 40kg", smaller as it grows (his gym photo, "40kg" wrapped a letter a line)', got['line.sp'] === '26,22,18', got['line.sp'])
 
 console.log('\n8. The rest')
 check('+15s adds fifteen seconds', is('rest.plus', '75000'))

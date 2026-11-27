@@ -86,6 +86,16 @@ console.log('\n1b. Movement prep is a warm-up, not a working set (whole-app QA w
     { withTicks: sum.extraSets, without: noPrepTicked.extraSets, planned: sum.setsPrescribed })
   check('...where without the prep list the same ticks WOULD read as two extra (the check binds)',
     computeSessionSummary(prepLogs, work, at, at).extraSets === noPrepTicked.extraSets + 2)
+  // A WARM-UP MOVE LEFT UNDONE IS NAMED (his report 27 Nov 2026: "I didn't log Prone Y-T Raises but the app said I
+  // logged 14/14 sets"): the fraction still counts working sets only, and the card says which prep was not logged.
+  const prepSized = withPrep.exercises.filter(e => isMovementPrepRow(e)).map(e => ({ id: e.id, name: e.name, sets: e.sets }))
+  const undone = computeSessionSummary(logs, work, at, at, prepSized)
+  check('a warm-up move with no sets is named as not logged, and the fraction is unchanged',
+    JSON.stringify(undone.prepNotLogged) === JSON.stringify(prepSized.map(p => p.name)) && undone.setsPrescribed === 10, undone.prepNotLogged)
+  check('...and once its sets are ticked it is not named', computeSessionSummary(prepLogs, work, at, at, prepSized).prepNotLogged?.length === 0)
+  check('Today hands the summary each prep row\'s sets, and the card draws the line',
+    /prep: workout\.exercises\.filter\(ex => isMovementPrepRow\(ex\)\)\.map\(ex => \(\{ id: ex\.id, name: ex\.name, sets: ex\.sets \}\)\)/.test(code('src/components/exercise/TodayPanel.tsx'))
+    && /data-testid="summary-prep-not-logged"[\s\S]{0,120}Not logged: \{data\.summary\.prepNotLogged!\.join/.test(code('src/components/exercise/SessionSummaryDialog.tsx')))
   // RE-ANCHORED 19 Nov 2026: the rows now come from one helper (summaryRowsOf), because the summary is worked out in
   // two places (at Finish, and again as the sets stand after it). The property is unchanged: both are handed the
   // day's movement-prep rows, taken from the plan by the one prep test.

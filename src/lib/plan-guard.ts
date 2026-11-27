@@ -200,8 +200,8 @@ export function buildDayGuard(mesocycle: MesocycleWeek[], input: DayGuardInput):
  * would redraw the session under him) and wrong for a ban: he is asking for that exercise gone from the session in
  * front of him, the edit a mid-session swap already makes.
  *
- * So today's row is open to a ban when a session is running today, today is not closed (missed, rested, swapped),
- * and NOTHING of this exercise has been logged today. An exercise with one logged set keeps today as the record; a
+ * So today's row is open to a ban when a session is running today (closed or not: running it means he is training
+ * it after all), and NOTHING of this exercise has been logged today. An exercise with one logged set keeps today as the record; a
  * past date, and a row today shares with a date already behind him, stay shut. `loggedTodayNames` null means the
  * day's sets could not be read: nothing is opened (the guard errs protective, as its loader does).
  */
@@ -213,9 +213,15 @@ export function buildBanGuard(mesocycle: MesocycleWeek[], input: DayGuardInput &
 }): DayGuard {
   const open = input.runningToday && input.loggedTodayNames !== null
     && !input.loggedTodayNames.has(input.exerciseName.toLowerCase())
-  // Running counts as logged; taking today out of the logged dates is the whole change. A day he closed (missed,
-  // rested, swapped) and a row another past date serves stay protected by the same rule as ever.
-  return buildDayGuard(mesocycle, open ? { ...input, loggedDates: [...input.loggedDates].filter(d => d !== input.today) } : input)
+  // Running counts as logged; taking today out of the logged dates is the change. AND OUT OF THE CLOSED DATES TOO (his
+  // gym report 27 Nov 2026): he counted a morning walk as the workout, then tapped "Train it anyway", and a ban on the
+  // warm-up move said "the session already behind you keeps it" about the session in front of him. A day he closed
+  // and is now TRAINING is a session again, as the screen already reads it. A row another past date serves stays shut.
+  return buildDayGuard(mesocycle, open ? {
+    ...input,
+    loggedDates: [...input.loggedDates].filter(d => d !== input.today),
+    closedDates: [...input.closedDates].filter(d => d !== input.today),
+  } : input)
 }
 
 /**

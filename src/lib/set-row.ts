@@ -103,3 +103,29 @@ export function blankWeightFor(input: {
   if (input.lastTimeKg != null) return { text: String(input.lastTimeKg), source: 'last_time' }
   return { text: input.fallback, source: 'fallback' }
 }
+
+/**
+ * THE NEXT SET'S REPS FOLLOW THE SET JUST DONE — his ruling 27 Nov 2026, "Copy the last set" (over keeping the bottom
+ * of the range and over the middle of it), from the gym: T-Bar Row 9-11, set 1 logged 35 kg x 11, and set 2 offered
+ * 35 x 9. It REVERSES, for a row whose weight is carried from the set above, the earlier "a blank box logs the bottom
+ * of the range" rule; he was told so and chose it.
+ *
+ * Only where the row's weight IS the set just done (source 'carried'), so the row reads as one source; never when the
+ * set nudge moved the weight (more reps at a heavier weight, or the same reps at a lighter one, is the wrong target).
+ * Capped at the top of the prescribed range, so an untyped tap never logs past what the plan asks (CSCS, mine: reps
+ * beyond the top are what the nudge acts on, not a new target). Null where none of this applies.
+ */
+export function carriedRepsFor(input: {
+  blank: BlankWeight
+  nudged: boolean
+  loggedWorkingSets: readonly { set_number: number; reps_completed?: number | null }[]
+  prescribedReps: string | null | undefined
+}): string | null {
+  if (input.blank.source !== 'carried' || input.nudged || input.blank.fromSet == null) return null
+  const above = input.loggedWorkingSets.find(l => l.set_number === input.blank.fromSet)
+  const reps = Number(above?.reps_completed)
+  if (!(reps > 0)) return null
+  const nums = (input.prescribedReps ?? '').match(/\d+/g)
+  const top = nums && nums.length > 0 ? Number(nums[nums.length - 1]) : null
+  return String(top != null && top > 0 ? Math.min(reps, top) : reps)
+}

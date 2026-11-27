@@ -221,7 +221,7 @@ async function main() {
   setOnline(true)
   // A server that can be taken away, or told to refuse: the three calls the plan's saver and reader make.
   const server = new Map<string, { profile_id: string; week_number: number; label: string; days: unknown[]; created_at?: string }>()
-  let net: 'up' | 'down' | 'refuse' = 'up'
+  let net: 'up' | 'down' | 'refuse' | 'hang' = 'up'
   let downFor: (weekNumber: number) => boolean = () => true
   const dead = { message: 'TypeError: Failed to fetch', details: '', hint: '', code: '' }
   const refusal = { message: 'new row violates check constraint', details: null, hint: null, code: '23514' }
@@ -231,6 +231,7 @@ async function main() {
       upsert: async (rows: unknown) => {
         const list = (Array.isArray(rows) ? rows : [rows]) as { profile_id: string; week_number: number; label: string; days: unknown[] }[]
         if (net === 'refuse') return { error: refusal }
+        if (net === 'hang') return new Promise(() => {})
         if (net === 'down' && list.some(r => downFor(r.week_number))) return { error: dead }
         for (const r of list) server.set(`${r.profile_id}|${r.week_number}`, r)
         return { error: null }
@@ -290,6 +291,17 @@ async function main() {
   net = 'up'
   await safe(() => P.saveMesocycle('p1', plan({ 1: 'new plan' })))
   check('a whole new plan drops everything kept from the old one', P.keptPlanWeeks('p1').size === 0)
+
+  // A GYM'S SIGNAL, WHERE THE SAVE NEITHER LANDS NOR FAILS (his report 27 Nov 2026: a swap sat on "Applying…").
+  reset(); net = 'hang'
+  const t0 = Date.now()
+  // Bounded here too, so a save with no limit FAILS the check rather than hanging the gate.
+  const hung = await Promise.race([safe(() => P.saveScopedEdit('p1', plan({ 2: 'swapped, no answer' }), 2, 'today', { keepOffline: true })), new Promise<'still waiting'>(r => setTimeout(() => r('still waiting'), P.SAVE_WEEK_WAIT_MS + 4000))])
+  const waited = Date.now() - t0
+  check(`a save that never answers is KEPT on the phone after ${P.SAVE_WEEK_WAIT_MS / 1000}s, never waited on for ever`,
+    hung === 'kept' && waited < P.SAVE_WEEK_WAIT_MS + 1500 && (P.keptPlanWeeks('p1').get(2) as { label?: string } | undefined)?.label === 'swapped, no answer', { hung, waited })
+  check('...and the last-session read has its own limit, so the swap never waits on it either',
+    /await Promise\.race\(\[read, late\]\)/.test(strip(readFileSync('src/lib/set-log-store.ts', 'utf8'))) && /void sweepStaleForTarget\(/.test(strip(readFileSync('src/lib/screen-swap.ts', 'utf8'))))
 
   reset(); net = 'down'
   await safe(() => P.saveWeekKeepingOffline('p1', wk(2, 'will be refused')))

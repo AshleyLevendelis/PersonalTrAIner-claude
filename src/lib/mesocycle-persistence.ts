@@ -247,10 +247,18 @@ export function isNetworkFailure(error: unknown): boolean {
   return /Failed to fetch|NetworkError|Load failed|network request failed|fetch failed|ERR_INTERNET_DISCONNECTED/i.test(text)
 }
 
+/** How long a plan save may take before the week is kept on the phone instead. */
+export const SAVE_WEEK_WAIT_MS = 6000
+
 /** One week, saved now or kept for later. Throws only on a real refusal. */
 export async function saveWeekKeepingOffline(profileId: string, week: MesocycleWeek): Promise<'saved' | 'kept'> {
   try {
-    await saveMesocycleWeek(profileId, week)
+    // A SAVE THAT HANGS IS KEPT, NOT WAITED ON (his report 27 Nov 2026: a swap sat on "Applying…" on a gym's signal,
+    // where the request neither lands nor fails). Past the limit it is treated as no signal: the week is kept on the
+    // phone and sent later; if the slow request lands after all, the later send writes the same week again.
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const slow = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('fetch failed: no answer in time')), SAVE_WEEK_WAIT_MS) })
+    try { await Promise.race([saveMesocycleWeek(profileId, week), slow]) } finally { clearTimeout(timer) }
     return 'saved'
   } catch (error) {
     if (!isNetworkFailure(error)) throw error

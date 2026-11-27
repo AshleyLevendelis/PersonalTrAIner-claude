@@ -100,7 +100,15 @@ async function main() {
     days: [{ date: '2026-11-28', title: 'Legs', rows: [{ id: 'sq', name: 'Back Squat', sets: 4, reps: '6', suggestedLoad: '~120kg', restSeconds: 150, done: 0 }] }] }) ?? 'null')
   check('a rest day still sends the week ahead (and no session for today)', restDay?.exercises?.length === 0 && restDay?.days?.[0]?.date === '2026-11-28', restDay)
   const todayStoreSrc = strip(read("android/wear/src/main/java/uk/co/personaltrainerapp/wear/TodayStore.java"))
-  check('the watch reads today\'s session out of the week ahead when today\'s own is not the one sent', /JSONObject o = dayFor\(new JSONObject\(raw\), today\(\)\)/.test(todayStoreSrc) && /if \(date\.equals\(sent\.optString\("date"\)\)\) return sent;/.test(todayStoreSrc) && /sent\.optJSONArray\("days"\)/.test(todayStoreSrc))
+  // THE WATCH FOLLOWS THE PHONE (his gym report 27 Nov 2026: "the watch and phone disagree with each other").
+  check('a new session from the phone clears the watch\'s own moves for today (skip, pick, changed reps and weight)',
+    /static void save\(Context c, String json\) \{[\s\S]{0,400}k\.equals\("chosen:" \+ day\) \|\| k\.startsWith\("skip:" \+ day \+ ":"\) \|\| k\.startsWith\("reps:" \+ day \+ ":"\) \|\| k\.startsWith\("kg:" \+ day \+ ":"\)\) e\.remove\(k\)/.test(todayStoreSrc))
+  check('...the phone\'s exercise and next set are read from today\'s own entry only, and offered as the set\'s numbers',
+    /JSONObject now = o == sent \? o\.optJSONObject\("now"\) : null;/.test(todayStoreSrc) && /x\.nextReps = now\.optInt\("reps", -1\)/.test(todayStoreSrc)
+    && /static int reps\(Context c, Exercise x\) \{ return prefs\(c\)\.getInt\("reps:" \+ today\(\) \+ ":" \+ x\.id, plannedReps\(x\)\); \}/.test(todayStoreSrc)
+    && /return v == null \? plannedKg\(x\) : Double\.parseDouble\(v\);/.test(todayStoreSrc))
+  check('...and the lift screen is redrawn when one arrives', /else if \(a\.screen == Screen\.LIFT\) a\.showLift\(\);/.test(strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/MainActivity.java'))))
+  check('the watch reads today\'s session out of the week ahead when today\'s own is not the one sent', /JSONObject sent = new JSONObject\(raw\);\s*JSONObject o = dayFor\(sent, today\(\)\)/.test(todayStoreSrc) && /if \(date\.equals\(sent\.optString\("date"\)\)\) return sent;/.test(todayStoreSrc) && /sent\.optJSONArray\("days"\)/.test(todayStoreSrc))
   // A PLANNED CARDIO SESSION (27 Nov 2026): sent with today and with the days ahead, under the plan's own name.
   const { watchCardioOf } = await import('../src/lib/planned-rounds')
   const bike = watchCardioOf({ activity: 'Assault Bike Rounds', duration: 16, targetRpe: 8, rounds: { rounds: 4, workSeconds: 180, restSeconds: 60 } } as never)
@@ -222,12 +230,12 @@ async function main() {
   const mainSrc = strip(read(`${W}MainActivity.java`))
   // ONLY WHERE HE CHANGED THEM: unchanged, the phone saves its own number, the right one even for a session that came
   // days ago with the week ahead.
-  check('a watch set carries his reps and his weight ("kg") only where he changed them from the plan', /if \(reps != LiftFlow\.plannedReps\(x\.reps\)\) e\.put\("reps", reps\)/.test(mainSrc) && /if \(x\.kg >= 0 && kg != x\.kg\) e\.put\("kg", kg\)/.test(mainSrc) && !/put\("weight/.test(mainSrc))
+  check('a watch set carries his reps and his weight ("kg") only where he changed them from the phone\'s next set', /if \(reps != TodayStore\.plannedReps\(x\)\) e\.put\("reps", reps\)/.test(mainSrc) && /if \(x\.kg >= 0 && kg != TodayStore\.plannedKg\(x\)\) e\.put\("kg", kg\)/.test(mainSrc) && !/put\("weight/.test(mainSrc))
   check('steps and distance only on foot (walk, run, or a planned session the phone calls on foot), as the phone records them', /onFoot = "cardio"\.equals\(kind\) && \("Walk"\.equals\(activity\) \|\| "Run"\.equals\(activity\) \|\| onFootPlanned\)/.test(service))
   const main = strip(read(`${W}MainActivity.java`))
   // HIS FLOW, 27 Nov 2026 ("One tap, with options"): the words and the order come from LiftFlow, which
   // test:watch-flow RUNS; these hold that the screens draw what it decides rather than words of their own.
-  check('the lift screen draws LiftFlow\'s kicker, the exercise, his reps and weight as numbers to tap, and the set', /kicker\(LiftFlow\.liftKicker\(setNumber\)/.test(main) && /setLine\(x, /.test(main) && /tapNumber\(r, LiftFlow\.countText\(reps, x\.reps\), null, reps != LiftFlow\.plannedReps\(x\.reps\) \? WatchStyle\.VIOLET : FG, v -> showEdit\(x, false\)\)/.test(main) && /tapNumber\(r, load\[0\], load\[1\], kg != x\.kg \? WatchStyle\.VIOLET : MINT, v -> showEdit\(x, true\)\)/.test(main) && /"Set " \+ setNumber \+ " of " \+ x\.sets/.test(main))
+  check('the lift screen draws LiftFlow\'s kicker, the exercise, his reps and weight as numbers to tap, and the set', /kicker\(LiftFlow\.liftKicker\(setNumber\)/.test(main) && /setLine\(x, /.test(main) && /String count = LiftFlow\.countText\(reps, x\.reps\);/.test(main) && /tapNumber\(r, count, null, reps != TodayStore\.plannedReps\(x\) \? WatchStyle\.VIOLET : FG, sp, v -> showEdit\(x, false\)\)/.test(main) && /tapNumber\(r, load\[0\], load\[1\], kg != TodayStore\.plannedKg\(x\) \? WatchStyle\.VIOLET : MINT, sp, v -> showEdit\(x, true\)\)/.test(main) && /int sp = LiftFlow\.setLineSp\(/.test(main) && /t\.setSingleLine\(true\);/.test(main.slice(main.indexOf('private void tapNumber('), main.indexOf('private void edge('))) && /"Set " \+ setNumber \+ " of " \+ x\.sets/.test(main))
   check('Log set is ONE tap: it ticks the set and starts the rest', /edge\(LiftFlow\.logLabel\(x\), R\.drawable\.ic_check, v -> setDone\(s, x\)\)/.test(main) && /startRest\(x\.restSeconds \* 1000L, x\.restSeconds \* 1000L, after\)/.test(main))
   check('the rest\'s button is LiftFlow\'s "Next set" / "Next exercise", and ends the rest in the service', /edge\(LiftFlow\.restButton\(same\), 0, v -> endRest\(\)\)/.test(main) && /private void endRest\(\) \{\s*WorkoutService\.rest\(this, 0, 0, null, null\);/.test(main) && /nextLine = text\(LiftFlow\.restLine\(x, setNumber, same\)/.test(main))
   // BIG ENOUGH FOR SHAKY, SWEATY HANDS (28 Nov 2026, his words): every session screen's one action is the edge

@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------------
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { carriedWeightFor, blankWeightFor } from '../src/lib/set-row'
+import { carriedWeightFor, blankWeightFor, carriedRepsFor } from '../src/lib/set-row'
 import { sameAsSet, setReading } from '../src/lib/coach-voice'
 
 const ROOT = join(import.meta.dirname, '..')
@@ -98,7 +98,7 @@ console.log('\n4. The grid asks the one decision everywhere')
     ghostWeightReads.length === 1 && /lastTimeKg: ghost \? Number\(ghost\.weight_kg\)/.test(fn), ghostWeightReads)
   check('last session drives a row only when the blank box says so, and as a whole',
     /return g && workingBlankFor\(ref\)\.source === 'last_time' \? g : undefined/.test(grid)
-    && (grid.match(/const ghost = drivingGhostFor\(ref\)/g) ?? []).length === 2)
+    && (grid.match(/const ghost = drivingGhostFor\(ref\)/g) ?? []).length === 3)
   check('the "weight from set N" line is said only when the carry differs from the plan',
     /blank\.source !== 'carried'/.test(grid) && /String\(plan\) === blank\.text/.test(grid) && /sameAsSet\(blank\.fromSet\)/.test(grid))
   check('...and never for a bodyweight carry, where it would say "0 · weight from set 1"', /!\(Number\(blank\.text\) > 0\)\) return null/.test(grid))
@@ -146,6 +146,27 @@ console.log('\n6. A timed set is said in seconds and claims no lifting record (r
     /const countedInReps = \(prescriptionType \?\? 'reps'\) === 'reps'/.test(grid)
     && /const pr = warm \|\| drop \|\| !countedInReps \? null : checkForPR\(/.test(grid)
     && /const topPR = warm \|\| drop \|\| !countedInReps \? null : getTopPRSet\(/.test(grid))
+}
+
+console.log('\nTHE NEXT SET COPIES THE LAST (his ruling 27 Nov 2026, "Copy the last set")')
+{
+  const done = [{ set_number: 1, weight_kg: 35, reps_completed: 11 }]
+  const carried = blankWeightFor({ carry: carriedWeightFor(2, done), planKg: 35, lastTimeKg: null, fallback: '' })
+  check('T-Bar Row 9-11, set 1 logged 35 x 11: set 2 offers 11, not 9', carriedRepsFor({ blank: carried, nudged: false, loggedWorkingSets: done, prescribedReps: '9-11' }) === '11')
+  check('...capped at the top of the range: 14 on 9-11 offers 11',
+    carriedRepsFor({ blank: carried, nudged: false, loggedWorkingSets: [{ set_number: 1, weight_kg: 35, reps_completed: 14 }], prescribedReps: '9-11' }) === '11')
+  check('...a short set is copied as done (7 on 9-11 offers 7: never more than he did)',
+    carriedRepsFor({ blank: carried, nudged: false, loggedWorkingSets: [{ set_number: 1, weight_kg: 35, reps_completed: 7 }], prescribedReps: '9-11' }) === '7')
+  check('...never when the set nudge moved the weight', carriedRepsFor({ blank: carried, nudged: true, loggedWorkingSets: done, prescribedReps: '9-11' }) === null)
+  check('...never when the row is not the set just done (the plan or last session drives it)',
+    carriedRepsFor({ blank: blankWeightFor({ carry: null, planKg: 35, lastTimeKg: null, fallback: '' }), nudged: false, loggedWorkingSets: done, prescribedReps: '9-11' }) === null)
+  const bwDone = [{ set_number: 1, weight_kg: 0, is_bodyweight: true, reps_completed: 8 }]
+  check('bodyweight Chin-Ups 7-9, set 1 logged 8: set 2 offers 8, not 7',
+    carriedRepsFor({ blank: blankWeightFor({ carry: carriedWeightFor(2, bwDone), planKg: null, lastTimeKg: 0, fallback: '0' }), nudged: false, loggedWorkingSets: bwDone, prescribedReps: '7-9' }) === '8')
+  const grid = stripComments(readFileSync(join(ROOT, 'src/components/exercise/SetGrid.tsx'), 'utf8'))
+  check('the grid reads its reps through this one rule (box, tick and save)',
+    /carriedRepsFor\(\{ blank, nudged: blank\.source === 'carried' && !!nudgeFor\(ref\)/.test(grid)
+    && (grid.match(/input\.reps \|\| blankRepsFor\(ref\)/g) ?? []).length === 2 && /placeholder=\{blankRepsFor\(ref\)\}/.test(grid))
 }
 
 console.log(`\nset-row: ${ran} checks ran`)

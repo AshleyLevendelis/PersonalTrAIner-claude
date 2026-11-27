@@ -21,14 +21,21 @@ final class LiftFlow {
         boolean skipped(TodayStore.Exercise x);
         /** The exercise he picked from "All exercises" (the bench was taken), or null to go in the plan's order. */
         String chosen();
+        /**
+         * The exercise the PHONE is on (its Log set button's), or null (27 Nov 2026, his gym report: "the watch and phone
+         * disagree with each other"). After his own pick, it outranks the plan's order, so both screens name one lift.
+         */
+        default String now() { return null; }
     }
 
     static boolean open(TodayStore.Exercise x, State st) { return st.done(x) < x.sets && !st.skipped(x); }
 
-    /** The exercise he picked while it has sets left, else the first with sets left in the plan's order; null when done. */
+    /** The exercise he picked while it has sets left, else the phone's, else the first with sets left in the plan's order. */
     static TodayStore.Exercise next(List<TodayStore.Exercise> all, State st) {
         String pick = st.chosen();
         if (pick != null) for (TodayStore.Exercise x : all) if (x.id.equals(pick) && st.done(x) < x.sets) return x;
+        String now = st.now();
+        if (now != null) for (TodayStore.Exercise x : all) if (x.id.equals(now) && open(x, st)) return x;
         for (TodayStore.Exercise x : all) if (open(x, st)) return x;
         return null;
     }
@@ -80,6 +87,16 @@ final class LiftFlow {
     }
 
     /** The count alone, as the set line prints it beside "3 ×": "10", or "30s" for a hold (28 Nov 2026, his mock). */
+    /**
+     * The set line's number size, so "3 × 10 @ 100kg" fits across the round face on ONE line (his gym photo, 27 Nov 2026:
+     * a weight that did not fit wrapped one letter per line, "4 / 0 / k / g"). Counted in characters of the mono face,
+     * the unit at half size: 26sp up to 10, 22sp up to 13, else 18sp.
+     */
+    static int setLineSp(int sets, String count, String kg, String unit) {
+        double chars = (sets + " ×").length() + count.length() + 1 + kg.length() + (unit == null ? 0 : unit.length() / 2.0);
+        return chars <= 10 ? 26 : chars <= 13 ? 22 : 18;
+    }
+
     static String countText(int value, String reps) {
         return timed(reps) ? value + "s" : String.valueOf(value);
     }
