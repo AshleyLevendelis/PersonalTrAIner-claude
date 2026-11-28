@@ -896,7 +896,9 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 28 Nov 2026: 3600 -> 3610, the route map (its own on-demand chunk). MEASURED 3600 with it.
   // MOVED 28 Nov 2026: 3610 -> 3625, advise-then-allow fixes 1-6 and the coach's rest-day session. MEASURED 3610 on the
   // branch head, exactly on the old line (the check is a strict "under"). The app chunk measured 1727 of 1735.
-  const TOTAL_BUDGET_KB = 3625
+  // MOVED 28 Nov 2026: 3625 -> 3645, Builder D's coach-awareness builders and routes merged with the coach's own
+  // workout, swap advice and hard stops. MEASURED 3630 on the branch head.
+  const TOTAL_BUDGET_KB = 3645
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)

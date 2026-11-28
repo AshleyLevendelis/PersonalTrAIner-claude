@@ -78,7 +78,9 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   window.fetch = async (url, init) => {
     const u = String(url)
     if (u.includes('chat-gemini')) {
-      const said = String(JSON.parse((init && init.body) || '{}').message || '')
+      const body = JSON.parse((init && init.body) || '{}')
+      const said = String(body.message || '')
+      window.__lastContext = body.context ?? null
       const out = p => new Response(JSON.stringify({ reply: '', proposal: p }), { status: 200, headers: { 'Content-Type': 'application/json' } })
       if (/my own session/i.test(said)) return out({ kind: 'propose_own_workout', rawArgs: { mode: 'start', name: 'Arms', items: [{ exercise: 'Barbell Bench Press', sets: 4, reps: '6', weight_kg: 60 }, { exercise: 'Hammer Curls' }] } })
       if (/for Saturday/i.test(said)) return out({ kind: 'propose_own_workout', rawArgs: { mode: 'plan', name: 'Hotel', date: '2026-09-19', items: [{ exercise: 'Goblet Squats', sets: 3, reps: '12' }] } })
@@ -126,6 +128,14 @@ check('A9. ...the sets in the boxes, none logged', w.length === 1 && w[0].items[
 const rc = await ev(`(() => { const n = [...document.querySelectorAll('[data-receipt-line]')].pop(); return n ? n.innerText.replace(/\\s+/g, ' ').trim() : null })()`)
 check('A10. the receipt says it is set up and where it is', /^Workout set up · Arms started, on Exercise/.test(rc ?? '') && /Undo/.test(rc ?? ''), rc)
 await shoot('own-workout-chat-done')
+// THE COACH IS TOLD (Builder D's blocks, wired 28 Nov 2026): the next message carries his own workout and his setup answers.
+check('A10b. the next message goes', await say('how is my day looking'))
+await until(`!!window.__lastContext && /how is my day/.test(document.body.innerText)`, 8000)
+await wait(400)
+const ctx = await ev('window.__lastContext')
+check('A10c. the coach is told his own workout, by name, in its own block', typeof ctx?.own_workouts === 'string' && /Arms/.test(ctx.own_workouts), ctx?.own_workouts)
+check('A10d. ...and the setup answers it was not told before', typeof ctx?.setup_answers === 'string' && ctx.setup_answers.length > 20, ctx?.setup_answers)
+check('A10e. ...and nothing about a watch on a page with none (null, not an empty block)', ctx && ctx.watch_waiting === null, ctx?.watch_waiting)
 check('A11. Undo taps', await tapExpr(byText('Undo')))
 await wait(1200)
 check('A12. ...and it is gone (nothing was logged in it)', (await own()).length === 0, await own())

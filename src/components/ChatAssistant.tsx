@@ -145,6 +145,16 @@ import { shortenOrFloor, SHORTEST_VERSION_MINUTES } from '@/lib/exercise-plan'
 import { resolveAdditionAnywhere } from '@/lib/exercise-add-candidates'
 import { swapPatternAdvice, swapHardStop, swapFitWarnings } from '@/lib/swap-advice'
 import { blockSwapEndsOn } from '@/lib/block-swap-until'
+import { buildCoachLiftFeel } from '@/lib/lift-feel-context'
+import { buildCoachSetupAnswers } from '@/lib/setup-answers-context'
+import { buildCoachOwnWorkouts } from '@/lib/own-workouts-context'
+import { buildCoachWatchWaiting } from '@/lib/watch-workout-context'
+import { buildCoachTightness } from '@/lib/tightness-context'
+import { tightnessWarmup } from '@/lib/tightness'
+import { normalizeWarmup } from '@/lib/session-derive'
+import { readWatchOffers } from '@/lib/watch-workouts'
+import { loadOwnWorkouts } from '@/lib/own-workout'
+import { ownPlans } from '@/lib/own-workout-plans'
 import { planOwnWorkoutOffer, applyOwnWorkout, undoOwnWorkout, ownWorkoutStopAtApply, type OwnWorkoutPayload } from '@/lib/own-workout-offer'
 import { dayLengthParts, formatDayLength } from '@/lib/session-duration'
 import { planDaysForDate } from '@/lib/plan-week'
@@ -2221,7 +2231,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // Fix #4: System prompt context assembled once per call, separate from conversation window
   // eatenByDay: read fresh by callGemini for this turn (H26); null = the log could not be read.
   // weekReview: this week and last, Monday to Sunday, as the strip counts them (run 7, M50); null = unread.
-  const buildContext = (eatenByDay: string | null = null, weekReview: string | null = null, patterns: string[] = []) => {
+  const buildContext = (eatenByDay: string | null = null, weekReview: string | null = null, patterns: string[] = [], awareness: Record<string, string | null> = {}) => {
     const activeWeek = getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, getAppNow(profile.id), mesocycle.length > 0 ? mesocycle.length : 4)
     // Split out from `.days` (not just `?.days || exercisePlan` inline) so
     // the week's own coach_note is still reachable below — that's where a
@@ -2512,6 +2522,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       chat_summary: chatSummaryRef.current?.text ?? null,
       // PATTERNS THE APP SEES (coach-patterns.ts), worked out this turn with the eaten log.
       patterns_seen: patterns.length > 0 ? patterns.join('\n') : null,
+      // WHAT THE OTHER SCREENS KNOW (readAwareness): each null when there is nothing to say.
+      lift_feel: awareness.lift_feel ?? null,
+      setup_answers: awareness.setup_answers ?? null,
+      own_workouts: awareness.own_workouts ?? null,
+      watch_waiting: awareness.watch_waiting ?? null,
+      tightness_today: awareness.tightness_today ?? null,
       // WHAT THEY LOGGED AS EATEN, today and the seven days before (H26). The
       // flag says it was read, so the coach can tell "nothing logged" from
       // "could not see".
@@ -2850,7 +2866,29 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // THE TURN'S FACTS, READ TOGETHER (his "make it fast", 17 Nov 2026). These were four reads one after another, and the
   // reply placeholder was saved before any of them started. Now the independent ones run at once, and sendMessage
   // starts them before it saves the placeholder, so the wait is the slowest read rather than the sum.
-  const readTurnFacts = async (): Promise<{ eatenByDay: string | null; weekReview: ReturnType<typeof buildCoachWeekReview> | null; patterns: string[] }> => {
+  /**
+   * WHAT THE OTHER SCREENS KNOW, TOLD TO THE COACH (Builder D's builders, wired 28 Nov 2026): how each lift felt, the
+   * setup answers it was not told, his own workouts, a watch workout waiting to be logged, and what feels tight today.
+   * Each builder returns '' when there is nothing to say; the server prints a block only when it is non-empty.
+   */
+  const readAwareness = async (today: string): Promise<Record<string, string | null>> => {
+    const or = (t: string) => t || null
+    const id = profile.id
+    if (!id) return {}
+    const warm = normalizeWarmup(todayResolved.day?.warmup)
+    const warmupNames = warm ? [...warm.general, ...warm.mobility].map(i => i.name) : []
+    const tight = activeSession.tightAreas ?? []
+    const offers = await readWatchOffers(id, today).catch(() => [])
+    return {
+      lift_feel: or(buildCoachLiftFeel(recentLogsRef.current)),
+      setup_answers: or(buildCoachSetupAnswers(profile, today)),
+      own_workouts: or(buildCoachOwnWorkouts({ workouts: loadOwnWorkouts(id), plans: ownPlans(id), today })),
+      watch_waiting: or(buildCoachWatchWaiting(offers, today)),
+      tightness_today: or(buildCoachTightness(tight, tightnessWarmup(tight, profile.injuries ?? [], warmupNames, isPregnant(profile)))),
+    }
+  }
+
+  const readTurnFacts = async (): Promise<{ eatenByDay: string | null; weekReview: ReturnType<typeof buildCoachWeekReview> | null; patterns: string[]; awareness?: Record<string, string | null> }> => {
     // THIS TURN'S EATEN LOG, read now rather than from a copy loaded earlier, so
     // a meal logged on Nutrition a moment ago is in it (H26).
     const eatenToday = getLocalDateString(getAppNow(profile.id))
@@ -2877,7 +2915,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       proteinTargetG: macros?.protein ?? 0,
       tooHard: tirednessBuilding(recentLogsRef.current, eatenToday),
     })
-    return { eatenByDay, weekReview, patterns }
+    return { eatenByDay, weekReview, patterns, awareness: await readAwareness(eatenToday).catch(() => ({})) }
   }
 
   const callGemini = async (userMessage: string, placeholderId?: string, facts?: ReturnType<typeof readTurnFacts>, replyTo: ReplyRef | null = null): Promise<ChatApiResponse> => {
@@ -2902,7 +2940,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       stampTurn,
     )
 
-    const { eatenByDay, weekReview, patterns } = await (facts ?? readTurnFacts())
+    const { eatenByDay, weekReview, patterns, awareness } = await (facts ?? readTurnFacts())
 
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-gemini`
     const controller = new AbortController()
@@ -2916,7 +2954,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       body: JSON.stringify({
         message: userMessage,
         history,
-        context: buildContext(eatenByDay, weekReview, patterns),
+        context: buildContext(eatenByDay, weekReview, patterns, awareness ?? {}),
         // THE ROW THIS REPLY GOES IN (6 Nov 2026): the coach's server saves the
         // reply there itself and texts her phone if she has left the app, so a
         // reply is never lost to a closed page. It writes only into this row.

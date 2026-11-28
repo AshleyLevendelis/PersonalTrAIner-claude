@@ -3366,6 +3366,19 @@ THIS MESSAGE CAME WITH A PHOTO (read once; the app keeps only what you estimate)
 PATTERNS THE APP SEES IN THEIR LOGS (facts the app worked out; nothing here is a diagnosis):
 ${String(context.patterns_seen).slice(0, 800)}
 Coach to AT MOST ONE of these, once, and only when it fits the conversation (never as an opener to an unrelated question). A stuck lift: name it and offer one fix (a rep target to beat before adding weight, or a small drop and rebuild). Low protein: one easy addition from foods they already eat. "Too hard" piling up: ask how sleep and recovery are, and offer a lighter day. One or two sentences, never a lecture, never a number not in these lines.
+` : ''}${typeof context.lift_feel === 'string' && context.lift_feel.trim() ? `
+${String(context.lift_feel).slice(0, 1200)}
+When they ask whether to go up, quote their own answer from HOW EACH LIFT FELT; the app already moves the weight off it, so never promise a different number.
+` : ''}${typeof context.setup_answers === 'string' && context.setup_answers.trim() ? `
+${String(context.setup_answers).slice(0, 1500)}
+Explain a plan or meal choice from SETUP ANSWERS when it is the reason; never contradict those counts.
+` : ''}${typeof context.own_workouts === 'string' && context.own_workouts.trim() ? `
+${String(context.own_workouts).slice(0, 1500)}
+A day in THEIR OWN WORKOUTS is not a rest day; its sets were their own choice, not the plan's.
+` : ''}${typeof context.watch_waiting === 'string' && context.watch_waiting.trim() ? `
+${String(context.watch_waiting).slice(0, 800)}
+` : ''}${typeof context.tightness_today === 'string' && context.tightness_today.trim() ? `
+${String(context.tightness_today).slice(0, 800)}
 ` : ''}${typeof context.chat_summary === 'string' && context.chat_summary.trim() ? `
 EARLIER IN YOUR CHATS (the app's running summary of messages older than the conversation below; his own words where it matters):
 ${String(context.chat_summary).slice(0, 1500)}

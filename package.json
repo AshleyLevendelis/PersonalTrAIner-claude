@@ -280,6 +280,7 @@
     "test:swap-for-anything": "tsx scripts/test-swap-for-anything.ts",
     "test:coach-advise-not-refuse": "tsx scripts/test-coach-advise-not-refuse.ts",
     "test:own-workout-offer": "tsx scripts/test-own-workout-offer.ts",
+    "test:coach-awareness-wiring": "tsx scripts/test-coach-awareness-wiring.ts",
     "verify:own-workout-chat": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/own-workout-chat.mjs",
     "test:coach-promises": "tsx scripts/test-coach-promises.ts",
     "test:app-tour": "tsx scripts/test-app-tour.ts",

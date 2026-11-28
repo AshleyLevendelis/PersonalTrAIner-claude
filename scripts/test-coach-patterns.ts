@@ -46,7 +46,7 @@ check('one line per pattern, facts only', lines.length === 3 && /Bench Press has
 check('nothing found, nothing said', coachPatternLines({ stuck: [], protein: null, proteinTargetG: 160, tooHard: null }).length === 0)
 const chat = strip(readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
 const server = strip(readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8'))
-check('the chat sends them with the message', /patterns_seen: patterns\.length > 0 \? patterns\.join/.test(chat) && /context: buildContext\(eatenByDay, weekReview, patterns\)/.test(chat))
+check('the chat sends them with the message', /patterns_seen: patterns\.length > 0 \? patterns\.join/.test(chat) && /context: buildContext\(eatenByDay, weekReview, patterns(, [^)]*)?\)/.test(chat))
 check('...worked out from the same 14 days of sets and the eaten log the turn reads', /stuck: stuckLifts\(recentLogsRef\.current\)/.test(chat) && /lowProtein\(todayEaten, eatenToday, macros\.protein\)/.test(chat))
 check('the coach coaches to at most one, once, and never as a diagnosis', /context\.patterns_seen/.test(server) && /AT MOST ONE of these, once/.test(server) && /nothing here is a diagnosis/.test(server))
 
