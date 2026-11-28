@@ -217,9 +217,10 @@ async function main() {
   check('the Exercise tab starts from the remembered borrow and writes every change',
     /useState<string \| null>\(\(\) => readBorrowedDay\(profileId, today\)\)/.test(today) && /writeBorrowedDay\(profileId, today, dayName\)/.test(today))
   check('...a new day reads its own, it does not blank one', !/setBorrowedDayName\(null\)/.test(today) && /setBorrowedDayState\(readBorrowedDay\(profileId, today\)\)/.test(today))
-  check('...and the options come from the week\'s own states', /trainAnywayOptions\(\{[\s\S]{0,120}week: weekTrain\.days/.test(today))
+  // Through train-today.ts since 28 Nov 2026 (his "advise, then allow"): the same states, a done session offered as a repeat.
+  check('...and the options come from the week\'s own states', /trainAnywayChoices\(\{[\s\S]{0,160}week: weekTrain\.days/.test(today))
   check('the rest-day card prints the label and borrows by the day',
-    /\{o\.label\}/.test(strip(read('src/components/exercise/RestDayCard.tsx'))) && /onTrainAnyway\(o\.day\)/.test(read('src/components/exercise/RestDayCard.tsx')))
+    /\{o\.label\}/.test(strip(read('src/components/exercise/RestDayCard.tsx'))) && /onPick\(o\.day\)/.test(read('src/components/exercise/RestDayCard.tsx')))
 
   // -------------------------------------------------------------------------
   console.log('\n§6 M46 — a rest day she trained on, and a time nobody measured')

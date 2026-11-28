@@ -88,6 +88,10 @@ export const COACH_ACTIONS: Record<string, CoachAction> = {
   propose_injury_adaptation: { family: 'plan', screen: 'screen', card: 'propose_injury_adaptation', rule: none('pain is triaged first (edit-reason); a sharp one changes nothing') },
   propose_injury_recovered: { family: 'plan', screen: 'screen', card: 'propose_injury_recovered', rule: none('ends a change he has; nothing new is added') },
   propose_equipment_adaptation: { family: 'plan', screen: 'screen', card: 'propose_equipment_adaptation', rule: { words: ['kit'] } },
+  // A SESSION ON A REST DAY, TODAY ONLY (28 Nov 2026, his "Add a weight session just for today" and his ruling "the
+  // app should be able to do whatever I ask it but give reasons or advise around it"): the rest day card's "Train
+  // anyway", reached from the chat. Never off "from now on": a regular extra day is a change of training days.
+  propose_train_today: { family: 'day', screen: 'screen', card: 'propose_train_today', rule: T },
   propose_missed_session: { family: 'day', screen: 'screen', card: 'propose_missed_session', rule: none('a past day only; offer-still-holds refuses a trained day') },
   // A LOGGED ACTIVITY TAKEN OFF ITS DAY (27 Nov 2026, his "I accidentally added a walk today. Remove it"): a log
   // already made, named on the card before Apply; the screen's Remove on the same row does the same.

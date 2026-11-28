@@ -216,18 +216,23 @@ console.log('\n4. Which references may be edited — and what the refusal says')
   check('the moved-in session is editable, under Monday\'s key and Friday\'s name', ok.ok && ok.planDayName === 'Monday' && ok.sayDay === 'Friday', ok)
   check('a rest day passes through (the edits refuse an empty day in their own words; cardio goes ON one)', editTarget(asRef(sessionRefForDayArg('Wednesday', ctx(MOVED)))!).ok)
 
+  // ADVISE, THEN ALLOW (his ruling 28 Nov 2026): a marked day is edited, never refused, and the note says what the mark is.
   const away = editTarget(asRef(sessionRefForDayArg('Monday', ctx(MOVED, false)))!)
-  check('the emptied origin is refused, naming both days', !away.ok && /Monday/.test(away.refusal) && /Friday/.test(away.refusal), away)
+  check('the emptied origin is EDITED where the session now sits: Monday\'s row, said as Friday, the note naming both',
+    away.ok && away.planDayName === 'Monday' && away.sayDay === 'Friday' && /Monday's session is on Friday this week, so this changes it there\./.test(away.note ?? ''), away)
 
   const sw = editTarget(asRef(sessionRefForDayArg('Tuesday', ctx(cells([], { Tuesday: { swapped_for_activity: 'Football' } }))))!)
-  check('a day swapped for football is refused, naming the day and the activity', !sw.ok && /Tuesday/.test(sw.refusal) && /Football/.test(sw.refusal), sw)
+  check('a day swapped for football is edited, the note naming the day and the activity', sw.ok && sw.planDayName === 'Tuesday' && /^Tuesday is down as Football instead of this session\./.test(sw.note ?? ''), sw)
   const re = editTarget(asRef(sessionRefForDayArg('Thursday', ctx(cells([], { Thursday: { deliberate_rest: true } }))))!)
-  check('a chosen rest day is refused, naming the day', !re.ok && /Thursday/.test(re.refusal) && /rest day/.test(re.refusal), re)
+  check('a chosen rest day is edited, the note saying a logged set makes it a session again', re.ok && re.planDayName === 'Thursday' && /^Thursday is down as a rest day you chose\..*log a set and it counts as a session again\.$/.test(re.note ?? ''), re)
   const mi = editTarget(asRef(sessionRefForDayArg('Tuesday', ctx(cells([], { Tuesday: { marked_missed: true } }))))!)
-  check('a day said missed is refused, naming the day', !mi.ok && /Tuesday/.test(mi.refusal) && /missed/.test(mi.refusal), mi)
+  check('a day said missed is edited, the note naming the day', mi.ok && /^Tuesday's session is down as missed\./.test(mi.note ?? ''), mi)
+  check('an ordinary day carries no note', editTarget(asRef(sessionRefForDayArg('Tuesday', ctx(MOVED)))!).ok && !(editTarget(asRef(sessionRefForDayArg('Tuesday', ctx(MOVED)))!) as { note?: string }).note)
   for (const r of [away, sw, re, mi]) {
-    check(`no refusal leaks "undefined" or "null": ${!r.ok ? r.refusal : ''}`, !r.ok && !/undefined|null|NaN/.test(r.refusal))
+    check(`no note leaks "undefined" or "null": ${r.ok ? r.note : ''}`, r.ok && !!r.note && !/undefined|null|NaN/.test(r.note))
   }
+  const chatSrc = code('src/components/ChatAssistant.tsx')
+  check('the coach puts the note FIRST on its edit cards', /DAY_NOTE_KINDS\.has\([\s\S]{0,400}editTarget\(ref\)[\s\S]{0,200}implications: \[\{ severity: 'info', text: note \}, \.\.\./.test(chatSrc))
 }
 
 // ---------------------------------------------------------------------------
@@ -250,10 +255,10 @@ console.log('\n5. The real edits, through the reference')
     shorten.refusal == null || (!/Monday/.test(sayDayIn(shorten.refusal, ref)) ), shorten.refusal && sayDayIn(shorten.refusal, ref))
 
   const remove = removeExerciseFromSession({ mesocycle: MESO, profile, weekNumber: WEEK.week_number, dayName: key, exIndex: 2, scope: 'today' })
-  check('removing from a three-exercise session meets the FLOOR, not "couldn\'t find"', !remove.changed && /fewer than 3 exercises/.test(remove.refusal ?? ''), remove.refusal)
-  const said = sayDayIn(remove.refusal ?? '', ref)
-  check('the floor\'s refusal names the day on screen: "That would leave Friday with fewer than 3 exercises…"',
-    said === 'That would leave Friday with fewer than 3 exercises. Take the whole day off instead, or swap this one for something easier.', said)
+  check('removing from a three-exercise session GOES THROUGH, with a warning (advise, then allow: 28 Nov 2026)', remove.changed && /with 2 exercises/.test(remove.note ?? ''), remove.note ?? remove.refusal)
+  const said = sayDayIn(remove.note ?? '', ref)
+  check('the warning names the day on screen: "That leaves Friday with 2 exercises…"',
+    said === 'That leaves Friday with 2 exercises. A short session still counts, but Friday loses that work; swapping it for something easier keeps it.', said)
   check('...and never the plan row', !/Monday/.test(said), said)
 
   // An ordinary day is untouched by any of this.

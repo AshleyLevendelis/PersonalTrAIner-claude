@@ -63,9 +63,11 @@
 // through one row component, and ties break on name so the same day offers
 // the same list twice.
 // ---------------------------------------------------------------------------
-import { getConstrainedPool, mapMovementPattern, hasBetterLoadingPeer, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, dayHoldsDefiningWork, isWeekSupportLeg } from './exercise-plan'
+import { getConstrainedPool, getExerciseCompatibilityWarnings, mapMovementPattern, hasBetterLoadingPeer, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, dayHoldsDefiningWork, isWeekSupportLeg } from './exercise-plan'
 import { isExternallyLoaded } from './load-prescription'
-import { EXERCISE_DATABASE, getExerciseEntry, muscleGroupsOf, type ExerciseEntry, type MuscleGroup } from './exercise-db'
+import { EXERCISE_DATABASE, INJURED_JOINTS, isContraindicatedFor, contraindicatedJoints, getExerciseEntry, muscleGroupsOf, type ExerciseEntry, type MuscleGroup } from './exercise-db'
+import { isPregnant } from './health-conditions'
+import { pregnancyExclusion, pregnancyWarning } from './pregnancy-rules'
 import type { WorkoutDay, UserProfile, MesocycleMovementPattern, EquipmentAccess } from './types'
 import { equipmentTierFor } from './kit-list'
 
@@ -343,4 +345,39 @@ export function resolveAdditionRequest(
 
   const partial = pool.filter(e => e.name.toLowerCase().includes(wanted))
   return partial.length === 1 ? partial[0] : null
+}
+
+/**
+ * WHAT THE COACH MAY ADD, SINCE HIS RULING OF 28 NOV 2026 ("advise, then allow", the four hard stops kept): any
+ * exercise in the catalogue. One that fits his plan comes back with no warning (resolveAdditionRequest, above); one
+ * outside his kit, style or level comes back WITH the warning the screen's search shows (the screen already let him
+ * pick it, so the coach was the stricter of the two). The hard stops come back as `stop`, never as an entry: a move
+ * his injuries list rules out, a move the pregnancy rules leave out, and one on his never-again list. A near-copy is
+ * still log-only (his 3 Nov ruling, open again with him). Null: no such exercise, or two that fit the words.
+ */
+export type AdditionResolution = { entry: ExerciseEntry; warnings: string[] } | { stop: string } | null
+
+export function resolveAdditionAnywhere(item: string, profile: UserProfile, exclusions: string[] = []): AdditionResolution {
+  const fits = resolveAdditionRequest(item, profile, exclusions)
+  if (fits) return { entry: fits, warnings: [] }
+  const wanted = item.trim().toLowerCase()
+  if (!wanted) return null
+  // Near-copies are not in the catalogue (they load on their own for the logging search), so none can be added here.
+  const live = EXERCISE_DATABASE.filter(e => !e.retired)
+  const partial = live.filter(e => e.name.toLowerCase().includes(wanted))
+  const entry = live.find(e => e.name.toLowerCase() === wanted) ?? (partial.length === 1 ? partial[0] : null)
+  if (!entry) return null
+  if (exclusions.some(x => x.trim().toLowerCase() === entry.name.toLowerCase())) {
+    return { stop: `${entry.name} is on your never-again list, so it stays out. Take it off the list on Profile and I can add it.` }
+  }
+  const flagged = new Set<string>()
+  for (const injury of profile.injuries ?? []) for (const j of INJURED_JOINTS[injury] ?? []) flagged.add(j)
+  if (isContraindicatedFor(entry, flagged)) {
+    const joints = contraindicatedJoints(entry).filter(j => flagged.has(j)).map(j => j.replace(/_/g, ' '))
+    return { stop: `${entry.name} loads your ${joints.join(' and ')}, which is on your injuries list, so I won't put it in. I can find one that works the same muscles without it.` }
+  }
+  const pregnancy = isPregnant(profile) ? pregnancyExclusion(entry) : null
+  if (pregnancy) return { stop: pregnancyWarning(pregnancy) }
+  const warnings = getExerciseCompatibilityWarnings(entry, profile, exclusions)
+  return { entry, warnings: warnings.length > 0 ? warnings : ["It isn't one your plan would pick for your training style or level, so it goes in because you asked for it."] }
 }

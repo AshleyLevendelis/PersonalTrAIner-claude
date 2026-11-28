@@ -108,19 +108,23 @@ console.log('\n1. Removing takes one out, and refuses rather than gut a session'
     names(r.mesocycle, WEEK).join('|') === before.filter((_, i) => i !== 1).join('|'))
   check('the input is untouched — pure', names(MESO, WEEK).join('|') === before.join('|'))
 
-  // A day trimmed to the floor refuses the next one.
+  // ADVISE, THEN ALLOW (his ruling 28 Nov 2026): below three exercises is SAID, never refused; only the last one is.
   let m = MESO
   let guard = 0
   while (dayOf(m, WEEK).exercises.length > MIN_EXERCISES_PER_SESSION && guard++ < 20) {
     const step = removeExerciseFromSession({ mesocycle: m, profile, weekNumber: WEEK, dayName: DAY, exIndex: 0, scope: 'today' })
     if (!step.changed) break
+    check(`...down to ${MIN_EXERCISES_PER_SESSION}, no warning (${dayOf(step.mesocycle, WEEK).exercises.length} left)`, !step.note, step.note)
     m = step.mesocycle
   }
-  check(`a session can be trimmed down to the ${MIN_EXERCISES_PER_SESSION}-exercise floor`, dayOf(m, WEEK).exercises.length === MIN_EXERCISES_PER_SESSION, dayOf(m, WEEK).exercises.length)
-  const refused = removeExerciseFromSession({ mesocycle: m, profile, weekNumber: WEEK, dayName: DAY, exIndex: 0, scope: 'today' })
-  check('...and the one after that is refused', !refused.changed && !!refused.refusal, refused.refusal)
-  check('...with nothing written', refused.mesocycle === m)
-  check('...saying what to do instead', /take the whole day off|swap/i.test(refused.refusal ?? ''), refused.refusal)
+  check(`a session can be trimmed down to ${MIN_EXERCISES_PER_SESSION} exercises`, dayOf(m, WEEK).exercises.length === MIN_EXERCISES_PER_SESSION, dayOf(m, WEEK).exercises.length)
+  const below = removeExerciseFromSession({ mesocycle: m, profile, weekNumber: WEEK, dayName: DAY, exIndex: 0, scope: 'today' })
+  check('...and the one after that GOES THROUGH (was refused)', below.changed && dayOf(below.mesocycle, WEEK).exercises.length === MIN_EXERCISES_PER_SESSION - 1, below.refusal)
+  check('...with the cost said before the tap', new RegExp(`^That leaves ${DAY} with 2 exercises\\. A short session still counts, but ${DAY} loses that work; swapping it for something easier keeps it\\.$`).test(below.note ?? ''), below.note)
+  const one = removeExerciseFromSession({ mesocycle: below.mesocycle, profile, weekNumber: WEEK, dayName: DAY, exIndex: 0, scope: 'today' })
+  check('...down to one, said in the singular', one.changed && /with 1 exercise\./.test(one.note ?? ''), one.note)
+  const last = removeExerciseFromSession({ mesocycle: one.mesocycle, profile, weekNumber: WEEK, dayName: DAY, exIndex: 0, scope: 'today' })
+  check('the LAST exercise is not taken out: that is a rest day, and it says so', !last.changed && last.mesocycle === one.mesocycle && new RegExp(`is the last exercise on ${DAY}\\. To skip the session, take ${DAY} as a rest day instead\\.$`).test(last.refusal ?? ''), last.refusal)
 
   const missing = removeExerciseFromSession({ mesocycle: MESO, profile, weekNumber: WEEK, dayName: 'Nonesuch', exIndex: 0, scope: 'today' })
   check('an unknown day is refused, not crashed', !missing.changed && missing.mesocycle === MESO)

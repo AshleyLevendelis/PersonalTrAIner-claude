@@ -417,7 +417,7 @@ async function main() {
       /banOnScreen\(\{[\s\S]{0,200}profile: poolProfile \?\? profile,/.test(app)
         && /banExerciseFromMesocycle\(\{\s*mesocycle, profile, bannedName/.test(screenBan))
     check('the coach is handed the pool profile and the adaptations', /<ChatAssistant[\s\S]{0,200}poolProfile=\{poolProfile \?\? profile\}\s*activeAdaptations=\{activeAdaptations\}/.test(app))
-    check('the coach\'s add, session rebuild and ban use it', /resolveAdditionRequest\(item, poolProfile, exerciseExclusions\)/.test(chat) && /rebuildDayAroundMainLift\(\{\s*mesocycle, profile: poolProfile,/.test(chat) && /executeSessionRebuild\(poolProfile,/.test(chat) && /executeExerciseBan\(poolProfile,/.test(chat) && /executeExerciseAdd\(poolProfile,/.test(chat))
+    check('the coach\'s add, session rebuild and ban use it', /resolveAdditionAnywhere\(item, poolProfile, exerciseExclusions\)/.test(chat) && /rebuildDayAroundMainLift\(\{\s*mesocycle, profile: poolProfile,/.test(chat) && /executeSessionRebuild\(poolProfile,/.test(chat) && /executeExerciseBan\(poolProfile,/.test(chat) && /executeExerciseAdd\(poolProfile,/.test(chat))
     check('the coach\'s context line is built with the adaptations', /buildCoachInjuriesSummary\(profile, activeAdaptations, getAppNow\(profile\.id\)\)/.test(chat))
     check('a profile write in the coach still uses the saved profile', /executeLastingInjury\(profile, mesocycle, payload,/.test(chat) && /executeInjuryRecovered\(profile, payload\)/.test(chat) && !/onProfileChanged\(\{ injuries: [^}]*poolProfile/.test(chat))
     check('Profile lists active adaptations under Injuries, with End now', /<h3 className="ds-label">Injuries<\/h3>[\s\S]{0,700}<ActiveAdaptationLines[\s\S]{0,200}onEnd=\{onEndAdaptation\}/.test(profileScreen))

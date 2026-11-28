@@ -58,7 +58,8 @@ function movesFrom(typed: string): string[] {
  * in front of them, so the sheet never offers to shorten a 30-minute session
  * to 45.
  */
-const SHORTEN_CHOICES = [20, 30, 40, 45] as const
+// 15 joined 28 Nov 2026 (advise, then allow): the cut goes past the usual floor and says what it keeps.
+const SHORTEN_CHOICES = [15, 20, 30, 40, 45] as const
 
 /** What the middle column counts, in the word the person would use. A 40m carry is not 40 reps. */
 const UNIT_WORD: Record<SetUnit, string> = { reps: 'reps', seconds: 'secs', meters: 'm' }

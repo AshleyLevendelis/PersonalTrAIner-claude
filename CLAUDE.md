@@ -1913,6 +1913,24 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   workout is an ongoing activity. `test:watch-app`. Needs a watch rebuild (wear-ongoing's first compile is his)
 
 ### His requests of 28 Nov 2026
+- **ADVISE, THEN ALLOW, FOR EVERY TRAINING CHANGE: his ruling 28 Nov 2026, widened the same day** ("users can add or
+  remove or change workouts, days' workouts, single exercises, whatever they want, and we just guide them and tell
+  them the whys, why not ... if somebody wants to train on the day they weren't supposed to, they should be able to
+  add it and log it in the app"; then "fix everything one by one and keep the hard stops"). On BOTH surfaces, any
+  change to the plan, a day, a session, an exercise or its sets, reps and weight is possible; where it works against
+  the plan the app says why and offers the better option, then lets him do it. **The only hard stops, his to change**:
+  pain triaged as sharp, one-sided or worsening (a professional, nothing changes); an exercise his injuries list
+  excludes; the load ceilings; the pregnancy exercise rules. A floor or filter that is not one of those four is
+  advice, never a block (it REPLACES, for training, the 14 Sep "four tiers" only in that tier 3 is always one tap
+  from done). The fix list: `docs/plans/advise-then-allow.md`.
+- **The app does what he asks and advises around it: his ruling 28 Nov 2026** ("The app should be able to do whatever I
+  ask it but give reasons or advise around it. Ie make suggestions for changes or recommendations to not train with
+  reasons why"): a request the plan advises against is offered with its cost and the better option; only the unsafe is
+  refused, and "I can't" is never the whole reply. First case: a session on a rest day from the chat
+  (`propose_train_today`, the rest day card's "Train anyway", today only; the session and advice are the app's, CSCS
+  mine: a missed one first, else the furthest from its own day, tomorrow's last, a repeat when all are trained).
+  `test:train-today`, `verify:train-today`. Needs the `chat-gemini` deploy. **And the watch home screen says nothing
+  about the phone** (his "we dont need it"): the cardio list leads. `test:watch-app`
 - **A walk, jog or run's route from the watch's GPS: his ruling "Save the route"** (over showing it once and over
   hiding its ends): GPS on foot only, with his permission; a point every 5 m moved, none after End; kept with the walk,
   his alone, "Delete route" under it (screen only: the coach is never told where he went). **Streets under it: his

@@ -141,12 +141,15 @@ import { reasonChipsFor, reasonQuestion, equipmentNothingToChange, type Reasoned
 import { assessMealEdit, mealAskKey, type MealEditKind, type MealEditContext } from '@/lib/meal-tradeoff'
 import { settleWeek } from '@/lib/settle-week'
 import { shortenOrFloor, SHORTEST_VERSION_MINUTES } from '@/lib/exercise-plan'
-import { resolveAdditionRequest } from '@/lib/exercise-add-candidates'
+import { resolveAdditionAnywhere } from '@/lib/exercise-add-candidates'
 import { dayLengthParts, formatDayLength } from '@/lib/session-duration'
 import { planDaysForDate } from '@/lib/plan-week'
 import { restoreMesocycle } from '@/lib/mesocycle-persistence'
 import { offerStillHolds, fingerprintWeeks, undoStillFits, weeksUndoWrites, dayStillAsWritten, planReadsAsBefore } from '@/lib/offer-still-holds'
 import { dayHasSession } from '@/lib/day-verbs'
+import { planTrainToday, asksForWeightsSession } from '@/lib/train-today'
+import { readBorrowedDay, writeBorrowedDay } from '@/lib/borrowed-day'
+import { isPausedOn, planPausedSince } from '@/lib/plan-pause'
 import { addDays, daysBetween, dayNameOf, sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause } from '@/lib/session-move'
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { planMoveLoggedSets, applyMoveLoggedSets, moveLine } from '@/lib/move-logged-sets'
@@ -324,6 +327,12 @@ const UNTAGGED_ALLERGEN_HIDDEN_FORMS: Record<string, string> = {
   sulphite: 'dried fruit, wine, and wine vinegar',
   sulphites: 'dried fruit, wine, and wine vinegar',
 }
+
+/** The exercise and session edits whose day may be one he marked; its note leads the card (28 Nov 2026). */
+const DAY_NOTE_KINDS = new Set(['propose_exercise_swap', 'propose_exercise_add', 'propose_exercise_remove', 'propose_exercise_reorder', 'propose_session_shorten', 'propose_session_rebuild', 'propose_volume_change', 'propose_session_kind_today'])
+
+/** What propose_train_today's card carries: the session borrowed onto today, and the borrow before it (none). */
+interface TrainTodayPayload { date: string; day: string; focus: string; previous: string | null }
 
 /** What propose_cardio_remove's card carries to Apply and Undo: the log as it was, so Undo can put it back. */
 interface CardioRemovePayload { date: string; dayWord: string; line: string; log: CardioLogView }
@@ -1414,7 +1423,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // back is the plan row to WRITE (`day`, keyed by `day.day`) and the weekday
   // to SAY (`sayDay`), and those are different words on a moved-in session.
   // A day swapped for another activity, rested on purpose, marked missed or
-  // emptied by a move is refused in a sentence rather than edited.
+  // emptied by a move is edited all the same (28 Nov 2026), with a note on the card about the mark.
   // -------------------------------------------------------------------------
   type EditDay =
     | { ok: true; day: WorkoutDay; sayDay: string; ref: SessionRef; say: (text: string) => string }
@@ -3058,6 +3067,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (pendingAction.kind === 'propose_goal_change') return "Here's your plan and your food for the new goal:"
     if (pendingAction.kind === 'propose_concurrent_activity') return "Here's the week built around it:"
     if (pendingAction.kind === 'propose_rest_day') return 'Want me to mark that as a rest day?'
+    if (pendingAction.kind === 'propose_train_today') return 'Want me to put that session on today?'
     if (pendingAction.kind === 'propose_missed_session') return 'Want me to mark that session as missed?'
     if (pendingAction.kind === 'propose_session_activity_swap') return 'Want me to swap that day over?'
     if (pendingAction.kind === 'propose_circuit_log') return 'Want me to log this workout?'
@@ -3270,10 +3280,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // writes to. Anything a person reads uses `on.sayDay`.
     const dayName = day.day
 
-    const entry = resolveAdditionRequest(item, poolProfile, exerciseExclusions)
-    if (!entry) {
-      return { ok: false, reason: `I can't add ${item} — it isn't something I can prescribe with your equipment and injuries. Tell me what you have available and I'll find the closest thing.` }
-    }
+    // ANY EXERCISE IN THE CATALOGUE (his ruling 28 Nov 2026, "advise, then allow"): outside his kit, style or level it
+    // is added with the warning on the card; an injury, the pregnancy rules or his never-again list stop it.
+    const found = resolveAdditionAnywhere(item, poolProfile, exerciseExclusions)
+    if (!found) return { ok: false, reason: `I couldn't find ${item} in the exercise list. What's it called, or what does it work?` }
+    if ('stop' in found) return { ok: false, reason: found.stop }
+    const entry = found.entry
+    const fitWarnings = found.warnings
 
     const scope: SwapScope = rawArgs.scope === 'permanent' ? 'permanent' : 'today'
     const trial = addExerciseToSession({
@@ -3310,6 +3323,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         ],
         unchanged: [`Everything else on ${on.sayDay}`],
         implications: [
+          // Outside his kit, style or level: the screen search's own warning, first (28 Nov 2026).
+          ...fitWarnings.map(text => ({ severity: 'warn' as const, text })),
           // HER RULING, 13 Sep 2026: the session gets longer and the app says
           // so. It does NOT quietly take something out to pay for the work she
           // asked for, and the card says that too, so nobody has to wonder.
@@ -3507,6 +3522,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         rows: [{ field: on.sayDay, before: target.exerciseName, after: '— removed' }],
         unchanged: [`Everything else on ${on.sayDay}`],
         implications: [
+          // Below three exercises: said, then allowed (28 Nov 2026).
+          ...(trial.note ? [{ severity: 'warn' as const, text: on.say(trial.note) }] : []),
           { severity: 'info', text: 'The session gets shorter. Weights on the rest of it are re-checked when you confirm.' },
           // Her ruling, 13 Sep 2026: the balancing may touch another day, and
           // the card says so before she confirms. Info, not warn — it is the
@@ -4178,7 +4195,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     ]
     // SAY IT WHEN IT COULD NOT GET THERE, rather than showing a card headed
     // "25 min" for a session that takes 32.
-    if (!floor && trial.achievedMinutes > minutes) {
+    // PAST THE FLOOR (28 Nov 2026, advise then allow): what was kept and what waits, before the tap.
+    if (trial.note) implications.push({ severity: 'warn', text: on.say(trial.note) })
+    else if (!floor && trial.achievedMinutes > minutes) {
       implications.push({ severity: 'warn', text: `${minutes} minutes isn't reachable without cutting into your main lift — about ${trial.achievedMinutes} is the closest.` })
     }
     // SAY WHAT ACTUALLY COMES OFF when it is only the padding — otherwise the
@@ -4202,7 +4221,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           { field: 'Time', before: formatDayLength(dayLengthParts(day)), after: `~${trial.achievedMinutes} min` },
           { field: 'Exercises', before: String(day.exercises.length), after: String(after.exercises.length) },
         ],
-        unchanged: [`Your main lift — every set of it`],
+        unchanged: trial.note ? [] : [`Your main lift — every set of it`],
         implications,
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         reversible: true,
@@ -4419,6 +4438,54 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           ...(wasRest ? [] : [{ severity: 'warn' as const, text: `This replaces the ${day.focus.toLowerCase()} that was on ${day.day}.` }]),
         ],
         rationale: reason,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Builds propose_train_today's card: "Add a weight session just for today" on a rest day (his report and ruling,
+   * 28 Nov 2026, "The app should be able to do whatever I ask it but give reasons or advise around it"). The session
+   * and the advice come from train-today.ts; Apply is the rest day card's own "Train anyway" (writeBorrowedDay), so
+   * the screen and the coach borrow the same way. Today only; the plan does not change.
+   */
+  const buildTrainTodayProposal = (rawArgs: Record<string, unknown>): {
+    ok: true
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: TrainTodayPayload
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | { ok: false; reason: string } => {
+    const date = activeSession.date
+    // A PAUSED PLAN CAN STILL TAKE A SESSION (28 Nov 2026, advise then allow; the screen's "Train it anyway" already
+    // could): the card says it sits outside the pause and that nothing becomes due.
+    const paused = isPausedOn(date, planPausedSince(profile.id))
+    const todayName = new Date(`${date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
+    const borrowed = readBorrowedDay(profile.id, date)
+    const own = todayResolved.day
+    const plan = planTrainToday({
+      plan: planForDate(date),
+      todayName,
+      todayDate: date,
+      week: trainingWeek.days,
+      todayHasSession: !!borrowed || (own?.exercises.length ?? 0) > 0,
+      todayFocus: borrowed ? `${borrowed}'s session` : own?.focus ?? null,
+      borrowedOn: d => readBorrowedDay(profile.id, d),
+      named: [rawArgs.session, rawArgs.day].filter(v => typeof v === 'string').join(' ') || null,
+    })
+    if (!plan.ok) return plan
+    return {
+      ok: true,
+      scopeKey: `${profile.id}:propose_train_today:${date}:${plan.day}`,
+      preconditions: { date, day: plan.day },
+      payload: { date, day: plan.day, focus: plan.focus, previous: borrowed },
+      diff: {
+        lead: ask(plan.lead),
+        rows: [{ field: 'Today', before: 'Rest day', after: `${plan.day}'s ${plan.focus}` }],
+        implications: [
+          ...(paused ? [{ severity: 'info' as const, text: "Your plan is paused: this session is one of your own, nothing else becomes due, and the pause carries on." }] : []),
+          ...plan.advice.map(text => ({ severity: 'info' as const, text })),
+        ],
         reversible: true,
       },
     }
@@ -7076,10 +7143,27 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         const weighIn = buildWeighInProposal(profile.id, result.proposal.rawArgs, await getWeighInPicture(profile.id))
         if (weighIn) built = { scopeKey: weighIn.scopeKey, preconditions: weighIn.preconditions, payload: weighIn.payload as unknown as Record<string, unknown>, diff: weighIn.diff }
         else refusal = "That weight doesn't look right — could you give it to me in kilograms (e.g. 86.4)?"
+      } else if (result.proposal.kind === 'propose_train_today') {
+        const tt = buildTrainTodayProposal(result.proposal.rawArgs ?? {})
+        if (tt.ok) built = { scopeKey: tt.scopeKey, preconditions: tt.preconditions, payload: tt.payload as unknown as Record<string, unknown>, diff: tt.diff }
+        else refusal = tt.reason
       } else if (result.proposal.kind === 'propose_session_activity_swap' && result.proposal.rawArgs) {
         const sw = buildSwapForActivityProposal(result.proposal.rawArgs)
         if (sw) built = { scopeKey: sw.scopeKey, preconditions: sw.preconditions, payload: sw.payload as unknown as Record<string, unknown>, diff: sw.diff }
-        else refusal = "There's no session on that day to swap — it's already a rest day on your plan."
+        else {
+          // A REST DAY HAS NOTHING TO SWAP, AND THAT IS NEVER THE ANSWER (28 Nov 2026, his "Add a weight session just
+          // for today" answered "There's no session on Saturday to swap"): weights asked for today become the borrow
+          // card, so his sentence works before the chat-gemini deploy; anything else is offered, never refused.
+          const raw = result.proposal.rawArgs
+          const onToday = !raw.date || raw.date === activeSession.date
+          const wantsWeights = asksForWeightsSession(`${String(raw.activity_name ?? '')} ${userSaid}`)
+          const tt = onToday && wantsWeights ? buildTrainTodayProposal({}) : null
+          if (tt?.ok) {
+            built = { scopeKey: tt.scopeKey, preconditions: tt.preconditions, payload: tt.payload as unknown as Record<string, unknown>, diff: tt.diff }
+            kindOverride = 'propose_train_today'
+          } else refusal = tt && !tt.ok ? tt.reason
+            : "That's already a rest day on your plan, so there's no session to swap. I can bring one of this week's sessions onto it, or put some cardio on it instead."
+        }
       } else if (result.proposal.kind === 'propose_exercise_add' && result.proposal.rawArgs) {
         const ad = buildExerciseAddProposal(result.proposal.rawArgs)
         if (ad.ok) { built = { scopeKey: ad.scopeKey, preconditions: ad.preconditions, payload: ad.payload as unknown as Record<string, unknown>, preImage: ad.preImage, diff: ad.diff }; advice = ad.advice }
@@ -7166,6 +7250,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
       if (!built) {
         return { text: refusal ?? UNKNOWN_PROPOSAL_REFUSAL, outcome: 'refused' }
+      }
+
+      // A DAY HE MARKED (rested, missed, swapped, moved) IS EDITED WITH A WORD ABOUT THE MARK (28 Nov 2026, his "we just
+      // guide them and tell them the whys"): editTarget no longer refuses it, and its note goes on the card first.
+      if (DAY_NOTE_KINDS.has(kindOverride ?? result.proposal.kind)) {
+        const ref = sessionRefForDayArg(String(result.proposal.rawArgs?.day ?? ''), { todayDate: activeSession.date, cells: trainingWeek.days, weekNumber: activeSession.liveWeek })
+        const note = 'refusal' in ref ? undefined : (() => { const t = editTarget(ref); return t.ok ? t.note : undefined })()
+        if (note) built = { ...built, diff: { ...built.diff, implications: [{ severity: 'info', text: note }, ...(built.diff.implications ?? [])] } }
       }
 
       // A SCOPE HE HAS ALREADY SAID IS NOT ASKED AGAIN (17 Nov 2026): "for today" keeps one Apply, no "Just today".
@@ -8603,6 +8695,16 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       title = ok ? RECEIPTS['propose_concurrent_activity'].done : RECEIPTS['propose_concurrent_activity'].failed
       rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_train_today') {
+      // THE REST DAY CARD'S OWN "TRAIN ANYWAY": the same store, so Exercise shows the session at once.
+      const payload = row.payload as unknown as TrainTodayPayload
+      writeBorrowedDay(profile.id, payload.date, payload.day)
+      const ok = readBorrowedDay(profile.id, payload.date) === payload.day
+      receipt = ok ? { landed: [`Today: ${payload.day}'s ${payload.focus}`], failed: [] } : { landed: [], failed: [{ op: 'propose_train_today', error: "it didn't save on this phone" }] }
+      title = ok ? RECEIPTS['propose_train_today'].done : RECEIPTS['propose_train_today'].failed
+      rows = ok ? [{ label: `${payload.day}'s ${payload.focus}`, detail: '' }] : []
+      undoToken = ok ? row.id : undefined
+      if (ok) onLogsUpdated?.()
     } else if (row.kind === 'propose_rest_day') {
       const payload = row.payload as unknown as RestDayPayload
       const result = await executeRestDay(profile, payload)
@@ -9124,6 +9226,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             onProfileChanged({ training_style: before as TrainingStyle })
           }
         }
+      } else if (row.kind === 'propose_train_today') {
+        // Back to a rest day, only while nothing has been logged on the borrowed session: logged sets stay where they are.
+        const payload = row.payload as unknown as TrainTodayPayload
+        if (payload.date === activeSession.date && activeSession.logs.length > 0) return { refused: "You've logged sets on it, so it stays. Your sets are kept.", keep: false }
+        writeBorrowedDay(profile.id, payload.date, payload.previous)
+        if (readBorrowedDay(profile.id, payload.date) !== payload.previous) return { refused: RECEIPTS_UNDONE.failed, keep: true }
+        onLogsUpdated?.()
       } else if (row.kind === 'propose_rest_day') {
         // AN UNDO IS A WRITE (27 Oct 2026): one that did not save says so and keeps its button, never "undone".
         const undone = await undoRestDay(profile.id, row.payload as unknown as RestDayPayload)
@@ -9814,7 +9923,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                   }
                                   onViewGrocery={msg.receipt.kind === 'grocery_item_added' || msg.receipt.kind === 'grocery_day_added' || msg.receipt.kind === 'grocery_item_removed' ? onOpenGrocery : undefined}
                                   onViewDashboard={msg.receipt.kind === 'water_logged' ? onOpenDashboard : undefined}
-                                  onViewExercise={msg.receipt.kind === 'steps_logged' ? onOpenExercise : undefined}
+                                  onViewExercise={msg.receipt.kind === 'steps_logged' || msg.receipt.kind === 'propose_train_today' ? onOpenExercise : undefined}
                                   tone={msg.receipt.kind === 'water_logged' ? 'water' : undefined}
                                 />
                               )}

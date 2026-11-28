@@ -24,6 +24,13 @@ import type { WorkoutDay } from './types'
 
 const key = (profileId: string, date: string) => `fitplan_borrowed_day_v1:${profileId}:${date}`
 
+// THE SCREEN HEARS A BORROW THE COACH MADE (28 Nov 2026, propose_train_today): Exercise re-reads when this fires.
+const listeners = new Set<() => void>()
+export function subscribeBorrowedDay(l: () => void): () => void {
+  listeners.add(l)
+  return () => { listeners.delete(l) }
+}
+
 /** The weekday whose session today borrowed, or null. */
 export function readBorrowedDay(profileId: string | undefined, date: string | undefined): string | null {
   if (!profileId || !date) return null
@@ -40,6 +47,7 @@ export function writeBorrowedDay(profileId: string | undefined, date: string | u
     if (dayName) localStorage.setItem(key(profileId, date), dayName)
     else localStorage.removeItem(key(profileId, date))
   } catch { /* storage blocked — the borrow lasts as long as the screen does */ }
+  listeners.forEach(l => l())
 }
 
 export interface TrainAnywayOption {

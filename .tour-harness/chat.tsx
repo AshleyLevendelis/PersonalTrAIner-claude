@@ -62,6 +62,7 @@ import { planSessionKindToday, type SessionKind } from '@/lib/session-kind'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import '@/index.css'
 import * as pendingStore from '@/lib/pending-actions-store'
+import { setPlanPausedSince } from '@/lib/plan-pause'
 // THE APP'S OWN OFFER STORE, for a driver to ask directly (chat-offer-replace.mjs §4): the fake database behind it
 // holds the one-open-offer index the real one has.
 ;(window as unknown as { __pendingStore: typeof pendingStore }).__pendingStore = pendingStore
@@ -116,6 +117,9 @@ const MOVED_AWAY = new URLSearchParams(location.search).get('movedaway') === '1'
 // ?day=mid|done|rest — THE CONTEXT STRIP'S THREE STATES (design 2b, 31 Oct 2026). INPUT only: some of today's sets
 // logged, every set logged and the session closed (52 minutes; 45 is the column's placeholder, which Home ignores), or today not a training day. What the strip says is
 // the app's own reading of it. ?ate=1 adds one eaten breakfast, so the calories left are not just the target.
+// ?paused=1 — THE PLAN IS PAUSED (since three days ago), for verify:train-today (28 Nov 2026). INPUT only: App mirrors the
+// profile's pause into plan-pause the same way.
+if (new URLSearchParams(location.search).get('paused') === '1') setPlanPausedSince(PROFILE_ID, (() => { const d = anchorDate(); d.setDate(d.getDate() - 3); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })())
 const DAY_STATE = new URLSearchParams(location.search).get('day')
 const ATE = new URLSearchParams(location.search).get('ate') === '1'
 const availableIdx = new Set(MOVED_IN

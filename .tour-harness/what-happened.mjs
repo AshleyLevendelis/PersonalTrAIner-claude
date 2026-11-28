@@ -236,6 +236,24 @@ await wait(4500)
 check('11a. a fresh day is made a rest day', (await openSheet()) === 'open' && await clickSel('[data-verb="rest"]') && await untilClosed())
 const cRest11 = await untilCard(c => !!c.line)
 check('11b. ...the card says so and offers "Train it anyway"', /made today a rest day/.test(cRest11?.line || '') && cRest11?.start === 'Train it anyway', cRest11)
+// ADVISE, THEN ALLOW (his ruling 28 Nov 2026): the session on a day he made a rest day is still his to change. It was
+// refused ("Today is down as a rest day you chose, so there's no session on it to change").
+const names11 = () => ev(`[...document.querySelectorAll('[data-exercise-name]')].map(n => n.getAttribute('data-exercise-name')).filter((v, i, a) => a.indexOf(v) === i)`)
+const before11 = await names11()
+const victim11 = before11[before11.length - 1]
+const row11 = `[data-exercise-name=${JSON.stringify(victim11)}]`
+if (!(await has(`${row11} button[aria-label="Exercise options"]`))) { await tap(`${row11} [role="button"], ${row11} .cursor-pointer`); await wait(700) }
+check('11b2. on the rest day he made, an exercise\'s menu opens', await tap(`${row11} button[aria-label="Exercise options"]`) && (await wait(500), await has('[data-testid="remove-exercise"]')), victim11)
+check('11b3. ...and "Take out" goes through: why, drop, just today', await tap('[data-testid="remove-exercise"]')
+  && (await wait(700), await clickSel('[data-testid="reason-skip"]')) && (await wait(400), await clickSel('[data-verb="drop"]'))
+  && (await wait(400), await clickSel('[data-scope="today"]')))
+let after11 = await names11()
+for (let i = 0; i < 20 && after11.includes(victim11); i++) { await wait(300); after11 = await names11() }
+check('11b4. THE EXERCISE IS OUT of the rested day\'s session, never refused', !after11.includes(victim11) && after11.length === before11.length - 1, { victim11, before11, after11 })
+check('11b5. ...no "nothing on it to change" anywhere', !/so there's no session on it to change|nothing on it to change/.test(await ev('document.body.innerText')))
+const still11 = await card()
+check('11b6. ...and the day is still the rest he made until he trains it', /made today a rest day/.test(still11?.line || ''), still11)
+await shoot('what-happened-rest-edited')
 check('11c. "Train it anyway" is tapped', await clickSel('[data-testid="hero-start"]'))
 let running11 = null
 for (let i = 0; i < 20; i++) { await wait(300); running11 = await ev(`/today · in progress/i.test(document.body.innerText)`); if (running11) break }

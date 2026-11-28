@@ -38,7 +38,9 @@ import {
 } from '../src/lib/exercise-plan'
 import { addExerciseToSession, peerProgrammingFor } from '../src/lib/session-edit'
 import { executeExerciseAdd } from '../src/lib/pending-action-executor'
-import { getAdditionCandidates, resolveAdditionRequest } from '../src/lib/exercise-add-candidates'
+import { getAdditionCandidates, resolveAdditionRequest, resolveAdditionAnywhere } from '../src/lib/exercise-add-candidates'
+import { getExerciseEntry, registerNearCopies, logOnlyExercises, isContraindicatedFor } from '../src/lib/exercise-db'
+import { NEAR_COPIES } from '../src/lib/exercise-near-copies'
 import { applyReplacement, recomputeLoad, priceAddedLift, calibrates } from '../src/lib/mesocycle-edit'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { searchExerciseCatalog, muscleGroupsOf, getExerciseEntry, EXERCISE_DATABASE, type ExerciseEntry } from '../src/lib/exercise-db'
@@ -446,7 +448,7 @@ async function main() {
   // the file, on the import line. The resolver is now one exported function
   // that both the card and the confirm use, so the property can be asserted by
   // running it.
-  check('the card goes through the one resolver', /resolveAdditionRequest/.test(client))
+  check('the card goes through the one resolver', /resolveAdditionAnywhere\(item, poolProfile, exerciseExclusions\)/.test(client))
 
   // THE CONFIRM IS RUN, NOT READ. Grepping the executor for the resolver's
   // name survived a mutation that replaced the call with a raw catalogue
@@ -465,12 +467,13 @@ async function main() {
 
   const invented = await executeExerciseAdd(noId, limitedMeso, addPayload('Turbo Encabulator Press'), [])
   check('confirming a movement the model invented is refused',
-    opOf(invented) === 'propose_exercise_add' && /can't add/i.test(errOf(invented)), errOf(invented))
+    opOf(invented) === 'propose_exercise_add' && /couldn't find/i.test(errOf(invented)), errOf(invented))
   check('...and nothing is written', invented.mesocycle === limitedMeso)
 
   const blocked = await executeExerciseAdd(noId, limitedMeso, addPayload(injuryFiltered[0].name), [])
   check('confirming an injury-blocked movement is refused at the confirm, not only in the card',
     opOf(blocked) === 'propose_exercise_add', errOf(blocked))
+  check('...in the hard stop\'s own words', /on your injuries list, so I won't put it in/.test(errOf(blocked)), errOf(blocked))
 
   const allowed = await executeExerciseAdd(noId, limitedMeso, addPayload(limitedCands[0].exercise.name), [])
   check('a movement this profile CAN be prescribed gets past the resolution step',
@@ -480,6 +483,28 @@ async function main() {
     noId, limitedMeso, addPayload(limitedCands[0].exercise.name), [limitedCands[0].exercise.name])
   check('...and a ban still stops it at confirm time',
     opOf(bannedAtConfirm) === 'propose_exercise_add', errOf(bannedAtConfirm))
+  // ADVISE, THEN ALLOW (his ruling 28 Nov 2026): the coach adds ANY catalogue exercise, warned outside his kit, style
+  // or level; only the hard stops (an injury, the pregnancy rules, his never-again list) are refused.
+  const outOfKit = forbidden.find(e => !injuryFiltered.some(i => i.name === e.name) && !e.log_only && resolveAdditionAnywhere(e.name, limited, []) !== null && !('stop' in (resolveAdditionAnywhere(e.name, limited, []) as object)))
+  const kitAdd = outOfKit ? resolveAdditionAnywhere(outOfKit.name, limited, []) : null
+  check('ANY CATALOGUE EXERCISE: one outside his kit is ADDED, not refused', !!kitAdd && 'entry' in kitAdd && kitAdd.entry.name === outOfKit!.name, outOfKit?.name)
+  check('...with the warning the screen\'s search shows (what kit it needs)', !!kitAdd && 'entry' in kitAdd && kitAdd.warnings.some(w => /^Needs .+ — (outside your .+ equipment|not in the kit you've told me you have)\.$/.test(w)), kitAdd && 'entry' in kitAdd ? kitAdd.warnings : kitAdd)
+  const fitting = resolveAdditionAnywhere(limitedCands[0].exercise.name, limited, [])
+  check('...and one that fits his plan carries no warning', !!fitting && 'entry' in fitting && fitting.warnings.length === 0, fitting)
+  const hurt = resolveAdditionAnywhere(injuryFiltered[0].name, limited, [])
+  check('HARD STOP: a move his shoulder injury rules out is refused, naming the joint', !!hurt && 'stop' in hurt && /on your injuries list, so I won't put it in/.test(hurt.stop) && /shoulder/.test(hurt.stop), hurt)
+  const bannedAny = resolveAdditionAnywhere(limitedCands[0].exercise.name, limited, [limitedCands[0].exercise.name])
+  check('HARD STOP: one on his never-again list is refused', !!bannedAny && 'stop' in bannedAny && /never-again list/.test(bannedAny.stop), bannedAny)
+  const pregnant = { ...baseProfile, health_conditions: ['pregnancy'] } as unknown as UserProfile
+  const jump = ['Box Jumps', 'Burpees', 'Jump Squats'].map(n => getExerciseEntry(n)).find(Boolean)
+  const preg = jump ? resolveAdditionAnywhere(jump.name, pregnant, []) : null
+  check('HARD STOP: a move the pregnancy rules leave out is refused', !!preg && 'stop' in preg, { jump: jump?.name, preg })
+  const healthy = { ...baseProfile, injuries: [] } as unknown as UserProfile
+  registerNearCopies(NEAR_COPIES)
+  const nearCopy = logOnlyExercises().find(e => !isContraindicatedFor(e, new Set()))
+  const nc = nearCopy ? resolveAdditionAnywhere(nearCopy.name, healthy, []) : 'none'
+  check('a near-copy stays log-only (his 3 Nov ruling): its own name is never added', !!nearCopy && (nc === null || !('entry' in (nc as object)) || (nc as { entry: { name: string } }).entry.name !== nearCopy.name), { near: nearCopy?.name, nc })
+  check('the confirm uses the same lookup', /resolveAdditionAnywhere\(payload\.exerciseName, profile, exclusions\)/.test(readFileSync('src/lib/pending-action-executor.ts', 'utf8')))
   check('a movement the model invented resolves to nothing',
     resolveAdditionRequest('Turbo Encabulator Press', limited, []) === null)
   check('a real movement this profile is filtered out of resolves to nothing',

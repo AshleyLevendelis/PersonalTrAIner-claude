@@ -1,3 +1,4 @@
+import type { TrainAnywayChoice } from '@/lib/train-today'
 import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import { Card, CardContent } from '@/components/ui/card'
@@ -266,12 +267,48 @@ function TomorrowPreview({
   )
 }
 
+/**
+ * "TRAIN ANYWAY", ON EVERY KIND OF DAY WITH NO LIFTING SESSION (28 Nov 2026, his ruling "users can add or remove or
+ * change workouts ... whatever they want, and we just guide them"): a rest day, an active recovery or planned cardio
+ * day, and a day whose session moved away. Opened, it says what training through the day costs, then lists the
+ * week's sessions; one already done this week is offered last, as a repeat. Borrowed for today only.
+ */
+export function TrainAnyway({ options, advice, onPick }: {
+  options: TrainAnywayChoice[]
+  advice?: string | null
+  onPick: (sourceDayName: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  if (options.length === 0) return null
+  return open ? (
+    <div className="py-1.5 px-0.5 space-y-2" data-testid="train-anyway-picker">
+      {advice && <p className="text-[0.75rem] leading-snug text-muted-foreground" data-testid="train-anyway-advice">{advice}</p>}
+      <div className="flex flex-wrap gap-1.5">
+        {options.map(o => (
+          <Button key={o.day} variant="outline" size="sm" className="min-h-11 h-auto py-2 text-xs" data-testid="train-anyway-option" data-repeat={o.repeat ? 'true' : undefined} onClick={() => onPick(o.day)}>
+            {o.label}
+          </Button>
+        ))}
+      </div>
+    </div>
+  ) : (
+    <PlanActionRow
+      icon={Dumbbell}
+      title="Train anyway"
+      subtitle="Borrow another day's session — today only"
+      testid="train-anyway"
+      onClick={() => setOpen(true)}
+    />
+  )
+}
+
 export function RestDayCard({
   dayName,
   weekTally,
   tomorrow,
   onPeek,
   trainAnywayOptions,
+  trainAnywayAdvice,
   onTrainAnyway,
   onAddCardio,
 }: {
@@ -279,13 +316,14 @@ export function RestDayCard({
   weekTally: { done: number; planned: number; left?: number }
   tomorrow?: { dayName: string; focus: string; detail: string }
   onPeek?: (dayName: string) => void
-  /** Each a session she could borrow: its weekday and "Tuesday · Pull & Hinge". */
-  trainAnywayOptions: { day: string; label: string }[]
+  /** Each a session he could borrow: its weekday and "Tuesday · Pull & Hinge"; one done this week is a repeat. */
+  trainAnywayOptions: TrainAnywayChoice[]
+  /** What training through the rest day costs (train-today.ts), shown above the choices. */
+  trainAnywayAdvice?: string | null
   onTrainAnyway: (sourceDayName: string) => void
   /** Returns null on success, or a sentence to show. Absent means no plan loaded yet. */
   onAddCardio?: (activity: string, minutes: number, targetRpe: number) => Promise<string | null>
 }) {
-  const [pickerOpen, setPickerOpen] = useState(false)
   const [cardioOpen, setCardioOpen] = useState(false)
 
   return (
@@ -317,24 +355,7 @@ export function RestDayCard({
             the same action twice. */}
         {(trainAnywayOptions.length > 0 || onAddCardio) && (
           <PlanActions>
-            {trainAnywayOptions.length > 0 && !pickerOpen && (
-              <PlanActionRow
-                icon={Dumbbell}
-                title="Train anyway"
-                subtitle="Borrow another day's session — today only"
-                testid="train-anyway"
-                onClick={() => setPickerOpen(true)}
-              />
-            )}
-            {pickerOpen && (
-              <div className="flex flex-wrap gap-1.5 py-1.5 px-0.5">
-                {trainAnywayOptions.map(o => (
-                  <Button key={o.day} variant="outline" size="sm" className="h-8 text-xs" data-testid="train-anyway-option" onClick={() => onTrainAnyway(o.day)}>
-                    {o.label}
-                  </Button>
-                ))}
-              </div>
-            )}
+            <TrainAnyway options={trainAnywayOptions} advice={trainAnywayAdvice} onPick={onTrainAnyway} />
             {onAddCardio && !cardioOpen && (
               <PlanActionRow
                 icon={CalendarDays}
@@ -382,6 +403,9 @@ export function MovedDayCard({
   tomorrow,
   onPeek,
   onDoItToday,
+  trainAnywayOptions = [],
+  trainAnywayAdvice,
+  onTrainAnyway,
 }: {
   /** What left — the plan's own session for this weekday. Null when the plan cannot say. */
   focus: string | null
@@ -391,6 +415,9 @@ export function MovedDayCard({
   onPeek?: (dayName: string) => void
   /** Resolves true when the move was cleared, false when the write failed. */
   onDoItToday: () => Promise<boolean>
+  trainAnywayOptions?: TrainAnywayChoice[]
+  trainAnywayAdvice?: string | null
+  onTrainAnyway?: (sourceDayName: string) => void
 }) {
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -442,6 +469,7 @@ export function MovedDayCard({
             disabled={busy}
             onClick={handleDoItToday}
           />
+          {onTrainAnyway && <TrainAnyway options={trainAnywayOptions} advice={trainAnywayAdvice} onPick={onTrainAnyway} />}
         </PlanActions>
         {failed && (
           <p className="mt-2 text-[0.6875rem] leading-[1.4] text-[color:var(--role-warn-text)]">
@@ -460,6 +488,9 @@ export function ActiveRecoveryCard({
   onPeek,
   onAddCardio,
   raceDate,
+  trainAnywayOptions = [],
+  trainAnywayAdvice,
+  onTrainAnyway,
 }: {
   workout: WorkoutDay
   weekTally: { done: number; planned: number; left?: number }
@@ -468,6 +499,9 @@ export function ActiveRecoveryCard({
   onAddCardio?: (activity: string, minutes: number, targetRpe: number) => Promise<string | null>
   /** His race date (running.ts): the two weeks before it are lighter. */
   raceDate?: string | null
+  trainAnywayOptions?: TrainAnywayChoice[]
+  trainAnywayAdvice?: string | null
+  onTrainAnyway?: (sourceDayName: string) => void
 }) {
   const cardio = workout.recommendedCardio
   // A DAY WHOSE WHOLE PLAN IS AN ACTIVITY SHOWS THE ACTIVITY. The beginner's
@@ -527,6 +561,9 @@ export function ActiveRecoveryCard({
             reading "Active recovery" with no control on it.
             Hidden once the day HAS a prescription — there is nothing to add. */}
         {onAddCardio && !planned && <Suspense fallback={null}><AddCardioSession dayName={workout.day} onAdd={onAddCardio} /></Suspense>}
+        {onTrainAnyway && trainAnywayOptions.length > 0 && (
+          <PlanActions><TrainAnyway options={trainAnywayOptions} advice={trainAnywayAdvice} onPick={onTrainAnyway} /></PlanActions>
+        )}
       </CardContent>
     </Card>
   )

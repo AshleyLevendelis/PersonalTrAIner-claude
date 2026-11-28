@@ -192,29 +192,35 @@ export function sessionRefForDayArg(dayArg: string, ctx: DayArgContext): Session
 }
 
 export type EditTarget =
-  | { ok: true; planDayName: string; sayDay: string; weekNumber: number }
+  | { ok: true; planDayName: string; sayDay: string; weekNumber: number; note?: string }
   | { ok: false; refusal: string }
 
 /**
- * May this session be edited, and under which key?
+ * May this session be edited, and under which key? ALWAYS, since his ruling of 28 Nov 2026 ("users can add or remove
+ * or change workouts ... whatever they want, and we just guide them and tell them the whys"). A day he marked as a
+ * rest, as missed or as swapped for something else still holds its full session in the plan row, and a set logged on
+ * it makes it a session again (logged work outranks the mark), so an edit there changes the session he would train
+ * if he trains it after all. `note` says so, in the day's own words, for the card or the line to carry. A session
+ * moved away is edited where it now sits: its plan row IS the moved session.
  *
- * The ONLY door to `planDayName`. A rest day passes — the edits themselves
- * already refuse an empty day in their own words, and a rest day is exactly
- * what a cardio session is put ON — but a day the person has said they are
- * not lifting on does not, because its plan row still holds a full session.
+ * The ONLY door to `planDayName`. A rest day with no session passes too: the edits themselves say what an empty
+ * day can take, and a rest day is exactly what a cardio session is put ON.
  */
 export function editTarget(ref: SessionRef): EditTarget {
+  const ok = (sayDay: string, note?: string): EditTarget => ({ ok: true, planDayName: ref.planDayName, sayDay, weekNumber: ref.weekNumber, ...(note ? { note } : {}) })
   switch (ref.kind) {
     case 'moved_away':
-      return { ok: false, refusal: `${ref.sayDay}'s session is on ${ref.movedTo?.dayName ?? 'another day'} this week, so there's nothing on ${ref.sayDay} to change.` }
+      return ref.movedTo
+        ? ok(ref.movedTo.dayName, `${ref.sayDay}'s session is on ${ref.movedTo.dayName} this week, so this changes it there.`)
+        : ok(ref.sayDay)
     case 'swapped':
-      return { ok: false, refusal: `${ref.sayDay} is down as ${ref.swappedFor || 'something else'} instead of your session, so there's nothing on it to change.` }
+      return ok(ref.sayDay, `${ref.sayDay} is down as ${ref.swappedFor || 'something else'} instead of this session. This changes the session in case you train it after all; log a set and it counts.`)
     case 'rest_chosen':
-      return { ok: false, refusal: `${ref.sayDay} is down as a rest day you chose, so there's no session on it to change.` }
+      return ok(ref.sayDay, `${ref.sayDay} is down as a rest day you chose. This changes its session in case you train it after all; log a set and it counts as a session again.`)
     case 'missed':
-      return { ok: false, refusal: `${ref.sayDay}'s session is down as missed, so there's nothing on it to change.` }
+      return ok(ref.sayDay, `${ref.sayDay}'s session is down as missed. This changes it in case you still do it; log a set and it counts.`)
     default:
-      return { ok: true, planDayName: ref.planDayName, sayDay: ref.sayDay, weekNumber: ref.weekNumber }
+      return ok(ref.sayDay)
   }
 }
 

@@ -210,40 +210,53 @@ check('4e. THE SESSION GOT SHORTER in the saved plan: fewer exercises, or fewer 
 if (await has('[data-testid="what-happened-sheet"]')) await escape()
 await shoot('moved-edit-4-shortened')
 
-// --- 5. THE FLOOR names the right day --------------------------------------
-// Sam's moved session had three exercises: once the lookup works, "Drop it"
-// meets "never below three" and THAT sentence has to name the day on screen.
-// Keep removing the last exercise until the app refuses.
+// --- 5. BELOW THREE, SAID AND THEN ALLOWED, naming the right day -------------
+// Sam's moved session had three exercises. Since his ruling of 28 Nov 2026 ("advise, then allow") "Drop it" on one of
+// the three is not refused: the sheet says what the day loses BEFORE the tap, naming the day on screen, and it goes.
 let floorText = ''
 let guard = 0
+let heldBefore = 0 // what the day held when the warning came up; since fix 6 a shortened day may already be at two
 for (; guard < 8 && !floorText; guard++) {
   const now = (await order()) || []
+  heldBefore = now.length
   const victim = now[now.length - 1]
   if (!victim) break
   if ((await openRowMenu(victim)) !== 'open') break
   await tap('[data-testid="remove-exercise"]'); await until(() => has('[data-testid="remove-exercise-sheet"]'))
   await clickSel('[data-testid="reason-skip"]'); await wait(450)
   await clickSel('[data-verb="drop"]'); await wait(450)
-  await clickSel('[data-scope="today"]'); await wait(1100)
-  floorText = await ev(`document.querySelector('[data-testid="remove-error"]')?.innerText || ''`)
+  floorText = await ev(`document.querySelector('[data-testid="remove-balance-cost"]')?.innerText || ''`)
+  if (!/That leaves/.test(floorText)) { floorText = ''; await clickSel('[data-scope="today"]'); await wait(1100) }
   if (!floorText && await has('[data-testid="remove-exercise-sheet"]')) await escape()
 }
-check('5a. removing eventually meets the three-exercise floor', /fewer than 3 exercises/.test(floorText), { floorText, guard, left: await order() })
-check(`5b. ...and the refusal names ${TODAY_NAME}, the day on screen`, floorText.includes(`leave ${TODAY_NAME} with fewer than 3`), floorText)
+const heldAfter = heldBefore - 1
+const heldWords = `${heldAfter} exercise${heldAfter === 1 ? '' : 's'}`
+check('5a. taking one out below three says what the day loses, before the tap', floorText.includes(`with ${heldWords}. A short session still counts`) && heldBefore >= 2, { floorText, guard, heldBefore, left: await order() })
+check(`5b. ...naming ${TODAY_NAME}, the day on screen`, floorText.includes(`leave ${TODAY_NAME} with ${heldWords}`) || floorText.includes(`leaves ${TODAY_NAME} with ${heldWords}`), floorText)
 check(`5c. ...never ${FROM_NAME}, the row it was written to`, floorText.length > 0 && !floorText.includes(FROM_NAME), floorText)
-check('5d. the refusal is on screen where the tap was (inside the viewport)', await ev(`(() => { const n = document.querySelector('[data-testid="remove-error"]'); if (!n) return false; const r = n.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight && r.width > 0 })()`))
-check('5e. ...and the session still holds three', ((await order()) || []).length === 3, await order())
+check('5d. the warning is on screen where the tap is (inside the viewport)', await ev(`(() => { const n = document.querySelector('[data-testid="remove-balance-cost"]'); if (!n) return false; const r = n.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight && r.width > 0 })()`))
+await clickSel('[data-scope="today"]'); await wait(1300)
+check('5e. ...and "Just today" takes it out: the session now holds one fewer', ((await order()) || []).length === heldAfter, { heldAfter, now: await order() })
 await shoot('moved-edit-5-floor')
 
 
 // ===========================================================================
-// SHEET MANNERS, on the same session (M26, M27, M10). Three exercises are
-// left, so "Drop it" is refused — which is exactly the state the tester was
-// in when the red line from one step followed him into the next.
+// SHEET MANNERS, on the same session (M26, M27, M10). Taken down to ONE exercise first, so "Drop it" is refused
+// (the last exercise is a rest day, 28 Nov 2026) — the state the tester was in when the red line from one step
+// followed him into the next.
 // ===========================================================================
 console.log('\n  sheet manners\n')
 const facts = () => ev(`((window.__fakeDb && window.__fakeDb.user_facts) || []).length`)
+{
+  const two = (await order()) || []
+  if ((await openRowMenu(two[two.length - 1])) === 'open') {
+    await tap('[data-testid="remove-exercise"]'); await until(() => has('[data-testid="remove-exercise-sheet"]'))
+    await clickSel('[data-testid="reason-skip"]'); await wait(450); await clickSel('[data-verb="drop"]'); await wait(450)
+    await clickSel('[data-scope="today"]'); await wait(1300)
+  }
+}
 const three = (await order()) || []
+check('5e2. ...and down to one, with the same warning: it still goes', three.length === 1, three)
 const mannersVictim = three[three.length - 1] ?? 'NO-ROW'
 if (await has('[data-testid="remove-exercise-sheet"]')) await escape()
 
@@ -255,7 +268,7 @@ const scopeButtons = (await ev(`[...document.querySelectorAll('[data-testid="rem
 check('5g. the question and its buttons use the same words: "Just today, or the rest of the block?" over "Just today" / "Whole block" (her 31 Oct words)',
   scopeQuestion === 'Just today, or the rest of the block?' && scopeButtons.join('|') === 'Just today|Whole block', { scopeQuestion, scopeButtons })
 await clickSel('[data-scope="today"]'); await wait(1100)
-check('5h. the refusal shows on the step that produced it', /fewer than 3/.test(await ev(`document.querySelector('[data-testid="remove-error"]')?.innerText || ''`)))
+check('5h. the refusal (the last exercise: that is a rest day) shows on the step that produced it', /is the last exercise on .+ take .+ as a rest day instead/.test(await ev(`document.querySelector('[data-testid="remove-error"]')?.innerText || ''`)))
 check('5i. "Back" takes the red line away with it', await clickSel('[data-testid="remove-scope-back"]') && (await wait(450), !(await has('[data-testid="remove-error"]'))) && await has('[data-verb="drop"]'),
   await ev(`document.querySelector('[data-testid="remove-exercise-sheet"]')?.innerText || ''`))
 await escape()
