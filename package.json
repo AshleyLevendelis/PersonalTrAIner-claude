@@ -277,6 +277,7 @@
     "test:coach-tics": "tsx scripts/test-coach-tics.ts",
     "test:chat-log-words": "tsx scripts/test-chat-log-words.ts",
     "test:chat-log-date": "tsx scripts/test-chat-log-date.ts",
+    "test:swap-for-anything": "tsx scripts/test-swap-for-anything.ts",
     "test:coach-promises": "tsx scripts/test-coach-promises.ts",
     "test:app-tour": "tsx scripts/test-app-tour.ts",
     "test:overlay-artifacts": "tsx scripts/test-overlay-artifacts.ts",

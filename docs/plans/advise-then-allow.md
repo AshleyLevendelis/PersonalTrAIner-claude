@@ -54,7 +54,23 @@ earlier ruling of his and wait for his word.
 14. [ ] **A weights session on a future rest day, as part of the plan**, from either surface.
 15. [ ] **Move a session into next week** (session-move.ts keeps a move inside its own week).
 16. [ ] **A cardio session on one day only** (both surfaces write it for every week of the block).
-17. [ ] **Swap for anything**: the coach's "must be the same movement pattern" becomes advice.
+17. [x] **Swap for anything**: the coach's "must be the same movement pattern" becomes advice. DONE 28 Nov 2026
+    (Builder B): the tool and prompt now say a replacement HE names is proposed whatever its pattern (the coach's own
+    pick stays the swap list's first); the card says what changes ("That puts a squat (Goblet Squats) where Tuesday's
+    session had a lunge or split squat (Walking Lunges): the session keeps the work but trains a different movement.
+    Fine if that's what you want; a like-for-like swap keeps the plan's balance."; into or out of the warm-up or
+    conditioning it says the session "does a different job there"), and any kit, style or level warning. FOUND: a
+    replacement he named was never checked against his hard stops on the coach's path. Now `swapHardStop`
+    (swap-advice.ts) refuses, at the card and again at confirm, a move his injuries or a running ease-off rule out, the
+    pregnancy rules (early AND from 28 weeks, which until now only generation applied) and his never-again list (a
+    version answers as its parent). It reads the ENTRY: the review found the add lookup returns nothing for the 477
+    machine versions, which would have waved "45-Degree Hyperextension Bench" through for a bad back. `test:swap-for-
+    anything` (28, 16/16 mutations over two rounds), `verify:swap-request` 4e0-4g2 (4/4). Needs the `chat-gemini`
+    deploy for the tool and prompt words; the card and stops are client side.
+    **Left, not mine:** (a) HIS decision 2: the SCREEN's swap search lets an injury- or pregnancy-ruled-out move
+    through with a warning, so chat and screen now answer differently; (b) the coach's ADD lookup (fix 4) still says
+    "I couldn't find X" for a machine version and misses the from-28-weeks list, the same two holes; `swapHardStop`
+    could serve it; (c) `executeExerciseSwap`'s stops are optional, so other callers skip them.
 18. [ ] **The same exercise twice on a day**: advise "add sets instead", then allow.
 19. [ ] **Edits beyond this week** (next week's sessions), for one day or the block.
 20. [x] **The coach's logging windows** (cardio and circuits 7 days; taking a log off 14 days; sessions 14 days)

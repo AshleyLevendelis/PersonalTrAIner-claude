@@ -143,6 +143,7 @@ import { assessMealEdit, mealAskKey, type MealEditKind, type MealEditContext } f
 import { settleWeek } from '@/lib/settle-week'
 import { shortenOrFloor, SHORTEST_VERSION_MINUTES } from '@/lib/exercise-plan'
 import { resolveAdditionAnywhere } from '@/lib/exercise-add-candidates'
+import { swapPatternAdvice, swapHardStop, swapFitWarnings } from '@/lib/swap-advice'
 import { dayLengthParts, formatDayLength } from '@/lib/session-duration'
 import { planDaysForDate } from '@/lib/plan-week'
 import { restoreMesocycle } from '@/lib/mesocycle-persistence'
@@ -3161,6 +3162,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     }
     // A NEAR-COPY IS NEVER PRESCRIBED (her ruling "Searchable, log-only"): said here, before any card is drawn.
     if (newEntry.log_only) return { ok: false, reason: logOnlyRefusal(newEntry) }
+    // SWAP FOR ANYTHING, WITH THE WHY (advise-then-allow fix 17, 28 Nov 2026): his own named choice is no longer held
+    // to the generator's pool. The hard stops stay stops, by the same lookup the coach's add uses: a move his injuries
+    // list rules out, the pregnancy rules, his never-again list. Outside his kit, style or level it is said on the card.
+    const stop = swapHardStop(newEntry, poolProfile, exerciseExclusions, activeSession.date)
+    if (stop) return { ok: false, reason: stop }
+    const fitWarnings = swapFitWarnings(newEntry, poolProfile, exerciseExclusions)
+    // Only about a replacement HE chose: when the swap list's first stood in for the coach's pick, he chose nothing.
+    const patternNote = pick?.replaced ? null : swapPatternAdvice(oldEx.name, newEntry.name, on.sayDay)
 
     const scope: SwapScope = rawArgs.scope === 'permanent' ? 'permanent' : 'today'
     const payload: ExerciseSwapPayload = {
@@ -3228,6 +3237,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           // the trial's weights are real, but confirm re-runs against the live
           // plan, and quoting a number here that confirm could supersede is the
           // thing this card was correct to refuse.
+          ...(patternNote ? [{ severity: 'warn' as const, text: patternNote }] : []),
+          ...fitWarnings.map(text => ({ severity: 'warn' as const, text })),
           { severity: 'info', text: 'Load recomputed for the new movement once you confirm.' },
           ...(impact.balancing ? [{ severity: 'info' as const, text: impact.balancing }] : []),
           ...(impact.cost ? [{ severity: 'warn' as const, text: impact.cost }] : []),
@@ -8132,7 +8143,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const payload = row.payload as unknown as ExerciseSwapPayload
       const scope: SwapScope = editedScope === 'permanent' ? 'permanent' : payload.scope
       appliedScope = scope
-      const result = await executeExerciseSwap(profile, mesocycle, { ...payload, scope })
+      const result = await executeExerciseSwap(profile, mesocycle, { ...payload, scope }, { profile: poolProfile, exclusions: exerciseExclusions, today: activeSession.date })
       onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       receipt = sayReceipt(result.receipt, payload)
       const ok = receipt.failed.length === 0

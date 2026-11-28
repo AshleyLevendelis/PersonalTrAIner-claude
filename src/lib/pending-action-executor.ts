@@ -98,9 +98,17 @@ export async function executeExerciseSwap(
   profile: UserProfile,
   mesocycle: MesocycleWeek[],
   payload: ExerciseSwapPayload,
+  /** The hard stops, checked again at confirm (advise-then-allow fix 17): the profile carrying his injuries and any
+   *  ease-off, and his never-again list. The card checked them; they may have changed while it sat. */
+  stops?: { profile: UserProfile; exclusions: string[]; today: string },
 ): Promise<ExerciseSwapResult> {
   const preImage = mesocycle
   const newExercise = getExerciseEntry(payload.newExerciseName)
+  if (stops && newExercise) {
+    const { swapHardStop } = await import('./swap-advice')
+    const stop = swapHardStop(newExercise, stops.profile, stops.exclusions, stops.today)
+    if (stop) return { mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'propose_exercise_swap', error: stop }] } }
+  }
   if (!newExercise) {
     return {
       mesocycle,

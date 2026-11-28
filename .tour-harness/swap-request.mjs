@@ -238,7 +238,17 @@ if (cross) {
   //         because "Unchanged: … Sets × reps: 2×8" sits in the same card.
   // Reading the warn-severity lines fixes both: nothing else on the card is
   // one, so neither a silent card nor a neighbouring row can satisfy it.
-  const costs = [likeForLike, crossCard].flatMap(c => c?.warns ?? [])
+  // A SWAP ACROSS MOVEMENTS SAYS SO, as its own warning (advise-then-allow fix 17, 28 Nov 2026): set apart here, so a
+  // balance cost is still the only other warn line.
+  const ACROSS = /trains a different movement|does a different job there/
+  const COUNTED_SETS = /\d+[^.]*\bsets?\b/i
+  const acrossLines = [likeForLike, crossCard].flatMap(c => c?.warns ?? []).filter(w => ACROSS.test(w))
+  check('4e0. a swap he named across movements says which movements, and that it is his choice',
+    acrossLines.length > 0 && acrossLines.every(w => /^That puts .+ \(.+\) where .+'s session had .+ \(.+\)[:,] .+Fine if that's what you want/.test(w)), acrossLines)
+  // A warm-up or conditioning slot does a different JOB: never "keeps the work" there (the Leg Press here replaces a warm-up move).
+  check('4e1. a swap out of the warm-up says the session does a different job, never that it keeps the work',
+    acrossLines.some(w => /a warm-up move|conditioning/.test(w)) && acrossLines.filter(w => /a warm-up move|conditioning/.test(w)).every(w => /does a different job there/.test(w) && !/keeps the work/.test(w)), acrossLines)
+  const costs = [likeForLike, crossCard].flatMap(c => c?.warns ?? []).filter(w => !ACROSS.test(w))
   check('4e. at least one of the two swaps reports a balance cost, in its own warning line',
     costs.length > 0, { first: likeForLike?.warns, second: crossCard?.warns })
   // AND THE NUMBERS ARE IN THE SENTENCE SHE READS, not merely somewhere on the
@@ -265,6 +275,7 @@ if (cross) {
   // session-balance-cost's own header says a week no worse after gets silence.
   check('4g. ...and a swap that costs nothing stays quiet about balance',
     costs.length < 2, { first: likeForLike?.warns, second: crossCard?.warns })
+  check('4g2. ...and the balance line is still the card\'s, on the cross-pattern swap', (crossCard?.warns ?? []).some(w => !ACROSS.test(w) && (COUNTED_SETS.test(w) || /leaves nothing/i.test(w))), { first: likeForLike?.warns, second: crossCard?.warns })
   await shoot('swap-request-cost')
 }
 
