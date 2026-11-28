@@ -87,7 +87,10 @@ await open('h14')
 const fit = await evj(`(() => {
   const input = document.querySelector(${JSON.stringify(INPUT)}); if (!input) return null
   const mic = !!document.querySelector('button:has(svg.lucide-mic)')
-  const cs = getComputedStyle(input), room = input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+  // THE ROOM IS THE DRAWN WIDTH LESS PADDING AND BORDER (28 Nov 2026): an input's clientWidth here already leaves the
+  // padding out (296px box, 20px either side, clientWidth 254), so taking the padding off it again under-read the room
+  // by 40px and failed hints that fit.
+  const cs = getComputedStyle(input), room = input.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth)
   // THE BOX'S OWN FONT, built from its parts: an input's computed shorthand is "" in Chromium, and a canvas left on its
   // default 10px measured every hint at about half its width, so this check passed while hints were cut (9 Nov 2026).
   const ph = getComputedStyle(input, '::placeholder')

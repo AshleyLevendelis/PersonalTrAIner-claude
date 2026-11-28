@@ -62,9 +62,14 @@ await setOffline(false)
 const backOnline = await until(() => ev(`document.querySelector('[data-testid="part-not-loaded"]')?.getAttribute('data-online') ?? (document.querySelector('[data-testid="program-calendar"]') ? 'loaded' : null)`), v => v === 'true' || v === 'loaded', 40)
 check('the signal comes back: the notice stops saying the phone has no connection, or the calendar is simply there', backOnline === 'true' || backOnline === 'loaded', backOnline)
 check('...and nothing reloaded by itself', (await ev(`window.__sameLoad`)) === 'yes')
-const onlineButtons = backOnline === 'true' ? await ev(`[...document.querySelectorAll('[data-testid="part-not-loaded"] button')].map(x => x.textContent.trim())`) : ['Reload the app']
+// A RACE, NOT A FAULT (28 Nov 2026): with the signal back the app asks for the part again by itself, and where the
+// browser allows it the calendar arrives before the buttons are read; the notice is then simply gone. That is the
+// "calendar is there" case, so it is read as such rather than as a notice with no buttons.
+const buttonsNow = backOnline === 'true' ? await ev(`[...document.querySelectorAll('[data-testid="part-not-loaded"] button')].map(x => x.textContent.trim())`) : []
+const arrived = buttonsNow.length === 0 && (await until(() => ev(`!!document.querySelector('[data-testid="program-calendar"]')`), v => v === true, 20)) === true
+const onlineButtons = backOnline === 'true' && !arrived ? buttonsNow : ['Reload the app']
 check('...and with signal the button says what it does: "Reload the app", no "Try again" that cannot work', onlineButtons.includes('Reload the app') && !onlineButtons.includes('Try again'), onlineButtons)
-if (backOnline === 'true') await clickAt(`[...document.querySelectorAll('[data-testid="part-not-loaded"] button')].find(x => /Reload the app/.test(x.textContent))`)
+if (backOnline === 'true' && !arrived) await clickAt(`[...document.querySelectorAll('[data-testid="part-not-loaded"] button')].find(x => /Reload the app/.test(x.textContent))`)
 const cal = await until(() => ev(`!!document.querySelector('[data-testid="program-calendar"]')`), v => v === true, 80)
 check('her tap brings the calendar', cal === true)
 check('...and the notice is gone', (await ev(`!!document.querySelector('[data-testid="part-not-loaded"]')`)) === false)
@@ -145,7 +150,8 @@ for (let i = 0; i < 80; i++) {
     continue
   }
   await clickAt(`document.querySelector('[data-next-set-button]')`); taps++
-  await wait(300)
+  // A second press inside a second is a thumb bounce and ignored (28 Nov 2026): a real next set waits longer than that.
+  await wait(1100)
   if (await ev(`!!(${byText('/^Skip/')})`)) { await clickAt(byText('/^Skip/')); await wait(120) }
 }
 await wait(1200)
