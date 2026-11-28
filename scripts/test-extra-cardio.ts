@@ -79,6 +79,13 @@ async function main() {
   check('a stored row\'s line reads its distance', cardioLine({ activity_name: 'Run', duration_minutes: 40, intensity_rpe: 7, distance_km: 5.25 }) === 'Run · 40 min · Hard · 5.25 km')
   const ai = formatCardioLogsForAI([{ user_id: 'u', date: '2026-10-20', activity_name: 'Run', duration_minutes: 40, intensity_rpe: 7, distance_km: 6 }])
   check('the coach\'s history line carries it', /Run for 40min at RPE 7, 6 km/.test(ai), ai)
+  // STEPS AND CALORIES of a recorded walk or run reach the coach too; an estimate says so; nothing when 0 or absent.
+  const rec = formatCardioLogsForAI([{ user_id: 'u', date: '2026-10-20', activity_name: 'Walk', duration_minutes: 30, intensity_rpe: 3, steps: 3412.4, active_kcal: 141.6, kcal_estimated: true }])
+  check('the coach\'s line carries a recorded walk\'s steps and calories, the estimate marked', /Walk for 30min at RPE 3, 3,412 steps, 142 kcal burned \(an estimate\)/.test(rec), rec)
+  const watched = formatCardioLogsForAI([{ user_id: 'u', date: '2026-10-20', activity_name: 'Walk', duration_minutes: 30, intensity_rpe: 3, steps: 3000, active_kcal: 120, kcal_estimated: false }])
+  check('...a watch\'s own figure is not called an estimate', /3,000 steps, 120 kcal burned/.test(watched) && !/estimate/.test(watched), watched)
+  const none = formatCardioLogsForAI([{ user_id: 'u', date: '2026-10-20', activity_name: 'Walk', duration_minutes: 30, intensity_rpe: 3, steps: 0, active_kcal: 0 }, { user_id: 'u', date: '2026-10-21', activity_name: 'Walk', duration_minutes: 30, intensity_rpe: 3, steps: null, active_kcal: null }])
+  check('...and nothing when there are none', !/steps|kcal/.test(none), none)
 
   const { makeFakeSupabase } = await import('../.tour-harness/fake-supabase')
   const { setSupabaseClient } = await import('../src/lib/supabase')

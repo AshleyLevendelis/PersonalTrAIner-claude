@@ -749,6 +749,10 @@ export function formatCardioLogsForAI(logs: CardioLog[]): string {
     const parts = entries.map(e => {
       let s = `${e.activity_name} for ${e.duration_minutes}min at RPE ${e.intensity_rpe}`
       if (e.distance_km != null && Number(e.distance_km) > 0) s += `, ${Math.round(Number(e.distance_km) * 100) / 100} km`
+      // A RECORDED WALK OR RUN'S STEPS AND CALORIES (Builder D's coach-awareness audit, 28 Nov 2026): on the log, and
+      // now told to the coach in the session summary's own words; an estimate is said to be one.
+      if (e.steps != null && Number(e.steps) > 0) s += `, ${Math.round(Number(e.steps)).toLocaleString('en-GB')} steps`
+      if (e.active_kcal != null && Number(e.active_kcal) > 0) s += `, ${Math.round(Number(e.active_kcal))} kcal burned${e.kcal_estimated ? ' (an estimate)' : ''}`
       if (e.avg_heart_rate) s += ` (heart rate: average ${e.avg_heart_rate}${e.max_heart_rate ? `, highest ${e.max_heart_rate}` : ''})`
       return s
     })
