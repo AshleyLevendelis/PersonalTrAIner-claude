@@ -202,6 +202,34 @@ export function offerButtons(text: string): string {
   return `${trimmed}\n${OFFER_BUTTONS}${tail}`
 }
 
+// --- 5c. A how-to in short steps gets its "Full form guide" button ---------
+
+/**
+ * His 24 Sep 2026 ruling, "short steps": a how-to is up to three short numbered lines WITH a "Full form guide" button
+ * for the rest. The prompt says so; the 18 Nov 2026 exam's deadlift how-to came back as three good steps and three
+ * buttons, none of them the guide, so the rest of the technique was one typed message away on a gym floor. Code can
+ * SEE this one: he asked about a lift's form, the reply is one to three numbered steps, and no button is the guide.
+ * The button goes FIRST and the chat draws at most four, so a fourth of the coach's own is the one left out.
+ * CLOSED and literal on his side: "how do I eat more protein" is not a form question and never gets it.
+ */
+export const FULL_GUIDE = 'Full form guide'
+const ASKED_FORM = /\b(?:form|technique|cues?)\b|\bhow (?:do|to|should|can) i (?:do|perform|set up|squat|deadlift|bench|press|row|lunge|hinge|brace|pull|push|hip thrust|clean|snatch|swing)\b|\bhow to (?:do|perform|set up)\b/i
+const QUICK_TAG = /\[QUICK_REPLIES:\s*(.*?)\]/i
+const MAX_BUTTONS = 4
+
+export function fullGuideButton(text: string, userMessage: string | null | undefined): string {
+  const said = userMessage ?? ''
+  if (!ASKED_FORM.test(said) || /full form guide/i.test(said)) return text
+  const steps = text.replace(ANY_APP_TAG, '\n').split('\n').filter(l => /^\s*\d+[.)]\s/.test(l)).length
+  if (steps < 1 || steps > 3) return text
+  const tag = QUICK_TAG.exec(text)
+  if (!tag) return `${text.trimEnd()}\n[QUICK_REPLIES: "${FULL_GUIDE}"]`
+  const items = tag[1].split('|').map(o => o.trim().replace(/^"|"$/g, '')).filter(Boolean)
+  if (items.some(o => /full form guide/i.test(o))) return text
+  const next = [FULL_GUIDE, ...items].slice(0, MAX_BUTTONS)
+  return text.replace(tag[0], `[QUICK_REPLIES: ${next.map(o => `"${o}"`).join(' | ')}]`)
+}
+
 // --- 6. His name -------------------------------------------------------------
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -237,6 +265,8 @@ export interface TicContext {
   name?: string | null
   /** The coach's last few messages, newest last. */
   recentCoach?: string[]
+  /** What he just said (the how-to button reads it). */
+  userMessage?: string | null
 }
 
 export function withoutTics(text: string, ctx: TicContext = {}): string {
@@ -251,5 +281,5 @@ export function withoutTics(text: string, ctx: TicContext = {}): string {
   }
   const name = (ctx.name ?? '').trim()
   if (name) out = limitName(out, name, (ctx.recentCoach ?? []).slice(-3).some(t => saysName(t, name)))
-  return offerButtons(out)
+  return offerButtons(fullGuideButton(out, ctx.userMessage))
 }

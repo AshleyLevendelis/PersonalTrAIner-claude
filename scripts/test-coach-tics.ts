@@ -23,6 +23,7 @@ import { fileURLToPath } from 'url'
 import {
   withoutTics, removeInventedTags, plainInternalNames, capEmoji, dropStockOpener, dropStockCloser, isStockCloser,
   limitName, saysName, EMOJI_OVER_CHARS, MIN_LEFT_AFTER_CLOSER, offerButtons, OFFER_BUTTONS,
+  fullGuideButton, FULL_GUIDE,
 } from '../supabase/functions/chat-gemini/stock-phrases.ts'
 import { textLikeACoach, cleanCoachResponse, ticContextOf } from '../supabase/functions/chat-gemini/text-like-a-coach.ts'
 import { detectPlanPromise, PLAN_PROMISE_NUDGE, PLAN_PROMISE_FLOOR } from '../supabase/functions/_shared/plan-promise.ts'
@@ -155,7 +156,7 @@ async function main() {
   check('textLikeACoach runs the tics as well as the markup', textLikeACoach(`**Brace** first. ${answer} How does that sound?`) === `Brace first. ${answer}`, textLikeACoach(`**Brace** first. ${answer} How does that sound?`))
   const ctx = ticContextOf({ context: { display_name: 'Ashley' }, history: [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'Morning, Ashley.' }, { role: 'assistant', content: 42 }] })
   check('the conversation is read off the request: his name and the coach\'s own last messages only', ctx.name === 'Ashley' && JSON.stringify(ctx.recentCoach) === '["Morning, Ashley."]', ctx)
-  check('...and a request with neither is not an error', JSON.stringify(ticContextOf(null)) === '{"name":null,"recentCoach":[]}')
+  check('...and a request with neither is not an error', JSON.stringify(ticContextOf(null)) === '{"name":null,"recentCoach":[],"userMessage":null}')
   const json = (b: unknown) => new Response(JSON.stringify(b), { headers: { 'Content-Type': 'application/json' } })
   const out = await (await cleanCoachResponse(json({ reply: 'Not at all, Ashley! Use propose_plan_pause.', proposal: { kind: 'propose_plan_pause' } }), ctx)).json()
   check('a response is cleaned with that context, and the offer beside the words is untouched',
@@ -244,6 +245,27 @@ async function main() {
     const idx = code('supabase/functions/chat-gemini/index.ts')
     check('O7. combat-sport conditioning is 3-minute rounds with a minute\'s rest, named so the round timer reads it', /3-minute rounds at hard effort/.test(idx) && /"4 rounds of 3 minutes, 1 minute rest"/.test(idx) && /Skipping is a warm-up or an easy day, never the main conditioning/.test(idx))
     check('O8. "my cardio is bad" after their sport asks about breathing and pacing before prescribing', /"MY CARDIO IS BAD" AFTER THEIR SPORT IS A QUESTION BEFORE IT IS A PRESCRIPTION/.test(idx) && /holding the breath/.test(idx))
+  }
+
+  console.log('\n[G] A how-to in short steps carries its "Full form guide" button (his 24 Sep 2026 "short steps")')
+  {
+    // The 18 Nov 2026 exam's deadlift reply, as recorded (raw), buttons and all.
+    const dead = "Here's the foundation for a solid deadlift:\n\n1. Stand feet hip-width, bar over mid-foot, grip outside knees.\n2. Pull hips down, chest up, and squeeze your armpits.\n3. Drive through your feet, keeping the bar close.\n[BREAK]\nSetting your back protects your spine.\n\n[QUICK_REPLIES: \"Breathing & bracing\" | \"Common mistakes\" | \"Got it\"]"
+    const got = fullGuideButton(dead, 'how do I do a deadlift')
+    check('G1. his deadlift how-to gets the guide button FIRST, the coach\'s own kept after it', got.includes(`[QUICK_REPLIES: "${FULL_GUIDE}" | "Breathing & bracing" | "Common mistakes" | "Got it"]`), got.slice(-110))
+    check('G2. ...and nothing else in the reply moves', got.replace(/\[QUICK_REPLIES:[^\]]*\]/, '') === dead.replace(/\[QUICK_REPLIES:[^\]]*\]/, ''))
+    const four = dead.replace('"Got it"]', '"Got it" | "Show a video"]')
+    check('G3. the chat draws four buttons, so a fourth of the coach\'s is the one left out', fullGuideButton(four, 'deadlift form?').includes(`"${FULL_GUIDE}" | "Breathing & bracing" | "Common mistakes" | "Got it"]`) && !fullGuideButton(four, 'deadlift form?').includes('Show a video'))
+    const bare = '1. Brace hard.\n2. Push the floor away.'
+    check('G4. a how-to with no buttons gets the guide as its one button', fullGuideButton(bare, 'what are the cues for a squat?') === `${bare}\n[QUICK_REPLIES: "${FULL_GUIDE}"]`)
+    check('G5. a reply that already has it is left exactly as it is', fullGuideButton(`${bare}\n[QUICK_REPLIES: "Full form guide" | "Got it"]`, 'how do I squat') === `${bare}\n[QUICK_REPLIES: "Full form guide" | "Got it"]`)
+    check('G6. the full guide itself gets none (he is reading it)', fullGuideButton(bare, 'Full form guide') === bare)
+    check('G7. a question that is not about form gets none ("how do I eat more protein")', fullGuideButton(bare, 'how do I eat more protein?') === bare)
+    check('G8. a form question answered in prose, with no steps, gets none', fullGuideButton('Keep the bar over mid-foot and brace before you pull.', 'deadlift form?') === 'Keep the bar over mid-foot and brace before you pull.')
+    const seven = [1,2,3,4,5,6,7].map(n => `${n}. Step ${n}.`).join('\n')
+    check('G9. more than three steps is not the short-steps shape, and gets none', fullGuideButton(seven, 'how do I deadlift') === seven)
+    check('G10. the one door adds it, reading his message off the request', textLikeACoach(bare, ticContextOf({ message: 'how do I deadlift', history: [], context: {} })).includes(FULL_GUIDE))
+    check('G11. ...and without his message the door adds nothing', !textLikeACoach(bare, ticContextOf({ history: [], context: {} })).includes(FULL_GUIDE))
   }
 
   console.log(`\ncoach-tics: ${ran} checks ran`)

@@ -48,7 +48,7 @@ export function textLikeACoach(text: string, ctx: TicContext = {}): string {
 
 /** What the door needs to know about the conversation, read off the request the client sent. */
 export function ticContextOf(request: unknown): TicContext {
-  const r = (request && typeof request === 'object' ? request : {}) as { context?: { display_name?: unknown }; history?: unknown }
+  const r = (request && typeof request === 'object' ? request : {}) as { context?: { display_name?: unknown }; history?: unknown; message?: unknown }
   const name = typeof r.context?.display_name === 'string' ? r.context.display_name : null
   const recentCoach = Array.isArray(r.history)
     ? r.history
@@ -56,7 +56,7 @@ export function ticContextOf(request: unknown): TicContext {
         .slice(-3)
         .map((t: { content: string }) => t.content)
     : []
-  return { name, recentCoach }
+  return { name, recentCoach, userMessage: typeof r.message === 'string' ? r.message : null }
 }
 
 /**
