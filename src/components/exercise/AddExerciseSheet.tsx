@@ -4,10 +4,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
-import { Plus, ShieldAlert, Zap, Clock } from 'lucide-react'
+import { Plus, ShieldAlert, Zap, Clock, Ban } from 'lucide-react'
 import { searchExerciseCatalogByWords, type ExerciseEntry } from '@/lib/exercise-db'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
-import { getAdditionCandidates } from '@/lib/exercise-add-candidates'
+import { getAdditionCandidates, hardStopFor, hardStopLine } from '@/lib/exercise-add-candidates'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 import type { UserProfile, WorkoutDay } from '@/lib/types'
 import { tierWords, machineVersionLine } from '@/lib/coach-voice'
@@ -127,11 +127,17 @@ export function AddExerciseSheet({
     }
   }
 
-  const row = (exercise: ExerciseEntry, note: string | null, warnings: string[]) => (
+  // A HARD STOP IS SHOWN, NEVER PICKABLE (his ruling 28 Nov 2026, "Stop it on the screen too"): greyed, with the reason.
+  const row = (exercise: ExerciseEntry, note: string | null, warnings: string[]) => {
+    const stop = profile ? hardStopFor(exercise, profile) : null
+    return (
     <button
       key={exercise.name}
       data-add-candidate={exercise.name}
-      className="w-full text-left rounded-md border p-3 hover:bg-accent hover:border-primary/30 transition-colors"
+      data-hard-stop={stop ? '' : undefined}
+      disabled={!!stop}
+      aria-disabled={!!stop}
+      className="w-full text-left rounded-md border p-3 hover:bg-accent hover:border-primary/30 transition-colors disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:border-border"
       onClick={() => setPending(exercise)}
     >
       <div className="flex items-start justify-between gap-2">
@@ -155,17 +161,23 @@ export function AddExerciseSheet({
               <span>{note}</span>
             </p>
           )}
-          {warnings.map((w, i) => (
+          {stop ? (
+            <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1" data-testid="hard-stop-line">
+              <Ban className="size-3 mt-0.5 shrink-0" />
+              <span>{hardStopLine(stop)}</span>
+            </p>
+          ) : warnings.map((w, i) => (
             <p key={i} className="text-xs text-[color:var(--role-warn-text)] mt-1 flex items-start gap-1">
               <ShieldAlert className="size-3 mt-0.5 shrink-0" />
               <span>{w}</span>
             </p>
           ))}
         </div>
-        <Plus className="size-4 shrink-0 text-muted-foreground mt-1" />
+        {!stop && <Plus className="size-4 shrink-0 text-muted-foreground mt-1" />}
       </div>
     </button>
-  )
+    )
+  }
 
   return (
     <Dialog open={!!target} onOpenChange={(open) => { if (!open) handleClose() }}>

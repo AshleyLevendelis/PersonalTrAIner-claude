@@ -178,6 +178,38 @@ await wait(3500)
 const back = await until(order, o => Array.isArray(o) && o.length > 0)
 check('5. it is still there after leaving the tab and coming back', (back ?? []).includes(picked), back)
 
+// --- 6. A HARD STOP IS SHOWN, NEVER PICKABLE (his ruling 28 Nov 2026, "Stop it on the screen too") -----------------------
+// A shoulder on the injuries list: in the add AND swap searches a move it rules out stays visible, greyed with the
+// reason, and a tap does nothing; a move outside the stop is still picked as before.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&mobility=1#/tab/exercise` })
+await wait(4500)
+const typeSearch = (sel, value) => ev(`(() => { const t = document.querySelector(${JSON.stringify(sel)}); if (!t) return false; const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(t, ${JSON.stringify(value)}); t.dispatchEvent(new Event('input', { bubbles: true })); return true })()`)
+const stopRows = () => ev(`[...document.querySelectorAll('[data-hard-stop]')].map(b => ({ name: b.getAttribute('data-add-candidate') ?? b.getAttribute('data-swap-candidate'), disabled: b.disabled, line: b.querySelector('[data-testid="hard-stop-line"]')?.textContent.trim() ?? '' }))`)
+check('6a. the add sheet opens on a shoulder-injury profile', (await tap('[data-testid="add-exercise"]')) && !!(await until(() => has('[data-testid="add-exercise-sheet"]'), v => v)))
+await typeSearch('[data-testid="add-exercise-search"]', 'press'); await wait(700)
+const addStops = (await stopRows()) ?? []
+check('6b. a move his shoulder rules out is LISTED, greyed (disabled), with the reason', addStops.length > 0 && addStops.every(r => r.disabled && /^Loads your .*shoulder.*, which is on your injuries list, so it can't go in your plan\.$/.test(r.line)), addStops.slice(0, 3))
+check('6c. ...while moves outside the stop are still pickable rows', (await ev(`[...document.querySelectorAll('[data-add-candidate]:not([data-hard-stop])')].filter(b => !b.disabled).length`)) > 0)
+await shoot('exercise-add-hard-stop')
+if (addStops[0]) await tap(`[data-add-candidate=${JSON.stringify(addStops[0].name)}]`)
+await wait(700)
+check('6d. tapping a stopped row picks nothing (no confirm step)', !(await has('[data-scope="today"]')))
+for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 })
+await wait(700)
+// THE SWAP SEARCH, the same rule.
+const firstEx = (await order())?.[1]
+if (!(await has(`[data-exercise-name=${JSON.stringify(firstEx)}] button[aria-label="Exercise options"]`))) { await tap(`[data-exercise-name=${JSON.stringify(firstEx)}] [role="button"], [data-exercise-name=${JSON.stringify(firstEx)}] .cursor-pointer`); await wait(700) }
+await tap(`[data-exercise-name=${JSON.stringify(firstEx)}] button[aria-label="Exercise options"]`); await wait(500)
+check('6e. the swap dialog opens', await tap('[data-testid="swap-exercise"]') && !!(await until(() => has('[data-testid="swap-dialog"]'), v => v)), firstEx)
+if (await has('[data-testid="reason-skip"]')) { await tap('[data-testid="reason-skip"]'); await wait(600) }
+await typeSearch('[data-testid="swap-dialog"] input[placeholder^="e.g."]', 'press'); await wait(700)
+const swapStops = ((await stopRows()) ?? []).filter(r => r.name)
+check('6f. the swap search greys the same stopped moves, with the reason', swapStops.length > 0 && swapStops.every(r => r.disabled && /which is on your injuries list, so it can't go in your plan/.test(r.line)), swapStops.slice(0, 3))
+if (swapStops[0]) await tap(`[data-swap-candidate=${JSON.stringify(swapStops[0].name)}]`)
+await wait(700)
+check('6g. ...and tapping one picks nothing', (await ev(`!![...document.querySelectorAll('[data-testid="swap-dialog"] button')].find(b => /^Swap to|^Use /.test(b.textContent.trim()))`)) === false && (await stopRows())?.length > 0)
+await shoot('exercise-swap-hard-stop')
+
 console.log(failures === 0 ? '\nAll add checks passed.\n' : `\n${failures} add check(s) failed.\n`)
 ws.close(); chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)

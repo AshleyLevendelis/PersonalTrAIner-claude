@@ -499,6 +499,21 @@ async function main() {
   const jump = ['Box Jumps', 'Burpees', 'Jump Squats'].map(n => getExerciseEntry(n)).find(Boolean)
   const preg = jump ? resolveAdditionAnywhere(jump.name, pregnant, []) : null
   check('HARD STOP: a move the pregnancy rules leave out is refused', !!preg && 'stop' in preg, { jump: jump?.name, preg })
+  // ONE PREDICATE FOR THE SCREEN AND THE COACH (his "Stop it on the screen too", 28 Nov 2026): hardStopFor is what the
+  // coach's resolver refuses by and what greys a row in the add and swap searches.
+  const { hardStopFor, hardStopLine } = await import('../src/lib/exercise-add-candidates')
+  const hurtEntry = getExerciseEntry(injuryFiltered[0].name)!
+  const hs = hardStopFor(hurtEntry, limited)
+  check('SCREEN STOP: the same shoulder move is a hard stop, naming the joint, in the screen\'s words', hs?.kind === 'injury' && /shoulder/.test(hs.joints.join(' ')) && /^Loads your .*shoulder.*, which is on your injuries list, so it can't go in your plan\.$/.test(hardStopLine(hs!)), hs)
+  check('...a move that fits is no stop', hardStopFor(getExerciseEntry(limitedCands[0].exercise.name)!, limited) === null)
+  check('...a move outside his kit only is no stop (a warning, then allowed)', !!outOfKit && hardStopFor(outOfKit, limited) === null, outOfKit?.name)
+  check('...the pregnancy rules are a stop on the screen too, in the same words', !!jump && hardStopFor(jump, pregnant)?.kind === 'pregnancy' && 'stop' in (preg as object) && hardStopLine(hardStopFor(jump, pregnant)!) === (preg as { stop: string }).stop, jump?.name)
+  // A MACHINE VERSION is judged as the lift it is a version of: a version whose parent his injury rules out is a stop.
+  const { machineVersions } = await import('../src/lib/exercise-db')
+  const versionOfHurt = machineVersions().find(e => !!e.parent && hardStopFor(getExerciseEntry(e.parent)!, limited)?.kind === 'injury')
+  check('...a machine version of a lift his injury rules out is a stop too (it carries its parent\'s tags)', !!versionOfHurt && hardStopFor(versionOfHurt, limited)?.kind === 'injury', versionOfHurt?.name)
+  const screenSrc = ['src/components/exercise/AddExerciseSheet.tsx', 'src/components/exercise/SwapDialog.tsx'].map(f => readFileSync(f, 'utf8'))
+  check('both screen searches ask hardStopFor and disable the row on it', screenSrc.every(src => /const stop = profile \? hardStopFor\(exercise, profile\) : null/.test(src) && /\sdisabled=\{!!stop\}/.test(src)))
   const healthy = { ...baseProfile, injuries: [] } as unknown as UserProfile
   registerNearCopies(NEAR_COPIES)
   const nearCopy = logOnlyExercises().find(e => !isContraindicatedFor(e, new Set()))

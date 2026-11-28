@@ -357,6 +357,30 @@ export function resolveAdditionRequest(
  */
 export type AdditionResolution = { entry: ExerciseEntry; warnings: string[] } | { stop: string } | null
 
+/**
+ * THE HARD STOPS FOR PUTTING A MOVE IN THE PLAN (his ruling 28 Nov 2026, "keep the hard stops"; and "Stop it on the
+ * screen too" the same day): a move his injuries list rules out, and one the pregnancy rules leave out. ONE predicate
+ * for the coach's add and the Exercise screen's add and swap searches, so the two cannot disagree about what is a stop.
+ * A machine version carries its parent's own injury tags (measured: none differs), so it is judged as itself. Logging
+ * work already done is never stopped.
+ */
+export type HardStop = { kind: 'injury'; joints: string[] } | { kind: 'pregnancy'; why: NonNullable<ReturnType<typeof pregnancyExclusion>> }
+
+export function hardStopFor(entry: ExerciseEntry, profile: UserProfile): HardStop | null {
+  const flagged = new Set<string>()
+  for (const injury of profile.injuries ?? []) for (const j of INJURED_JOINTS[injury] ?? []) flagged.add(j)
+  if (isContraindicatedFor(entry, flagged)) return { kind: 'injury', joints: contraindicatedJoints(entry).filter(j => flagged.has(j)).map(j => j.replace(/_/g, ' ')) }
+  const why = isPregnant(profile) ? pregnancyExclusion(entry) : null
+  return why ? { kind: 'pregnancy', why } : null
+}
+
+/** The screen's sentence for a stop, on the greyed row: why it cannot be picked. */
+export function hardStopLine(stop: HardStop): string {
+  return stop.kind === 'injury'
+    ? `Loads your ${stop.joints.join(' and ')}, which is on your injuries list, so it can't go in your plan.`
+    : pregnancyWarning(stop.why)
+}
+
 export function resolveAdditionAnywhere(item: string, profile: UserProfile, exclusions: string[] = []): AdditionResolution {
   const fits = resolveAdditionRequest(item, profile, exclusions)
   if (fits) return { entry: fits, warnings: [] }
@@ -370,14 +394,11 @@ export function resolveAdditionAnywhere(item: string, profile: UserProfile, excl
   if (exclusions.some(x => x.trim().toLowerCase() === entry.name.toLowerCase())) {
     return { stop: `${entry.name} is on your never-again list, so it stays out. Take it off the list on Profile and I can add it.` }
   }
-  const flagged = new Set<string>()
-  for (const injury of profile.injuries ?? []) for (const j of INJURED_JOINTS[injury] ?? []) flagged.add(j)
-  if (isContraindicatedFor(entry, flagged)) {
-    const joints = contraindicatedJoints(entry).filter(j => flagged.has(j)).map(j => j.replace(/_/g, ' '))
-    return { stop: `${entry.name} loads your ${joints.join(' and ')}, which is on your injuries list, so I won't put it in. I can find one that works the same muscles without it.` }
+  const stop = hardStopFor(entry, profile)
+  if (stop?.kind === 'injury') {
+    return { stop: `${entry.name} loads your ${stop.joints.join(' and ')}, which is on your injuries list, so I won't put it in. I can find one that works the same muscles without it.` }
   }
-  const pregnancy = isPregnant(profile) ? pregnancyExclusion(entry) : null
-  if (pregnancy) return { stop: pregnancyWarning(pregnancy) }
+  if (stop) return { stop: hardStopLine(stop) }
   const warnings = getExerciseCompatibilityWarnings(entry, profile, exclusions)
   return { entry, warnings: warnings.length > 0 ? warnings : ["It isn't one your plan would pick for your training style or level, so it goes in because you asked for it."] }
 }

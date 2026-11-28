@@ -119,7 +119,8 @@ earlier ruling of his and wait for his word.
   or swap one in, priced from its parent, the card naming the plan's own choice; the generator still never picks one.
 - [x] **The screen's injury stop** (found in fix 4; his 13 Sep "show everything, warn me"). **ANSWERED 28 Nov 2026:
   "Stop it on the screen too"** (over the warning only): a move his injuries list excludes stays visible in the add
-  and swap searches, greyed with the reason, and cannot be picked, as the coach already refuses.
+  and swap searches, greyed with the reason, and cannot be picked, as the coach already refuses. BUILT 28 Nov 2026 (Builder A):
+  `hardStopFor` greys injury and pregnancy stops in both searches, one predicate with the coach's add.
 - [x] **Shortening when warm-up + main lift alone is over the time** (fix 6). **ANSWERED 28 Nov 2026: "Keep it whole,
   say the real time"** (over cutting main-lift sets): his 13 Sep "protect the main lift" stands; nothing to build.
 

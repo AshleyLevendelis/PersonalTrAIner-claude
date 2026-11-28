@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input'
 import { EditReasonStep, type ReasonAnswer } from './EditReasonStep'
 import { isNothingToChangeMessage } from '@/lib/edit-reason'
 import { tierWords, blockSwapLine, machineVersionLine } from '@/lib/coach-voice'
-import { ArrowRightLeft, ShieldAlert, Zap } from 'lucide-react'
+import { ArrowRightLeft, ShieldAlert, Zap, Ban } from 'lucide-react'
+import { hardStopFor, hardStopLine } from '@/lib/exercise-add-candidates'
 import { getExerciseEntry, searchExerciseCatalogByWords, type ExerciseEntry } from '@/lib/exercise-db'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
 import { getReplacementCandidates, type SwapScope } from '@/lib/mesocycle-edit'
@@ -360,10 +361,16 @@ export function SwapDialog({
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {searchResults.map(exercise => {
                     const warnings = profile ? getExerciseCompatibilityWarnings(exercise, profile, exclusions) : []
+                    // A HARD STOP IS SHOWN, NEVER PICKABLE (his ruling 28 Nov 2026, "Stop it on the screen too").
+                    const stop = profile ? hardStopFor(exercise, profile) : null
                     return (
                       <button
                         key={exercise.name}
-                        className="w-full text-left rounded-md border p-3 hover:bg-accent hover:border-primary/30 transition-colors"
+                        data-swap-candidate={exercise.name}
+                        data-hard-stop={stop ? '' : undefined}
+                        disabled={!!stop}
+                        aria-disabled={!!stop}
+                        className="w-full text-left rounded-md border p-3 hover:bg-accent hover:border-primary/30 transition-colors disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:border-border"
                         onClick={() => setPendingSwap(exercise)}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -384,14 +391,19 @@ export function SwapDialog({
                             {machineVersionLine(exercise) && (
                               <p data-testid="swap-version-of" className="text-xs leading-[1.45] text-muted-foreground">{machineVersionLine(exercise)}</p>
                             )}
-                            {warnings.map((w, i) => (
+                            {stop ? (
+                              <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1" data-testid="hard-stop-line">
+                                <Ban className="size-3 mt-0.5 shrink-0" />
+                                <span>{hardStopLine(stop)}</span>
+                              </p>
+                            ) : warnings.map((w, i) => (
                               <p key={i} className="text-xs text-[color:var(--role-warn-text)] mt-1 flex items-start gap-1">
                                 <ShieldAlert className="size-3 mt-0.5 shrink-0" />
                                 <span>{w}</span>
                               </p>
                             ))}
                           </div>
-                          <ArrowRightLeft className="size-4 shrink-0 text-muted-foreground mt-1" />
+                          {!stop && <ArrowRightLeft className="size-4 shrink-0 text-muted-foreground mt-1" />}
                         </div>
                       </button>
                     )
