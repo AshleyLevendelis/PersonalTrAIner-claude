@@ -1915,8 +1915,9 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
 ### His requests of 28 Nov 2026
 - **A walk, jog or run's route from the watch's GPS: his ruling "Save the route"** (over showing it once and over
   hiding its ends): GPS on foot only, with his permission; a point every 5 m moved, none after End; kept with the walk,
-  his alone, "Delete route" under it (screen only: the coach is never told where he went); drawn from the points with
-  no map service asked. `test:watch-app`, `test:rls-local` §11b, `verify:watch-sets` §8. Needs migration
+  his alone, "Delete route" under it (screen only: the coach is never told where he went). **Streets under it: his
+  ruling "Streets, OpenStreetMap"** (over Google and over the plain line): map squares by area only, never the route,
+  with OpenStreetMap's credit. `test:watch-app`, `test:rls-local` §11b, `verify:watch-sets` §8. Needs migration
   20261128120000 and a phone and watch rebuild
 
 ### His requests of 26 Nov 2026

@@ -195,6 +195,12 @@ await ev(`location.hash = '#/tab/exercise'`); await wait(2500)
 const map8 = await until(() => ev(`(() => { const m = document.querySelector('[data-testid="route-map"]'); if (!m) return null; m.scrollIntoView({ block: 'center' }); const line = m.querySelector('[data-testid="route-line"]'); return { pts: (line?.getAttribute('points') || '').trim().split(/\\s+/).length, km: m.querySelector('[data-testid="route-km"]')?.textContent, start: !!m.querySelector('[data-testid="route-start"]'), end: !!m.querySelector('[data-testid="route-end"]'), w: m.getBoundingClientRect().width } })()`), v => !!v, 40)
 check('8a. the walk logged from the watch shows its route under it, the whole line, start and finish marked', !!map8 && map8.pts === pts8.length && map8.start && map8.end && map8.w > 200, map8)
 // The loop: 333 m north, 332 m east, 333 m south, 305 m west (longitude shrinks by cos 51.5°): 1.30 km.
+const streets8 = await ev(`(() => { const m = document.querySelector('[data-testid="route-map"]'); if (!m) return null; const imgs = [...m.querySelectorAll('[data-testid="route-streets"] image')].map(i => i.getAttribute('href')); const kids = [...m.querySelector('svg').children].map(k => k.getAttribute('data-testid') || k.tagName); const credit = m.querySelector('[data-testid="route-credit"]'); const r = credit?.getBoundingClientRect(); return { imgs, under: kids.indexOf('route-streets') < kids.indexOf('route-line'), credit: credit?.textContent, creditH: r?.height ?? 0 } })()`)
+// THE STREETS (his ruling 28 Nov 2026, "Streets, OpenStreetMap"). This machine cannot reach OpenStreetMap, so the squares
+// are checked by what they ask for; the picture shows them blank.
+check('8a2. under the line, OpenStreetMap squares asked for by grid place only, with the map\'s credit to tap',
+  !!streets8 && streets8.imgs.length > 0 && streets8.imgs.every(u => /^https:\/\/tile\.openstreetmap\.org\/\d+\/\d+\/\d+\.png$/.test(u))
+  && streets8.under && streets8.credit === '© OpenStreetMap contributors' && streets8.creditH >= 44, streets8)
 check('8b. ...with its length along the route (1.30 km)', /Route · 1\.30 km/.test(map8?.km ?? ''), map8?.km)
 await wait(400)
 await shoot('watch-sets-route')
