@@ -64,8 +64,9 @@ honest-propose-not-announce, specific-why-this-exercise. They answer first, give
 Advise, then allow: `allow-weights-on-a-rest-day`, `allow-swap-to-another-pattern`, `allow-session-down-to-two`.
 The hard stops: `stop-an-exercise-the-injury-excludes`, `stop-red-flag-pain-changes-nothing`. The other screens:
 `aware-weight-trend-from-home`, `aware-shopping-list-contents`. A change he asks for: `change-asked-move-session`,
-`change-asked-lighter-fortnight`, `change-asked-four-days`. 78 cases. `allow-swap-to-another-pattern` is expected to
-FAIL until B1 lands: the prompt still refuses a swap he names across patterns.
+`change-asked-lighter-fortnight`, `change-asked-four-days`. 78 cases. `allow-swap-to-another-pattern` grades B1, which
+Builder B had already made as advise-then-allow fix 17 (0532c24, on claude/builder-b-coach); it can pass only once
+that branch is merged and deployed.
 
 ## 4. Prompt wording for Builder B (chat-gemini/index.ts is Builder B's file; nothing here was edited by me)
 
@@ -119,6 +120,12 @@ Reason: voice-how-to-short-steps, specific 1.
 > composition better; never call the scale "the best way" to see it.
 
 Reason: invented-feature-progress-photos, correct 1 (a dietitian would correct it).
+
+## Status of section 4 (28 Nov 2026, from Builder B)
+
+B2, B3, B4, B5 and B6 applied by Builder B on claude/builder-b-coach at 63a376a (B4 and B6 also in
+_shared/coach-rules.ts, which must match the prompt word for word). B1 was already fix 17 (0532c24), held by
+`test:coach-advise-not-refuse` §4. All of it is unproven until the exam runs after the `chat-gemini` deploy.
 
 ## HIS
 
