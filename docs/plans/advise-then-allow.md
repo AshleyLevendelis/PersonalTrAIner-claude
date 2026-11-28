@@ -67,6 +67,12 @@ earlier ruling of his and wait for his word.
 21. [ ] **The coach's prompt**: every "do not call it for..." that is a training refusal becomes "offer it with the
     reason"; the "point them at the right screen" fallback is only for what no tool does.
 
+## Ruled 28 Nov 2026
+
+- **Two sessions on one day: his "Allow, with a warning"** (reverses 8 Sep). Coach half (Builder B): the train-today,
+  move and cardio-session cards allow a day that already has a session, leading with the recovery cost. Screen half:
+  Builder A.
+
 ## HIS (each reverses an earlier ruling)
 
 - **Two sessions on one day** (his 8 Sep ruling: "a day never holds two sessions"). Needed for: moving a session
