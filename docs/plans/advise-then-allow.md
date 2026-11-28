@@ -1,5 +1,16 @@
 # Advise, then allow: every training change (his ruling, 28 Nov 2026)
 
+> **STATUS, Builder B (coach half), 28 Nov 2026, branch `claude/builder-b-coach`:** DONE 20 (any past day), 17 (swap
+> for anything; named swaps now meet the hard stops, machine versions and from-28-weeks included), 13 start and plan
+> (`propose_own_workout`), 21 first part (prompt refusals that were not hard stops). All need the `chat-gemini` deploy
+> except 20 (client only). **Waiting on Builder A:** 13's log-afterwards (lift `OwnWorkoutSheet.saveAfter` into a
+> library); 21's rest and the two-sessions ruling's coach cards (move into next week / onto a day with a session,
+> volume below its floor, train-today on a training day) need the move, volume and train-today libraries to allow
+> them first; items 7-12, 15, 16, 18, 19 wait for their shared functions. **Also for A (parity, found here):** the
+> screen's swap and own-workout pickers let injury, pregnancy and never-again moves through with a warning (his
+> decision 2); the coach's add (fix 4) misses machine versions and the from-28-weeks list (`swapHardStop` fits).
+
+
 His words: "users can add or remove or change workouts, days' workouts, single exercises, whatever they want, and we
 just guide them and tell them the whys, why not ... if somebody wants to train on the day they weren't supposed to,
 they should be able to add it and log it in the app." Then: "fix everything one by one and keep the hard stops".
