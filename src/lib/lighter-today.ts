@@ -75,9 +75,16 @@ export function planLighterToday(input: {
   const after = settled.week.days.find(d => d.day === dayName)
   if (!after) return { ok: false, refusal: "I can't see today's session just now." }
   // A SECOND STEP KEEPS THE PLANNED DAY, so Undo puts back the session as planned, never the first step.
-  const unmarked: WorkoutDay = { ...day }
-  delete unmarked.lightened_from
-  const marked: WorkoutDay = { ...after, lightened_from: { planned: again ? again.planned : unmarked, left: dayFingerprint(after) } }
+  // THE FULL SESSION, ALWAYS (the lead's review, 28 Nov 2026): on a day changed since an earlier step (a swap between
+  // steps), "Put the full session back" must still give the full session, keeping the change: each exercise the plan
+  // had takes its planned sets again, a swapped-in one keeps its own, and no mark of an earlier step is left.
+  const earlier = day.lightened_from
+  const fullNow: WorkoutDay = earlier
+    ? { ...day, exercises: day.exercises.map(ex => { const was = earlier.planned.exercises.find(e => e.name === ex.name); return was ? { ...ex, sets: was.sets } : ex }) }
+    : { ...day }
+  delete fullNow.lightened_from
+  delete fullNow.lightened_today
+  const marked: WorkoutDay = { ...after, lightened_from: { planned: again ? again.planned : fullNow, left: dayFingerprint(after) } }
   const finalWeek: MesocycleWeek = { ...settled.week, days: settled.week.days.map(d => (d.day === dayName ? marked : d)) }
 
   // THE WORDS, read off the two days: every exercise whose sets moved, then the length.

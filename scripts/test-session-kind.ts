@@ -442,7 +442,8 @@ console.log('\n15. Advise, then allow (fix 8): an added block on a started sessi
   const dayAfter = off ? off.week.days.find(d => d.day === 'Monday')! : null
   check('...the started session is kept EXACTLY, every exercise and set, the block after it', !!dayAfter && J(dayAfter.exercises.slice(0, live.exercises.length)) === J(live.exercises) && dayAfter.exercises.length > live.exercises.length, dayAfter?.exercises.map(e => e.name))
   check('...the offer\'s session is the block alone, and none of it is already on the day', !!off && !!dayAfter && J(off.session) === J(dayAfter.exercises.slice(live.exercises.length)) && off.session.every(e => !live.exercises.some(x => x.name === e.name)))
-  check('...no second warm-up in the block', !!off && off.session.every(e => e.tier !== 'tier_0_primer'), off?.session.map(e => [e.name, e.tier]))
+  const { isMovementPrepRow } = await import('../src/lib/session-duration')
+  check('...no second warm-up in the block (the one definition of a warm-up move)', !!off && off.session.every(e => !isMovementPrepRow(e)), off?.session.map(e => [e.name, e.tier]))
   check('...about twenty minutes, never past twenty-five', !!off && off.minutes > 0 && off.minutes <= 25, off?.minutes)
   check('...the marker names the block, and keeps the started day as it was', !!dayAfter?.kind_today && J(dayAfter.kind_today.addedAfter) === J(off!.session.map(e => e.name)) && J(dayAfter.kind_today.planned.exercises) === J(live.exercises))
   check('...no main lift is dropped by adding', !!off && off.droppedMainLift === null)
@@ -454,6 +455,31 @@ console.log('\n15. Advise, then allow (fix 8): an added block on a started sessi
   const hyAdd = await planSessionKindToday({ mesocycle: M_ONE, profile: ONE, weekNumber: 2, dayName: oneHybrid!.dayName, kind: 'hybrid', moves: [], exclusions: [], loggedSets: 2 })
   check('the case binds: a hybrid SESSION opens with a heavy main lift', hyFresh.ok && hyFresh.offer.session.some(e => getEntryTier(e.name) === 'tier1_compound'), hyFresh.ok ? hyFresh.offer.session.map(e => [e.name, getEntryTier(e.name)]) : hyFresh)
   check('...but a hybrid BLOCK added after a started session takes no second heavy main lift', hyAdd.ok && hyAdd.offer.session.every(e => getEntryTier(e.name) !== 'tier1_compound'), hyAdd.ok ? hyAdd.offer.session.map(e => [e.name, getEntryTier(e.name)]) : hyAdd)
+  // ACROSS EVERY FIXTURE PROFILE AND KIND (the lead's review: one profile was all this rested on), an added block never
+  // holds a heavy main lift, the limited kits and the injured one included.
+  const fixtures: [string, MesocycleWeek[], UserProfile][] = [['full', M_FULL, FULL], ['mini', M_MINI, MINI], ['body', M_BODY, BODY], ['knee', M_KNEE, KNEE], ['one', M_ONE, ONE]]
+  const t1In: string[] = []
+  let blocks = 0
+  for (const [label, m, prof] of fixtures) {
+    const w2 = m.find(w => w.week_number === 2)!
+    const started = w2.days.find(d => d.exercises.length > 2)
+    if (!started) continue
+    for (const k of ['cardio', 'functional', 'bodybuilding', 'hybrid'] as SessionKind[]) {
+      const r = await planSessionKindToday({ mesocycle: m, profile: prof, weekNumber: 2, dayName: started.day, kind: k, moves: [], exclusions: [], loggedSets: 2 })
+      if (!r.ok) continue
+      blocks++
+      for (const e of r.offer.session) if (getEntryTier(e.name) === 'tier1_compound') t1In.push(`${label}/${k}: ${e.name}`)
+    }
+  }
+  check('no added block on any fixture profile holds a heavy main lift', blocks >= 10 && t1In.length === 0, { blocks, t1In })
+  // THE CASE THAT BINDS: every lighter leg move kept out (his exercises to avoid), so the hybrid block's leg place has
+  // only tier-1 lifts left. A SESSION of that kind still takes one; an ADDED block leaves the place empty.
+  const legLight = EXERCISE_DATABASE.filter(e => !e.retired && ['knee_dominant', 'hip_hinge', 'single_leg'].includes(e.movement_pattern) && e.mechanics_tier !== 'tier1_compound').map(e => e.name)
+  const oneDay = M_ONE.find(w => w.week_number === 2)!.days.find(d => d.exercises.length > 2)!
+  const freshT1 = await planSessionKindToday({ mesocycle: M_ONE, profile: ONE, weekNumber: 2, dayName: oneDay.day, kind: 'hybrid', moves: [], exclusions: legLight, loggedSets: 0 })
+  const addT1 = await planSessionKindToday({ mesocycle: M_ONE, profile: ONE, weekNumber: 2, dayName: oneDay.day, kind: 'hybrid', moves: [], exclusions: legLight, loggedSets: 2 })
+  check('the case binds: with only heavy leg lifts left, a hybrid SESSION takes one', freshT1.ok && freshT1.offer.session.some(e => getEntryTier(e.name) === 'tier1_compound'), freshT1.ok ? freshT1.offer.session.map(e => [e.name, getEntryTier(e.name)]) : freshT1)
+  check('...an ADDED block leaves that place empty rather than take a second heavy main lift', addT1.ok && addT1.offer.session.every(e => getEntryTier(e.name) !== 'tier1_compound'), addT1.ok ? addT1.offer.session.map(e => [e.name, getEntryTier(e.name)]) : addT1)
   // A MOVE HE NAMES that the started session already holds is not put in twice.
   const liveName = live.exercises.find(e => e.tier !== 'tier_0_primer' && getEntryTier(e.name) === 'tier2_compound')?.name ?? live.exercises[1].name
   const dup = await planSessionKindToday({ mesocycle: M_FULL, profile: FULL, weekNumber: 2, dayName: 'Monday', kind: 'bodybuilding', moves: [liveName], exclusions: [], loggedSets: 2 })
@@ -461,7 +487,7 @@ console.log('\n15. Advise, then allow (fix 8): an added block on a started sessi
   check('a named move already in the started session appears once on the day, never twice', !!dupDay && dupDay.exercises.filter(e => e.name === liveName).length === 1, dupDay?.exercises.map(e => e.name))
   check('...and it is SAID, never silently dropped', dup.ok && dup.offer.asked.some(a => a.reason === `${liveName} ${/[^s]s(\s*\([^)]*\))?$/.test(liveName) ? 'are' : 'is'} already in today's session, so I haven't added ${/[^s]s(\s*\([^)]*\))?$/.test(liveName) ? 'them' : 'it'} again.`), dup.ok ? dup.offer.asked : dup)
   const funcAdd = await call({ logged: 2, kind: 'functional' })
-  check('a functional block takes no explosive warm-up and no second heavy main lift', funcAdd.ok && funcAdd.offer.session.every(e => e.tier !== 'tier_0_primer' && getEntryTier(e.name) !== 'tier1_compound'), funcAdd.ok ? funcAdd.offer.session.map(e => [e.name, getEntryTier(e.name)]) : funcAdd)
+  check('a functional block takes no explosive warm-up and no second heavy main lift', funcAdd.ok && funcAdd.offer.session.every(e => !isMovementPrepRow(e) && getEntryTier(e.name) !== 'tier1_compound'), funcAdd.ok ? funcAdd.offer.session.map(e => [e.name, getEntryTier(e.name)]) : funcAdd)
   // (b) UNDO OF AN ADDED BLOCK
   const written = off ? confirmSessionKindToday(M_FULL, off) : null
   const m2 = written?.ok ? written.mesocycle : M_FULL
@@ -479,7 +505,13 @@ console.log('\n15. Advise, then allow (fix 8): an added block on a started sessi
   const againKind = await call({ meso: m2, kind: 'cardio' })
   check('the same kind on a day carrying an added block (nothing logged now) replaces the day, never "already"', againKind.ok && !againKind.offer.added && J(kindTodayOf(againKind.offer.week.days.find(d => d.day === 'Monday'))?.planned.exercises) === J(live.exercises), againKind.ok ? undefined : againKind)
   const twice = await call({ logged: 2, meso: m2, kind: 'functional' })
-  check('a second added block is refused in words until the first is put back', !twice.ok && /already added after today's session/.test(twice.refusal), twice)
+  check('a SECOND added block goes on after the first, the reason first', twice.ok && twice.offer.added && /^A cardio block is already added after today's session; this adds a functional block after that\./.test(twice.offer.advice[0] ?? ''), twice.ok ? twice.offer.advice : twice)
+  const m2t = twice.ok ? (confirmSessionKindToday(m2, twice.offer) as { ok: true; mesocycle: MesocycleWeek[] }).mesocycle : m2
+  const uT = undoSessionKindToday(m2t, 2, 'Monday', 2, [live.exercises[0].name])
+  check('...and its Undo takes off only the second block, leaving the first exactly', uT.ok && J(dayIn(uT.mesocycle, 2, 'Monday')) === J(dayIn(m2, 2, 'Monday')), uT.ok ? undefined : uT)
+  // HIS OWN STYLE after a started session is added as a block, never redirected to a choice the menu hides.
+  const own = await call({ logged: 2, kind: 'hybrid' })
+  check('a block of his own style is added to a started session, not refused', own.ok && own.offer.added, own)
   // A day swapped to another kind and then started takes a block; Undo gives back the swapped day, marker and all.
   const swappedOffer = offerOf(await call({ kind: 'functional' }))
   const m3 = swappedOffer ? (confirmSessionKindToday(M_FULL, swappedOffer) as { ok: true; mesocycle: MesocycleWeek[] }).mesocycle : M_FULL
@@ -501,6 +533,14 @@ console.log('\n15. Advise, then allow (fix 8): an added block on a started sessi
   const actMeso = M_FULL.map(w => w.week_number !== 2 ? w : { ...w, days: w.days.map(d => d.day !== 'Tuesday' ? d : { ...d, plannedActivity: { activity: 'Brisk walk', duration: 20, targetRpe: 3, timing: 'standalone', reason: 'Easy movement' } as never }) })
   const act = await call({ day: 'Tuesday', say: 'Tuesday', meso: actMeso })
   check('a planned-activity day says the session replaces it, never "there to let you recover"', act.ok && act.offer.advice[0] === 'This replaces the planned activity on Tuesday, just this week.', act.ok ? act.offer.advice : act)
+  // (d0) A DAY IN THE NEXT PLAN WEEK (the lead's review): the offer, its write and its Undo are in THAT week's row,
+  // never this week's.
+  const nextDay = M_FULL.find(w => w.week_number === 3)!.days.find(d => d.exercises.length > 3)!
+  const nx = await planSessionKindToday({ mesocycle: M_FULL, profile: FULL, weekNumber: 3, dayName: nextDay.day, kind: 'cardio', moves: [], exclusions: [], loggedSets: 0, sayDay: nextDay.day })
+  const mNx = nx.ok ? (confirmSessionKindToday(M_FULL, nx.offer) as { ok: true; mesocycle: MesocycleWeek[] }).mesocycle : M_FULL
+  check('a next-week day\'s kind is written to week 3\'s row, and week 2\'s row is untouched', nx.ok && nx.offer.weekNumber === 3 && kindTodayOf(dayIn(mNx, 3, nextDay.day))?.kind === 'cardio' && J(mNx.find(w => w.week_number === 2)) === J(M_FULL.find(w => w.week_number === 2)), nx.ok ? nx.offer.weekNumber : nx)
+  const uNx = undoSessionKindToday(mNx, 3, nextDay.day, 0, [])
+  check('...and its Undo clears it there, leaving the plan as it was', uNx.ok && J(uNx.mesocycle) === J(M_FULL), uNx.ok ? undefined : uNx)
   // (d) A LATER DAY THIS WEEK, in its own name
   const thu = await call({ say: 'Thursday', kind: 'functional', meso: M_FULL })
   const thuWords = thu.ok ? buildSessionKindTodayProposal(thu.offer, 'Thursday') : null

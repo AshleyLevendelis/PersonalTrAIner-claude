@@ -741,9 +741,10 @@ export function TodayPanel({
    */
   const kindRefFor = (date: string | null | undefined): SessionRef | null => {
     if (!date || date === today) return todayRef
-    // NEVER TODAY BY DEFAULT: a day that cannot be found is said, never silently swapped for today's row.
+    // NEVER TODAY BY DEFAULT: a day that cannot be found, or whose plan week is not known, is said, never silently
+    // swapped for today's row or this week's (the lead's review).
     const cell = stripWeek.days.find(d => d.date === date) ?? weekTrain.days.find(d => d.date === date)
-    return cell ? sessionRefFromCell(cell, cell.planWeek ?? liveWeek) : null
+    return cell && cell.planWeek != null ? sessionRefFromCell(cell, cell.planWeek) : null
   }
   const kindPlan = async (kind: SessionKind, moves: string[]): Promise<SessionKindPlan> => {
     if (!profile || !mesocycle) return { ok: false, refusal: 'No plan to edit.' }

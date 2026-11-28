@@ -12,7 +12,7 @@ import { getExperienceConfig } from './experience-config'
 import { PHASE_CONFIGS } from './periodization'
 import { isExternallyLoaded } from './load-prescription'
 import { equipmentTierFor } from './kit-list'
-import { estimateDaySeconds, getDurationBudgetSeconds, getSessionMaximumSeconds } from './session-duration'
+import { estimateDaySeconds, getDurationBudgetSeconds, getSessionMaximumSeconds, isMovementPrepRow } from './session-duration'
 import { seededRngFromKey } from './seeded-random'
 import { resolveExerciseName } from './set-parse'
 import { ask, SCOPE, logOnlyRefusal } from './coach-voice'
@@ -265,7 +265,9 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
   const planned = addedMode ? live : marker?.addedAfter ? (marker.replaced?.planned ?? marker.planned) : (marker?.planned ?? live)
   const advice: string[] = []
   if (addedMode) {
-    if (marker?.addedAfter) return { ok: false, refusal: `A ${marker.label.toLowerCase()} block is already added after ${daysSession}. Put it back first if you want a different one.` }
+    // A SECOND BLOCK goes on after the first (the lead's review: refusing it was not a hard stop); its Undo takes off only
+    // the newest, leaving the first block as it was.
+    if (marker?.addedAfter) advice.push(`A ${marker.label.toLowerCase()} block is already added after ${daysSession}; this adds a ${option.label.toLowerCase()} block after that. That's a long day, so keep the effort honest and stop if your form goes.`)
     advice.push(`You've started ${daysSession}, so it stays as it is and this adds a ${option.label.toLowerCase()} block after it. Two kinds of work in one day is fine; skip anything left of the planned session you won't get to, and expect your next session to feel a little heavier.`)
   } else if (planned.exercises.length === 0 && planned.plannedActivity) {
     advice.push(`This replaces the planned activity on ${isToday ? 'today' : sayDay}, just ${isToday ? 'for today' : 'this week'}.`)
@@ -273,7 +275,9 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
     advice.push(`${isToday ? 'Today' : sayDay} is a rest day, there to let you recover. An easy session costs little; a hard one makes your next planned session harder, so keep it comfortable if you can.`)
   }
   if (!addedMode && marker?.kind === kind && !marker.addedAfter) return { ok: false, refusal: `${isToday ? 'Today' : sayDay} is already a ${option.label.toLowerCase()} session.` }
-  if (option.style && option.style === (profile.training_style || 'hybrid')) {
+  // A block of his OWN style after a started session is just more of his training, added (the lead's review: the
+  // redirect named "Give me a different session", which the menu does not offer on a started session).
+  if (!addedMode && option.style && option.style === (profile.training_style || 'hybrid')) {
     return { ok: false, refusal: `${option.label} is already how you train. For a different session of the same kind, "Give me a different session" rebuilds it and keeps your main lift.` }
   }
 
@@ -389,6 +393,10 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
       // ONE MAIN LIFT. A second tier-1 compound is only taken where nothing
       // else can fill the block.
       if (mainTaken && candidates.some(e => e.mechanics_tier !== T1)) candidates = candidates.filter(e => e.mechanics_tier !== T1)
+      // AN ADDED BLOCK NEVER TAKES A HEAVY MAIN LIFT, even where nothing else fills the place (CSCS, mine, the lead's
+      // review): after a started session a second tier-1 compound is fatigue with no training reason, so the place is
+      // left empty and the block is smaller.
+      if (addedMode) candidates = candidates.filter(e => e.mechanics_tier !== T1)
       // A STAND-IN OF ITS OWN KIND first, where the pool has one.
       const wanted = wantGroup.get(b.id)
       if (wanted && candidates.some(e => e.substitution_group === wanted)) candidates = candidates.filter(e => e.substitution_group === wanted)
@@ -500,7 +508,8 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
     }
     return addedMode ? day : rebuildWarmup(day, profile)
   }
-  const working = (list: typeof pricedBlocks) => list.filter(x => x.ex.tier !== 'tier_0_primer').length
+  // A warm-up move is not working work: the one definition app-wide (isMovementPrepRow).
+  const working = (list: typeof pricedBlocks) => list.filter(x => !isMovementPrepRow(x.ex)).length
   let chosen = pricedBlocks.filter(x => x.required)
   for (const id of [...recipe.priority]) {
     const block = pricedBlocks.find(x => x.id === id && !x.required)

@@ -24,7 +24,7 @@
 
 import { clampToVolumeRole, getRoleSetFloor, getRoleSetCeiling } from './exercise-plan'
 import { getExerciseEntry, getVolumeRole } from './exercise-db'
-import { estimateDaySeconds, getSessionMaximumSeconds, yieldFillerTo } from './session-duration'
+import { estimateDaySeconds, getSessionMaximumSeconds, yieldFillerTo, isMovementPrepRow } from './session-duration'
 import type { WorkoutDay, Exercise, UserProfile } from './types'
 
 export type VolumeDirection = 'lighter' | 'heavier'
@@ -36,7 +36,7 @@ export interface VolumeAdjustResult {
   setsBefore: number
   setsAfter: number
   /** Exercises that could not move because a bound stopped them — named so the receipt can say so. */
-  blocked: { name: string; reason: 'at the minimum' | 'at the maximum for its role' | 'no room in the session' }[]
+  blocked: { name: string; reason: 'at the minimum' | 'down to one set' | 'at the maximum for its role' | 'no room in the session' | 'not one the app knows' }[]
 }
 
 /**
@@ -64,10 +64,11 @@ export function adjustDayVolume(
     // MOVEMENT PREP IS NOT VOLUME (28 Nov 2026, CSCS, mine; found by fix 7's floor check): a warm-up move has no
     // role, so nothing bounded it and "make it easier" took a one-set primer to NO sets, a row of zero on the card.
     // A tired day still needs its warm-up, and a harder one does not need a longer one: it is left alone both ways.
-    if (isMovementPrep(ex)) return ex
+    if (isMovementPrepRow(ex)) return ex
     const wanted = direction === 'lighter' ? current - 1 : current + 1
-    // A NAME THE CATALOGUE CANNOT RESOLVE has no role to bound it: it steps as it always did, but never under one set.
-    if (!role) return wanted >= 1 && wanted !== current ? { ...ex, sets: wanted } : ex
+    // A NAME THE CATALOGUE CANNOT RESOLVE has no role to bound it, so it is left alone, and SAID (the lead's review:
+    // stepping it silently, or skipping it silently, both left the receipt wrong about what moved).
+    if (!role) { blocked.push({ name: ex.name, reason: 'not one the app knows' }); return ex }
     // ONE STEP, THE RIGHT WAY (28 Nov 2026, found by fix 7): a day already under its role's floor (a step under it,
     // below) was clamped back UP by a "lighter" step, and a "heavier" one jumped it to the floor in one go. Lighter
     // never adds a set; heavier adds one at most, and still brings a count over its role's ceiling back inside it.
@@ -164,10 +165,8 @@ export interface AdvisedVolumeChange {
   advice: string[]
 }
 
-/** MOVEMENT PREP IS NOT VOLUME (CSCS, mine): a warm-up move is never stepped, either way. */
-function isMovementPrep(ex: Exercise): boolean {
-  return getExerciseEntry(ex.name)?.mechanics_tier === 'primer'
-}
+/** MOVEMENT PREP IS NOT VOLUME (CSCS, mine): a warm-up move is never stepped, either way. One definition app-wide. */
+const isMovementPrep = isMovementPrepRow
 
 /**
  * One step lighter or heavier, past the limits that used to refuse, with the advice for each. `deload` is the week's
@@ -193,20 +192,28 @@ export function adjustDayVolumeAdvised(
   if (result.changed || direction === 'heavier' || opts.scope !== 'today') return { result, advice }
 
   // At (or already under) the floor: one set off every training exercise holding more than one.
-  const training = day.exercises.filter(ex => !isMovementPrep(ex))
-  const exercises = day.exercises.map(ex => (!isMovementPrep(ex) && (ex.sets ?? 0) > 1 ? { ...ex, sets: (ex.sets ?? 0) - 1 } : ex))
+  // Training work the app knows: warm-up moves are never stepped, and a name it cannot resolve is left alone here as
+  // in the ordinary step (and named), so the two steps cannot treat one exercise differently.
+  const roleOf = (ex: Exercise) => { const e = getExerciseEntry(ex.name); return e ? getVolumeRole(e) : null }
+  const steppable = (ex: Exercise) => !isMovementPrep(ex) && roleOf(ex) !== null
+  const training = day.exercises.filter(steppable)
+  const unknown = day.exercises.filter(ex => !isMovementPrep(ex) && roleOf(ex) === null)
+  const exercises = day.exercises.map(ex => (steppable(ex) && (ex.sets ?? 0) > 1 ? { ...ex, sets: (ex.sets ?? 0) - 1 } : ex))
   const under: WorkoutDay = { ...day, exercises }
   const sum = (list: Exercise[]) => list.reduce((n, ex) => n + (ex.sets ?? 0), 0)
   const setsBefore = sum(day.exercises)
   const setsAfter = sum(exercises)
   if (setsAfter === setsBefore) return { result, advice }
   // THE COUNT IS OF TRAINING WORK, warm-up moves left out, and it says "under" once the day is already below the floor.
-  const roleOf = (ex: Exercise) => { const e = getExerciseEntry(ex.name); return e ? getVolumeRole(e) : null }
   const alreadyUnder = training.some(ex => { const r = roleOf(ex); return !!r && (ex.sets ?? 0) < getRoleSetFloor(r) })
   const count = `${sum(training)} working sets across ${training.length} exercises`
   advice.push(alreadyUnder
     ? `${opts.sayDay}'s session is already under the fewest sets the plan uses (${count}). Taking more off is fine for a day when you're run down; it trains less, so it's not one to repeat every week.`
     : `${opts.sayDay}'s session is already at the fewest sets the plan uses (${count}). Going under that is fine for a day when you're run down; it trains less, so it's not one to repeat every week.`)
-  const left = training.filter(ex => (ex.sets ?? 0) <= 1).map(ex => ({ name: ex.name, reason: 'at the minimum' as const }))
+  // Its own reason (the lead's review): "at the minimum" is the plan's floor; this is one set, under it.
+  const left = [
+    ...training.filter(ex => (ex.sets ?? 0) <= 1).map(ex => ({ name: ex.name, reason: 'down to one set' as const })),
+    ...unknown.map(ex => ({ name: ex.name, reason: 'not one the app knows' as const })),
+  ]
   return { result: { day: under, changed: true, setsBefore, setsAfter, blocked: left }, advice }
 }

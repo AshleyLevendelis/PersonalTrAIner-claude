@@ -216,5 +216,36 @@ const back10 = await until(() => text('[data-testid="peek-plan"]'), o => o === b
 check('10i. ...puts that day\'s planned session back exactly', back10 === before10, { before10, back10 })
 check('10j. ...and the line is gone', (await until(() => has('[data-testid="peek-kind-note"]'), v => v === false, 12)) === false)
 
+// --- 11. A DAY IN THE NEXT PLAN WEEK (the lead's review, 28 Nov 2026) -----------------------------------------------
+// ?thursday=1: the plan began on a Thursday evening, so today (Wednesday) is the LAST day of plan week 1 and this
+// week's Thursday onward is plan week 2. A different kind on such a day is saved to week 2's row and its Undo clears it
+// there; with the screen saving to today's plan week the change would be drawn and never saved.
+await go('&tour=off&thursday=1&load=11', '#/tab/exercise')
+await until(order, o => Array.isArray(o) && o.length >= 1, 40)
+const today11 = await ev(`document.querySelector('[data-strip-date]')?.getAttribute('data-strip-date')`)
+const futures11 = await ev(`[...document.querySelectorAll('[data-strip-date]')].map(b => b.getAttribute('data-strip-date')).filter(d => d > ${JSON.stringify(today11)})`)
+let peeked11 = null, before11 = null
+for (const date of futures11 ?? []) {
+  await clickAt(`document.querySelector('[data-strip-date="${date}"]')`); await wait(900)
+  const t = await text('[data-testid="peek-plan"]')
+  if (/\b([3-9]|\d\d) exercises\b/.test(t)) { peeked11 = date; before11 = t; break }
+}
+check('11a. a later day with a session, in the next plan week, is peeked', !!peeked11, futures11)
+const day11 = peeked11 ? new Date(`${peeked11}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long' }) : ''
+check('11b. its menu offers a different kind of session on it', (await openSheet()) === 'open' && (await text('[data-verb="kind"]')) === `A different kind of session on ${day11}`, await text('[data-verb="kind"]'))
+await click('[data-verb="kind"]'); await wait(300)
+await click('[data-kind="cardio"]')
+await until(() => has('[data-testid="kind-confirm"]'), v => v === true, 40)
+check('11c. using it', await click('[data-testid="kind-confirm"]') && (await untilClosed()) === false)
+await until(() => text('[data-testid="peek-kind-note"]'), t => t.length > 0, 30)
+const rowsWith = () => ev(`(window.__fakeDb?.mesocycle_weeks ?? []).filter(r => (Array.isArray(r.days) ? r.days : []).some(d => d.kind_today?.kind === 'cardio')).map(r => r.week_number)`)
+const saved11 = await rowsWith()
+check('11d. SAVED IN PLAN WEEK 2\'S ROW, not week 1\'s', Array.isArray(saved11) && saved11.length === 1 && saved11[0] === 2, saved11)
+check('11e. "Put my planned session back"', await click('[data-testid="peek-kind-undo"]'))
+const back11 = await until(() => text('[data-testid="peek-plan"]'), v => v === before11, 30)
+check('11f. ...puts the planned session back on screen', back11 === before11, { before11, back11 })
+const cleared11 = await until(rowsWith, v => Array.isArray(v) && v.length === 0, 30)
+check('11g. ...and the saved week 2 row no longer holds it', Array.isArray(cleared11) && cleared11.length === 0, cleared11)
+
 check('8. no uncaught error on the page', (await ev('window.__err ?? null')) === null, await ev('window.__err ?? null'))
 await finish('verify:session-kind PASSED')
