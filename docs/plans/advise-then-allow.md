@@ -1,5 +1,15 @@
 # Advise, then allow: every training change (his ruling, 28 Nov 2026)
 
+> **UPDATE, Builder B, later 28 Nov 2026:** the lead's review fixed (one hard-stop rule, read at the last day a change
+> reaches); Builder D's five context blocks wired (branch contains D at 61a354d); D's lift-effort route built
+> (`propose_lift_effort`). **D's other four routes need ONE prop each from App (Builder A's file) before the coach can
+> act, because each screen save does more than write the profile:** meals cooked for me: the single
+> `makeMealsElsewhereController({ read, save })` App builds for Profile, passed to ChatAssistant; freestyle a day:
+> `useMealDays`' FreestyleController (Nutrition has it), passed to ChatAssistant; cardio days: Profile's save of
+> `plan.patch` plus the rebuild offer's confirm (as the running goal), passed as one callback; macro split:
+> `handleMacroSplitChange` (it recomputes the day's targets as well as saving), passed as `onMacroSplitChange`. Also
+> from App: `chosenMeals` for the meal-markers block. Each then takes the coach about one card's work.
+
 > **STATUS, Builder B (coach half), 28 Nov 2026, branch `claude/builder-b-coach`:** DONE 20 (any past day), 17 (swap
 > for anything; named swaps now meet the hard stops, machine versions and from-28-weeks included), 13 start and plan
 > (`propose_own_workout`), 21 first part (prompt refusals that were not hard stops). All need the `chat-gemini` deploy
