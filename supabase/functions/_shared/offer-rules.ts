@@ -105,6 +105,9 @@ export const COACH_ACTIONS: Record<string, CoachAction> = {
   // app should be able to do whatever I ask it but give reasons or advise around it"): the rest day card's "Train
   // anyway", reached from the chat. Never off "from now on": a regular extra day is a change of training days.
   propose_train_today: { family: 'day', screen: 'screen', card: 'propose_train_today', rule: T },
+  // HOW A LIFT FELT, TOLD IN THE CHAT (Builder D's route, wired 28 Nov 2026): the screen's Too easy / About right / Too
+  // hard, on today's lift. Never off a maybe: a guess at how it felt is not his answer.
+  propose_lift_effort: { family: 'logging', screen: 'screen', card: 'propose_lift_effort', rule: { words: ['definite'] } },
   // A WORKOUT OF HIS OWN (advise-then-allow fix 13, 28 Nov 2026): started now or saved for a day, through the screen's
   // own store. He names every exercise; the card lists them before Apply.
   propose_own_workout: { family: 'day', screen: 'screen', card: 'propose_own_workout', rule: none('only exercises he named or agreed to (the prompt); the card lists every one, and the day, before Apply') },

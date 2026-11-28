@@ -1608,6 +1608,20 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_lift_effort",
+    description:
+      "PROPOSES recording how one of TODAY'S lifts felt, as the Exercise screen's Too easy / About right / Too hard question does — this does NOT apply anything, the app shows a card and they tap Apply. Call it when they TELL you how a lift they did today felt ('that bench felt easy', 'squats were brutal today'). The app finds the lift in today's log, puts the answer on its last working set, and the next weight for it takes that into account. Pass their words; never a guess at how it felt (a maybe is not an answer). NOT log_workout (sets and reps), NOT record_session_feel (the whole session).",
+    parameters: {
+      type: "object",
+      properties: {
+        lift: { type: "string", description: "The lift, in their words ('bench', 'the squats')." },
+        felt: { type: "string", description: "How it felt, in their words ('easy', 'about right', 'too hard')." },
+        origin_verbatim_quote: { type: "string", description: "The exact substring of the user's CURRENT message saying how it felt. Copied verbatim." },
+      },
+      required: ["lift", "felt", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_cardio_remove",
     description:
       "PROPOSES taking a LOGGED activity (a walk, run, ride, swim, class or any cardio already logged) off a day, when they say it was logged by mistake or should not be there ('I accidentally added a walk today, remove it', 'delete the run I logged yesterday'). This does NOT apply anything: the app finds the log on that day, names it on a card and they tap Apply, with an Undo after. It is NEVER propose_exercise_remove: that takes an exercise out of the PLAN's session, and a logged walk is not on the plan.",
@@ -3212,6 +3226,7 @@ FUNCTION CALL RULES (CRITICAL):
 - EATING OUT (Ashley, 12 Nov 2026). When they say they are eating out at a meal today or in the next six days ("I'm out for dinner Friday", "we're going out for lunch tomorrow"), call propose_eating_out with that day and meal straight away. The APP asks how big a night it is, with buttons: never ask it yourself and never guess a size. The meal then sits in their plan as an estimate, off the shopping list, and the rest of that day fits around it. If they then say what they will order, estimate that dish with propose_custom_meal (cooked_for_me true, that day and meal). Never call a meal out "on plan", "fine" or "free": a restaurant's food is unknown, and an allergy or restriction on their profile still stands; say the app cannot confirm what is in it.
 - SUGGESTED ORDERS (the owner's 13 Nov 2026 strategy, slice 5). When they name the restaurant, paste or describe its menu, or send a photo of it, suggest 2 or 3 orders from what is actually on it, ONE reason each tied to their day ("the grilled chicken with rice: keeps your protein on track tonight"), then offer to mark the meal out at the matching size. Never suggest a dish that clashes with their restrictions or foods they avoid, and never say a dish is free of an allergen: say the app cannot confirm it and they should ask the restaurant ("can't confirm it's nut-free"). A meal out is logged as a RANGE the app works out ("about 650-850 kcal"), never a precise number from you. The NEXT meal goes back to the plan as normal: never tell them to eat less tomorrow or skip a meal to make up for it, and never suggest earning it with extra exercise.
 - A MEAL COOKED FOR THEM (Ashley, 11 Nov 2026). Their plan can already hold meals somebody else cooks: a day's list then shows "Breakfast cooked for you" or "Lunch cooked for you" at a normal size, marked as assumed, and those meals are never on the shopping list. When they tell you WHAT one of those meals is ("the canteen has chicken curry and rice today", "Thursday's work lunch is a jacket potato with tuna"), call propose_custom_meal with cooked_for_me true, that day's date and that meal: write the dish as its everyday foods at ordinary single portions (they cannot weigh a canteen plate, so here, and only here, you supply the amounts), and say in one short line that it is an estimate. ONE MEAL PER CALL: if they give you several days at once, do the nearest one, and say you will take the others one at a time when they are ready. NEVER say a meal cooked for them fits their diet or is free of anything: you do not know what is in a kitchen's food, and if it clashes with an allergy or restriction on their profile the app will say so itself. WHICH meals are cooked for them on WHICH days is a setting you cannot change: if they tell you that ("breakfast and lunch are cooked for me at work, Monday to Friday"), say plainly that you can't set it from here and that it is on Profile, under Meals & shopping, as "Meals cooked for me". Do not claim to have recorded it.
+- Trigger propose_lift_effort when they tell you how one of today's lifts felt ('that bench felt easy'): the app records it as the Exercise screen's own question does, and the next weight follows it.
 - Trigger propose_own_workout when they want a workout of THEIR OWN rather than the plan's: started now ('let's do my own session today: bench, rows, curls') or saved for later ('set me up push-ups, squats and lunges for Saturday'). With no exercises named, suggest them in words first and call it on their yes. It never replaces the plan's session; on a day that has one, it is a second, separate workout (say the recovery cost in one line when the day already has hard work). Pass only what they named.
 - Trigger propose_train_today when today is a rest day and they ASK to train today ("add a weight session just for today", "give me a session today"). Never answer that with "there's no session to swap": a rest day has nothing to swap, and that is not an answer to a request to train.
 - ASKED FOR SOMETHING THE PLAN ADVISES AGAINST, OFFER IT WITH THE REASON (his ruling, 28 Nov 2026: "The app should be able to do whatever I ask it but give reasons or advise around it. Ie make suggestions for changes or recommendations to not train with reasons why"). Training on a rest day, an extra session, heavy legs the day before a hard run: say in one or two lines what it costs and the better option if there is one, then offer it. Only something unsafe is refused (a red-flag symptom, an allergen, a load the app will not prescribe). "I can't" and "there's nothing to change" are never the whole reply to a request; say what you CAN do instead.
@@ -4196,6 +4211,14 @@ Keep this context in mind to ensure your greetings and questions naturally align
               rawArgs: { mode: args.mode, name: args.name, date: args.date, items: args.items },
             },
           }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_lift_effort") {
+        // Proposal, not a write: the app finds the lift in today's log and writes the answer on its last working set.
+        return new Response(
+          JSON.stringify({ reply: "", proposal: { kind: "propose_lift_effort", rawArgs: { lift: args.lift, felt: args.felt } } }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

@@ -155,6 +155,8 @@ import { normalizeWarmup } from '@/lib/session-derive'
 import { readWatchOffers } from '@/lib/watch-workouts'
 import { loadOwnWorkouts } from '@/lib/own-workout'
 import { ownPlans } from '@/lib/own-workout-plans'
+import { planLiftEffort } from '@/lib/coach-routes/lift-effort'
+import { effortFromRpe as liftEffortFromRpe } from '@/lib/lift-effort'
 import { planOwnWorkoutOffer, applyOwnWorkout, undoOwnWorkout, ownWorkoutStopAtApply, type OwnWorkoutPayload } from '@/lib/own-workout-offer'
 import { dayLengthParts, formatDayLength } from '@/lib/session-duration'
 import { planDaysForDate } from '@/lib/plan-week'
@@ -3111,6 +3113,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (pendingAction.kind === 'propose_rest_day') return 'Want me to mark that as a rest day?'
     if (pendingAction.kind === 'propose_train_today') return 'Want me to put that session on today?'
     if (pendingAction.kind === 'propose_own_workout') return 'Want me to set it up?'
+    if (pendingAction.kind === 'propose_lift_effort') return 'Want me to note that?'
     if (pendingAction.kind === 'propose_missed_session') return 'Want me to mark that session as missed?'
     if (pendingAction.kind === 'propose_session_activity_swap') return 'Want me to swap that day over?'
     if (pendingAction.kind === 'propose_circuit_log') return 'Want me to log this workout?'
@@ -4560,6 +4563,44 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         ],
         reversible: true,
       },
+    }
+  }
+
+  /** What propose_lift_effort writes: the set as logged, the answer, and the answer before (for Undo). */
+  type LiftEffortPayload = { input: SaveSetInput; rpe: number; oldRpe: number | null }
+  /**
+   * Builds propose_lift_effort's card (Builder D's route, wired 28 Nov 2026): "that bench felt easy" put on today's lift
+   * as the Exercise screen's own Too easy / About right / Too hard does (SetGrid's sayEffort): its last working set, as
+   * logged, with that answer. Today only: the screen asks it today, and the chat writes through the same facade.
+   */
+  const buildLiftEffortProposal = (rawArgs: Record<string, unknown>): {
+    ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: LiftEffortPayload; diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | { ok: false; reason: string } => {
+    const today = todayResolved.day
+    const plan = planLiftEffort({
+      logs: activeSession.logs,
+      lift: String(rawArgs.lift ?? ''),
+      said: String(rawArgs.felt ?? ''),
+      dayWords: 'today',
+      prescribedSets: name => { const e = today?.exercises.find(x => x.name === name); return e ? Number(e.sets) || null : null },
+      deloadWeek: !!mesocycle.find(w => w.week_number === activeSession.liveWeek)?.is_deload,
+    })
+    if (!plan.ok) return { ok: false, reason: plan.choices && plan.choices.length > 0 ? `${plan.reason} ${plan.choices.join(', ')}.` : plan.reason }
+    const set = plan.set
+    const input: SaveSetInput = {
+      userId: profile.id ?? '', date: activeSession.date, weekNumber: activeSession.liveWeek, day: activeSession.dayName,
+      exerciseId: set.exercise_id ?? getExerciseId(set.exercise_name), exerciseName: set.exercise_name,
+      setNumber: set.set_number, weightKg: set.weight_kg, repsCompleted: set.reps_completed, unit: set.unit,
+      isBodyweight: set.is_bodyweight, addedLoadKg: set.added_load_kg ?? null, isWarmup: false, dropIndex: 0,
+    }
+    return {
+      ok: true,
+      scopeKey: `${profile.id}:propose_lift_effort:${activeSession.date}:${plan.lift}`,
+      preconditions: { date: activeSession.date, lift: plan.lift },
+      payload: { input, rpe: plan.rpe, oldRpe: set.rpe ?? null },
+      // The shared lead ("Want me to ...?"); the planner's own follow-on sentences (short of its sets, a deload week,
+      // the next weight) go under it.
+      diff: { lead: ask(`put **${plan.lift}** down as ${plan.row.after}`), rows: [plan.row], implications: [{ severity: 'info', text: plan.lead.slice(plan.lead.indexOf('?') + 1).trim() }], reversible: true },
     }
   }
 
@@ -7278,6 +7319,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         const weighIn = buildWeighInProposal(profile.id, result.proposal.rawArgs, await getWeighInPicture(profile.id))
         if (weighIn) built = { scopeKey: weighIn.scopeKey, preconditions: weighIn.preconditions, payload: weighIn.payload as unknown as Record<string, unknown>, diff: weighIn.diff }
         else refusal = "That weight doesn't look right — could you give it to me in kilograms (e.g. 86.4)?"
+      } else if (result.proposal.kind === 'propose_lift_effort') {
+        const le = buildLiftEffortProposal(result.proposal.rawArgs ?? {})
+        if (le.ok) built = { scopeKey: le.scopeKey, preconditions: le.preconditions, payload: le.payload as unknown as Record<string, unknown>, diff: le.diff }
+        else refusal = le.reason
       } else if (result.proposal.kind === 'propose_own_workout') {
         const ow = buildOwnWorkoutProposal(result.proposal.rawArgs ?? {})
         if (ow.ok) built = { scopeKey: ow.scopeKey, preconditions: ow.preconditions, payload: ow.payload as unknown as Record<string, unknown>, diff: ow.diff }
@@ -8837,6 +8882,15 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       title = ok ? RECEIPTS['propose_concurrent_activity'].done : RECEIPTS['propose_concurrent_activity'].failed
       rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_lift_effort') {
+      // THE SCREEN'S OWN WRITE (SetGrid's sayEffort): the set as logged, with the answer. Today only.
+      const payload = row.payload as unknown as LiftEffortPayload
+      const ok = payload.input.date === activeSession.date && !!activeSession.logSet({ ...payload.input, rpe: payload.rpe })
+      receipt = ok ? { landed: [`${payload.input.exerciseName}: ${({ easy: 'too easy', right: 'about right', hard: 'too hard' } as const)[liftEffortFromRpe(payload.rpe) ?? 'right']}`], failed: [] } : { landed: [], failed: [{ op: 'propose_lift_effort', error: payload.input.date === activeSession.date ? "it didn't save on this phone" : 'that was for yesterday' }] }
+      title = ok ? RECEIPTS['propose_lift_effort'].done : RECEIPTS['propose_lift_effort'].failed
+      rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
+      undoToken = ok ? row.id : undefined
+      if (ok) onLogsUpdated?.()
     } else if (row.kind === 'propose_own_workout') {
       // THE SCREEN'S OWN WORKOUT STORE: started, it is on Exercise at once; saved, it is in his workouts.
       const payload = row.payload as unknown as OwnWorkoutPayload
@@ -9384,6 +9438,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             onProfileChanged({ training_style: before as TrainingStyle })
           }
         }
+      } else if (row.kind === 'propose_lift_effort') {
+        // The answer before goes back on the same set (none: no answer), only on the day it was given.
+        const payload = row.payload as unknown as LiftEffortPayload
+        if (payload.input.date !== activeSession.date || !activeSession.logSet({ ...payload.input, rpe: payload.oldRpe })) return { refused: RECEIPTS_UNDONE.failed, keep: true }
+        onLogsUpdated?.()
       } else if (row.kind === 'propose_own_workout') {
         // A started workout goes only while nothing in it is logged; a saved one is removed everywhere.
         const back = undoOwnWorkout(profile.id, row.payload as unknown as OwnWorkoutPayload, getAppNow(profile.id).toISOString())

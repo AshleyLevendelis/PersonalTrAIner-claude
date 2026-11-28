@@ -43,6 +43,7 @@ it is wrong.
 | `propose_exercise_add` | SCREEN | The session's "Add an exercise" row. Both surfaces since 13 Sep 2026. |
 | `propose_exercise_remove` | SCREEN | The exercise row's menu. Both surfaces ask why first since 15 Sep 2026, with the same four answers. |
 | `propose_train_today` | SCREEN | The rest day card's "Train anyway" (borrow another day's session, today only). Both surfaces since 28 Nov 2026, his ruling "the app should be able to do whatever I ask it but give reasons or advise around it": the coach's card borrows through the same store and carries the advice the screen does not. |
+| `propose_lift_effort` | SCREEN | Exercise → a lift, once its sets are in → Too easy / About right / Too hard (his 11 Nov 2026 "One tap per lift"). The coach's card (Builder D's route, wired 28 Nov 2026) writes the same answer on the same set (the lift's last working set, as logged) through the same facade, so the next weight hears it either way. Today only, as the screen asks it. |
 | `propose_own_workout` | SCREEN | Exercise → a day → "Start a workout" (Empty or one of "My workouts") and "Plan a workout" for a day ahead (his 25 Nov 2026 own-workout requests, "Both"). The coach's card (advise-then-allow fix 13, 28 Nov 2026) writes through the same store functions (`saveOwnWorkout`, `saveOwnPlan`, `workoutFromPlan`), so Exercise shows what the chat made; it starts one now or saves one for a day. Logging one AFTER the fact as its own workout is screen-only for now (the screen's save lives in its sheet); the coach logs what he did on that day with `log_workout`. |
 | `propose_cardio_remove` | SCREEN | A logged activity's row (Remove, then an Undo line), on Exercise's Additional work and the rest day card. Since 27 Nov 2026. |
 | `propose_exercise_reorder` | SCREEN | The exercise row's menu. |
@@ -91,12 +92,11 @@ it is wrong.
 
 ## Things the screen can do that the coach cannot
 
-**Thirteen screen-only, as of 28 Nov 2026** ("Train anyway" left that day, the coach's `propose_train_today`; deleting a walk's route joined that day; picking up a workout the watch
+**Twelve screen-only, as of 28 Nov 2026** (saying how a lift felt left that day, the coach's `propose_lift_effort`; "Train anyway" left that day, the coach's `propose_train_today`; deleting a walk's route joined that day; picking up a workout the watch
 recorded on 26 Nov; the macro MODE
 was taken out on 25 Nov, his "Take it out": one method, the split's choices kept) — the pre-session tightness check,
 macro split, logging a build-up set, logging a drop set,
-saying how a lift felt on a set already
-logged, which meals are cooked for him on which days, a freestyle day, "Show
+which meals are cooked for him on which days, a freestyle day, "Show
 numbers", "Meal variety", cardio days a week, recording a walk or run, picking up a workout the watch recorded, and
 deleting a walk's route
 (re-derived from the bullets on 25 Nov 2026: the freestyle three and cardio days
