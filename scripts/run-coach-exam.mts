@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { coachFingerprint, examCaseStamps } from './coach-fingerprint.ts'
+import { appAnswered } from './coach-exam-hard-rules.ts'
 
 // ---------------------------------------------------------------------------
 // THE COACH EXAM, PART 1 OF 3 — play the conversations. This one costs money.
@@ -240,6 +241,15 @@ for (const c of cases) {
 
   console.log(`— ${c.name}`)
   for (const text of c.messages) {
+    // THE APP ANSWERS A PLAIN "OPEN X" ITSELF AND NEVER CALLS THE COACH (open-request.ts, the chat's own function):
+    // so neither does the exam. The turn records the app's line; the next turn's history holds it, as the phone's does.
+    const answered = appAnswered({ user: text })
+    if (answered) {
+      history.push({ role: 'user', content: text }, { role: 'assistant', content: answered.line })
+      console.log(`  USER:  ${text}\n  APP:   ${answered.line} (the coach was not asked)`)
+      turnRecords.push({ user: text, reply: '', raw: '', error: null, action: null, proposal: null, saved: null, refused: null, appAnswered: answered.line })
+      continue
+    }
     const j = await callWithRetry(JSON.stringify({ message: text, history, context }))
     const raw = String(j.reply ?? '')
     const reply = strip(raw)

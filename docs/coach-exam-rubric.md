@@ -70,6 +70,15 @@ card in its own words and waits for a tap. Mark such a turn on what offering it
 says about the coaching — was it the right change, at the right moment, for
 this person — and never as a failure to reply.
 
+A line `[buttons under it: "A" | "B"]` is the tap buttons the phone draws under
+that reply: the coach's own quick replies first, then any the app adds itself
+(a Start button for a timer the reply names, an Open button for a screen it
+names). A question with buttons under it is answered in one tap; mark it on
+whether the question and its buttons were the right ones. A turn rendered as
+`(the app answered this itself, before the coach was asked: ...)` was never sent
+to the coach, and a turn where `the app logged it ... and wrote its own line` is
+the app's words, not the coach's: neither is held for or against the coach.
+
 ### DIMENSION: correct — Is the advice right?
 
 Would a qualified strength coach and a registered dietitian both sign this

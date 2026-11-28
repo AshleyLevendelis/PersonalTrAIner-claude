@@ -3,6 +3,9 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { resolveExerciseName } from '../src/lib/set-parse'
 import { appAsksFirst, type AppAsk } from '../src/lib/app-asks-first'
+import { openButtonLabel, openedLine, parseOpenRequest, screenNamedInReply } from '../src/lib/open-request'
+import { parseTimerSuggestion } from '../src/lib/timer-engine'
+import { LOG_WORDS } from '../src/lib/coach-voice'
 
 // ---------------------------------------------------------------------------
 // TIER A OF THE COACH EXAM — the rules a machine can decide, with no model and
@@ -28,6 +31,10 @@ const ROOT = join(__dirname, '..')
 export interface Turn {
   user: string
   reply: string
+  /** The coach's reply as sent, tags and all (its [QUICK_REPLIES] are the buttons he taps). */
+  raw?: string | null
+  /** The app's own line, on a turn it answered before the coach was asked (open-request.ts). Absent before 28 Nov 2026. */
+  appAnswered?: string | null
   error?: string | null
   /** The confirm card this turn offered, when it answered with one instead of
    *  words. Written by scripts/run-coach-exam.mts off chat-gemini's own
@@ -149,16 +156,52 @@ export function clauses(text: string): string[] {
 const quoteOf = (text: string, match: string) =>
   clauses(text).find(c => c.toLowerCase().includes(match.toLowerCase())) ?? match
 
+/**
+ * WHAT HE SEES, NOT ONLY WHAT THE SERVER SENT (28 Nov 2026). The phone does three things to a coach turn that the
+ * transcript's `reply` cannot show, and the 18 Nov judge marked all three as if they were missing:
+ *   - a plain ask to open a screen ("where's my shopping list?") is answered by the app before the coach is called
+ *     (open-request.ts), so the coach's words on that turn were never on screen;
+ *   - the coach's [QUICK_REPLIES] become tap buttons, so "How does that sound?" with two buttons under it is a one-tap
+ *     choice, not an idle question (the runner strips the tag from `reply`; `raw` keeps it);
+ *   - a reply naming a timer or one screen gets the app's own Start / Open button (timer-engine.ts, open-request.ts),
+ *     so "3 rounds of 30 seconds" reads to him as a Start button, not a promise with nothing behind it.
+ * Each is read with the chat's OWN function, the appAsk pattern: the exam marks the turn he would have seen.
+ */
+export function appAnswered(turn: Pick<Turn, 'user'>): { line: string; button: string } | null {
+  const o = parseOpenRequest(turn.user)
+  return o ? { line: openedLine(o.target, o.kg), button: openButtonLabel(o.target) } : null
+}
+/** The tap buttons under a coach reply, in the order the chat draws them: his quick replies, then the app's own. */
+export function buttonsUnder(turn: Pick<Turn, 'reply'> & { raw?: string | null }): string[] {
+  const out: string[] = []
+  const quick = /\[QUICK_REPLIES:\s*(.*?)\]/i.exec(turn.raw ?? '')
+  if (quick) out.push(...quick[1].split('|').map(o => o.trim().replace(/^"|"$/g, '')).filter(Boolean))
+  const timer = parseTimerSuggestion(turn.reply)
+  if (timer) out.push(timer.kind === 'round' ? 'Start the round timer at these numbers' : timer.kind === 'lap' ? 'Start the lap timer' : 'Start the stopwatch')
+  const named = screenNamedInReply(turn.reply)
+  if (named) out.push(openButtonLabel(named))
+  return out
+}
+
 /** How a turn reads when the coach answered with a card rather than a sentence.
  *  ONE definition, used by the report AND by the transcript the judge marks —
  *  the rubric already learned that lesson (it is read from its file rather
  *  than restated), and a second copy here would be the one that drifts. */
 export function coachLine(turn: Turn): string {
-  if (turn.reply.trim()) return turn.reply
+  // THE APP ANSWERED IT, AND THE COACH WAS NEVER ASKED (28 Nov 2026): a plain ask to open a screen.
+  const answered = appAnswered(turn)
+  if (answered) return `(the app answered this itself, before the coach was asked: "${answered.line}", with a button: ${answered.button})`
+  if (turn.reply.trim()) {
+    const buttons = buttonsUnder(turn)
+    return buttons.length ? `${turn.reply}\n[buttons under it: ${buttons.map(b => `"${b}"`).join(' | ')}]` : turn.reply
+  }
   // What he SAW on a turn the app asked instead (19 Nov 2026): the app's own question, said as the app's.
   const asked = appAsk(turn)
   if (asked) return `(the app asked this itself, in place of the offer the coach reached for (${turn.proposal!.kind}): "${asked.text}")`
   if (turn.proposal?.kind) return `(no words — the app showed a confirm card: ${turn.proposal.kind}, waiting to be tapped)`
+  // A WORKOUT LOGGED BY CHAT GETS THE APP'S OWN LINE (19 Nov 2026, log-words.ts): the 18 Nov judge read the log of a
+  // first 50 kg squat as "logged it without a single word" and marked warmth 1, about a turn he never saw.
+  if (turn.saved?.kind === 'log_workout') return `(no words from the coach — the app logged it straight away and wrote its own line: "${LOG_WORDS.logged}"; when a set beats his record, that line names the record with its unit instead)`
   if (turn.saved?.kind) return `(no words — the app saved it straight away: ${turn.saved.kind}, and showed its own receipt)`
   return '(no text at all)'
 }
@@ -590,7 +633,12 @@ function wrongSwapReplacement(t: Transcript): Violation[] {
 }
 
 /** Every hard rule, in report order. Any hit fails the case outright. */
-export function hardRuleViolations(t: Transcript, tabs: string[] = realTabNames()): Violation[] {
+export function hardRuleViolations(transcript: Transcript, tabs: string[] = realTabNames()): Violation[] {
+  // A turn the app answered itself is held to the app's line: the coach's words on it were never shown.
+  const t: Transcript = { ...transcript, turns: transcript.turns.map(x => {
+    const a = appAnswered(x)
+    return a ? { ...x, reply: a.line, proposal: null, saved: null } : x
+  }) }
   return [
     ...silence(t),
     ...missingProposal(t),

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { hardRuleViolations, appRefusals, appAsk, offerShown, realTabNames, coachLine, type Transcript, type Violation } from './coach-exam-hard-rules.ts'
+import { hardRuleViolations, appRefusals, appAsk, offerShown, realTabNames, coachLine, buttonsUnder, appAnswered, type Transcript, type Violation } from './coach-exam-hard-rules.ts'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -461,6 +461,48 @@ console.log('\n14. An offer the app turns into its own question is marked as the
   const caught = appRefusals([dislike, usual, race, asked])
   if (caught.total === 3 && caught.byTool.every(b => b.rules.every(r => r.startsWith('asked first: ')))) pass('each one is counted under "the app caught", by the offer the coach reached for')
   else fail('app asks were not counted as caught', caught)
+}
+
+console.log('\n[14] the turn he SEES: the buttons under a reply, and a turn the app answered itself (28 Nov 2026)')
+{
+  // His quick replies are buttons on the phone; the runner strips them out of `reply` and keeps them in `raw`.
+  const chips = { user: 'I can\'t face training today', reply: 'A short one keeps the week going. Which suits?', raw: 'A short one keeps the week going. Which suits?\n[QUICK_REPLIES: "Short version" | "Rest today"]' }
+  const shown = coachLine(chips)
+  if (shown.includes('"Short version" | "Rest today"') && shown.startsWith(chips.reply)) pass('the coach\'s quick replies are shown under its words, in order')
+  else fail('quick replies were not shown to the judge', shown)
+  // ONE candidate cannot test a choice: two tags, only the QUICK_REPLIES one is buttons.
+  const noChips = { user: 'q', reply: 'Squats first today.', raw: 'Squats first today.\n[ACTION: none]' }
+  if (coachLine(noChips) === 'Squats first today.') pass('...and a reply with no buttons is shown exactly as written')
+  else fail('a reply with no buttons gained some', coachLine(noChips))
+  // The round timer button the chat reads off the coach's words.
+  const timer = { user: '3 rounds of 30 seconds with 30 seconds rest', reply: 'Got it, 3 rounds of 30 seconds work, 30 seconds rest.' }
+  if (buttonsUnder(timer).some(b => /round timer/i.test(b))) pass('a reply naming rounds, work and rest shows the app\'s Start button')
+  else fail('the timer button was not shown', buttonsUnder(timer))
+  const vague = { user: 'q', reply: 'Rest 90 seconds between sets.' }
+  if (buttonsUnder(vague).length === 0) pass('...and a vague "rest 90 seconds" shows none, as on the phone')
+  else fail('a vague rest got a button', buttonsUnder(vague))
+  // A reply naming ONE screen gets its Open button.
+  const named = { user: 'is chicken on there?', reply: 'Yes, it is on your shopping list for Thursday.' }
+  if (buttonsUnder(named).some(b => /shopping list/i.test(b))) pass('a reply naming the shopping list shows its Open button')
+  else fail('the named-screen button was not shown', buttonsUnder(named))
+  // A plain "where's my shopping list?" is answered by the app before the coach is asked.
+  const ask = { user: "where's my shopping list?", reply: 'Tap Nutrition, then scroll to the Grocery tab to find it.' }
+  const asked = appAnswered(ask)
+  if (asked && coachLine(ask).includes(asked.line) && !coachLine(ask).includes('Grocery tab')) pass('a plain ask to open a screen is shown as the app\'s own line, never the coach\'s words')
+  else fail('an open request was shown as the coach\'s reply', coachLine(ask))
+  if (appAnswered({ user: 'how do I improve my squat depth?' }) === null) pass('...and a coaching question is not taken for one')
+  else fail('a coaching question was read as an open request', appAnswered({ user: 'how do I improve my squat depth?' }))
+  const tabWords = t([{ user: "where's my shopping list?", reply: 'It is on the Groceries tab.' }])
+  const plain = t([{ user: 'what do I eat tonight?', reply: 'It is on the Groceries tab.' }])
+  if (!rules(tabWords).includes('wrong-tab') && rules(plain).includes('wrong-tab')) pass('the hard rules hold an app-answered turn to the app\'s line, and still mark the coach everywhere else')
+  else fail('hard rules marked words he never saw, or stopped marking the coach', { app: rules(tabWords), coach: rules(plain) })
+  // A workout logged by chat: the app's own line, not "no words".
+  const logged = coachLine({ user: 'squats done, 50kg for all three', reply: '', saved: { kind: 'log_workout' } })
+  if (/the app logged it/.test(logged) && /record/.test(logged)) pass('a workout logged by chat shows the app\'s own line, and that a record is named in it')
+  else fail('a chat log was shown as no words', logged)
+  const fact = coachLine({ user: 'remember I hate burpees', reply: '', saved: { kind: 'record_fact' } })
+  if (/its own receipt/.test(fact) && !/logged it/.test(fact)) pass('...and any other save keeps the receipt line')
+  else fail('another save was described as a workout log', fact)
 }
 
 console.log('')

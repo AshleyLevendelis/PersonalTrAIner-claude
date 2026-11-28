@@ -104,6 +104,10 @@ async function runExam(caseName: string, port: number, extraEnv: Record<string, 
   const outDir = fs.mkdtempSync(join(os.tmpdir(), 'coach-exam-out-'))
   fs.writeFileSync(join(cwd, '.env.local'), 'VITE_SUPABASE_URL=http://127.0.0.1:1\nVITE_SUPABASE_ANON_KEY=decoy-must-never-be-used\n')
   fs.symlinkSync(join(ROOT, 'scripts'), join(cwd, 'scripts'))
+  // The runner reads the chat's own functions (open-request.ts and what it imports), so the decoy checkout needs them.
+  fs.symlinkSync(join(ROOT, 'src'), join(cwd, 'src'))
+  fs.symlinkSync(join(ROOT, 'node_modules'), join(cwd, 'node_modules'))
+  for (const f of fs.readdirSync(ROOT).filter(n => /^tsconfig.*\.json$/.test(n))) fs.symlinkSync(join(ROOT, f), join(cwd, f))
 
   const child = spawn(TSX, [RUNNER, ...extraArgs, '--only', caseName], {
     cwd,
@@ -239,6 +243,18 @@ async function main() {
     const t = r.transcript!
     const rules = hardRuleViolations(t).map(v => v.rule)
     check('silence still fires on an empty reply with no card behind it', rules.includes('silence'), rules)
+  }
+
+  // THE APP ANSWERS A PLAIN "OPEN X" ITSELF (open-request.ts), so the real coach is never asked it, and the exam
+  // must not ask it either: a paid turn about words he never sees (28 Nov 2026).
+  console.log('\n[4e] a plain ask to open a screen never reaches the coach')
+  {
+    const coach = await fakeCoach(() => TEXT('Tap Nutrition, then the Grocery tab.'))
+    const r = await runExam('where-is-the-shopping-list', coach.port)
+    await coach.close()
+    const t = r.transcript
+    check('the fake coach was not called for it', coach.seen.length === 0, coach.seen.map(x => x.message))
+    check("...and the turn records the app's own line", !!t && typeof t.turns[0]?.appAnswered === 'string' && /shopping list/i.test(String(t.turns[0]?.appAnswered)), t?.turns[0])
   }
 
   // THE SAME MISTAKE ONE SHAPE OVER, found by the first real run on 23 Sep
