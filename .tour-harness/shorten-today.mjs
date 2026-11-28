@@ -239,6 +239,35 @@ check('9i. ...the button and the "Shortened" line are gone', !(await has('[data-
 check('9j. ...and the saved week changed with it (the put-back was written)', (await ev(`JSON.stringify(window.__fakeDb?.mesocycle_weeks ?? [])`)) !== savedShort)
 check('9k. ...with nothing on screen reading as a failure', !(await has('[data-testid="day-edit-error"]')), await ev(`document.querySelector('[data-testid="day-edit-error"]')?.textContent ?? null`))
 
+// --- 10. A SECOND STEP LIGHTER (advise, then allow, his ruling 28 Nov 2026, fix 7) ------------------------------------
+// "Make it easier" on a session already made lighter was refused ("Put the full session back first"). Now it is taken,
+// the reason said first, and ONE "Put the full session back" restores the session as planned, not the first step.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&load=10#/tab/exercise` })
+await wait(4000)
+const rows10 = () => ev(`[...document.querySelectorAll('[data-exercise-name]')].map(n => n.innerText.replace(/\\s+/g, ' ').trim())`)
+const planned10 = await rows10()
+check('10a. a first step lighter, confirmed', (await openSheet()) === 'open' && await clickSel('[data-verb="lighter"]') && (await wait(500), await clickSel('[data-testid="lighter-confirm"]')) && await untilClosed())
+let first10 = planned10
+for (let i = 0; i < 20 && JSON.stringify(first10) === JSON.stringify(planned10); i++) { await wait(300); first10 = await rows10() }
+check('10b. ...the session got lighter', JSON.stringify(first10) !== JSON.stringify(planned10))
+check('10c. the day menu still offers "make it easier"', (await openSheet()) === 'open' && (await verbs()).includes('lighter'), await verbs())
+check('10d. tapping it again SHOWS the step (it was refused)', await clickSel('[data-verb="lighter"]') && (await wait(500), await has('[data-testid="what-happened-lighter"]')),
+  await ev(`document.querySelector('[data-testid="what-happened-sheet"]')?.innerText ?? null`))
+const lines10 = await ev(`[...document.querySelectorAll('[data-testid="lighter-lines"] li')].map(n => n.textContent.trim())`)
+check('10e. ...saying first that it is already a step lighter, and how to get the plan back', /^\w+'s session is already one step lighter; this takes it one step further\. "Put the full session back"/.test(lines10?.[0] ?? ''), lines10)
+check('10e2. ...and, one step down already at the plan\'s floor, that it goes under it, with the set count', (lines10 ?? []).some(l => /^\w+'s session is already at the fewest sets the plan uses \(\d+ across \d+ exercises\)\./.test(l)), lines10)
+await shoot('shorten-today-lighter-again')
+check('10f. confirming closes the sheet', await clickSel('[data-testid="lighter-confirm"]') && await untilClosed())
+let second10 = first10
+for (let i = 0; i < 20 && JSON.stringify(second10) === JSON.stringify(first10); i++) { await wait(300); second10 = await rows10() }
+check('10g. ...and the session is lighter again', JSON.stringify(second10) !== JSON.stringify(first10), { first10, second10 })
+let undo10 = false
+for (let i = 0; i < 20 && !(undo10 = await has('[data-testid="lighter-today-undo"]')); i++) await wait(300)
+check('10h. one "Put the full session back"', undo10 && await clickSel('[data-testid="lighter-today-undo"]'))
+let back10 = null
+for (let i = 0; i < 20; i++) { await wait(300); back10 = await rows10(); if (JSON.stringify(back10) === JSON.stringify(planned10)) break }
+check('10i. ...restores the session AS PLANNED, not the first step', JSON.stringify(back10) === JSON.stringify(planned10), { planned10, back10 })
+
 console.log(failures === 0 ? '\nShortening takes the tail off, keeps the main lift whole, says so, and sticks.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)

@@ -41,7 +41,21 @@ earlier ruling of his and wait for his word.
    waits and the real minutes (~23 for 15 asked). "Shortest version" keeps its three-exercise definition. 15 minutes
    added to the screen's choices. `test:today-only` (4/4), `verify:shorten-today`. OPEN, HIS: cutting main-lift sets
    when even that is over the time (reverses 13 Sep).
-7. [ ] **Volume change and "make it lighter" in a deload week or at a set floor**: say which limit, then allow.
+7. [x] **Volume change and "make it lighter" in a deload week or at a set floor**: say which limit, then allow.
+   DONE 28 Nov 2026 (screen and the shared step): "Make it easier" takes its step in a deload week ("This is already a
+   lighter week, built to let you recover..."), on a day already made lighter (one "Put the full session back" still
+   restores the plan), and at the plan's set floor (one set off each, never under one; "...already at the fewest sets
+   the plan uses (15 across 7 exercises). Going under that is fine for a day when you're run down..."). Only "one set
+   of everything" is left as a no-op. Found on the way and fixed in the shared step: a warm-up move (no volume role)
+   lost its last set (a row of zero), and a "lighter" step on a day under the floor pushed sets back UP to it.
+   `test:lighter-today` §4, §6 (12/12), `test:sheet-manners`, `verify:shorten-today` §10 (2/2).
+   **Coach half: Builder B, call `adjustDayVolumeAdvised(day, direction, profile, { deload: week.is_deload, sayDay })`**
+   (src/lib/volume-adjust.ts) in `buildVolumeChangeProposal` (ChatAssistant) and `executeVolumeChange`
+   (pending-action-executor): put its `advice` on the card first; for a TODAY scope in a deload week, keep that week
+   (both filter deload weeks out with `isVolumeAdjustable`, so today in a deload is still a dead end there); a lasting
+   ("from now on") change should still leave deload weeks alone (CSCS: a standing change does not cancel the planned
+   recovery week), and the card already says so. A heavier step past the role ceiling or the session's time is not in
+   this item (it moves nothing today and says why).
 8. [ ] **A different kind of session on any day this week**, not only today; a started session takes an added block.
 9. [ ] **An exercise added to a rest day makes it a training day** (session-edit.ts: "Make it a training day
    first").

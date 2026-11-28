@@ -61,8 +61,16 @@ export function adjustDayVolume(
     const entry = getExerciseEntry(ex.name)
     const role = entry ? getVolumeRole(entry) : null
     const current = ex.sets ?? 0
+    // MOVEMENT PREP IS NOT VOLUME (28 Nov 2026, CSCS, mine; found by fix 7's floor check): a warm-up move has no
+    // role, so nothing bounded it and "make it easier" took a one-set primer to NO sets, a row of zero on the card.
+    // A tired day still needs its warm-up, and a harder one does not need a longer one: it is left alone both ways.
+    if (!role) return ex
     const wanted = direction === 'lighter' ? current - 1 : current + 1
-    const clamped = clampToVolumeRole(wanted, role, isLongSession)
+    // LIGHTER NEVER ADDS A SET (28 Nov 2026, found by fix 7): a day already under its role's floor (a step under it,
+    // below) was clamped back UP by a "lighter" step. Heavier keeps its clamp as it was, which also brings a count
+    // over its role's ceiling back inside it.
+    const bounded = clampToVolumeRole(wanted, role, isLongSession)
+    const clamped = direction === 'lighter' ? Math.min(current, bounded) : bounded
 
     if (clamped === current) {
       // Distinguish the two reasons, because they mean different things to
@@ -132,3 +140,58 @@ export function isVolumeAdjustable(week: { is_deload?: boolean } | undefined): b
 }
 
 export { getRoleSetCeiling }
+
+// ---------------------------------------------------------------------------
+// ADVISE, THEN ALLOW (his ruling 28 Nov 2026, fix 7 of docs/plans/advise-then-allow.md): a lighter day in a deload
+// week, a lighter day already at the plan's set floor, and a heavier day in a deload are DONE, with the reason said
+// first. None of the four hard stops is involved: weights never move here, so the load ceilings cannot be reached.
+//
+// CSCS, mine, the basis: the role floors (main 3, accessory 2, conditioning 4) are what a GENERATED session needs to
+// train each exercise over a block; one session under them is a deliberate dip for fatigue, which a coach gives on a
+// bad day, so below the floor the step is one set off every exercise holding more than one, never under one set (an
+// exercise with no sets is a removal, which has its own road). A deload is already reduced on purpose: easing it
+// further serves its job (recovery); adding sets back cuts into it, so it is said, then done, one set at a time.
+// The floors themselves are unchanged for generation and for every ordinary step (question 4 of the review).
+// ---------------------------------------------------------------------------
+
+export interface AdvisedVolumeChange {
+  result: VolumeAdjustResult
+  /** The reasons, said before the change: empty when the step is an ordinary one. */
+  advice: string[]
+  /** True when the plan's own floor was gone under, so the caller can mark it. */
+  belowFloor: boolean
+}
+
+const totalSets = (d: WorkoutDay) => d.exercises.reduce((n, ex) => n + (ex.sets ?? 0), 0)
+
+/**
+ * One step lighter or heavier, past the limits that used to refuse, with the advice for each. `deload` is the week's
+ * own flag; `sayDay` is the day as he sees it ("Today", "Thursday"). The caller shows `advice` before the tap.
+ * `result.changed` is false only when nothing can move at all (every exercise at one set, or a heavier step the
+ * session's own time or the role ceilings stop): a no-op, never a refusal of something possible.
+ */
+export function adjustDayVolumeAdvised(
+  day: WorkoutDay,
+  direction: VolumeDirection,
+  profile: UserProfile,
+  opts: { deload: boolean; sayDay: string },
+): AdvisedVolumeChange {
+  const advice: string[] = []
+  if (opts.deload) {
+    advice.push(direction === 'lighter'
+      ? "This is already a lighter week, built to let you recover. Easing off more is fine if you're run down."
+      : "This is a lighter week on purpose, so you recover before the next block. Adding sets back cuts into that; fine if you feel fresh, but the next block may feel harder.")
+  }
+  const result = adjustDayVolume(day, direction, profile)
+  if (result.changed || direction === 'heavier') return { result, advice, belowFloor: false }
+
+  // At the floor: one set off every exercise holding more than one.
+  const hasRole = (ex: Exercise) => { const entry = getExerciseEntry(ex.name); return !!entry && getVolumeRole(entry) !== null }
+  const exercises = day.exercises.map(ex => (hasRole(ex) && (ex.sets ?? 0) > 1 ? { ...ex, sets: (ex.sets ?? 0) - 1 } : ex))
+  const under: WorkoutDay = { ...day, exercises }
+  const setsBefore = totalSets(day)
+  const setsAfter = totalSets(under)
+  if (setsAfter === setsBefore) return { result, advice, belowFloor: false }
+  advice.push(`${opts.sayDay}'s session is already at the fewest sets the plan uses (${setsBefore} across ${day.exercises.length} exercises). Going under that is fine for a day when you're run down; it trains less, so it's not one to repeat every week.`)
+  return { result: { day: under, changed: true, setsBefore, setsAfter, blocked: [] }, advice, belowFloor: true }
+}

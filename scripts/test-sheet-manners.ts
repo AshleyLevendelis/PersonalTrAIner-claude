@@ -110,8 +110,10 @@ console.log('\n4. An error belongs to the step that produced it; the question ma
   // it before the tap. The property is the same: an empty day says so before anything is adjusted; the floor says what
   // is still possible.
   const lighter = readFileSync(join(ROOT, 'src/lib/lighter-today.ts'), 'utf8')
-  check('"I\'m wiped" on an empty day says there is no session, before anything is adjusted', lighter.indexOf("There's no session here to make lighter.") !== -1 && lighter.indexOf("There's no session here to make lighter.") < lighter.indexOf('adjustDayVolume('))
-  check('...and at the floor it says what the minimum is and what is still possible', /already as light as it goes: \$\{sets\} sets across \$\{day\.exercises\.length\} exercises/.test(lighter) && /You can still swap an exercise for an easier one, shorten the session, or move it to another day/.test(lighter))
+  check('"I\'m wiped" on an empty day says there is no session, before anything is adjusted', lighter.indexOf("There's no session here to make lighter.") !== -1 && lighter.indexOf('adjustDayVolumeAdvised(') !== -1 && lighter.indexOf("There's no session here to make lighter.") < lighter.indexOf('adjustDayVolumeAdvised('))
+  // ADVISE, THEN ALLOW (fix 7, 28 Nov 2026): the floor is now gone under with the reason first (test:lighter-today §6);
+  // only one set of everything is left as a stop, and it still says what is possible.
+  check('...and with one set of everything left it says so and what is still possible', /down to one set of each exercise/.test(lighter) && /You can still shorten it, swap an exercise for an easier one, or move it to another day/.test(lighter))
   check('...never the bare dead end', !/'Every exercise is already at its minimum\.'/.test(today))
 }
 

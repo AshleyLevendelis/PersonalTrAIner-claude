@@ -1,5 +1,5 @@
 import type { MesocycleWeek, UserProfile, WorkoutDay } from './types'
-import { adjustDayVolume, isVolumeAdjustable } from './volume-adjust'
+import { adjustDayVolumeAdvised } from './volume-adjust'
 import { settleWeek } from './settle-week'
 import { dayLengthParts } from './session-duration'
 
@@ -50,16 +50,19 @@ export function planLighterToday(input: {
   if (!week || !day) return { ok: false, refusal: "I can't see today's session just now." }
   // AN EMPTY DAY IS NOT A DAY AT ITS FLOOR (M26).
   if (day.exercises.length === 0) return { ok: false, refusal: "There's no session here to make lighter." }
-  if (!isVolumeAdjustable(week)) return { ok: false, refusal: "This is a deload week — it's already lighter on purpose." }
-  if (day.lightened_from) return { ok: false, refusal: `${sayDay}'s session is already made lighter. Put the full session back first if you want to change it again.` }
-  const result = adjustDayVolume(day, 'lighter', profile)
+  // ADVISE, THEN ALLOW (his ruling 28 Nov 2026, fix 7): a deload week, a day already made lighter and a day at the
+  // plan's set floor each take the step, with the reason said first. Only "nothing left to take" stays a no-op.
+  const again = day.lightened_from
+  const advised = adjustDayVolumeAdvised(day, 'lighter', profile, { deload: !!week.is_deload, sayDay })
+  const result = advised.result
   if (!result.changed) {
-    // SAY WHAT THE MINIMUM IS, AND WHAT IS STILL POSSIBLE (M26).
-    const sets = day.exercises.reduce((n, e) => n + (e.sets ?? 0), 0)
-    const floor = `${sayDay}'s session is already as light as it goes: ${sets} sets across ${day.exercises.length} exercises, the fewest that still trains each one.`
-    const blocked = result.blocked[0] ? ` (${result.blocked[0].name} is ${result.blocked[0].reason}.)` : ''
-    return { ok: false, refusal: `${floor}${blocked} You can still swap an exercise for an easier one, shorten the session, or move it to another day from the day menu.` }
+    // SAY WHAT IS LEFT, AND WHAT IS STILL POSSIBLE (M26): every exercise is down to one set.
+    return { ok: false, refusal: `${sayDay}'s session is down to one set of each exercise, so there's no set left to take. You can still shorten it, swap an exercise for an easier one, or move it to another day from the day menu.` }
   }
+  const advice = [
+    ...(again ? [`${sayDay}'s session is already one step lighter; this takes it one step further. "Put the full session back" still restores the session as planned.`] : []),
+    ...advised.advice,
+  ]
   const settled = settleWeek(
     { ...week, days: week.days.map(d => (d.day === dayName ? { ...result.day, lightened_today: true } : d)) },
     dayName,
@@ -68,11 +71,12 @@ export function planLighterToday(input: {
   )
   const after = settled.week.days.find(d => d.day === dayName)
   if (!after) return { ok: false, refusal: "I can't see today's session just now." }
-  const marked: WorkoutDay = { ...after, lightened_from: { planned: day, left: dayFingerprint(after) } }
+  // A SECOND STEP KEEPS THE PLANNED DAY, so Undo puts back the session as planned, never the first step.
+  const marked: WorkoutDay = { ...after, lightened_from: { planned: again ? again.planned : day, left: dayFingerprint(after) } }
   const finalWeek: MesocycleWeek = { ...settled.week, days: settled.week.days.map(d => (d.day === dayName ? marked : d)) }
 
   // THE WORDS, read off the two days: every exercise whose sets moved, then the length.
-  const lines: string[] = []
+  const lines: string[] = [...advice]
   for (const ex of after.exercises) {
     const was = day.exercises.find(e => e.name === ex.name)
     if (was && (was.sets ?? 0) !== (ex.sets ?? 0)) lines.push(`${ex.name}: ${was.sets} → ${ex.sets} ${ex.sets === 1 ? 'set' : 'sets'}`)
