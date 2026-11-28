@@ -41,20 +41,28 @@ earlier ruling of his and wait for his word.
    waits and the real minutes (~23 for 15 asked). "Shortest version" keeps its three-exercise definition. 15 minutes
    added to the screen's choices. `test:today-only` (4/4), `verify:shorten-today`. OPEN, HIS: cutting main-lift sets
    when even that is over the time (reverses 13 Sep).
-7. [x] **Volume change and "make it lighter" in a deload week or at a set floor**: say which limit, then allow.
-   DONE 28 Nov 2026 (screen and the shared step): "Make it easier" takes its step in a deload week ("This is already a
+7. [~] **Volume change and "make it lighter" in a deload week or at a set floor**: say which limit, then allow.
+   SCREEN DONE 28 Nov 2026; COACH HALF OPEN (Builder B, below). The screen and the shared step: "Make it easier" takes its step in a deload week ("This is already a
    lighter week, built to let you recover..."), on a day already made lighter (one "Put the full session back" still
    restores the plan), and at the plan's set floor (one set off each, never under one; "...already at the fewest sets
    the plan uses (15 across 7 exercises). Going under that is fine for a day when you're run down..."). Only "one set
    of everything" is left as a no-op. Found on the way and fixed in the shared step: a warm-up move (no volume role)
    lost its last set (a row of zero), and a "lighter" step on a day under the floor pushed sets back UP to it.
    `test:lighter-today` §4, §6 (12/12), `test:sheet-manners`, `verify:shorten-today` §10 (2/2).
-   **Coach half: Builder B, call `adjustDayVolumeAdvised(day, direction, profile, { deload: week.is_deload, sayDay })`**
+   REVIEW FOLLOW-UP (same day): a swap or ban between two steps is never thrown away by Undo (the second step
+   starts afresh from the day as it stands); a third step says "already under"; the count is of working sets; a
+   heavier step adds one set at most; an unknown exercise name never goes under one set; the "I'm wiped" chip opens
+   the preview with the reasons instead of applying straight (`test:lighter-today` §7, 8/8; `verify:shorten-today`
+   §11, 2/2). NOT done: `test:edit-keeps-the-bar` still re-scores only the ordinary step, not one under the floor.
+   **Coach half: Builder B, call `adjustDayVolumeAdvised(day, direction, profile, { deload: week.is_deload, sayDay, scope })`**
    (src/lib/volume-adjust.ts) in `buildVolumeChangeProposal` (ChatAssistant) and `executeVolumeChange`
    (pending-action-executor): put its `advice` on the card first; for a TODAY scope in a deload week, keep that week
    (both filter deload weeks out with `isVolumeAdjustable`, so today in a deload is still a dead end there); a lasting
    ("from now on") change should still leave deload weeks alone (CSCS: a standing change does not cancel the planned
-   recovery week), and the card already says so. A heavier step past the role ceiling or the session's time is not in
+   recovery week), and the card already says so. Pass `scope: 'ongoing'` for a lasting change: it then stops at the
+   floor (the library enforces it). The coach's tool description (chat-gemini) still says the change "never touches a
+   deload week" and "will not go below the floor": true for a lasting change only. Builder D owns the why-sheet line
+   (app-decisions.ts) that still says it is "refused in a deload week". A heavier step past the role ceiling or the session's time is not in
    this item (it moves nothing today and says why).
 8. [ ] **A different kind of session on any day this week**, not only today; a started session takes an added block.
 9. [ ] **An exercise added to a rest day makes it a training day** (session-edit.ts: "Make it a training day

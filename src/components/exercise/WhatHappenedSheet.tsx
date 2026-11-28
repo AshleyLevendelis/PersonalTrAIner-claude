@@ -19,7 +19,7 @@
 // that marks a day done with nothing in it — an empty finished session is not
 // done (Ashley, 3 Sep), and no number is ever invented (log-correction).
 // ---------------------------------------------------------------------------
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,6 +41,8 @@ import { buildSessionKindTodayProposal, type SessionKind, type SessionKindOption
 export interface WhatHappenedTarget {
   date: string
   dayName: string
+  /** Open straight at a step's preview: the "I'm wiped" chip's step when it has advice to say first (fix 7). */
+  open?: 'lighter'
 }
 
 type Verb = DayVerb
@@ -246,6 +248,12 @@ export function WhatHappenedSheet({
     setLighterLines(plan.lines)
     setPhase('lighter')
   }
+  // OPENED AT THE STEP (fix 7): the reason chip's "I'm wiped" hands its step here when there is advice to say first,
+  // so the reasons are read before the tap, never skipped by the quicker route.
+  useEffect(() => {
+    if (target?.open === 'lighter') planLighter()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target])
   /** The TRIAL: nothing is written, the offer is shown in the sheet first. */
   const planKind = async (kind: SessionKind) => {
     setBusy(true); setError(null)

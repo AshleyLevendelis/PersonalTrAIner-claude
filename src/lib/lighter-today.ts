@@ -30,7 +30,7 @@ export function dayFingerprint(day: WorkoutDay): string {
 }
 
 export type LighterPlan =
-  | { ok: true; mesocycle: MesocycleWeek[]; lines: string[] }
+  | { ok: true; mesocycle: MesocycleWeek[]; lines: string[]; advice: string[] }
   | { ok: false; refusal: string }
 
 /**
@@ -52,15 +52,18 @@ export function planLighterToday(input: {
   if (day.exercises.length === 0) return { ok: false, refusal: "There's no session here to make lighter." }
   // ADVISE, THEN ALLOW (his ruling 28 Nov 2026, fix 7): a deload week, a day already made lighter and a day at the
   // plan's set floor each take the step, with the reason said first. Only "nothing left to take" stays a no-op.
-  const again = day.lightened_from
-  const advised = adjustDayVolumeAdvised(day, 'lighter', profile, { deload: !!week.is_deload, sayDay })
+  // A SECOND STEP builds on the first ONLY while the day is still as the first left it. A day changed since (a swap,
+  // a ban, an addition) starts afresh from what it holds now, so Undo can never bring back what that change removed
+  // (his 29 Oct rule: an Undo puts back only what is still as the card left it).
+  const again = day.lightened_from && dayFingerprint(day) === day.lightened_from.left ? day.lightened_from : null
+  const advised = adjustDayVolumeAdvised(day, 'lighter', profile, { deload: !!week.is_deload, sayDay, scope: 'today' })
   const result = advised.result
   if (!result.changed) {
     // SAY WHAT IS LEFT, AND WHAT IS STILL POSSIBLE (M26): every exercise is down to one set.
-    return { ok: false, refusal: `${sayDay}'s session is down to one set of each exercise, so there's no set left to take. You can still shorten it, swap an exercise for an easier one, or move it to another day from the day menu.` }
+    return { ok: false, refusal: `${sayDay}'s session has no set left to take: every exercise is down to one set, and warm-up moves stay as they are. You can still shorten it, swap an exercise for an easier one, or move it to another day from the day menu.` }
   }
   const advice = [
-    ...(again ? [`${sayDay}'s session is already one step lighter; this takes it one step further. "Put the full session back" still restores the session as planned.`] : []),
+    ...(again ? [`${sayDay}'s session is already made lighter; this takes it a step further. "Put the full session back" still restores the session as planned.`] : []),
     ...advised.advice,
   ]
   const settled = settleWeek(
@@ -72,7 +75,9 @@ export function planLighterToday(input: {
   const after = settled.week.days.find(d => d.day === dayName)
   if (!after) return { ok: false, refusal: "I can't see today's session just now." }
   // A SECOND STEP KEEPS THE PLANNED DAY, so Undo puts back the session as planned, never the first step.
-  const marked: WorkoutDay = { ...after, lightened_from: { planned: again ? again.planned : day, left: dayFingerprint(after) } }
+  const unmarked: WorkoutDay = { ...day }
+  delete unmarked.lightened_from
+  const marked: WorkoutDay = { ...after, lightened_from: { planned: again ? again.planned : unmarked, left: dayFingerprint(after) } }
   const finalWeek: MesocycleWeek = { ...settled.week, days: settled.week.days.map(d => (d.day === dayName ? marked : d)) }
 
   // THE WORDS, read off the two days: every exercise whose sets moved, then the length.
@@ -86,7 +91,7 @@ export function planLighterToday(input: {
   const now = dayLengthParts(after).workMinutes
   if (now < before) lines.push(`About ${before} → ${now} min.`)
   lines.push('Weights and reps stay the same. Only today changes; the rest of your week is as it was.')
-  return { ok: true, mesocycle: mesocycle.map(w => (w.week_number === weekNumber ? finalWeek : w)), lines }
+  return { ok: true, mesocycle: mesocycle.map(w => (w.week_number === weekNumber ? finalWeek : w)), lines, advice }
 }
 
 /**

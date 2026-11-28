@@ -254,8 +254,8 @@ check('10c. the day menu still offers "make it easier"', (await openSheet()) ===
 check('10d. tapping it again SHOWS the step (it was refused)', await clickSel('[data-verb="lighter"]') && (await wait(500), await has('[data-testid="what-happened-lighter"]')),
   await ev(`document.querySelector('[data-testid="what-happened-sheet"]')?.innerText ?? null`))
 const lines10 = await ev(`[...document.querySelectorAll('[data-testid="lighter-lines"] li')].map(n => n.textContent.trim())`)
-check('10e. ...saying first that it is already a step lighter, and how to get the plan back', /^\w+'s session is already one step lighter; this takes it one step further\. "Put the full session back"/.test(lines10?.[0] ?? ''), lines10)
-check('10e2. ...and, one step down already at the plan\'s floor, that it goes under it, with the set count', (lines10 ?? []).some(l => /^\w+'s session is already at the fewest sets the plan uses \(\d+ across \d+ exercises\)\./.test(l)), lines10)
+check('10e. ...saying first that it is already a step lighter, and how to get the plan back', /^\w+'s session is already made lighter; this takes it a step further\. "Put the full session back"/.test(lines10?.[0] ?? ''), lines10)
+check('10e2. ...and, one step down already at the plan\'s floor, that it goes under it, with the set count', (lines10 ?? []).some(l => /^\w+'s session is already at the fewest sets the plan uses \(\d+ working sets across \d+ exercises\)\./.test(l)), lines10)
 await shoot('shorten-today-lighter-again')
 check('10f. confirming closes the sheet', await clickSel('[data-testid="lighter-confirm"]') && await untilClosed())
 let second10 = first10
@@ -267,6 +267,33 @@ check('10h. one "Put the full session back"', undo10 && await clickSel('[data-te
 let back10 = null
 for (let i = 0; i < 20; i++) { await wait(300); back10 = await rows10(); if (JSON.stringify(back10) === JSON.stringify(planned10)) break }
 check('10i. ...restores the session AS PLANNED, not the first step', JSON.stringify(back10) === JSON.stringify(planned10), { planned10, back10 })
+
+// --- 11. THE "I'M WIPED" CHIP SAYS THE REASONS TOO (fix 7's review) ------------------------------------------------
+// The reason chip on "Take out" applied its lighter step straight. On a session already made lighter, the step has
+// reasons to say first, so the chip now opens the day menu's preview with them; nothing changes before the tap.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&load=11#/tab/exercise` })
+await wait(4000)
+check('11a. a first step lighter from the day menu', (await openSheet()) === 'open' && await clickSel('[data-verb="lighter"]') && (await wait(500), await clickSel('[data-testid="lighter-confirm"]')) && await untilClosed())
+await wait(1200)
+const rows11 = await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(n => n.innerText.replace(/\\s+/g, ' ').trim())`)
+const victim11 = (await order())?.[(await order()).length - 1]
+const openRowMenu11 = async name => {
+  if (!(await has(`[data-exercise-name=${JSON.stringify(name)}] button[aria-label="Exercise options"]`))) { await tap(`[data-exercise-name=${JSON.stringify(name)}] [role="button"], [data-exercise-name=${JSON.stringify(name)}] .cursor-pointer`); await wait(700) }
+  if (!(await tap(`[data-exercise-name=${JSON.stringify(name)}] button[aria-label="Exercise options"]`))) return false
+  await wait(500); return has('[data-testid="remove-exercise"]')
+}
+check('11b. "Take out" on the last exercise opens its sheet', !!victim11 && await openRowMenu11(victim11) && await tap('[data-testid="remove-exercise"]') && (await wait(700), await has('[data-testid="remove-exercise-sheet"]')), victim11)
+check('11c. "I\'m wiped" is one of its reasons', await clickSel('[data-testid="reason-chips"] [data-reason="tired"]'))
+let pre11 = false
+for (let i = 0; i < 20 && !(pre11 = await has('[data-testid="what-happened-lighter"]')); i++) await wait(300)
+const lines11 = await ev(`[...document.querySelectorAll('[data-testid="lighter-lines"] li')].map(n => n.textContent.trim())`)
+check('11d. ...it opens the preview with the reasons first, instead of applying straight', pre11 && /already made lighter; this takes it a step further/.test(lines11?.[0] ?? ''), lines11)
+await shoot('shorten-today-wiped-advice')
+check('11e. ...and nothing on the session changed before the tap', JSON.stringify(await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(n => n.innerText.replace(/\\s+/g, ' ').trim())`)) === JSON.stringify(rows11))
+check('11f. confirming takes the step', await clickSel('[data-testid="lighter-confirm"]') && await untilClosed())
+let rows11b = rows11
+for (let i = 0; i < 20 && JSON.stringify(rows11b) === JSON.stringify(rows11); i++) { await wait(300); rows11b = await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(n => n.innerText.replace(/\\s+/g, ' ').trim())`) }
+check('11g. ...and the session is lighter again', JSON.stringify(rows11b) !== JSON.stringify(rows11))
 
 console.log(failures === 0 ? '\nShortening takes the tail off, keeps the main lift whole, says so, and sticks.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()

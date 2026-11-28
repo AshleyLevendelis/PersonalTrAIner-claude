@@ -775,7 +775,14 @@ export function TodayPanel({
     if (a.type === 'equipment') return onEquipment ? onEquipment(a.tier) : 'I can\'t adjust for that just now.'
     switch (a.reason) {
       case 'no_time': return shortenToday(getSessionMinimumSeconds(profile?.session_duration_preference || '45-60') / 60)
-      case 'tired': return lighterToday()
+      case 'tired': {
+        // ADVICE FIRST (advise, then allow, fix 7): a step in a deload, a second step, or one under the plan's floor
+        // has reasons to say, so the chip opens the day menu's preview with them instead of applying straight. An
+        // ordinary step applies, as the chip's own card already said.
+        const plan = lighterPlan()
+        if (plan.ok && plan.advice.length > 0 && todayCell) { setWhatHappened({ date: todayCell.date, dayName: todayCell.dayName, open: 'lighter' }); return null }
+        return lighterToday()
+      }
       // 'dislike' never reaches here — the sheet keeps its own drop/swap step
       // for it, because "and never again" is a different question from "what
       // goes in its place", and Ashley ruled on that one separately (11 Sep).

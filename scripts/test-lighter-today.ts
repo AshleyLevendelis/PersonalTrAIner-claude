@@ -80,7 +80,7 @@ check('a day never made lighter has nothing to put back', !notLight.ok && /nothi
 console.log('\n4. Advise, then allow (his ruling 28 Nov 2026, fix 7): a second step, a deload, the floor')
 const again = plan.ok ? planLighterToday({ mesocycle: plan.mesocycle, profile: PROFILE, weekNumber: WEEK.week_number, dayName: DAY.day, sayDay: 'Today' }) : null
 check('a day already made lighter takes a second step', !!again?.ok, again)
-check('...saying first that it is already a step lighter', !!again?.ok && /^Today's session is already one step lighter/.test(again.lines[0]), again)
+check('...saying first that it is already a step lighter', !!again?.ok && /^Today's session is already made lighter; this takes it a step further/.test(again.lines[0]), again)
 const after2 = again?.ok ? again.mesocycle.find(w => w.week_number === WEEK.week_number)!.days.find(d => d.day === DAY.day)! : null
 check('...and it really is lighter than the first step', !!after2 && !!after && setsOf(after2) < setsOf(after), after2 && after ? { first: setsOf(after), second: setsOf(after2) } : null)
 check('...while Undo still holds the session AS PLANNED, never the first step', !!after2?.lightened_from && json(after2.lightened_from.planned) === json(DAY))
@@ -127,7 +127,10 @@ console.log('\n6. At the plan\'s set floor: one set off each, never under one, t
   check('the fixture binds: the ordinary step moves nothing on it', !adjustDayVolume(atFloor as never, 'lighter', PROFILE).changed)
   const p6 = planLighterToday({ mesocycle: meso, profile: PROFILE, weekNumber: WEEK.week_number, dayName: DAY.day, sayDay: 'Today' })
   check('the step is taken at the floor', p6.ok, p6.ok ? undefined : p6.refusal)
-  check('...saying first that the session is at the fewest sets the plan uses', p6.ok && p6.lines.some(l => /^Today's session is already at the fewest sets the plan uses \(\d+ across \d+ exercises\)\./.test(l)), p6.ok ? p6.lines : null)
+  check('...saying first that the session is at the fewest sets the plan uses', p6.ok && p6.lines.some(l => /^Today's session is already at the fewest sets the plan uses \(\d+ working sets across \d+ exercises\)\./.test(l)), p6.ok ? p6.lines : null)
+  const train6 = atFloor.exercises.filter(e => getEntry(e.name)?.mechanics_tier !== 'primer')
+  const want6 = `(${train6.reduce((n, e) => n + (e.sets ?? 0), 0)} working sets across ${train6.length} exercises)`
+  check('...and the count is of working sets, warm-up moves left out', p6.ok && train6.length < atFloor.exercises.length && p6.lines.some(l => l.includes(want6)), { want6, lines: p6.ok ? p6.lines : null })
   const a6 = p6.ok ? p6.mesocycle.find(w => w.week_number === WEEK.week_number)!.days.find(d => d.day === DAY.day)! : null
   const roleOf = (n: string) => { const en = getExerciseEntry(n); return en ? getVolumeRole(en) : null }
   check('the fixture holds a warm-up move (no volume role) with sets to take, to be left alone', atFloor.exercises.some(e => roleOf(e.name) === null && (e.sets ?? 0) > 1), atFloor.exercises.map(e => e.name))
@@ -138,7 +141,49 @@ console.log('\n6. At the plan\'s set floor: one set off each, never under one, t
   const ones = { ...DAY, exercises: DAY.exercises.map(e => ({ ...e, sets: 1 })) }
   const meso1 = MESO.map(w => (w.week_number === WEEK.week_number ? { ...w, days: w.days.map(d => (d.day === DAY.day ? ones : d)) } : w)) as MesocycleWeek[]
   const p1 = planLighterToday({ mesocycle: meso1, profile: PROFILE, weekNumber: WEEK.week_number, dayName: DAY.day, sayDay: 'Today' })
-  check('one set of everything is the only stop, and it says what is still possible', !p1.ok && /one set of each exercise/.test(p1.refusal) && /shorten it/.test(p1.refusal), p1)
+  check('one set of everything is the only stop, and it says what is still possible', !p1.ok && /no set left to take: every exercise is down to one set/.test(p1.refusal) && /shorten it/.test(p1.refusal), p1)
+}
+
+console.log('\n7. The reviewer\'s cases: a change between two steps, a third step, heavier, lasting, unknown names')
+{
+  const { adjustDayVolume, adjustDayVolumeAdvised } = await import('../src/lib/volume-adjust')
+  const { getRoleSetFloor } = await import('../src/lib/exercise-plan')
+  const dayIn = (m: MesocycleWeek[]) => m.find(w => w.week_number === WEEK.week_number)!.days.find(d => d.day === DAY.day)!
+  // (a) A SWAP BETWEEN TWO STEPS IS NEVER THROWN AWAY BY UNDO. Constructed: after step 1, the last exercise is renamed
+  // (what a swap does to the row); step 2; Undo must give back the SWAPPED day, never the planned one.
+  const first = plan.ok ? plan.mesocycle : MESO
+  const lastName = dayIn(first).exercises[dayIn(first).exercises.length - 1].name
+  const swapped = first.map(w => w.week_number !== WEEK.week_number ? w : { ...w, days: w.days.map(d => d.day !== DAY.day ? d : { ...d, exercises: d.exercises.map((e, i) => i === d.exercises.length - 1 ? { ...e, name: 'Plank' } : e) }) })
+  const step2 = planLighterToday({ mesocycle: swapped, profile: PROFILE, weekNumber: WEEK.week_number, dayName: DAY.day, sayDay: 'Today' })
+  check('a step after a swap is taken', step2.ok, step2.ok ? undefined : step2.refusal)
+  check('...and is not called "already made lighter" (it starts afresh)', step2.ok && !step2.lines.some(l => /already made lighter/.test(l)), step2.ok ? step2.lines : null)
+  const back = step2.ok ? undoLighterToday(step2.mesocycle, WEEK.week_number, DAY.day, 0) : null
+  const backDay = back?.ok ? dayIn(back.mesocycle) : null
+  check('...Undo keeps the swap: the swapped-in move is there, the swapped-out one is not', !!backDay && backDay.exercises.some(e => e.name === 'Plank') && !backDay.exercises.some(e => e.name === lastName), backDay?.exercises.map(e => e.name))
+  check('...and the restored day carries no stale record of an earlier step', !!backDay && !backDay.lightened_from)
+  // (b) A THIRD STEP on a day already under the floor says "under", never "at".
+  const s2 = again?.ok ? again.mesocycle : MESO
+  const s3 = planLighterToday({ mesocycle: s2, profile: PROFILE, weekNumber: WEEK.week_number, dayName: DAY.day, sayDay: 'Today' })
+  check('a third step on a day under the floor says it is already UNDER the fewest sets', s3.ok && s3.lines.some(l => /^Today's session is already under the fewest sets the plan uses/.test(l)) && !s3.lines.some(l => /already at the fewest/.test(l)), s3.ok ? s3.lines : s3.refusal)
+  // (c) HEAVIER from under the floor adds ONE set, never a jump to the floor.
+  // Constructed so it binds: every training exercise two under its floor (never under one).
+  const under = { ...DAY, exercises: DAY.exercises.map(e => { const en = getEntry(e.name); const r = en ? getRole(en) : null; return r ? { ...e, sets: Math.max(1, getRoleSetFloor(r) - 2) } : e }) }
+  const heavier = adjustDayVolume(under, 'heavier', PROFILE)
+  check('heavier from under the floor adds at most one set per exercise', heavier.day.exercises.every(e => { const x = under.exercises.find(y => y.name === e.name)!; return (e.sets ?? 0) - (x.sets ?? 0) <= 1 }), heavier.day.exercises.map(e => [e.name, under.exercises.find(y => y.name === e.name)?.sets, e.sets]))
+  check('...the case binds: some exercise there is two or more under its floor', under.exercises.some(e => { const en = getEntry(e.name); const r = en ? getRole(en) : null; return !!r && (e.sets ?? 0) <= getRoleSetFloor(r) - 2 }), under.exercises.map(e => [e.name, e.sets]))
+  // (d) A LASTING change never goes under the floor.
+  const atFloor = { ...DAY, exercises: DAY.exercises.map(e => { const en = getEntry(e.name); const r = en ? getRole(en) : null; return { ...e, sets: r ? getRoleSetFloor(r) : 2 } }) }
+  const ongoing = adjustDayVolumeAdvised(atFloor as never, 'lighter', PROFILE, { deload: false, sayDay: 'Today', scope: 'ongoing' })
+  check('a lasting ("from now on") change stops at the floor', !ongoing.result.changed && ongoing.advice.length === 0, ongoing)
+  // (e) A NAME THE CATALOGUE DOES NOT KNOW is stepped, never under one set.
+  const unknown = { ...DAY, exercises: [{ ...DAY.exercises[1], name: 'Grandma Lifts', sets: 1 }, { ...DAY.exercises[1], name: 'Uncle Carries', sets: 3 }] }
+  const u = adjustDayVolume(unknown as never, 'lighter', PROFILE)
+  check('an unknown name with one set keeps it; one with three loses one', u.day.exercises[0].sets === 1 && u.day.exercises[1].sets === 2, u.day.exercises.map(e => e.sets))
+  // (f) A DAY OF WARM-UP MOVES ONLY is not "one set of each" when it is not: nothing is touched, and the words say why.
+  const prepOnly = DAY.exercises.filter(e => getEntry(e.name)?.mechanics_tier === 'primer').map(e => ({ ...e, sets: 2 }))
+  const mesoP = MESO.map(w => (w.week_number === WEEK.week_number ? { ...w, days: w.days.map(d => (d.day === DAY.day ? { ...d, exercises: prepOnly } : d)) } : w)) as MesocycleWeek[]
+  const pp = planLighterToday({ mesocycle: mesoP, profile: PROFILE, weekNumber: WEEK.week_number, dayName: DAY.day, sayDay: 'Today' })
+  check('a day of warm-up moves only is left alone, and the words name warm-up moves', prepOnly.length > 0 && !pp.ok && /warm-up moves stay as they are/.test(pp.refusal), pp)
 }
 
 console.log(`\n${ran} checks ran.`)

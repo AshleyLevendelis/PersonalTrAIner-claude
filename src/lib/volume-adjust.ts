@@ -64,26 +64,26 @@ export function adjustDayVolume(
     // MOVEMENT PREP IS NOT VOLUME (28 Nov 2026, CSCS, mine; found by fix 7's floor check): a warm-up move has no
     // role, so nothing bounded it and "make it easier" took a one-set primer to NO sets, a row of zero on the card.
     // A tired day still needs its warm-up, and a harder one does not need a longer one: it is left alone both ways.
-    if (!role) return ex
+    if (isMovementPrep(ex)) return ex
     const wanted = direction === 'lighter' ? current - 1 : current + 1
-    // LIGHTER NEVER ADDS A SET (28 Nov 2026, found by fix 7): a day already under its role's floor (a step under it,
-    // below) was clamped back UP by a "lighter" step. Heavier keeps its clamp as it was, which also brings a count
-    // over its role's ceiling back inside it.
+    // A NAME THE CATALOGUE CANNOT RESOLVE has no role to bound it: it steps as it always did, but never under one set.
+    if (!role) return wanted >= 1 && wanted !== current ? { ...ex, sets: wanted } : ex
+    // ONE STEP, THE RIGHT WAY (28 Nov 2026, found by fix 7): a day already under its role's floor (a step under it,
+    // below) was clamped back UP by a "lighter" step, and a "heavier" one jumped it to the floor in one go. Lighter
+    // never adds a set; heavier adds one at most, and still brings a count over its role's ceiling back inside it.
     const bounded = clampToVolumeRole(wanted, role, isLongSession)
-    const clamped = direction === 'lighter' ? Math.min(current, bounded) : bounded
+    const clamped = direction === 'lighter' ? Math.min(current, bounded) : Math.min(bounded, current + 1)
 
     if (clamped === current) {
       // Distinguish the two reasons, because they mean different things to
       // somebody reading the receipt: one says "this is as light as it goes",
       // the other says "this is as much as this exercise should ever do".
-      if (role) {
-        blocked.push({
-          name: ex.name,
-          reason: direction === 'lighter' && current <= getRoleSetFloor(role)
-            ? 'at the minimum'
-            : 'at the maximum for its role',
-        })
-      }
+      blocked.push({
+        name: ex.name,
+        reason: direction === 'lighter' && current <= getRoleSetFloor(role)
+          ? 'at the minimum'
+          : 'at the maximum for its role',
+      })
       return ex
     }
     return { ...ex, sets: clamped }
@@ -134,7 +134,11 @@ export function describeVolumeChange(result: VolumeAdjustResult, dayName: string
   return `${base} ${n} ${n === 1 ? 'exercise was' : 'exercises were'} left alone — ${result.blocked[0].reason}.`
 }
 
-/** Deload weeks are already reduced on purpose; changing their volume fights the plan. */
+/**
+ * Whether a LASTING ("from now on") volume change reaches this week. Deload weeks are reduced on purpose, and a standing
+ * change does not cancel the planned recovery week. A change for ONE DAY in a deload goes through
+ * adjustDayVolumeAdvised instead, which says so and does it (advise, then allow, fix 7).
+ */
 export function isVolumeAdjustable(week: { is_deload?: boolean } | undefined): boolean {
   return !week?.is_deload
 }
@@ -158,11 +162,12 @@ export interface AdvisedVolumeChange {
   result: VolumeAdjustResult
   /** The reasons, said before the change: empty when the step is an ordinary one. */
   advice: string[]
-  /** True when the plan's own floor was gone under, so the caller can mark it. */
-  belowFloor: boolean
 }
 
-const totalSets = (d: WorkoutDay) => d.exercises.reduce((n, ex) => n + (ex.sets ?? 0), 0)
+/** MOVEMENT PREP IS NOT VOLUME (CSCS, mine): a warm-up move is never stepped, either way. */
+function isMovementPrep(ex: Exercise): boolean {
+  return getExerciseEntry(ex.name)?.mechanics_tier === 'primer'
+}
 
 /**
  * One step lighter or heavier, past the limits that used to refuse, with the advice for each. `deload` is the week's
@@ -174,7 +179,7 @@ export function adjustDayVolumeAdvised(
   day: WorkoutDay,
   direction: VolumeDirection,
   profile: UserProfile,
-  opts: { deload: boolean; sayDay: string },
+  opts: { deload: boolean; sayDay: string; scope: 'today' | 'ongoing' },
 ): AdvisedVolumeChange {
   const advice: string[] = []
   if (opts.deload) {
@@ -183,15 +188,25 @@ export function adjustDayVolumeAdvised(
       : "This is a lighter week on purpose, so you recover before the next block. Adding sets back cuts into that; fine if you feel fresh, but the next block may feel harder.")
   }
   const result = adjustDayVolume(day, direction, profile)
-  if (result.changed || direction === 'heavier') return { result, advice, belowFloor: false }
+  // UNDER THE FLOOR IS A ONE-DAY ANSWER ONLY: a lasting change below the plan's own floor would be the habit the
+  // advice itself warns against, so the ongoing scope stops at the floor as it always did.
+  if (result.changed || direction === 'heavier' || opts.scope !== 'today') return { result, advice }
 
-  // At the floor: one set off every exercise holding more than one.
-  const hasRole = (ex: Exercise) => { const entry = getExerciseEntry(ex.name); return !!entry && getVolumeRole(entry) !== null }
-  const exercises = day.exercises.map(ex => (hasRole(ex) && (ex.sets ?? 0) > 1 ? { ...ex, sets: (ex.sets ?? 0) - 1 } : ex))
+  // At (or already under) the floor: one set off every training exercise holding more than one.
+  const training = day.exercises.filter(ex => !isMovementPrep(ex))
+  const exercises = day.exercises.map(ex => (!isMovementPrep(ex) && (ex.sets ?? 0) > 1 ? { ...ex, sets: (ex.sets ?? 0) - 1 } : ex))
   const under: WorkoutDay = { ...day, exercises }
-  const setsBefore = totalSets(day)
-  const setsAfter = totalSets(under)
-  if (setsAfter === setsBefore) return { result, advice, belowFloor: false }
-  advice.push(`${opts.sayDay}'s session is already at the fewest sets the plan uses (${setsBefore} across ${day.exercises.length} exercises). Going under that is fine for a day when you're run down; it trains less, so it's not one to repeat every week.`)
-  return { result: { day: under, changed: true, setsBefore, setsAfter, blocked: [] }, advice, belowFloor: true }
+  const sum = (list: Exercise[]) => list.reduce((n, ex) => n + (ex.sets ?? 0), 0)
+  const setsBefore = sum(day.exercises)
+  const setsAfter = sum(exercises)
+  if (setsAfter === setsBefore) return { result, advice }
+  // THE COUNT IS OF TRAINING WORK, warm-up moves left out, and it says "under" once the day is already below the floor.
+  const roleOf = (ex: Exercise) => { const e = getExerciseEntry(ex.name); return e ? getVolumeRole(e) : null }
+  const alreadyUnder = training.some(ex => { const r = roleOf(ex); return !!r && (ex.sets ?? 0) < getRoleSetFloor(r) })
+  const count = `${sum(training)} working sets across ${training.length} exercises`
+  advice.push(alreadyUnder
+    ? `${opts.sayDay}'s session is already under the fewest sets the plan uses (${count}). Taking more off is fine for a day when you're run down; it trains less, so it's not one to repeat every week.`
+    : `${opts.sayDay}'s session is already at the fewest sets the plan uses (${count}). Going under that is fine for a day when you're run down; it trains less, so it's not one to repeat every week.`)
+  const left = training.filter(ex => (ex.sets ?? 0) <= 1).map(ex => ({ name: ex.name, reason: 'at the minimum' as const }))
+  return { result: { day: under, changed: true, setsBefore, setsAfter, blocked: left }, advice }
 }
