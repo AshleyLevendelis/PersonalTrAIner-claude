@@ -100,13 +100,13 @@ export async function executeExerciseSwap(
   payload: ExerciseSwapPayload,
   /** The hard stops, checked again at confirm (advise-then-allow fix 17): the profile carrying his injuries and any
    *  ease-off, and his never-again list. The card checked them; they may have changed while it sat. */
-  stops?: { profile: UserProfile; exclusions: string[]; today: string },
+  stops?: { profile: UserProfile; exclusions: string[]; latestDate: string },
 ): Promise<ExerciseSwapResult> {
   const preImage = mesocycle
   const newExercise = getExerciseEntry(payload.newExerciseName)
   if (stops && newExercise) {
     const { swapHardStop } = await import('./swap-advice')
-    const stop = swapHardStop(newExercise, stops.profile, stops.exclusions, stops.today)
+    const stop = swapHardStop(newExercise, stops.profile, stops.exclusions, stops.latestDate)
     if (stop) return { mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'propose_exercise_swap', error: stop }] } }
   }
   if (!newExercise) {
@@ -283,6 +283,8 @@ export async function executeExerciseAdd(
    *  injury and equipment executors take theirs, because the live list is the
    *  one the chat surface holds, not a stale copy on the profile row. */
   exclusions: string[] = [],
+  /** The last day the addition reaches, for the from-28-weeks rules (the coach passes it; absent, today's rules). */
+  latestDate?: string,
 ): Promise<SessionEditExecResult> {
   const preImage = mesocycle
   const fail = (error: string): SessionEditExecResult =>
@@ -296,10 +298,18 @@ export async function executeExerciseAdd(
   // replaying a stored diff.
   // The card's own lookup (28 Nov 2026): anything in the catalogue, the hard stops (injury, pregnancy, never-again)
   // checked again here because they may have changed since the card was made.
-  const found = resolveAdditionAnywhere(payload.exerciseName, profile, exclusions)
+  const looked = resolveAdditionAnywhere(payload.exerciseName, profile, exclusions)
+  // A machine version is outside the catalogue the lookup searches: found by its exact name (the card named it).
+  const byName = getExerciseEntry(payload.exerciseName)
+  const found = looked ?? (byName && !byName.log_only ? { entry: byName, warnings: [] } : null)
   if (!found) return fail(`I couldn't find ${payload.exerciseName} in the exercise list.`)
   if ('stop' in found) return fail(found.stop)
   const entry = found.entry
+  // ONE HARD-STOP RULE (swap-advice.ts), at the last day the addition reaches.
+  const { swapHardStop } = await import('./swap-advice')
+  const { getAppNow, getLocalDateString } = await import('./dev-clock')
+  const stop = swapHardStop(entry, profile, exclusions, latestDate ?? getLocalDateString(getAppNow(profile.id)))
+  if (stop) return fail(stop.replace("so I won't swap it in", "so I won't put it in").replace('and I can swap it in', 'and I can add it'))
 
   const week = mesocycle.find(w => w.week_number === payload.weekNumber)
   const day = week?.days.find(d => d.day === payload.dayName)

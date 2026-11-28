@@ -26,7 +26,9 @@ const check = (label: string, ok: boolean) => {
 console.log('\n1. The general rule is there')
 check('asked for something the plan advises against, the coach offers it with the reason', /ASKED FOR SOMETHING THE PLAN ADVISES AGAINST, OFFER IT WITH THE REASON/.test(fn))
 check('a change a tool can make is never declined or sent to a screen; only the hard stops are refused', /A training change a tool can make is never declined and never sent to a screen/.test(fn)
-  && /only the hard stops are refused \(pain that is sharp, one-sided or worsening; a move their injuries rule out; the pregnancy rules; the load limits\)/.test(fn))
+  && /only the hard stops are refused \(\$\{HARD_STOPS\}\)/.test(fn))
+check('ONE hard-stops list, used for the swap, his own workout and the general rule', /^const HARD_STOPS = "pain that is sharp, one-sided or worsening \(triaged, never a change\); a move their injuries or a running ease-off rule out; one the pregnancy rules leave out; one on their never-again list; the weight limits the app prescribes under"$/m.test(fn)
+  && (fn.match(/\$\{HARD_STOPS\}/g) ?? []).length === 3)
 check('...and the screen fallback is ONLY for what no tool does', /ONLY when they want something you have NO tool for, say plainly you cannot do it from chat/.test(fn))
 
 console.log('\n2. The refusals that were not hard stops now offer with the reason')

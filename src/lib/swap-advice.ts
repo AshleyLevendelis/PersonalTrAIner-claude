@@ -52,10 +52,13 @@ export function swapPatternAdvice(oldName: string, newName: string, day: string)
 }
 
 /**
- * Why this replacement may not go in (one of his hard stops), in a sentence, or null. `profile` carries his injuries
- * and any running ease-off (the pool profile); `today` is the app's date, for the from-28-weeks rules.
+ * THE HARD-STOP RULE FOR AN EXERCISE HE PICKS, on every coach path (swap, add, his own workout; the screen's to
+ * follow): why it may not go in, in a sentence, or null. `profile` carries his injuries and any running ease-off (the
+ * pool profile). `latestDate` is the LAST day the change reaches (a whole-block swap: the block's last day; a workout
+ * saved for Saturday: Saturday), because the from-28-weeks rules bind any week the change lands in, as generation
+ * reads a block at its last week.
  */
-export function swapHardStop(entry: ExerciseEntry, profile: UserProfile, exclusions: readonly string[], today: string): string | null {
+export function swapHardStop(entry: ExerciseEntry, profile: UserProfile, exclusions: readonly string[], latestDate: string): string | null {
   const names = [entry.name, entry.parent ?? ''].filter(Boolean).map(n => n.toLowerCase())
   if (exclusions.some(x => names.includes(x.trim().toLowerCase()))) {
     return `${entry.name} is on your never-again list, so it stays out. Take it off the list on Profile and I can swap it in.`
@@ -70,7 +73,7 @@ export function swapHardStop(entry: ExerciseEntry, profile: UserProfile, exclusi
     const kind = pregnancyExclusion(entry)
     const why = kind === 'impact' ? 'a jumping move' : kind === 'lying' ? 'a move lying flat' : kind === 'abdominal' ? 'a hard ab move' : null
     if (why) return `${entry.name} is ${why}, which your plan leaves out while you're pregnant, so I won't swap it in. I can find one that works the same muscles.`
-    if (lateInPregnancy(profile, today) && [entry.name, entry.parent ?? ''].some(n => PREGNANCY_LATE_EXCLUDED.has(n))) {
+    if (lateInPregnancy(profile, latestDate) && [entry.name, entry.parent ?? ''].some(n => PREGNANCY_LATE_EXCLUDED.has(n))) {
       return `${entry.name} is one your plan leaves out from 28 weeks pregnant (one-leg balance or face-down work), so I won't swap it in. I can find a supported version.`
     }
   }

@@ -103,7 +103,7 @@ import type { KitController } from '@/lib/kit-change'
 import { prescriptionLine } from '@/lib/activity-day'
 import { EQUIPMENT_OPTIONS, describeEquipmentAccess } from '@/lib/picker-options'
 import { compileFoodDislikes, compileSoftExercisePreferences } from '@/lib/fact-compiler'
-import { coachSwapPick, swapOptionsBlock } from '@/lib/coach-swap-pick'
+import { replacementNamed, coachSwapPick, swapOptionsBlock } from '@/lib/coach-swap-pick'
 import { namedFoodClash, namedFoodKindAsk, clashSentence, allergyRefusal, likeClash, likeRefusal } from '@/lib/named-food-clash'
 import { allergiesOf, allergyLine, allergyName, type Allergen } from '@/lib/allergies'
 import { carriesPen, describesReaction, REACTION_FIRST_LINE, allergensSaid, recordFor, ALLERGY_OFFER_WORDS, withoutSafetyPromises, ALLERGEN_RULES } from '@/lib/allergy-chat'
@@ -144,7 +144,8 @@ import { settleWeek } from '@/lib/settle-week'
 import { shortenOrFloor, SHORTEST_VERSION_MINUTES } from '@/lib/exercise-plan'
 import { resolveAdditionAnywhere } from '@/lib/exercise-add-candidates'
 import { swapPatternAdvice, swapHardStop, swapFitWarnings } from '@/lib/swap-advice'
-import { planOwnWorkoutOffer, applyOwnWorkout, undoOwnWorkout, type OwnWorkoutPayload } from '@/lib/own-workout-offer'
+import { blockSwapEndsOn } from '@/lib/block-swap-until'
+import { planOwnWorkoutOffer, applyOwnWorkout, undoOwnWorkout, ownWorkoutStopAtApply, type OwnWorkoutPayload } from '@/lib/own-workout-offer'
 import { dayLengthParts, formatDayLength } from '@/lib/session-duration'
 import { planDaysForDate } from '@/lib/plan-week'
 import { restoreMesocycle } from '@/lib/mesocycle-persistence'
@@ -3114,6 +3115,17 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * lives in swap-target.ts, tolerantly, and what comes back says which part
    * did not resolve.
    */
+  /**
+   * THE LAST DAY AN EXERCISE CHANGE REACHES, for the hard stops' from-28-weeks rules (the lead's review, 28 Nov 2026):
+   * just today's session, the end of this plan week; the whole block, its last day (the plan's last day when it is the
+   * last block). Read like generation, which judges a block at its last week.
+   */
+  const editReachesUntil = (scope: SwapScope): string => {
+    if (scope !== 'permanent') return addDays(activeSession.date, 6)
+    const next = blockSwapEndsOn(mesocycle, activeSession.liveWeek, planCreatedAt ?? profile.created_at)
+    return next ? addDays(next, -1) : addDays(activeSession.date, 7 * Math.max(1, mesocycle.length - activeSession.liveWeek + 1))
+  }
+
   const buildExerciseSwapProposal = async (rawArgs: Record<string, unknown>, userSaid = ''): Promise<{
     ok: true
     scopeKey: string
@@ -3167,11 +3179,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // SWAP FOR ANYTHING, WITH THE WHY (advise-then-allow fix 17, 28 Nov 2026): his own named choice is no longer held
     // to the generator's pool. The hard stops stay stops, by the same lookup the coach's add uses: a move his injuries
     // list rules out, the pregnancy rules, his never-again list. Outside his kit, style or level it is said on the card.
-    const stop = swapHardStop(newEntry, poolProfile, exerciseExclusions, activeSession.date)
+    // The card offers both scopes, so it is judged at the farther one; confirm judges the one he tapped.
+    const stop = swapHardStop(newEntry, poolProfile, exerciseExclusions, editReachesUntil('permanent'))
     if (stop) return { ok: false, reason: stop }
     const fitWarnings = swapFitWarnings(newEntry, poolProfile, exerciseExclusions)
     // Only about a replacement HE chose: when the swap list's first stood in for the coach's pick, he chose nothing.
-    const patternNote = pick?.replaced ? null : swapPatternAdvice(oldEx.name, newEntry.name, on.sayDay)
+    const patternNote = !pick || pick.replaced || !replacementNamed(userSaid, newEntry.name, oldEx.name) ? null : swapPatternAdvice(oldEx.name, newEntry.name, on.sayDay)
 
     const scope: SwapScope = rawArgs.scope === 'permanent' ? 'permanent' : 'today'
     const payload: ExerciseSwapPayload = {
@@ -3296,9 +3309,16 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
     // ANY EXERCISE IN THE CATALOGUE (his ruling 28 Nov 2026, "advise, then allow"): outside his kit, style or level it
     // is added with the warning on the card; an injury, the pregnancy rules or his never-again list stop it.
-    const found = resolveAdditionAnywhere(item, poolProfile, exerciseExclusions)
+    // ONE HARD-STOP RULE ON EVERY PATH (the lead's review, 28 Nov 2026): the add lookup searches the catalogue, so a
+    // machine version (477 of them, outside it) came back "couldn't find"; it is found by name here, and every entry
+    // meets swapHardStop at the farthest day the card can reach (the from-28-weeks rules too).
+    const looked = resolveAdditionAnywhere(item, poolProfile, exerciseExclusions)
+    const byName = (() => { const r = resolveExerciseName(item, []); const e = r.resolution === 'resolved' ? getExerciseEntry(r.exerciseName) : undefined; return e && !e.log_only ? e : undefined })()
+    const found = looked && 'entry' in looked ? looked : looked ? looked : byName ? { entry: byName, warnings: swapFitWarnings(byName, poolProfile, exerciseExclusions) } : null
     if (!found) return { ok: false, reason: `I couldn't find ${item} in the exercise list. What's it called, or what does it work?` }
     if ('stop' in found) return { ok: false, reason: found.stop }
+    const addStop = swapHardStop(found.entry, poolProfile, exerciseExclusions, editReachesUntil('permanent'))
+    if (addStop) return { ok: false, reason: addStop.replace("so I won't swap it in", "so I won't put it in").replace('and I can swap it in', 'and I can add it') }
     const entry = found.entry
     const fitWarnings = found.warnings
 
@@ -4744,7 +4764,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * on. The date is read as the coach SENT it: a string that is not a date is refused here, never read as today (the
    * 19 Nov defect, where a dropped date wrote onto today).
    */
-  const chatLogDay = (raw: unknown) => logDayFor(typeof raw === 'string' ? raw : null, activeSession.date, planStartDate(planCreatedAt ?? profile.created_at))
+  // A date that is not a string is not "no date": it is refused, never read as today. The plan's first day is the floor
+  // for SETS only (they file under a plan week); a walk or a run before the plan began is just a walk or a run.
+  const chatLogDay = (raw: unknown, sets = false) => logDayFor(raw == null ? null : typeof raw === 'string' ? raw : '?', activeSession.date, sets ? planStartDate(planCreatedAt ?? profile.created_at) : null)
 
   const buildCardioLogProposal = (rawArgs: Record<string, unknown>):
     | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: CardioLogPayload; diff: import('@/lib/pending-actions-store').ProposalDiff }
@@ -4829,7 +4851,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     ]
     if (replaces) implications.push({ severity: 'info', text: `It counts as ${dayName}'s workout instead of ${session!.focus}. The session stays on the plan if you still want it.` })
     // SAID "INSTEAD", AND IT CANNOT COUNT (no session still due that day): said on the card, never dropped quietly.
-    else if (rawArgs.replaced_session === true) implications.push({ severity: 'info', text: `It goes on ${dayName} as extra work: there's no session still due that day for it to count as.` })
+    // A day outside this week is not in the week the app reads, so no reason is claimed for it.
+    else if (rawArgs.replaced_session === true) implications.push({ severity: 'info', text: trainingWeek.days.some(d => d.date === date) ? `It goes on ${dayName} as extra work: there's no session still due that day for it to count as.` : `It goes on ${dayName} as extra work.` })
     return {
       ok: true,
       scopeKey: `${profile.id}:propose_circuit_log:${date}:${blocks.map(b => `${b.activityName}/${b.shape}`).join('|')}`,
@@ -7457,7 +7480,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // WHICH DAY (19 Nov 2026): the date the coach passed used to be dropped here, and "I did squats yesterday" was
       // written onto today. Any earlier day from the plan's start is written to that day (fix 20, 28 Nov); a day still
       // to come, one before the plan, or a date that is not a date is refused.
-      const day = chatLogDay(result.logWorkout.date)
+      const day = chatLogDay(result.logWorkout.date, true)
       if (day.kind === 'refused') return { text: day.say }
       const logged = resolveAndMaybeLog(entries, result.logWorkout.corrects_previous === true, userSaid, day.kind === 'past' ? day : null)
       return logged.past ? await logToPastDay(logged.past.groups, logged.past.day) : logged
@@ -8197,7 +8220,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const payload = row.payload as unknown as ExerciseSwapPayload
       const scope: SwapScope = editedScope === 'permanent' ? 'permanent' : payload.scope
       appliedScope = scope
-      const result = await executeExerciseSwap(profile, mesocycle, { ...payload, scope }, { profile: poolProfile, exclusions: exerciseExclusions, today: activeSession.date })
+      const result = await executeExerciseSwap(profile, mesocycle, { ...payload, scope }, { profile: poolProfile, exclusions: exerciseExclusions, latestDate: editReachesUntil(scope) })
       onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       receipt = sayReceipt(result.receipt, payload)
       const ok = receipt.failed.length === 0
@@ -8781,11 +8804,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const payload = row.payload as unknown as OwnWorkoutPayload
       // A card made before midnight and tapped after it would start a workout dated yesterday: it says so instead.
       const stale = payload.mode === 'start' && payload.date !== activeSession.date
+      // THE HARD STOPS AGAIN AT APPLY (the lead's review): his injuries or the date may have changed while it sat.
+      const stopNow = stale ? null : ownWorkoutStopAtApply(payload, poolProfile, exerciseExclusions, activeSession.date)
       // Its set numbers run on after the day's logged sets AND the plan's own sets of that lift today, so ticking his
       // own Bench never fills the plan's Bench row (it is a separate workout).
       const planSets = (id: string) => (todayResolved.day?.exercises ?? []).filter(e => getExerciseId(e.name) === id).flatMap(e => Array.from({ length: Number(e.sets) || 0 }, (_, k) => k + 1))
-      const ok = !stale && applyOwnWorkout(profile.id, payload, getAppNow(profile.id).toISOString(), id => [...activeSession.logs.filter(l => (l.exercise_id ?? getExerciseId(l.exercise_name)) === id).map(l => l.set_number), ...planSets(id)])
-      receipt = ok ? { landed: [payload.mode === 'start' ? `${payload.name}: started, on Exercise` : `${payload.name}: saved${payload.date ? `, on ${payload.date === activeSession.date ? 'today' : dayNameOf(payload.date)}` : ''}`], failed: [] } : { landed: [], failed: [{ op: 'propose_own_workout', error: stale ? 'that was set up for yesterday; ask me again for today' : "it didn't save on this phone" }] }
+      const ok = !stale && !stopNow && applyOwnWorkout(profile.id, payload, getAppNow(profile.id).toISOString(), id => [...activeSession.logs.filter(l => (l.exercise_id ?? getExerciseId(l.exercise_name)) === id).map(l => l.set_number), ...planSets(id)])
+      receipt = ok ? { landed: [payload.mode === 'start' ? `${payload.name}: started, on Exercise` : `${payload.name}: saved${payload.date ? `, on ${payload.date === activeSession.date ? 'today' : dayNameOf(payload.date)}` : ''}`], failed: [] } : { landed: [], failed: [{ op: 'propose_own_workout', error: stale ? 'that was set up for yesterday; ask me again for today' : stopNow ?? "it didn't save on this phone" }] }
       title = ok ? RECEIPTS['propose_own_workout'].done : RECEIPTS['propose_own_workout'].failed
       rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
       undoToken = ok ? row.id : undefined
@@ -8847,7 +8872,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // THE BUTTON SHE TAPPED IS THE SCOPE (29 Oct 2026): "Rest of block" applied today only, from the offer's own scope.
       const addPayload = { ...(row.payload as unknown as ExerciseAddPayload), ...(editedScope === 'permanent' || editedScope === 'today' ? { scope: editedScope as SwapScope } : {}) }
       appliedScope = addPayload.scope
-      const result = await executeExerciseAdd(poolProfile, mesocycle, addPayload, exerciseExclusions)
+      const result = await executeExerciseAdd(poolProfile, mesocycle, addPayload, exerciseExclusions, editReachesUntil(addPayload.scope))
       receipt = sayReceipt(result.receipt, row.payload as unknown as ExerciseAddPayload)
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_exercise_add'].done : RECEIPTS['propose_exercise_add'].failed

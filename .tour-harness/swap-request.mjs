@@ -279,6 +279,26 @@ if (cross) {
   await shoot('swap-request-cost')
 }
 
+// 5. A HARD STOP ON THE SWAP CARD (advise-then-allow fix 17, the lead's review): pregnant, a jumping replacement she
+// names is refused in the app's words, and no card is drawn. (Pregnancy, not the knee ease-off: this page hands the
+// coach the saved profile, not App's pool profile, so an ease-off never reaches it here; test:swap-for-anything
+// holds the ease-off case on the rule itself.)
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?pregnant=1&n=stop` })
+await wait(4000)
+let up5 = await ev(`!!document.querySelector('textarea')`)
+for (let i = 0; i < 20 && !up5; i++) { await wait(500); up5 = await ev(`!!document.querySelector('textarea')`) }
+const cardsBefore = await ev(`document.querySelectorAll('[data-testid="proposal-card"]').length`)
+const target5 = await ev(`window.__swapTarget`)
+await ev(`window.__swapOld = ${JSON.stringify(target5?.full ?? swapTarget.full)}; window.__swapNew = 'Box Jumps'`)
+await ev(`(() => { const t = document.querySelector('textarea'); if (t) (${setValue})(t, 'swap this exercise for box jumps') })()`)
+await wait(400)
+check('5a. pregnant, asking for a jumping replacement', up5 === true && await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /send/i.test(x.getAttribute('aria-label') || '')); if (!b || b.disabled) return false; b.click(); return true })()`))
+let said5 = ''
+for (let i = 0; i < 30 && !/won't swap it in/.test(said5); i++) { await wait(300); said5 = await ev('document.body.innerText') }
+check('5b. refused in the app\'s words: a jumping move, left out while pregnant', /Box Jumps is a jumping move, which your plan leaves out while you're pregnant, so I won't swap it in\./.test(said5), said5.slice(-300))
+check('5c. ...and no card to tap', (await ev(`document.querySelectorAll('[data-testid="proposal-card"]').length`)) === cardsBefore)
+await shoot('swap-request-hard-stop')
+
 const err = await ev('window.__err ?? null')
 check('3. no uncaught error on the page', err === null, err)
 

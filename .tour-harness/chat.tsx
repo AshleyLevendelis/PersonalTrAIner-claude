@@ -155,6 +155,8 @@ const profile: UserProfile = {
   coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
   // ?started=N: how many days ago the plan began (INPUT; default 9), so a driver can sit in a later week's phase.
   created_at: new Date(anchorNowMs() - Number(new URLSearchParams(location.search).get('started') ?? 9) * 86400000).toISOString(),
+  // ?pregnant=1 (28 Nov 2026, the swap card's hard stop): INPUT only; what it rules out is the app's to decide.
+  ...(new URLSearchParams(location.search).get('pregnant') === '1' ? { gender: 'female' as const, health_conditions: ['pregnancy'] } : {}),
 } as UserProfile
 // ?bday=today / ?bday=tomorrow (9 Nov 2026, the birthday wish): a date of birth 30 years before the harness's today, or
 // the day after it. INPUT only: whether today is the birthday is the app's to decide.

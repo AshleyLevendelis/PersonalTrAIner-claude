@@ -10,10 +10,12 @@ import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { setSupabaseClient } from '../src/lib/supabase'
-import { planOwnWorkoutOffer, applyOwnWorkout, undoOwnWorkout, ownItemLine, type OwnWorkoutPayload } from '../src/lib/own-workout-offer'
+import { planOwnWorkoutOffer, applyOwnWorkout, undoOwnWorkout, ownItemLine, ownWorkoutStopAtApply, type OwnWorkoutPayload } from '../src/lib/own-workout-offer'
 import { loadOwnWorkouts, saveOwnWorkout } from '../src/lib/own-workout'
 import { ownPlans, setPlanOnDate } from '../src/lib/own-workout-plans'
-import { getExerciseEntry } from '../src/lib/exercise-db'
+import { getExerciseEntry, registerNearCopies, logOnlyExercises } from '../src/lib/exercise-db'
+import { NEAR_COPIES } from '../src/lib/exercise-near-copies'
+import { swapHardStop } from '../src/lib/swap-advice'
 import type { UserProfile } from '../src/lib/types'
 
 setSupabaseClient({ from: () => ({ upsert: () => Promise.resolve({ error: null }) }) } as never)
@@ -75,6 +77,16 @@ check('pregnant: a jumping move filed as CARDIO is still refused (cardio was ski
 const late = { ...pregnant, due_date: '2027-01-20' } as unknown as UserProfile
 check('...and from 28 weeks a split squat, read on the app\'s today', (() => { const o = offer({ mode: 'start', items: [{ exercise: 'Bulgarian Split Squats' }] }, late); return !o.ok && /from 28 weeks/.test(o.reason) })())
 check('...a plain walk is cardio and goes in', offer({ mode: 'start', items: [{ cardio: 'walk', minutes: 20 }] }, pregnant).ok)
+const at27 = { ...pregnant, due_date: '2027-02-27' } as unknown as UserProfile
+check('at 27 weeks: a workout saved for three weeks on is judged on THAT day (past 28 weeks)', (() => { const o = offer({ mode: 'plan', date: '2026-12-19', items: [{ exercise: 'Bulgarian Split Squats' }] }, at27); return !o.ok && /from 28 weeks/.test(o.reason) })() && offer({ mode: 'start', items: [{ exercise: 'Bulgarian Split Squats' }] }, at27).ok)
+check('"jumps" while pregnant, a name that could be several moves, is asked about (any of them could be a stop)', (() => { const o = planOwnWorkoutOffer({ mode: 'start', name: null, date: null, items: [{ cardio: 'jumps', minutes: 10 }], today: TODAY, dayName: d => d, resolve: () => ({ ambiguous: ['Box Jumps', 'Jumping Jacks'] }), profile: pregnant, exclusions: [], newId: () => 'x' }); return !o.ok && o.reason === 'Which "jumps" do you mean: Box Jumps, Jumping Jacks?' })())
+check('...a cardio minutes figure that cannot be right is asked, as lifts are', (() => { const o = offer({ mode: 'start', items: [{ cardio: 'walk', minutes: 900 }] }); return !o.ok && /How many minutes of walk/.test(o.reason) })())
+const okStart = offer({ mode: 'start', items: [{ exercise: 'Box Jumps' }] })
+check('THE STOPS AGAIN AT APPLY: fine when carded, a knee added since stops it', okStart.ok && ownWorkoutStopAtApply(okStart.payload, profile, [], TODAY) === null && /won't put it in/.test(ownWorkoutStopAtApply(okStart.payload, knee, [], TODAY) ?? ''))
+registerNearCopies(NEAR_COPIES)
+const copy = logOnlyExercises().find(e => !!e.parent && swapHardStop(e, profile, [], TODAY) === null)
+const withCopy = copy ? offer({ mode: 'start', items: [{ exercise: copy.name }] }) : null
+check('a near-copy goes into his own workout WITH A NOTE naming the plan\'s own pick (his "Yes, with a note")', !!withCopy && withCopy.ok && withCopy.notes.some(n => n === `${copy!.name}: a version of ${copy!.parent}; your plan's own pick is ${copy!.parent}.`), { copy: copy?.name, withCopy })
 const home = { ...profile, equipment_access: 'bodyweight' } as unknown as UserProfile
 const outOfKit = offer({ mode: 'start', items: [{ exercise: 'Barbell Bench Press' }] }, home)
 check('outside his kit: in, with the screen\'s own warning named by exercise', outOfKit.ok && outOfKit.warnings.some(w => w.startsWith('Barbell Bench Press: ')), outOfKit)
@@ -114,7 +126,7 @@ const card = chat.slice(chat.indexOf('const buildOwnWorkoutProposal'), chat.inde
 check('the card is planned by the offer, with the pool profile, his bans and the app\'s today', card.length > 500 && /planOwnWorkoutOffer\(\{/.test(card) && /profile: poolProfile, exclusions: exerciseExclusions/.test(card) && /today: activeSession\.date/.test(card))
 check('...a refusal is said, never a card', /if \(!offer\.ok\) return offer/.test(card) && /propose_own_workout'\) \{\s*const ow = buildOwnWorkoutProposal[\s\S]{0,300}else refusal = ow\.reason/.test(chat))
 check('...on a day with a plan session, it says the plan\'s session stays', /It's a separate workout: today's \$\{todaySession\} stays on your plan\./.test(card))
-check('Apply and Undo go through the store functions', /const ok = !stale && applyOwnWorkout\(profile\.id, payload,/.test(chat) && /const back = undoOwnWorkout\(profile\.id,/.test(chat))
+check('Apply and Undo go through the store functions', /const ok = !stale && !stopNow && applyOwnWorkout\(profile\.id, payload,/.test(chat) && /const stopNow = stale \? null : ownWorkoutStopAtApply\(payload, poolProfile, exerciseExclusions, activeSession\.date\)/.test(chat) && /const back = undoOwnWorkout\(profile\.id,/.test(chat))
 check('...numbering after today\'s logged sets AND the plan\'s own sets of that lift', /id => \[\.\.\.activeSession\.logs\.filter\(l => \(l\.exercise_id \?\? getExerciseId\(l\.exercise_name\)\) === id\)\.map\(l => l\.set_number\), \.\.\.planSets\(id\)\]/.test(chat) && /const planSets = \(id: string\) => \(todayResolved\.day\?\.exercises/.test(chat))
 check('...a start card tapped after midnight is refused, not dated yesterday', /const stale = payload\.mode === 'start' && payload\.date !== activeSession\.date/.test(chat))
 check('...the chat\'s lookup hands back the few a name could be', /if \(r\.resolution === 'ambiguous'\) return \{ ambiguous: r\.candidates\.map\(c => c\.name\) \}/.test(card))

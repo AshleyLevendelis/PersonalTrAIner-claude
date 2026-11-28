@@ -15,7 +15,7 @@ import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/li
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { swapPatternAdvice, swapHardStop } from '../src/lib/swap-advice'
 import { resolveAdditionAnywhere } from '../src/lib/exercise-add-candidates'
-import { executeExerciseSwap } from '../src/lib/pending-action-executor'
+import { executeExerciseSwap, executeExerciseAdd } from '../src/lib/pending-action-executor'
 import { EXERCISE_DATABASE, getExerciseEntry } from '../src/lib/exercise-db'
 import type { UserProfile } from '../src/lib/types'
 
@@ -62,6 +62,10 @@ async function main() {
   const split = getExerciseEntry('Bulgarian Split Squats')!
   check('from 28 weeks: a split squat is refused (generation already swapped these out)', /from 28 weeks pregnant/.test(swapHardStop(split, late, [], '2026-11-28') ?? ''), swapHardStop(split, late, [], '2026-11-28'))
   check('...and allowed earlier in the pregnancy, as generation allows it', swapHardStop(split, early, [], '2026-11-28') === null)
+  // THE LAST DAY THE CHANGE REACHES (the lead's review): 27 weeks today, past 28 by the block's end.
+  const at27 = { ...pregnant, due_date: '2027-02-27' } as unknown as UserProfile
+  check('at 27 weeks: a swap for today alone is fine...', swapHardStop(split, at27, [], '2026-11-28') === null)
+  check('...but one reaching three weeks on (a whole block) is refused', /from 28 weeks pregnant/.test(swapHardStop(split, at27, [], '2026-12-19') ?? ''))
   check('a move he can do, of another pattern, has no stop', swapHardStop(goblet!, base, [], '2026-11-28') === null)
 
   console.log('\n2. The hard stops, at confirm (run, not read)')
@@ -88,21 +92,36 @@ async function main() {
   const noId = { ...hurt, id: undefined } as unknown as UserProfile
   const payload = (name: string) => ({ weekNumber: week.week_number, dayName: day.day, sayDay: day.day, exIndex, oldExerciseName: outgoing.name, newExerciseName: name, scope: 'today' as const })
   const errOf = (r: Awaited<ReturnType<typeof executeExerciseSwap>>) => r.receipt.failed[0]?.error ?? ''
-  const refused = await executeExerciseSwap(noId, meso, payload(stopped?.name ?? 'Overhead Press'), { profile: hurt, exclusions: [], today: '2026-11-28' })
+  const refused = await executeExerciseSwap(noId, meso, payload(stopped?.name ?? 'Overhead Press'), { profile: hurt, exclusions: [], latestDate: '2026-11-28' })
   check('an injury-blocked replacement is refused AT CONFIRM, in the stop\'s words, plan untouched', /which your plan is protecting for your injuries, so I won't swap it in/.test(errOf(refused)) && refused.mesocycle === meso, errOf(refused))
-  const banned = await executeExerciseSwap(noId, meso, payload(otherPattern?.name ?? 'Goblet Squats'), { profile: hurt, exclusions: [otherPattern?.name ?? 'Goblet Squats'], today: '2026-11-28' })
+  const banned = await executeExerciseSwap(noId, meso, payload(otherPattern?.name ?? 'Goblet Squats'), { profile: hurt, exclusions: [otherPattern?.name ?? 'Goblet Squats'], latestDate: '2026-11-28' })
   check('...and one on his never-again list', /never-again list/.test(errOf(banned)) && banned.mesocycle === meso, errOf(banned))
-  const allowed = await executeExerciseSwap(noId, meso, payload(otherPattern?.name ?? 'Goblet Squats'), { profile: hurt, exclusions: [], today: '2026-11-28' })
+  const allowed = await executeExerciseSwap(noId, meso, payload(otherPattern?.name ?? 'Goblet Squats'), { profile: hurt, exclusions: [], latestDate: '2026-11-28' })
   check('a different pattern he named gets past the stops (to the save, which needs an account)', allowed.receipt.failed[0]?.op === 'save' && allowed.mesocycle !== meso, allowed.receipt)
+
+  console.log('\n2b. ONE RULE ON THE COACH\'S ADD TOO (run, not read)')
+  const addPayload = (name: string) => ({ weekNumber: week.week_number, dayName: day.day, exerciseName: name, scope: 'today' as const })
+  const addErr = (r: Awaited<ReturnType<typeof executeExerciseAdd>>) => r.receipt.failed[0] ?? { op: '', error: '' }
+  const backHurt = { ...hurt, injuries: ['lower_back'], id: undefined } as unknown as UserProfile
+  const machine = await executeExerciseAdd({ ...hurt, injuries: [], id: undefined } as unknown as UserProfile, meso, addPayload('45-Degree Hyperextension Bench (Roman Chair)'), [], '2026-11-28')
+  check('a machine version is FOUND by the add (it was "couldn\'t find"): past resolution, to the save', addErr(machine).op === 'save', addErr(machine))
+  const machineHurt = await executeExerciseAdd(backHurt, meso, addPayload('45-Degree Hyperextension Bench (Roman Chair)'), [], '2026-11-28')
+  check('...and a bad back STOPS it there, in "won\'t put it in" words', /which your plan is protecting for your injuries, so I won't put it in/.test(addErr(machineHurt).error), addErr(machineHurt))
+  const lateAdd = await executeExerciseAdd({ ...hurt, injuries: [], health_conditions: ['pregnancy'], due_date: '2027-02-27', id: undefined } as unknown as UserProfile, meso, addPayload('Bulgarian Split Squats'), [], '2026-12-19')
+  check('...and the from-28-weeks rules bind an add reaching past 28 weeks', /from 28 weeks pregnant/.test(addErr(lateAdd).error), addErr(lateAdd))
+  const chat0 = strip(readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8'))
+  check('the coach\'s add card runs the same rule, at the farthest day it reaches', /const addStop = swapHardStop\(found\.entry, poolProfile, exerciseExclusions, editReachesUntil\('permanent'\)\)/.test(chat0) && /executeExerciseAdd\(poolProfile, mesocycle, addPayload, exerciseExclusions, editReachesUntil\(addPayload\.scope\)\)/.test(chat0))
 
   console.log('\n3. The card and the coach')
   const chat = strip(readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8'))
   const card = chat.slice(chat.indexOf('const buildExerciseSwapProposal'), chat.indexOf('const buildExerciseAddProposal'))
-  check('the card asks the stops about the ENTRY he named, with the pool profile and today, before any payload', card.length > 1000 && /const stop = swapHardStop\(newEntry, poolProfile, exerciseExclusions, activeSession\.date\)/.test(card) && card.indexOf('swapHardStop(') < card.indexOf('const payload: ExerciseSwapPayload'))
+  check('the card asks the stops about the ENTRY he named, with the pool profile, at the farthest day the card reaches, before any payload', card.length > 1000 && /const stop = swapHardStop\(newEntry, poolProfile, exerciseExclusions, editReachesUntil\('permanent'\)\)/.test(card) && card.indexOf('swapHardStop(') < card.indexOf('const payload: ExerciseSwapPayload'))
+  const reach = chat.slice(chat.indexOf('const editReachesUntil ='), chat.indexOf('const buildExerciseSwapProposal'))
+  check('...a whole-block change reaches the block\'s last day (the day before the next block), today\'s reaches the week', /if \(scope !== 'permanent'\) return addDays\(activeSession\.date, 6\)/.test(reach) && /const next = blockSwapEndsOn\(mesocycle, activeSession\.liveWeek,/.test(reach) && /return next \? addDays\(next, -1\)/.test(reach))
   check('...a stop is refused there', /if \(stop\) return \{ ok: false, reason: stop \}/.test(card))
-  check('...and the movement line only when HE chose (never on the list\'s stand-in for the coach\'s pick)', /const patternNote = pick\?\.replaced \? null : swapPatternAdvice\(/.test(card))
+  check('...and the movement line only when HE chose (never on the list\'s stand-in, nor on the coach\'s own pick when the list is empty)', /const patternNote = !pick \|\| pick\.replaced \|\| !replacementNamed\(userSaid, newEntry\.name, oldEx\.name\) \? null : swapPatternAdvice\(/.test(card))
   check('...the different-movement line and any kit, style or level warning are on the card, as warnings', /\.\.\.\(patternNote \? \[\{ severity: 'warn' as const, text: patternNote \}\] : \[\]\)/.test(card) && /\.\.\.fitWarnings\.map\(text => \(\{ severity: 'warn' as const, text \}\)\)/.test(card) && /const fitWarnings = swapFitWarnings\(newEntry, poolProfile, exerciseExclusions\)/.test(card))
-  check('confirm hands the stops to the executor', /executeExerciseSwap\(profile, mesocycle, \{ \.\.\.payload, scope \}, \{ profile: poolProfile, exclusions: exerciseExclusions, today: activeSession\.date \}\)/.test(chat))
+  check('confirm hands the stops to the executor', /executeExerciseSwap\(profile, mesocycle, \{ \.\.\.payload, scope \}, \{ profile: poolProfile, exclusions: exerciseExclusions, latestDate: editReachesUntil\(scope\) \}\)/.test(chat))
   const fn = readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8')
   check('the tool no longer says the replacement MUST be the same pattern', !/must be biomechanically similar/.test(fn) && !/for a biomechanically similar alternative/.test(fn))
   check('...it says his named choice is proposed, even a different movement', /when THEY name one, it is what they named, even a different kind of movement: propose it/.test(fn))

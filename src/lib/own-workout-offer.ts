@@ -19,7 +19,7 @@
 //
 // Pure: names are resolved by the caller's function, the store is touched only on Apply.
 // ---------------------------------------------------------------------------
-import type { ExerciseEntry } from './exercise-db'
+import { getExerciseEntry, type ExerciseEntry } from './exercise-db'
 import type { UserProfile } from './types'
 import { swapHardStop, swapFitWarnings } from './swap-advice'
 import { saveOwnPlan, deleteOwnPlan, ownPlans, workoutFromPlan, newPlanLift, newPlanCardio, type OwnPlan } from './own-workout-plans'
@@ -92,6 +92,8 @@ export function planOwnWorkoutOffer(input: {
   }
   const mode: 'start' | 'plan' = input.mode === 'start' && (!date || date === input.today) ? 'start' : 'plan'
 
+  // The hard stops are read on the day it is FOR (a workout saved for a day past 28 weeks pregnant meets those rules).
+  const onDay = date ?? input.today
   const items: OwnWorkoutOfferItem[] = []
   const warnings: string[] = []
   const notes: string[] = []
@@ -108,18 +110,26 @@ export function planOwnWorkoutOffer(input: {
       // Cardio is his words, but a known conditioning move (box jumps, burpees) is held to the same stops.
       const known = input.resolve(cardio)
       if (known && !('ambiguous' in known)) {
-        const stop = swapHardStop(known, input.profile, input.exclusions, input.today)
+        const stop = swapHardStop(known, input.profile, input.exclusions, onDay)
         if (stop) return { ok: false, reason: words(stop) }
+      } else if (known && 'ambiguous' in known) {
+        // "Jumps" could be several moves; if any of them is one he may not do, it is asked about, as a lift is.
+        const blocked = known.ambiguous.some(n => { const e = getExerciseEntry(n); return !!e && !!swapHardStop(e, input.profile, input.exclusions, onDay) })
+        if (blocked) return { ok: false, reason: `Which "${cardio}" do you mean: ${known.ambiguous.join(', ')}?` }
       }
-      const m = Number(r.minutes)
-      items.push({ kind: 'cardio', activity: cardio.replace(/^\w/, c => c.toUpperCase()), minutes: Number.isFinite(m) && m > 0 && m <= 600 ? String(Math.round(m)) : '' })
+      const m = r.minutes == null ? null : Number(r.minutes)
+      if (m != null && (!Number.isFinite(m) || m <= 0 || m > 600)) return { ok: false, reason: `How many minutes of ${cardio}?` }
+      items.push({ kind: 'cardio', activity: cardio.replace(/^\w/, c => c.toUpperCase()), minutes: m == null ? '' : String(Math.round(m)) })
       continue
     }
     if (!said) return { ok: false, reason: "I couldn't tell what one of those was. Which exercises do you want in it?" }
     const entry = lookUp(said)
     if ('ok' in entry) return entry
-    const stop = swapHardStop(entry, input.profile, input.exclusions, input.today)
+    const stop = swapHardStop(entry, input.profile, input.exclusions, onDay)
     if (stop) return { ok: false, reason: words(stop) }
+    // A NEAR-COPY GOES IN, WITH A NOTE (his ruling 28 Nov 2026, "Yes, with a note"): a version of a plan lift, which
+    // the plan itself would not pick.
+    if (entry.log_only) notes.push(`${entry.name}: a version of ${entry.parent ?? 'a plan lift'}; your plan's own pick is ${entry.parent ?? 'that lift'}.`)
     for (const w of swapFitWarnings(entry, input.profile, input.exclusions)) (/^Good for /.test(w) ? notes : warnings).push(`${entry.name}: ${w}`)
     // HIS NUMBERS AS HE GAVE THEM (the screen keeps reps as typed: "8", "8-10", "AMRAP", "45s"). Only an absent number
     // takes the default; a number that cannot be right is asked about, never replaced.
@@ -164,6 +174,17 @@ function planFingerprint(p: OwnPlan): string {
 }
 
 /** Writes it. `taken` gives the set numbers already used today for an exercise, so his never write over the plan's. */
+/** The hard stops again at Apply (the card may have sat while his injuries or the date changed): a sentence, or null. */
+export function ownWorkoutStopAtApply(p: OwnWorkoutPayload, profile: UserProfile, exclusions: readonly string[], today: string): string | null {
+  const onDay = p.date ?? today
+  for (const i of p.items) {
+    const e = getExerciseEntry(i.kind === 'lift' ? i.name : i.activity)
+    const stop = e ? swapHardStop(e, profile, exclusions, onDay) : null
+    if (stop) return words(stop)
+  }
+  return null
+}
+
 export function applyOwnWorkout(profileId: string, p: OwnWorkoutPayload, nowIso: string, taken: (exerciseId: string) => number[]): boolean {
   if (p.mode === 'plan') {
     if (!saveOwnPlan(profileId, asPlan(p, nowIso), nowIso)) return false
