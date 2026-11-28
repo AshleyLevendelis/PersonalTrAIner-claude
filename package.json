@@ -736,6 +736,7 @@
     "test:coach-route-meals-elsewhere": "tsx scripts/test-coach-route-meals-elsewhere.ts",
     "test:watch-workout-context": "tsx scripts/test-watch-workout-context.ts",
     "test:coach-route-lift-effort": "tsx scripts/test-coach-route-lift-effort.ts",
+    "test:tightness-context": "tsx scripts/test-tightness-context.ts",
     "gen:coach-actions": "tsx scripts/coach-actions-doc.ts --write",
     "test:offer-fixes": "tsx scripts/test-offer-fixes.ts",
     "test:chat-extras": "tsx scripts/test-chat-extras.ts",
