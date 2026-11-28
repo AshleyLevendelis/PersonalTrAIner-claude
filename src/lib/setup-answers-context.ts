@@ -17,7 +17,7 @@ import { describeMealsElsewhere, readMealsElsewhere } from './meals-elsewhere'
 import type { UserProfile } from './types'
 
 /** His ruling 28 Nov 2026, "Say the week, plainly": the week explains a plan change and nothing medical beyond it. */
-export const PREGNANCY_WEEK_RULE = 'Say the week plainly when it explains a change to her plan; say nothing medical beyond that, and send health questions to her midwife or GP.'
+const PREGNANCY_WEEK_RULE = 'Say the week plainly when it explains a change to her plan; say nothing medical beyond that, and send health questions to her midwife or GP.'
 
 export type SetupAnswersProfile = Pick<UserProfile,
   'recovery_capacity' | 'concurrent_activities' | 'conditioning_preference' | 'cardio_days_per_week' | 'running_goal'
