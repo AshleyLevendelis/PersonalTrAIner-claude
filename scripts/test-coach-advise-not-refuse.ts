@@ -38,6 +38,15 @@ console.log('\n3. What stays a stop stays one')
 check('pain red flags still never reach an injury tool', /Never call either injury tool for this tier\./.test(fn))
 check('a started session is still not redrawn (data safety, kept)', /a session they have started is not redrawn/.test(fn))
 
+console.log('\n4. His rulings and the reviewers\' wording (28 Nov 2026)')
+check('never mention price: no "this app is free", and he is told the coach cannot speak to pricing', !/this app is free/i.test(fn) && /NEVER MENTION PRICE \(his ruling, 28 Nov 2026[^\n]*say you can't speak to pricing, and never state a price, "free" or a plan/.test(fn))
+check('deleting an account is on the does-not-exist list', /deleting their account \(nothing in the app does it on request\)/.test(fn))
+check('body composition: the tape, never "the scale is the best way"', /a tape round the waist shows the composition better; never call the scale "the best way"/.test(fn))
+check('a safety or medical reply is still a text, two to four lines', /A SAFETY OR MEDICAL REPLY IS STILL A TEXT\./.test(fn) && /Two to four short lines: what you can say, the professional named once, the next step\./.test(fn))
+check('pain is asked which kind before any ease-off card (his 15 Sep three)', /Never on the first mention of pain: \\"it hurts when I press\\" is asked which kind first/.test(fn))
+check('a how-to has one cue about THEM', /one of them about THEM: their working weight, an injury on their list, or what their last log shows/.test(fn))
+check('calories burned never move the food target, and an estimate is said as one', /calories burned are shown for interest: they never change the food target/.test(fn))
+
 console.log(`\ncoach-advise-not-refuse: ${ran} checks ran`)
 if (failures > 0) { console.error(`coach-advise-not-refuse: ${failures} check(s) FAILED`); process.exit(1) }
 console.log('coach-advise-not-refuse: all checks passed')
