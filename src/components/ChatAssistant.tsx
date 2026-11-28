@@ -328,6 +328,9 @@ const UNTAGGED_ALLERGEN_HIDDEN_FORMS: Record<string, string> = {
   sulphites: 'dried fruit, wine, and wine vinegar',
 }
 
+/** The exercise and session edits whose day may be one he marked; its note leads the card (28 Nov 2026). */
+const DAY_NOTE_KINDS = new Set(['propose_exercise_swap', 'propose_exercise_add', 'propose_exercise_remove', 'propose_exercise_reorder', 'propose_session_shorten', 'propose_session_rebuild', 'propose_volume_change', 'propose_session_kind_today'])
+
 /** What propose_train_today's card carries: the session borrowed onto today, and the borrow before it (none). */
 interface TrainTodayPayload { date: string; day: string; focus: string; previous: string | null }
 
@@ -1420,7 +1423,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // back is the plan row to WRITE (`day`, keyed by `day.day`) and the weekday
   // to SAY (`sayDay`), and those are different words on a moved-in session.
   // A day swapped for another activity, rested on purpose, marked missed or
-  // emptied by a move is refused in a sentence rather than edited.
+  // emptied by a move is edited all the same (28 Nov 2026), with a note on the card about the mark.
   // -------------------------------------------------------------------------
   type EditDay =
     | { ok: true; day: WorkoutDay; sayDay: string; ref: SessionRef; say: (text: string) => string }
@@ -7233,6 +7236,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
       if (!built) {
         return { text: refusal ?? UNKNOWN_PROPOSAL_REFUSAL, outcome: 'refused' }
+      }
+
+      // A DAY HE MARKED (rested, missed, swapped, moved) IS EDITED WITH A WORD ABOUT THE MARK (28 Nov 2026, his "we just
+      // guide them and tell them the whys"): editTarget no longer refuses it, and its note goes on the card first.
+      if (DAY_NOTE_KINDS.has(kindOverride ?? result.proposal.kind)) {
+        const ref = sessionRefForDayArg(String(result.proposal.rawArgs?.day ?? ''), { todayDate: activeSession.date, cells: trainingWeek.days, weekNumber: activeSession.liveWeek })
+        const note = 'refusal' in ref ? undefined : (() => { const t = editTarget(ref); return t.ok ? t.note : undefined })()
+        if (note) built = { ...built, diff: { ...built.diff, implications: [{ severity: 'info', text: note }, ...(built.diff.implications ?? [])] } }
       }
 
       // A SCOPE HE HAS ALREADY SAID IS NOT ASKED AGAIN (17 Nov 2026): "for today" keeps one Apply, no "Just today".
