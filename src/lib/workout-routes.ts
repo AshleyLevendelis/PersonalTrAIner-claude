@@ -7,7 +7,8 @@
 // [ms, lat, lng] at five decimal places, one only once he has moved about five metres. They are kept on the phone first
 // (a run with the phone in a locker, a database before the migration) and saved whole to the route's row each time; a
 // route is found again by its activity and the watch's own start, which the logged walk carries as started_at.
-// Where he lives is in these points, so nothing here is ever logged, sent to the coach or shown to anyone else.
+// Where he lives is in these points, so nothing here is ever logged, sent to the coach or shown to anyone else. The
+// streets under the line (his ruling "Streets, OpenStreetMap") are fetched as map squares by area, never by route.
 // ---------------------------------------------------------------------------
 import { supabase } from './supabase'
 
@@ -114,21 +115,49 @@ export function routeKm(points: RoutePoint[]): number {
   return m / 1000
 }
 
+/** One OpenStreetMap map square, placed in the box. */
+interface MapTile { url: string; x: number; y: number; size: number }
+
+/** The map squares come from OpenStreetMap (his ruling 28 Nov 2026, "Streets, OpenStreetMap"). */
+const TILE_HOST = 'https://tile.openstreetmap.org'
+const TILE = 256
+
+/** A point's place on the Web Mercator world at `zoom`, in map pixels (the projection every street map uses). */
+function worldPx(lat: number, lng: number, zoom: number): [number, number] {
+  const n = TILE * 2 ** zoom
+  const s = Math.sin(Math.max(-85.05, Math.min(85.05, lat)) * Math.PI / 180)
+  return [(lng + 180) / 360 * n, (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n]
+}
+
 /**
- * The route drawn in a w x h box with `pad` around it: north up, east right, metres the same both ways (longitude
- * shrinks by the cosine of the latitude), centred. Returns the polyline's points and the start and end.
+ * The route laid on a street map in a w x h box with `pad` around it: the closest zoom (up to 17) at which the whole
+ * route fits, centred, north up, the line and its two ends in the box's own units, and the map squares that cover the
+ * box. A square's address names only its zoom and place on the grid, so OpenStreetMap is asked for an area of the
+ * map, never sent the route, the time or who is asking.
  */
-export function projectRoute(points: RoutePoint[], w: number, h: number, pad = 12): { line: string; start: [number, number]; end: [number, number] } | null {
+export function mapLayout(points: RoutePoint[], w: number, h: number, pad = 14): {
+  zoom: number; tiles: MapTile[]; line: string; start: [number, number]; end: [number, number]
+} | null {
   if (points.length < 2) return null
-  const lat0 = points.reduce((s, p) => s + p[1], 0) / points.length
-  const k = Math.cos(lat0 * Math.PI / 180)
-  const xy = points.map(p => [p[2] * k, -p[1]] as [number, number])
-  const xs = xy.map(p => p[0]), ys = xy.map(p => p[1])
-  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys)
-  const spanX = maxX - minX || 1e-9, spanY = maxY - minY || 1e-9
-  const scale = Math.min((w - 2 * pad) / spanX, (h - 2 * pad) / spanY)
-  const offX = (w - spanX * scale) / 2, offY = (h - spanY * scale) / 2
-  const at = (p: [number, number]): [number, number] => [+(offX + (p[0] - minX) * scale).toFixed(1), +(offY + (p[1] - minY) * scale).toFixed(1)]
-  const out = xy.map(at)
-  return { line: out.map(p => `${p[0]},${p[1]}`).join(' '), start: out[0], end: out[out.length - 1] }
+  let zoom = 17
+  let px: [number, number][] = []
+  for (; zoom >= 2; zoom--) {
+    px = points.map(p => worldPx(p[1], p[2], zoom))
+    const xs = px.map(p => p[0]), ys = px.map(p => p[1])
+    if (Math.max(...xs) - Math.min(...xs) <= w - 2 * pad && Math.max(...ys) - Math.min(...ys) <= h - 2 * pad) break
+  }
+  const xs = px.map(p => p[0]), ys = px.map(p => p[1])
+  const ox = (Math.min(...xs) + Math.max(...xs)) / 2 - w / 2, oy = (Math.min(...ys) + Math.max(...ys)) / 2 - h / 2
+  const at = (p: [number, number]): [number, number] => [+(p[0] - ox).toFixed(1), +(p[1] - oy).toFixed(1)]
+  const out = px.map(at)
+  const tiles: MapTile[] = []
+  const count = 2 ** zoom
+  for (let ty = Math.floor(oy / TILE); ty <= Math.floor((oy + h) / TILE); ty++) {
+    if (ty < 0 || ty >= count) continue
+    for (let tx = Math.floor(ox / TILE); tx <= Math.floor((ox + w) / TILE); tx++) {
+      const wx = ((tx % count) + count) % count
+      tiles.push({ url: `${TILE_HOST}/${zoom}/${wx}/${ty}.png`, x: +(tx * TILE - ox).toFixed(1), y: +(ty * TILE - oy).toFixed(1), size: TILE })
+    }
+  }
+  return { zoom, tiles, line: out.map(p => `${p[0]},${p[1]}`).join(' '), start: out[0], end: out[out.length - 1] }
 }

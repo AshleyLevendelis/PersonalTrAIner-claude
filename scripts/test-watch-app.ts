@@ -436,17 +436,36 @@ async function main() {
       && (await rt.readRoute('p1', 'Walk', new Date(rStart + 3_600_000).toISOString())) === null)
     const km = rt.routeKm(got?.points ?? [])
     check('the route\'s length is measured along it (5 points, about 0.2 km)', km > 0.15 && km < 0.25, km)
-    const drawn = rt.projectRoute([[0, 51.5, -0.1], [1, 51.501, -0.1]], 320, 180)
+    const drawn = rt.mapLayout([[0, 51.5, -0.1], [1, 51.501, -0.1]], 320, 180)
     check('the drawing is north up: going north moves up the box', !!drawn && drawn.end[1] < drawn.start[1] && drawn.end[0] === drawn.start[0], drawn)
-    const sq = rt.projectRoute([[0, 60, 0], [1, 60, 0.002], [2, 60.001, 0.002]], 300, 300, 0)
-    // At 60 degrees north 0.002 of longitude is ~111 m and 0.001 of latitude ~111 m: equal on the drawing.
-    check('...and a metre is the same length both ways (longitude shrinks with latitude)', !!sq && Math.abs(Math.abs(sq.end[0] - sq.start[0]) - Math.abs(sq.end[1] - sq.start[1])) < 3, sq)
+    const sq = rt.mapLayout([[0, 60, 0], [1, 60, 0.002], [2, 60.001, 0.002]], 300, 300, 0)
+    // At 60 degrees north 0.002 of longitude is ~111 m and 0.001 of latitude ~111 m: equal on the map.
+    check('...and a metre is the same length both ways (longitude shrinks with latitude)', !!sq && Math.abs(Math.abs(sq.end[0] - sq.start[0]) - Math.abs(sq.end[1] - sq.start[1])) / Math.abs(sq.end[1] - sq.start[1]) < 0.03, sq)
+    // THE STREETS (his ruling 28 Nov 2026, "Streets, OpenStreetMap"): squares by area, covering the box, never the route.
+    const loopPts = (got?.points ?? []) as [number, number, number][]
+    const lay = rt.mapLayout(loopPts, 320, 180)
+    const inBox = (p: [number, number]) => p[0] >= 0 && p[0] <= 320 && p[1] >= 0 && p[1] <= 180
+    check('the whole route sits in the box at the closest zoom that fits it', !!lay && lay.zoom >= 2 && lay.zoom <= 17 && lay.line.split(' ').every(xy => inBox(xy.split(',').map(Number) as [number, number]))
+      && (rt.mapLayout(loopPts, 320, 180)!.zoom === lay!.zoom), lay?.zoom)
+    // Ten metres: every zoom would fit it, so the cap is what decides (17, streets still readable around it).
+    check('...and a very short route is never zoomed past street level (17)', rt.mapLayout([[0, 51.5, -0.1], [1, 51.50009, -0.1]], 320, 180)?.zoom === 17)
+    const urls = lay?.tiles.map(t => t.url) ?? []
+    check('...under it, OpenStreetMap squares that cover the whole box', urls.length > 0 && urls.every(u => /^https:\/\/tile\.openstreetmap\.org\/\d+\/\d+\/\d+\.png$/.test(u))
+      && !!lay && Math.min(...lay.tiles.map(t => t.x)) <= 0 && Math.min(...lay.tiles.map(t => t.y)) <= 0
+      && Math.max(...lay.tiles.map(t => t.x + t.size)) >= 320 && Math.max(...lay.tiles.map(t => t.y + t.size)) >= 180, urls)
+    check('...each asked for by its zoom and place on the grid only: no point, time or name in any address',
+      urls.every(u => !/51\.5|-0\.1|p1|Walk|2026/.test(u)), urls)
+    const tileOf = (lat: number, lng: number, z: number) => [Math.floor((lng + 180) / 360 * 2 ** z), Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * 2 ** z)]
+    const [ex, ey] = tileOf(loopPts[0]?.[1] ?? 0, loopPts[0]?.[2] ?? 0, lay?.zoom ?? 0)
+    check('...the square under where he started is among them (the standard map grid)', urls.includes(`https://tile.openstreetmap.org/${lay?.zoom}/${ex}/${ey}.png`), { want: `${lay?.zoom}/${ex}/${ey}`, urls })
     const okDel = await rt.deleteRoute('p1', { activity: 'Walk', startedAt: rStart })
     check('"Delete route" takes it off the phone and his account', okDel && (db.workout_routes ?? []).length === 0 && (await rt.readRoute('p1', 'Walk', new Date(rStart).toISOString())) === null, db.workout_routes)
     const cardioRow = strip(read('src/components/exercise/CardioSetRow.tsx'))
     check('a logged walk with a start draws its route under it', /\{log\.started_at && log\.user_id && <Suspense fallback=\{null\}><RouteMap profileId=\{log\.user_id\} activity=\{log\.activity_name\} startedAt=\{log\.started_at\} \/><\/Suspense>\}/.test(cardioRow))
     const mapSrc = strip(read('src/components/RouteMap.tsx'))
-    check('...drawn from its own points, no map service asked (no other company sees where he went)', !/https?:\/\/|<img|tile/i.test(mapSrc) && /projectRoute\(/.test(mapSrc))
+    check('...drawn on the squares mapLayout names, with the credit OpenStreetMap asks for', /mapLayout\(route\.points, W, H\)/.test(mapSrc)
+      && /drawn\.tiles\.map\(t => <image key=\{t\.url\} href=\{t\.url\}/.test(mapSrc) && /© OpenStreetMap contributors/.test(mapSrc)
+      && /href="https:\/\/www\.openstreetmap\.org\/copyright"/.test(mapSrc))
     // The watch's half.
     const man = read('android/wear/src/main/AndroidManifest.xml')
     const mainP = strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/MainActivity.java'))
