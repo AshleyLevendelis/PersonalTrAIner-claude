@@ -311,6 +311,7 @@ export function RestDayCard({
   trainAnywayAdvice,
   onTrainAnyway,
   onAddCardio,
+  onAddExercise,
 }: {
   dayName: string
   weekTally: { done: number; planned: number; left?: number }
@@ -323,6 +324,8 @@ export function RestDayCard({
   onTrainAnyway: (sourceDayName: string) => void
   /** Returns null on success, or a sentence to show. Absent means no plan loaded yet. */
   onAddCardio?: (activity: string, minutes: number, targetRpe: number) => Promise<string | null>
+  /** Opens the add sheet for this day (fix 11): an exercise added makes it a training day, said on the card first. */
+  onAddExercise?: () => void
 }) {
   const [cardioOpen, setCardioOpen] = useState(false)
 
@@ -353,9 +356,12 @@ export function RestDayCard({
         {/* ONE GROUP, because these two are the only controls on the card that
             change the plan — and the subtitles are what stop them reading as
             the same action twice. */}
-        {(trainAnywayOptions.length > 0 || onAddCardio) && (
+        {(trainAnywayOptions.length > 0 || onAddCardio || onAddExercise) && (
           <PlanActions>
             <TrainAnyway options={trainAnywayOptions} advice={trainAnywayAdvice} onPick={onTrainAnyway} />
+            {onAddExercise && (
+              <PlanActionRow icon={Dumbbell} title="Add an exercise" subtitle={`Makes ${dayName} a training day`} testid="rest-add-exercise" onClick={onAddExercise} />
+            )}
             {onAddCardio && !cardioOpen && (
               <PlanActionRow
                 icon={CalendarDays}
@@ -491,6 +497,7 @@ export function ActiveRecoveryCard({
   trainAnywayOptions = [],
   trainAnywayAdvice,
   onTrainAnyway,
+  onAddExercise,
 }: {
   workout: WorkoutDay
   weekTally: { done: number; planned: number; left?: number }
@@ -502,6 +509,8 @@ export function ActiveRecoveryCard({
   trainAnywayOptions?: TrainAnywayChoice[]
   trainAnywayAdvice?: string | null
   onTrainAnyway?: (sourceDayName: string) => void
+  /** Opens the add sheet for this day (fix 11), as the rest day card's. */
+  onAddExercise?: () => void
 }) {
   const cardio = workout.recommendedCardio
   // A DAY WHOSE WHOLE PLAN IS AN ACTIVITY SHOWS THE ACTIVITY. The beginner's
@@ -561,8 +570,11 @@ export function ActiveRecoveryCard({
             reading "Active recovery" with no control on it.
             Hidden once the day HAS a prescription — there is nothing to add. */}
         {onAddCardio && !planned && <Suspense fallback={null}><AddCardioSession dayName={workout.day} onAdd={onAddCardio} /></Suspense>}
-        {onTrainAnyway && trainAnywayOptions.length > 0 && (
-          <PlanActions><TrainAnyway options={trainAnywayOptions} advice={trainAnywayAdvice} onPick={onTrainAnyway} /></PlanActions>
+        {((onTrainAnyway && trainAnywayOptions.length > 0) || onAddExercise) && (
+          <PlanActions>
+            {onTrainAnyway && trainAnywayOptions.length > 0 && <TrainAnyway options={trainAnywayOptions} advice={trainAnywayAdvice} onPick={onTrainAnyway} />}
+            {onAddExercise && <PlanActionRow icon={Dumbbell} title="Add an exercise" subtitle={`Makes ${workout.day} a training day`} testid="rest-add-exercise" onClick={onAddExercise} />}
+          </PlanActions>
         )}
       </CardContent>
     </Card>

@@ -88,11 +88,14 @@ earlier ruling of his and wait for his word.
    exercises"); `offer.added` says which, and `buildSessionKindTodayProposal` already words both. (4) Confirm a card
    built with nothing logged after sets ARE logged: rebuild the offer (it would now add a block) rather than replace the
    started session. (5) `planSessionKindToday` takes `sayDay` for a day other than today.
-9. [ ] **An exercise added to a rest day makes it a training day** (session-edit.ts: "Make it a training day
-   first").
+9. [x] **An exercise added to a rest day makes it a training day** (session-edit.ts: "Make it a training day
+   first"). DONE 28 Nov 2026 (engine + screen): the week's own tier prescription, counted as a session, the reason
+   first (`restDayAdditionNote`). `test:exercise-add`, `verify:rest-day` §13. **Coach half: Builder B**, the executor's
+   own refusal (pending-action-executor ~301) goes; call `addExerciseToSession` and show `restDayAdditionNote`.
 10. [ ] **A past or future day's exercises have the full menu** (swap, remove, move, add), and a swap that cannot
     happen says why instead of doing nothing (TodayPanel peek).
-11. [ ] **"Add exercise" on any day**, including a rest or recovery day.
+11. [~] **"Add exercise" on any day**, including a rest or recovery day. TODAY DONE 28 Nov 2026 (rest and recovery
+    cards); a past or future day's peek still has no Add (with item 10).
 12. [ ] **Change an exercise's sets, reps or weight** for today or the block, on the row and by the coach. Weight
     stays under the ceilings. Missing on both surfaces.
 13. [ ] **The coach can start, plan or log a workout of his own** (the screen can).

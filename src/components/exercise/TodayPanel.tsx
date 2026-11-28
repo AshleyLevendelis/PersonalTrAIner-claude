@@ -82,7 +82,7 @@ import type { ReasonAnswer } from './EditReasonStep'
 // for the coach's side of the same two operations, so the bundler keeps it in
 // the main chunk either way, and the dynamic form only added an await between
 // the tap and the sheet's cost line. The 13 kB is recorded in test:bundle.
-import { warmUpNowAfterWork, removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor, type SessionEditResult } from '@/lib/session-edit'
+import { warmUpNowAfterWork, removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor, restDayAdditionNote, type SessionEditResult } from '@/lib/session-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
 import { shortenOrFloor, mapTier, daysDroppedForRecovery } from '@/lib/exercise-plan'
 import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
@@ -879,10 +879,11 @@ export function TodayPanel({
     if (!target.ok) return null
     const planDay = target.planDayName
     const week = mesocycle.find(w => w.week_number === liveWeek)
-    const day = week?.days.find(d => d.day === planDay)
-    if (!day) return null
+    if (!week) return null
+    // A REST DAY (fix 9/11): no row, or an empty one; its numbers are the same week's own for that tier.
+    const day = week.days.find(d => d.day === planDay) ?? { day: planDay, focus: 'Rest', exercises: [] }
     const tier = mapTier(entry.mechanics_tier)
-    const programming = peerProgrammingFor(day.exercises, tier)
+    const programming = peerProgrammingFor(day.exercises.length > 0 ? day.exercises : week.days.flatMap(d => d.exercises), tier)
     if (!programming) return null
     const load = await priceAddedLift(entry, profile, programming, week, mesocycle)
     return { load, day, planDay }
@@ -1724,7 +1725,11 @@ export function TodayPanel({
       </Suspense>
       <Suspense fallback={null}>
       <AddExerciseSheet
-        target={addOpen && workout ? { dayName: todayRef.sayDay, day: workout } : null}
+        // A REST OR RECOVERY DAY TOO (advise, then allow, fix 11): an empty day takes the exercise and becomes a training
+        // day, the reason said on the card first.
+        target={addOpen ? (workout && workout.exercises.length > 0
+          ? { dayName: todayRef.sayDay, day: workout }
+          : { dayName: todayRef.sayDay, day: workout ?? { day: todayRef.planDayName, focus: 'Rest', exercises: [] }, note: restDayAdditionNote(todayRef.sayDay, 'today') }) : null}
         onClose={() => setAddOpen(false)}
         profile={profile}
         exclusions={exclusions}
@@ -1909,6 +1914,7 @@ export function TodayPanel({
           trainAnywayAdvice={trainAnywayPick.advice}
           onTrainAnyway={setBorrowedDayName}
           onAddCardio={handleAddCardio}
+          onAddExercise={() => setAddOpen(true)}
         />
       ) : isActiveRecovery ? (
         <ActiveRecoveryCard
@@ -1921,6 +1927,7 @@ export function TodayPanel({
           trainAnywayOptions={trainAnyway}
           trainAnywayAdvice={trainAnywayPick.advice}
           onTrainAnyway={setBorrowedDayName}
+          onAddExercise={() => setAddOpen(true)}
         />
       ) : (
         <div className="space-y-3">

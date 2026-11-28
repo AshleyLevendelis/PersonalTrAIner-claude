@@ -144,7 +144,9 @@ export function SwapDialog({
     let live = true
     void ensureNearCopies().then(() => { if (live) setCopiesReady(n => n + 1) })
     return () => { live = false }
-  }, [target])
+    // ONCE PER OPENING: the target is a new object on every render of the caller, so keying on it re-ran this, whose
+    // state update re-rendered the caller, for ever (a render loop, found 28 Nov 2026 reading the add path again).
+  }, [!!target])
   const searchResults = target && searchQuery.trim() && copiesReady >= 0
     ? searchExercisesToLog(searchQuery, 20).filter(e =>
         e.name.toLowerCase() !== target.exerciseName.toLowerCase() &&

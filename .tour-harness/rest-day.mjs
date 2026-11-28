@@ -518,6 +518,32 @@ check('12e. a tap borrows that session onto the recovery day', !!first12 && whos
 check('9. nothing on the page threw', !errs, errs)
 
 // COUNTED, not written down: a hardcoded total goes stale the first time a
+// ---------------------------------------------------------------------------
+// 13. AN EXERCISE ADDED ON A REST DAY MAKES IT A TRAINING DAY (advise, then allow, fixes 9 and 11, 28 Nov 2026). It was
+// refused ("Make it a training day first") and the card offered no way to add one. The rest day here has NO ROW in
+// the plan, the harder case: the add makes one.
+// ---------------------------------------------------------------------------
+console.log('\n13. Add an exercise on a rest day\n')
+// A clean rest day: section 12's "Train anyway" is kept on the phone for that date (borrowed-day.ts), so it is cleared.
+await ev(`(() => { try { for (const k of Object.keys(localStorage)) if (k.startsWith('fitplan_borrowed_day_v1:')) localStorage.removeItem(k) } catch {} })()`)
+await send('Page.navigate', { url: `${BASE}&today=${restDay?.date ?? ''}&load=13#/tab/exercise` })
+await wait(3500)
+check('13a. the rest day card offers "Add an exercise", saying it makes the day a training day', /Add an exercise\s*Makes \w+ a training day/.test(await text('[data-testid="rest-add-exercise"]')), await text('[data-testid="rest-add-exercise"]'))
+await tap('[data-testid="rest-add-exercise"]'); await wait(900)
+check('13b. ...it opens the add sheet', await ev(`!!document.querySelector('[data-testid="add-exercise-sheet"]')`))
+await ev(`(() => { const t = document.querySelector('[data-testid="add-exercise-search"]'); if (!t) return; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(t, 'goblet'); t.dispatchEvent(new Event('input', { bubbles: true })) })()`)
+await wait(900)
+const pick13 = await ev(`[...document.querySelectorAll('[data-add-candidate]')].find(b => !b.disabled)?.getAttribute('data-add-candidate') ?? null`)
+if (pick13) await tap(`[data-add-candidate=${JSON.stringify(pick13)}]`)
+await wait(900)
+const note13 = await text('[data-testid="add-day-note"]')
+check('13c. the card says first that the rest day becomes a training day, and the cost', /^\w+ is a rest day, so this makes it a training day this week\. That's fine if you're recovering well/.test(note13), { pick13, note13 })
+await shoot('rest-day-add-exercise')
+await tap('[data-scope="today"]'); await wait(2000)
+const rows13 = await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(n => n.getAttribute('data-exercise-name'))`)
+check('13d. ...and today is a training day holding it', Array.isArray(rows13) && rows13.includes(pick13), { pick13, rows13 })
+check('13e. ...with no rest day card left', !(await ev(`!!document.querySelector('[data-testid="rest-add-exercise"]')`)))
+
 // check is added, and the mutation harness relies on this number being real.
 console.log(`\n${ran} checks ran.`)
 console.log(failures === 0 ? '\nThe rest day has one job, and its plan actions say what they reach.\n' : `\n${failures} rest-day screen check(s) failed.\n`)

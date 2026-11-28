@@ -42,6 +42,8 @@ import { tierWords, machineVersionLine } from '@/lib/coach-voice'
 export interface AddExerciseTarget {
   dayName: string
   day: WorkoutDay
+  /** Said on the card before the tap (a rest day becoming a training day, fix 9/11). */
+  note?: string
 }
 
 export interface AddImpact {
@@ -102,7 +104,9 @@ export function AddExerciseSheet({
     let live = true
     void ensureNearCopies().then(() => { if (live) setCopiesReady(n => n + 1) })
     return () => { live = false }
-  }, [target])
+    // ONCE PER OPENING: the target is a new object on every render of the caller, so keying on it re-ran this, whose
+    // state update re-rendered the caller, for ever (a render loop, found 28 Nov 2026 reading the add path again).
+  }, [!!target])
   const searchResults = target && searchQuery.trim() && copiesReady >= 0
     ? searchExercisesToLog(searchQuery, 20).filter(e =>
         !present.has(e.name.toLowerCase()) &&
@@ -247,6 +251,7 @@ export function AddExerciseSheet({
 
         {pending && (
           <div className="space-y-2 py-1">
+            {target?.note && <p className="text-xs text-[color:var(--role-warn-text)]" data-testid="add-day-note">{target.note}</p>}
             {nearCopyNote(pending) && <p className="text-xs text-muted-foreground" data-testid="near-copy-card-note">{nearCopyNote(pending)}</p>}
             {profile && getExerciseCompatibilityWarnings(pending, profile, exclusions).map((w, i) => (
               <p key={i} className="text-xs text-[color:var(--role-warn-text)] flex items-start gap-1.5 rounded-lg bg-[color:var(--role-warn-bg)] p-2">

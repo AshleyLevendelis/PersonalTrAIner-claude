@@ -206,18 +206,21 @@ async function main() {
   // -------------------------------------------------------------------------
   console.log('\n4. Refusals, in words a person can read')
   // -------------------------------------------------------------------------
-  const restDay = MESO[0].days.find(d => d.exercises.length === 0)
-  if (restDay) {
-    const r = addExerciseToSession({ mesocycle: MESO, profile: PROFILE, weekNumber: WEEK, dayName: restDay.day, entry: PICK, load: LOAD, scope: 'today' })
-    check('a rest day is not silently turned into a one-exercise workout', !r.changed)
-    // THE REASON, NOT JUST A REFUSAL. Checking only that the sentence names
-    // the day let the guard be deleted outright: with no exercises there is no
-    // peer to copy, so the generic "I couldn't add X to Y" fires instead — and
-    // that names the day too. What a person needs to read here is that the day
-    // is a REST day and what to do about it, which the fallback never says.
-    check('...and says it is a rest day, and what to do instead',
-      /rest day/i.test(r.refusal ?? '') && /training day/i.test(r.refusal ?? ''), r.refusal)
-  }
+  // ADVISE, THEN ALLOW (fix 9, 28 Nov 2026): a REST DAY TAKES THE ADDITION AND BECOMES A TRAINING DAY, said first by
+  // restDayAdditionNote. Its numbers come from the same week's own days for that tier (CSCS, mine).
+  const { restDayAdditionNote } = await import('../src/lib/session-edit')
+  const restDay = MESO.find(w => w.week_number === WEEK)!.days.find(d => d.exercises.length === 0)
+  check('the fixture has a rest day in the week (the case binds)', !!restDay)
+  const r = restDay ? addExerciseToSession({ mesocycle: MESO, profile: PROFILE, weekNumber: WEEK, dayName: restDay.day, entry: PICK, load: LOAD, scope: 'today' }) : null
+  const rd = r?.changed ? r.mesocycle.find(w => w.week_number === WEEK)!.days.find(d => d.day === restDay!.day)! : null
+  check('a rest day takes the exercise', !!r?.changed && !!rd?.exercises.some(e => e.name === PICK.name), r?.refusal)
+  check('...and becomes a training day: counted as a session, named for it', rd?.is_scheduled === true && /^Extra session: /.test(rd?.focus ?? ''), rd && { s: rd.is_scheduled, f: rd.focus })
+  const peerOther = MESO.find(w => w.week_number === WEEK)!.days.flatMap(d => d.exercises).filter(e => e.tier === rd?.exercises.find(x => x.name === PICK.name)?.tier && !e.superset_label)
+  const added9 = rd?.exercises.find(e => e.name === PICK.name)
+  check('...its sets and rest are the week\'s own for that tier (a same-tier exercise on another day)', !!added9 && peerOther.some(e => e.sets === added9.sets && e.rest === added9.rest), { added9: added9 && [added9.sets, added9.rest], peers: peerOther.map(e => [e.sets, e.rest]).slice(0, 4) })
+  const otherDays = (m: typeof MESO) => JSON.stringify(m.map(w => ({ n: w.week_number, d: w.days.filter(x => !(w.week_number === WEEK && x.day === restDay?.day)) })))
+  check('...and no other day of any week moves', !!r?.changed && otherDays(r.mesocycle) === otherDays(MESO))
+  check('the reason is said first, for today and for the block', /^\w+day is a rest day, so this makes it a training day this week\./.test(restDayAdditionNote('Thursday', 'today')) && /for the rest of this block: one more session each week\./.test(restDayAdditionNote('Thursday', 'permanent')))
   const dup = addExerciseToSession({ mesocycle: added.mesocycle, profile: PROFILE, weekNumber: WEEK, dayName: DAY, entry: PICK, load: LOAD, scope: 'today' })
   check('adding the same exercise twice is refused', !dup.changed)
   // Same trap as the rest-day refusal above: the per-week duplicate skip makes

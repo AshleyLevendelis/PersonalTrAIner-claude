@@ -209,20 +209,23 @@ const UNPRICED_BASIS = 'New lift — find your working weight this session, then
  * exercise. The caller states the cost before the tap.
  */
 export function addExerciseToSession(params: AddExerciseParams): SessionEditResult {
-  const { mesocycle, profile, weekNumber, dayName, entry, load, scope } = params
+  const { profile, weekNumber, dayName, entry, load, scope } = params
+  // A REST DAY WITH NO ROW AT ALL (fix 11: the plan stores only the days it uses) is given an empty one in each week the
+  // change reaches, so it can take the exercise like any rest day.
+  const mesocycle = params.mesocycle.map(w => (targetWeekNumbers(params.mesocycle, weekNumber, scope).includes(w.week_number) && !w.days.some(d => d.day === dayName)
+    ? { ...w, days: [...w.days, { day: dayName, focus: 'Rest', exercises: [] }] }
+    : w))
   const week = mesocycle.find(w => w.week_number === weekNumber)
   const day = week?.days.find(d => d.day === dayName)
-  if (!week || !day) return { mesocycle, changed: false, refusal: "I couldn't find that day on your plan." }
+  if (!week || !day) return { mesocycle: params.mesocycle, changed: false, refusal: "I couldn't find that day on your plan." }
   // A NEAR-COPY GOES IN WHEN HE PICKS IT (his ruling 28 Nov 2026, "Yes, with a note"; it reverses 3 Nov's
   // "Searchable, log-only" for adding and swapping): priced from its parent (its fields are the parent's), the card
   // naming the plan's own choice (nearCopyNote). The generator never picks one.
-  // A REST DAY IS NOT A SESSION TO ADD TO. Silently turning one into a
-  // one-exercise workout would change what the week is without being asked.
-  if (day.exercises.length === 0) {
-    return { mesocycle, changed: false, refusal: `${dayName} is a rest day. Make it a training day first, then add to it.` }
-  }
+  // A REST DAY TAKES IT AND BECOMES A TRAINING DAY (advise, then allow, fix 9, 28 Nov 2026): it was refused ("Make it
+  // a training day first"), which no screen could do. The caller says so before the tap (restDayAdditionNote); it is
+  // never done silently, because he asked for it.
   if (day.exercises.some(e => e.name === entry.name)) {
-    return { mesocycle, changed: false, refusal: `${entry.name} is already on ${dayName}.` }
+    return { mesocycle: params.mesocycle, changed: false, refusal: `${entry.name} is already on ${dayName}.` }
   }
 
   const newTier = mapTier(entry.mechanics_tier)
@@ -231,12 +234,15 @@ export function addExerciseToSession(params: AddExerciseParams): SessionEditResu
   const next = mesocycle.map(w => {
     if (!weeks.has(w.week_number)) return w
     const d = w.days.find(x => x.day === dayName)
-    if (!d || d.exercises.length === 0) return w
+    if (!d) return w
     // A later week may have rotated its accessories; adding a duplicate there
     // is not what was asked for either.
     if (d.exercises.some(e => e.name === entry.name)) return w
 
-    const template = peerTemplate(d.exercises, newTier)
+    // ON A REST DAY the numbers come from the SAME WEEK's own training days (CSCS, mine): sets, reps and rest are this
+    // block and phase's prescription for that tier, as they would be on a day the plan built.
+    const restDay = d.exercises.length === 0
+    const template = peerTemplate(restDay ? w.days.flatMap(x => x.exercises) : d.exercises, newTier)
     if (!template) return w
     const priced = load ?? {
       display: 'Find your working weight',
@@ -257,7 +263,8 @@ export function addExerciseToSession(params: AddExerciseParams): SessionEditResu
 
     changed = true
     const exercises = insertByTier(d.exercises, slot, newTier)
-    const grown = { ...d, exercises }
+    // A rest day that takes work is a training day: counted as a session, named for what is on it.
+    const grown = restDay ? { ...d, exercises, focus: `Extra session: ${entry.name}`, is_scheduled: true } : { ...d, exercises }
     // NO WEEK-BALANCE PASS (whole-app QA walk, 7 Nov 2026). It is the one pass that changes OTHER days, and here it
     // broke the contract above: adding one press "just today" put a set on three pulling exercises across Tuesday and
     // Friday (66 of 288 adds on a 72-plan grid), and nothing said so. The card already states what the addition does
@@ -268,7 +275,7 @@ export function addExerciseToSession(params: AddExerciseParams): SessionEditResu
 
   return changed
     ? { mesocycle: next, changed: true }
-    : { mesocycle, changed: false, refusal: `I couldn't add ${entry.name} to ${dayName}.` }
+    : { mesocycle: params.mesocycle, changed: false, refusal: `I couldn't add ${entry.name} to ${dayName}.` }
 }
 
 /**
@@ -314,6 +321,17 @@ function peerTemplate(exercises: Exercise[], tier: ExerciseTier): Exercise | nul
     if (da !== db) return da - db
     return (b.tier ? TIER_RANK[b.tier] : 3) - (a.tier ? TIER_RANK[a.tier] : 3)
   })[0] ?? null
+}
+
+/**
+ * THE REASON, SAID BEFORE AN ADDITION TURNS A REST DAY INTO A TRAINING DAY (fix 9). One sentence for the screen's card
+ * and the coach's: what it costs and what stays true. CSCS, mine: one extra session in a week is recoverable; the
+ * cost is the rest the plan put there, felt in the next session.
+ */
+export function restDayAdditionNote(dayName: string, scope: 'today' | 'permanent'): string {
+  return scope === 'today'
+    ? `${dayName} is a rest day, so this makes it a training day this week. That's fine if you're recovering well; the rest it replaces was there to let your next session go well.`
+    : `${dayName} is a rest day, so this makes it a training day for the rest of this block: one more session each week. That's fine if you're recovering well; if your sessions start to feel heavier, take it back off.`
 }
 
 /** A plain rest for a slot that inherited a superset's 'alternate'. */
