@@ -1704,8 +1704,11 @@ export function TodayPanel({
         onClose={() => setWhatHappened(null)}
         profileId={profileId}
         today={today}
-        plan={liveWeekPlan}
+        // THE PLAN WEEK THE DAY IS IN (fix 8's review, 3c): a day in the next plan week, reached from its peek, is read
+        // in that week's own days, never this week's row for its weekday; and its strip cell says what was declared.
+        plan={(() => { const d = (whatHappened ?? tourWhatHappened)?.date; return d ? planDaysForDate(d, today, liveWeekPlan, mesocycle, planCreatedAt).days : liveWeekPlan })()}
         weekDays={weekTrain.days}
+        laterCells={stripWeek.days}
         moves={weekTrain.moves}
         weekOf={d => getActiveMesocycleWeek(planCreatedAt, new Date(`${d}T12:00:00`), mesocycle?.length || 4)}
         weekNumber={liveWeek}

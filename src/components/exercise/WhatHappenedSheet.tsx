@@ -79,6 +79,7 @@ export function WhatHappenedSheet({
   today,
   plan,
   weekDays,
+  laterCells,
   moves,
   weekOf,
   weekNumber,
@@ -99,6 +100,8 @@ export function WhatHappenedSheet({
   /** The LIVE week's plan — the same days the week strip is drawn from. */
   plan: WorkoutDay[]
   weekDays: TrainingWeekDay[]
+  /** The strip's cells, for a date this week's cells do not hold (a day in the next plan week, fix 8). */
+  laterCells?: TrainingWeekDay[]
   moves: SessionMove[]
   /** Which mesocycle week a date falls in — the move resolver keeps a move inside its own week. */
   weekOf: (date: string) => number
@@ -144,7 +147,7 @@ export function WhatHappenedSheet({
 
   const date = target?.date ?? ''
   const dayName = target?.dayName ?? ''
-  const cell = weekDays.find(d => d.date === date)
+  const cell = weekDays.find(d => d.date === date) ?? laterCells?.find(d => d.date === date)
   const resolved = useMemo(() => (target ? sessionForDate({ date, plan, moves }) : null), [target, date, plan, moves])
   const session = resolved?.day ?? null
   const hasSession = dayHasSession(session)
