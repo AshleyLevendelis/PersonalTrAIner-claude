@@ -733,6 +733,7 @@
     "test:lift-feel-context": "tsx scripts/test-lift-feel-context.ts",
     "test:setup-answers-context": "tsx scripts/test-setup-answers-context.ts",
     "test:own-workouts-context": "tsx scripts/test-own-workouts-context.ts",
+    "test:coach-route-meals-elsewhere": "tsx scripts/test-coach-route-meals-elsewhere.ts",
     "gen:coach-actions": "tsx scripts/coach-actions-doc.ts --write",
     "test:offer-fixes": "tsx scripts/test-offer-fixes.ts",
     "test:chat-extras": "tsx scripts/test-chat-extras.ts",
