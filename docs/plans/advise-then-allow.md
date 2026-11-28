@@ -89,8 +89,16 @@ earlier ruling of his and wait for his word.
     cardio log is stamped `completed_at` now (cardio-log-store.ts), so readers sorting by it treat an old run as the
     newest; a cardio/circuit Undo deletes every same-named log on that day; the missed-session card keeps its own
     7-day window and a bare weekday.
-21. [ ] **The coach's prompt**: every "do not call it for..." that is a training refusal becomes "offer it with the
-    reason"; the "point them at the right screen" fallback is only for what no tool does.
+21. [~] **The coach's prompt**: every "do not call it for..." that is a training refusal becomes "offer it with the
+    reason"; the "point them at the right screen" fallback is only for what no tool does. PART DONE 28 Nov 2026
+    (Builder B): read every refusal in the prompt and tool descriptions; most are routing ("not this tool, that one"),
+    and pain, injuries, pregnancy, the load limits and "a started session is not redrawn" stay. Changed: the screen
+    fallback is now only for what no tool does, with the hard stops listed; a class day's cardio or finisher, the
+    sport's volume notch and a climber's finger loading are no longer "never" but "not unasked; asked, offer it with
+    the reason". `test:coach-advise-not-refuse` (8, 5/5 mutations). Needs the `chat-gemini` deploy and an exam run.
+    **Waits on Builder A's libraries** (the words must not promise what the app still refuses): the session move's
+    "a day that already has a session cannot take a second one" and "this week" (fixes 15 and the two-sessions ruling),
+    the volume change's "will not go below the floor" (fix 7), train-today's "when today is a rest day".
 
 ## Ruled 28 Nov 2026
 

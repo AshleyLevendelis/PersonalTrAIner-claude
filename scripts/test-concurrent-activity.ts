@@ -238,7 +238,7 @@ console.log('\n7. Every reader goes through the one helper — and the rest of t
   check('the chat card no longer promises "same amount of lifting" unconditionally',
     /notchApplies = activityCountsAsLoad\(activity\)/.test(ui) && /Same amount of lifting/.test(ui) && /working sets a week\. Revert to full volume any time from the workout card/.test(ui))
   check('the coach is told the rule and told not to double-count it',
-    !/Total lifting work does not change/.test(tool) && /two or more sessions a week, or one hard\/combat session/.test(tool) && /never offer propose_volume_change "because of" the sport/.test(tool))
+    !/Total lifting work does not change/.test(tool) && /two or more sessions a week, or one hard\/combat session/.test(tool) && /never suggest propose_volume_change yourself "because of" the sport/.test(tool) && /if they still ask for less, offer it with that reason/.test(tool))
   check('...and is shown when the person kept full volume', /KEEP FULL lifting volume despite it/.test(tool))
   const shared = read('supabase/functions/_shared/coach-rules.ts')
   check('both copies of APP_REALITY mention the notch and the revert', /one recovery notch, shown on the workout card with a one-tap revert/.test(shared) && /one recovery notch, shown on the workout card with a one-tap revert/.test(tool))
