@@ -19,7 +19,7 @@ import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
 import { OPEN_OFFER_DETAILS_SCRIPT } from './driver-kit.mjs'
-import { anchorDate } from './anchor.mjs'
+import { anchorDate, ANCHOR_ISO } from './anchor.mjs'
 
 const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
@@ -131,6 +131,7 @@ check('A14. run logged', (await logUnplanned('Run', '40', 'hard', '6')) === 'ok'
 await wait(1500)
 check('A15. no question with nothing being eased off', (await ev(`!${q('[data-testid="ease-off-question"]')}`)) === true)
 
+const THREE_WEEKS_BACK = (() => { const [y, m, d] = ANCHOR_ISO.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d - 21)).toISOString().slice(0, 10) })()
 console.log('\n  B. THE COACH')
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   const realFetch = window.fetch
@@ -138,6 +139,9 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
     const u = String(url)
     if (u.includes('chat-gemini')) {
       const said = String(JSON.parse((init && init.body) || '{}').message || '')
+      if (/three weeks ago/i.test(said)) {
+        return new Response(JSON.stringify({ reply: '', proposal: { kind: 'propose_cardio_log', rawArgs: { activity_name: 'Run', duration_minutes: 30, effort: 'steady', date: ${J(THREE_WEEKS_BACK)} } } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
       if (/40 minute run/i.test(said)) {
         return new Response(JSON.stringify({ reply: '', proposal: { kind: 'propose_cardio_log', rawArgs: { activity_name: 'Run', duration_minutes: 40, effort: 'hard', distance_km: 6 } } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
       }
@@ -200,6 +204,20 @@ const swapped = await db(`(d.workout_sessions ?? []).filter(r => r.swapped_for_a
 check('B17. the run is logged AND counted as today\'s workout, named Run', (await db(`(d.cardio_logs ?? []).length`)) === 1 && JSON.stringify(swapped) === '["Run"]', swapped)
 check('B18. ...and the receipt says what it replaced', (await ev('document.body.innerText')).includes(`counted as your workout instead of ${todayFocus}`))
 await shoot('extra-cardio-chat-counted')
+
+console.log('\n  C. A RUN FROM THREE WEEKS AGO (advise-then-allow fix 20, 28 Nov 2026: any day that has happened; it was "from the last week" only)')
+const threeWeeksWords = (() => { const [y, m, d] = THREE_WEEKS_BACK.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1, d)); return `${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][t.getUTCDay()]} ${t.getUTCDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][t.getUTCMonth()]}` })()
+check('C0. a fresh chat, a run three weeks back', !!(await loadChat()) && await say('I did a 30 minute run three weeks ago, steady'))
+const c1 = await until(`(() => { const c = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop(); return !!c && c.getAttribute('data-card-status') === 'pending' && /\\?/.test(c.innerText) })()`, 15000) ? await offer() : await offer()
+check('C1. an offer to log it, naming THAT date (a bare weekday would be the wrong week)', (c1?.text ?? '').includes(`log your run on ${threeWeeksWords}?`) && !/last week/.test(c1?.text ?? ''), { want: threeWeeksWords, got: c1?.text })
+const cBefore = await db(`(d.cardio_logs ?? []).length`)
+check('C2. nothing is written before the tap', cBefore === 0, cBefore)
+// No "Count it as ...'s workout" three weeks on: that day's session is not this week's to count.
+check('C3. Apply and Not now, no "Count it" (that week is not this week)', JSON.stringify(c1?.btns) === J(['Apply', 'Not now']), c1?.btns)
+check('C3b. Apply', await tapExpr(byText('Apply')))
+await until(`(window.__fakeDb?.cardio_logs ?? []).some(r => r.date === ${J(THREE_WEEKS_BACK)})`, 8000)
+const cRows = await db(`(d.cardio_logs ?? []).filter(r => r.date === ${J(THREE_WEEKS_BACK)}).map(r => ({ a: r.activity_name, m: r.duration_minutes }))`)
+check('C4. one run of 30 minutes, on that date', cRows.length === 1 && cRows[0].a === 'Run' && cRows[0].m === 30, cRows)
 
 check('no uncaught error on any page', pageErrors.length === 0, pageErrors)
 console.log(`\n${ran} checks ran. ${failures === 0 ? 'Sam\'s run is logged as extra, with its distance, and the knee is asked about.' : `${failures} check(s) FAILED.`}\n`)

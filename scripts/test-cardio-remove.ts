@@ -60,7 +60,10 @@ const undoBlock = undoAt >= 0 ? chat.slice(undoAt, undoAt + 600) : ''
 check('Undo calls restoreCardioLog(', /restoreCardioLog\(/.test(undoBlock))
 check('an Undo that did not save keeps its button', /if \(!back\) return \{ refused: RECEIPTS_UNDONE\.failed, keep: true \}/.test(undoBlock))
 check('the card is reversible and says the plan is untouched', /reversible: true/.test(chat.slice(chat.indexOf('const buildCardioRemoveProposal'), chat.indexOf('const buildMissedSessionProposal'))) && /your plan and your sessions stay as they are/.test(chat))
-check('only the last two weeks, never a day ahead', /delta > 0 \|\| delta < -14/.test(chat))
+// Any day that has happened since 28 Nov 2026 (advise-then-allow fix 20), through the chat's one day rule; a day ahead
+// is still refused. test:chat-log-date holds the rule and §5 holds this card to it.
+const removeBlock = chat.slice(chat.indexOf('const buildCardioRemoveProposal'), chat.indexOf('const buildMissedSessionProposal'))
+check('any day that has happened, never a day ahead, by the chat\'s one day rule', /const when = logDayFor\(date, activeSession\.date\)/.test(removeBlock) && /when\.kind === 'refused'/.test(removeBlock) && !/< -(7|14)\b/.test(removeBlock))
 
 console.log('\n5. The row offers Remove only once Undo has gone')
 const row = strip(readFileSync('src/components/exercise/CardioSetRow.tsx', 'utf8'))

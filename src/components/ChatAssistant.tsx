@@ -4681,8 +4681,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: CardioLogPayload; diff: import('@/lib/pending-actions-store').ProposalDiff }
     | { ok: false; refusal: string } => {
     const date = typeof rawArgs.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawArgs.date) ? rawArgs.date : activeSession.date
-    const delta = daysBetween(activeSession.date, date)
-    if (!Number.isFinite(delta) || delta > 0 || delta < -7) return { ok: false, refusal: "I can only log something you've already done, from the last week." }
+    // ANY DAY THAT HAS HAPPENED (his 28 Nov 2026 ruling, advise-then-allow fix 20): the chat's one rule for which day.
+    const when = logDayFor(date, activeSession.date)
+    if (when.kind === 'refused') return { ok: false, refusal: when.say }
     const effort = (['easy', 'steady', 'hard'] as const).find(e => e === rawArgs.effort) as EffortKey | undefined
     if (!effort) return { ok: false, refusal: 'How hard did that feel — easy, steady or hard?' }
     const activityName = typeof rawArgs.activity_name === 'string' ? rawArgs.activity_name.trim().replace(/^\w/, c => c.toUpperCase()) : ''
@@ -4692,8 +4693,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const km = Number(rawArgs.distance_km)
     const distanceKm = Number.isFinite(km) && isPlausibleDistanceKm(km) ? km : null
     const intensityRpe = rpeToStore(effort)
-    const dayName = dayNameOf(date)
-    const isToday = date === activeSession.date
+    const dayName = when.kind === 'past' ? when.words : dayNameOf(date)
+    const isToday = when.kind === 'today'
     const session = sessionForDate({ date, plan: planForDate(date), moves: trainingWeek.moves }).day
     const dayState = trainingWeek.days.find(d => d.date === date)?.state
     // Only real work is offered as the day's workout (his ruling 27 Nov 2026, "Only ask after real work"): the same
@@ -4734,8 +4735,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: CircuitLogPayload; diff: import('@/lib/pending-actions-store').ProposalDiff }
     | { ok: false; refusal: string } => {
     const date = typeof rawArgs.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawArgs.date) ? rawArgs.date : activeSession.date
-    const delta = daysBetween(activeSession.date, date)
-    if (!Number.isFinite(delta) || delta > 0 || delta < -7) return { ok: false, refusal: "I can only log a workout you've already done, from the last week." }
+    const when = logDayFor(date, activeSession.date)
+    if (when.kind === 'refused') return { ok: false, refusal: when.say }
     const effort = (['easy', 'steady', 'hard'] as const).find(e => e === rawArgs.effort) as EffortKey | undefined
     if (!effort) return { ok: false, refusal: 'How hard did that feel overall — easy, steady or hard?' }
     const raw = Array.isArray(rawArgs.blocks) ? rawArgs.blocks as Record<string, unknown>[] : []
@@ -4749,7 +4750,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       blocks.push({ activityName: name, ...config, durationMinutes: Math.max(1, Math.round(seconds / 60)), shape: blockShape(config) })
     }
     if (blocks.length === 0) return { ok: false, refusal: 'What did each block look like — how many rounds, and how long each?' }
-    const dayName = dayNameOf(date)
+    const dayName = when.kind === 'past' ? when.words : dayNameOf(date)
     const session = sessionForDate({ date, plan: planForDate(date), moves: trainingWeek.moves }).day
     const dayState = trainingWeek.days.find(d => d.date === date)?.state
     const replaces = rawArgs.replaced_session === true && !!session && session.exercises.length > 0 && dayState === 'due'
@@ -4813,9 +4814,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     diff: import('@/lib/pending-actions-store').ProposalDiff
   } | { ok: false; reason: string }> => {
     const date = typeof rawArgs.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawArgs.date) ? rawArgs.date : activeSession.date
-    const delta = (new Date(`${date}T00:00:00`).getTime() - new Date(`${activeSession.date}T00:00:00`).getTime()) / 86_400_000
-    if (!Number.isFinite(delta) || delta > 0 || delta < -14) return { ok: false, reason: 'I can only take off something logged in the last two weeks.' }
-    const dayWord = delta === 0 ? 'today' : new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long' })
+    const when = logDayFor(date, activeSession.date)
+    if (when.kind === 'refused') return { ok: false, reason: when.say.startsWith('That day') ? "That day hasn't happened yet, so there's nothing logged on it to take off." : when.say.replace('nothing was logged', 'nothing was changed') }
+    const delta = when.kind === 'today' ? 0 : -1
+    const dayWord = when.kind === 'today' ? 'today' : when.words
     const said = String(rawArgs.activity ?? '').trim()
     let logs: CardioLogView[] = []
     try { if (profile.id) logs = await getCardioLogsForDateMerged(profile.id, date) } catch { /* said below */ }

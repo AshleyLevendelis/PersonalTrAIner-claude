@@ -9,17 +9,22 @@
 // So the day is decided here, once, from the date the coach passed and the
 // app's own today:
 //   - no date, or today's: today, exactly as before;
-//   - a day in the last two weeks: that day (the same write the Exercise
-//     screen's "I did it, not in the app" makes);
-//   - anything else is refused in a sentence and nothing is written. A day that
-//     has not happened cannot have been trained, and older than two weeks is
-//     where a mistyped date does the most damage for the least use.
+//   - any earlier day: that day (the same write the Exercise screen's "I did
+//     it, not in the app" makes). Until 28 Nov 2026 this stopped at two weeks;
+//     his ruling that day ("users can add or remove or change workouts ...
+//     whatever they want") widened it, so a workout from last month can be put
+//     on last month. A day more than a week back is named with its date (and
+//     its year when that is not this year's), so a mistyped date shows on the
+//     line that says where it went;
+//   - a day that has not happened yet, or a date that is not a date, is refused
+//     in a sentence and nothing is written. A day still to come cannot have
+//     been trained.
+//
+// The coach's other logging cards (one cardio activity, a circuit, taking a
+// log off) ask the same question through the same function.
 //
 // Pure, and date arithmetic on the date STRINGS (no instants, no time zone).
 // ---------------------------------------------------------------------------
-
-/** How far back the chat will log a session. */
-export const PAST_LOG_DAYS = 14
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
@@ -30,8 +35,10 @@ export interface PastLogDay {
   date: string
   /** "Tuesday" */
   dayName: string
-  /** "Tuesday 17 Nov": what he reads. */
+  /** "Tuesday 17 Nov" ("Tuesday 17 Nov 2025" when over a week back in another year): what he reads. */
   label: string
+  /** How a card names it: the weekday inside the last week ("Tuesday"), the label further back. */
+  words: string
 }
 export type LogDay = { kind: 'today' } | PastLogDay | { kind: 'refused'; say: string }
 
@@ -56,10 +63,9 @@ export function logDayFor(raw: string | null | undefined, today: string): LogDay
     return { kind: 'refused', say: "I couldn't tell which day that was, so nothing was logged. Tell me the day and I'll put it there." }
   }
   if (then > now) return { kind: 'refused', say: "That day hasn't happened yet, so nothing was logged. Tell me once it's done and I'll put it in." }
-  if (now - then > PAST_LOG_DAYS) {
-    return { kind: 'refused', say: `That's more than two weeks back, so I haven't logged it from here. Nothing was changed.` }
-  }
   const when = new Date(then * 86_400_000)
   const dayName = WEEKDAYS[when.getUTCDay()]
-  return { kind: 'past', date: said, dayName, label: `${dayName} ${when.getUTCDate()} ${MONTHS[when.getUTCMonth()]}` }
+  const year = now - then < 7 || when.getUTCFullYear() === Number(today.slice(0, 4)) ? '' : ` ${when.getUTCFullYear()}`
+  const label = `${dayName} ${when.getUTCDate()} ${MONTHS[when.getUTCMonth()]}${year}`
+  return { kind: 'past', date: said, dayName, label, words: now - then < 7 ? dayName : label }
 }

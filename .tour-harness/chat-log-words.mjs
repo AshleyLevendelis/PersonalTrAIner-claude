@@ -141,16 +141,21 @@ await wait(500)
 const more = await ev(DB)
 check('6b. five sets now, numbered 1 to 5, the first three untouched', more.sets.length === 5 && JSON.stringify(more.sets.map(r => r[1]).sort()) === '[1,2,3,4,5]' && more.sets.filter(r => r[2] === 50).length === 3 && more.sets.filter(r => r[2] === 55).length === 2, more.sets)
 
-// 7. A day that has not happened, and one too far back, are refused and nothing is written.
+// 7. A day that has not happened is refused and nothing is written; any earlier day, however far back, is that day
+// (two weeks until 28 Nov 2026; his "whatever they want" widened it, advise-then-allow fix 20).
 const before7 = (await ev(DB)).sets.length
 check('7a. the chat sent', await say(`did ${lift5} 3x8 at 50 kg on ${shift(today, 1)}`))
 await until(() => ev('document.body.innerText'), t => /hasn't happened yet/.test(t))
 const future = await ev('document.body.innerText')
 check('7b. tomorrow is refused in a sentence that says nothing was logged', /That day hasn't happened yet, so nothing was logged\./.test(future), future.slice(-200))
-check('7c. the chat sent', await say(`did ${lift5} 3x8 at 50 kg on ${shift(today, -20)}`))
-await until(() => ev('document.body.innerText'), t => /more than two weeks back/.test(t))
+check('7b2. ...and wrote no set', (await ev(DB)).sets.length === before7, (await ev(DB)).sets.length)
+const twentyBack = shift(today, -20)
+check('7c. the chat sent', await say(`did ${lift5} 3x8 at 50 kg on ${twentyBack}`))
+await until(() => ev(DB), v => v.sets.some(r => r[3] === twentyBack))
+await wait(500)
 const old = await ev('document.body.innerText')
-check('7d. twenty days back is refused', /more than two weeks back/.test(old), old.slice(-200))
-check('7e. ...and neither wrote a set', (await ev(DB)).sets.length === before7, (await ev(DB)).sets.length)
+const oldDb = await ev(DB)
+check('7d. twenty days back is logged, and the line names that date (not a bare weekday)', /logged on \w+day \d{1,2} \w{3}\./.test(old) && !/more than two weeks/.test(old), old.slice(-200))
+check('7e. ...three sets, every one on THAT day, none on today', oldDb.sets.filter(r => r[3] === twentyBack).length === 3 && oldDb.sets.length === before7 + 3 && oldDb.sets.every(r => r[3] !== today), oldDb.sets)
 
 await finish()

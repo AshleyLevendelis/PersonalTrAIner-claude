@@ -57,8 +57,13 @@ earlier ruling of his and wait for his word.
 17. [ ] **Swap for anything**: the coach's "must be the same movement pattern" becomes advice.
 18. [ ] **The same exercise twice on a day**: advise "add sets instead", then allow.
 19. [ ] **Edits beyond this week** (next week's sessions), for one day or the block.
-20. [ ] **The coach's logging windows** (cardio and circuits 7 days; taking a log off 14 days; sessions 14 days)
-    widen to any past day; a future day stays refused (it cannot have happened).
+20. [x] **The coach's logging windows** (cardio and circuits 7 days; taking a log off 14 days; sessions 14 days)
+    widen to any past day; a future day stays refused (it cannot have happened). DONE 28 Nov 2026 (Builder B): all
+    four ask one function (`logDayFor`, chat-log-date.ts); a day a week or more back is named by its date ("Wednesday
+    26 Aug", with its year in another year) so a mistyped date shows where it went. `test:chat-log-date` (6/6
+    mutations), `verify:chat-log-words` 7 (1/1), `verify:extra-cardio` C (2/2). Needs the `chat-gemini` deploy: no
+    (client only). **For Builder A (screen half, parity):** the screen still stops at 14 days for another day's
+    optional cardio (`LOG_BACK_DAYS`, activity-day.ts); the chat no longer does.
 21. [ ] **The coach's prompt**: every "do not call it for..." that is a training refusal becomes "offer it with the
     reason"; the "point them at the right screen" fallback is only for what no tool does.
 

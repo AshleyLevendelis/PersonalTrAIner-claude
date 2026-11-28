@@ -10,7 +10,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { logDayFor, PAST_LOG_DAYS } from '../src/lib/chat-log-date'
+import { logDayFor } from '../src/lib/chat-log-date'
 import { LOG_WORDS } from '../src/lib/coach-voice'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -32,13 +32,21 @@ console.log('\n1. Today, or no date: exactly as before')
 check('no date is today', logDayFor(null, TODAY).kind === 'today' && logDayFor(undefined, TODAY).kind === 'today' && logDayFor('', TODAY).kind === 'today' && logDayFor('  ', TODAY).kind === 'today')
 check("today's own date is today", logDayFor(TODAY, TODAY).kind === 'today')
 
-console.log('\n2. An earlier day in the last two weeks is THAT day')
+console.log('\n2. Any earlier day is THAT day (two weeks until 28 Nov 2026; his "whatever they want" widened it)')
 const y = logDayFor('2026-11-17', TODAY)
 check('yesterday is a past day, with its date kept', y.kind === 'past' && y.date === '2026-11-17', y)
 check('...its weekday is the date\'s own, not today\'s', y.kind === 'past' && y.dayName === 'Tuesday', y)
 check('...and it is said as a day he can recognise', y.kind === 'past' && y.label === 'Tuesday 17 Nov', y)
 const edge = logDayFor('2026-11-04', TODAY)
-check(`${PAST_LOG_DAYS} days back is still allowed`, edge.kind === 'past' && edge.dayName === 'Wednesday' && edge.label === 'Wednesday 4 Nov', edge)
+check('14 days back is allowed', edge.kind === 'past' && edge.dayName === 'Wednesday' && edge.label === 'Wednesday 4 Nov', edge)
+const fifteen = logDayFor('2026-11-03', TODAY)
+check('15 days back is allowed too (it was refused before 28 Nov)', fifteen.kind === 'past' && fifteen.label === 'Tuesday 3 Nov', fifteen)
+const months = logDayFor('2026-08-12', TODAY)
+check('three months back is that day', months.kind === 'past' && months.date === '2026-08-12' && months.label === 'Wednesday 12 Aug', months)
+const lastYear = logDayFor('2025-11-18', TODAY)
+check('a year back names its year, so a mistyped year shows where it went', lastYear.kind === 'past' && lastYear.label === 'Tuesday 18 Nov 2025', lastYear)
+check('a card names a day inside the last week by its weekday', y.kind === 'past' && y.words === 'Tuesday' && logDayFor('2026-11-12', TODAY).kind === 'past' && (logDayFor('2026-11-12', TODAY) as { words: string }).words === 'Thursday')
+check('...and a day a week or more back by its date (a bare weekday would be the wrong week)', logDayFor('2026-11-11', TODAY).kind === 'past' && (logDayFor('2026-11-11', TODAY) as { words: string }).words === 'Wednesday 11 Nov' && fifteen.kind === 'past' && fifteen.words === 'Tuesday 3 Nov')
 const overMonth = logDayFor('2026-10-30', '2026-11-02')
 check('a day across a month end keeps its own month and weekday', overMonth.kind === 'past' && overMonth.label === 'Friday 30 Oct', overMonth)
 const overYear = logDayFor('2026-12-31', '2027-01-02')
@@ -50,13 +58,11 @@ check('two days apart across a clock change is two days, and a Saturday', overCl
 console.log('\n3. Anything else is refused, and says nothing was logged')
 const tomorrow = logDayFor('2026-11-19', TODAY)
 check('a day that has not happened is refused', tomorrow.kind === 'refused' && /hasn't happened yet/.test(tomorrow.say) && /nothing was logged/.test(tomorrow.say), tomorrow)
-const old = logDayFor('2026-11-03', TODAY)
-check(`${PAST_LOG_DAYS + 1} days back is refused`, old.kind === 'refused' && /more than two weeks/.test(old.say) && /Nothing was changed/.test(old.say), old)
 for (const bad of ['yesterday', 'Tuesday', '17/11/2026', '2026-13-01', '2026-02-31', '2026-11-1']) {
   const r = logDayFor(bad, TODAY)
   check(`"${bad}" is not a date the app will guess at: refused`, r.kind === 'refused' && /couldn't tell which day/.test(r.say), r)
 }
-check('no refusal sends him to a screen or blames him', [tomorrow, old, logDayFor('yesterday', TODAY)].every(r => r.kind === 'refused' && !/tap|open|go to|rephrase|in your own words/i.test(r.say)))
+check('no refusal sends him to a screen or blames him', [tomorrow, logDayFor('yesterday', TODAY)].every(r => r.kind === 'refused' && !/tap|open|go to|rephrase|in your own words/i.test(r.say)))
 
 console.log('\n4. The chat obeys it')
 const chat = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
@@ -76,6 +82,18 @@ check('...and its rows carry no note about TODAY\'s plan', /rows: saved \? rows\
 check('the plan week is the DATE\'s week, not today\'s', /getActiveMesocycleWeek\(planCreatedAt \?\? profile\.created_at, new Date\(`\$\{day\.date\}T12:00:00`\), weeks\)/.test(past))
 check('a follow-up answer keeps the day the question was about', /pastDay \}/.test(chat) && /resolveAndMaybeLog\(updatedEntries, session\.correctsPrevious, said, session\.pastDay \?\? null\)/.test(chat) && /first\.past \? await logToPastDay\(first\.past\.groups, first\.past\.day\) : first/.test(chat))
 check('the words name the day', LOG_WORDS.loggedOn('Tuesday 17 Nov') === "Got it, that's logged on Tuesday 17 Nov." && /nothing was added to Tuesday 17 Nov/.test(LOG_WORDS.notLoggedOn('Tuesday 17 Nov')) && LOG_WORDS.pastTitle('Tuesday 17 Nov', true) === 'Logged · Tuesday 17 Nov' && LOG_WORDS.pastTitle('Tuesday 17 Nov', false) === 'Not logged · Tuesday 17 Nov')
+
+console.log('\n5. The coach\'s other logging cards ask the same function (fix 20, 28 Nov 2026)')
+const body = (start: string, end: string) => { const a = chat.indexOf(start); const b = chat.indexOf(end, a + 1); return a >= 0 && b > a ? chat.slice(a, b) : '' }
+const cardio = body('const buildCardioLogProposal', 'const buildCircuitLogProposal')
+const circuit = body('const buildCircuitLogProposal', 'const missedMoveOffer')
+const removal = body('const buildCardioRemoveProposal', 'const buildMissedSessionProposal')
+for (const [name, b, key] of [['one cardio activity', cardio, 'refusal'], ['a circuit', circuit, 'refusal'], ['taking a log off', removal, 'reason']] as const) {
+  check(`${name}: the day is decided by logDayFor against the app's today`, b.length > 300 && /const when = logDayFor\(date, activeSession\.date\)/.test(b), b.slice(0, 200))
+  check(`${name}: a refused day returns before anything else is read`, new RegExp(`if \\(when\\.kind === 'refused'\\) return \\{ ok: false, ${key}:`).test(b) && b.indexOf("when.kind === 'refused'") < b.indexOf('return {\n      ok: true'))
+  check(`${name}: no window of its own is left (no -7 or -14 day bound)`, !/< -(7|14)\b/.test(b) && !/from the last week|last two weeks/.test(b))
+}
+check('a card further back than a week names the date, not a bare weekday', /when\.kind === 'past' \? when\.words/.test(cardio) && /when\.kind === 'past' \? when\.words/.test(circuit) && /: when\.words/.test(removal))
 
 console.log(`\nchat-log-date: ${ran} checks ran`)
 if (failures > 0) { console.error(`chat-log-date: ${failures} check(s) FAILED`); process.exit(1) }
