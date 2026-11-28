@@ -1,0 +1,20 @@
+{
+  "name": "allow-session-down-to-two",
+  "why": "Advise, then allow, fix 3 (28 Nov 2026): removing an exercise below three is allowed, with the app's advice on the card ('A short session still counts ... swapping it for something easier keeps it'). Today holds three exercises; taking the lunges off leaves two. The coach offers the removal, never refuses it for the floor.",
+  "contextOverrides": {
+    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunges 3x12."
+  },
+  "messages": [
+    "take the lunges off today please, my legs are still heavy from Sunday"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_exercise_remove"
+        ]
+      }
+    ]
+  }
+}

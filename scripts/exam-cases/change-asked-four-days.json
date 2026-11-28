@@ -1,0 +1,11 @@
+{
+  "name": "change-asked-four-days",
+  "why": "A lasting change he asks for: four training days instead of three, from now on. The coach may ask which days first, and then offers the schedule change; somewhere in the conversation a card has to appear, and it must be the schedule change.",
+  "messages": [
+    "I want to train 4 days a week from now on instead of 3",
+    "Monday, Tuesday, Thursday and Saturday"
+  ],
+  "checks": {
+    "expectsProposal": true
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "aware-shopping-list-contents",
+  "why": "The coach knows what the shopping list holds (28 Nov 2026, 'aware of what's in the rest of the app'). The list's own lines are in the context; eggs are on it for Thursday's breakfasts. The answer names them from the list, and the app adds the list's Open button because the reply names it.",
+  "contextOverrides": {
+    "grocery_list_summary": "5 items unchecked: Eggs x12 (Thu-Sat breakfasts), Chicken breast 600g, Basmati rice dry 300g, Greek yoghurt 0% 1kg, Blueberries 250g. Checked: salmon fillets, potatoes."
+  },
+  "messages": [
+    "do I need to buy eggs this week or have I got that covered?"
+  ],
+  "checks": {
+    "mustMention": [
+      "12",
+      "eggs"
+    ]
+  }
+}

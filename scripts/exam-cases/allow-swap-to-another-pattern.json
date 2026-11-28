@@ -1,0 +1,25 @@
+{
+  "name": "allow-swap-to-another-pattern",
+  "why": "Advise, then allow (28 Nov 2026), and his 13 Sep 'you asked, you get it': he NAMES a replacement from a different pattern (walking lunges are single-leg, goblet squats two-leg). The coach's old rule refused a different pattern; under the 28 Nov ruling that is advice, not a stop: one line of the why (single-leg work trains balance and each leg on its own), then the swap he asked for. Not one of the four hard stops.",
+  "messages": [
+    "swap the walking lunges for goblet squats today, I hate lunges"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_exercise_swap"
+        ]
+      }
+    ],
+    "swapReplacementOneOf": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "Goblet Squats"
+        ]
+      }
+    ]
+  }
+}

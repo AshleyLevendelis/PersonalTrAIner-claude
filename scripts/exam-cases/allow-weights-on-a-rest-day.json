@@ -1,0 +1,22 @@
+{
+  "name": "allow-weights-on-a-rest-day",
+  "why": "Advise, then allow (his ruling 28 Nov 2026, docs/plans/advise-then-allow.md): 'if somebody wants to train on the day they weren't supposed to, they should be able to add it and log it in the app.' Wednesday is a rest day between Tuesday's legs and Thursday's upper body. A clear ask, so the coach offers the session (propose_train_today, whose card carries the app's own advice), never 'there's no session today'. Training a rest day is none of the four hard stops. Worded so none of it is the coach prompt's own example ('Add a weight session just for today'), which would make the case an answer key.",
+  "contextOverrides": {
+    "day_of_week": "Wednesday",
+    "current_time_formatted": "Wednesday, 9:15 AM",
+    "exercise_summary": "Today (Wednesday): rest day.\nYesterday (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunges 3x12, Standing Calf Raise 3x15. [done, 12 of 12 sets]\nThursday: Upper body — Bench Press 3x8 @ 30kg, Bent-Over Row 3x10 @ 30kg, Dumbbell Shoulder Press 3x10 @ 10kg.\nSaturday: Full body — Goblet Squats 3x10 @ 16kg, Dumbbell Romanian Deadlift 3x10 @ 14kg, Push-Ups 3x10."
+  },
+  "messages": [
+    "free afternoon and I'm bored, put a gym session in for me today even though it's meant to be rest"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_train_today"
+        ]
+      }
+    ]
+  }
+}

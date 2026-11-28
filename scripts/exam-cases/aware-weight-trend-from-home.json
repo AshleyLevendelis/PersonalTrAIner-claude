@@ -1,0 +1,19 @@
+{
+  "name": "aware-weight-trend-from-home",
+  "why": "The coach knows what the other screens show (28 Nov 2026, Ashley: 'the chat is aware of what's in the rest of the app'). Home's weight row holds 68.0 kg, down 0.4 kg over two weeks; the goal is fat loss. The answer must use those figures (a slow, steady loss, about 0.2 kg a week), never a generic 'weigh yourself daily'.",
+  "messages": [
+    "is my weight actually going the right way?"
+  ],
+  "checks": {
+    "mustMention": [
+      "0.4",
+      "68"
+    ],
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": []
+      }
+    ]
+  }
+}

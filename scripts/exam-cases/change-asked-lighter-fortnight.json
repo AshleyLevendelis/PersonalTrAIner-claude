@@ -1,0 +1,17 @@
+{
+  "name": "change-asked-lighter-fortnight",
+  "why": "A change he asks for, stated with its reason and its length: 'make my sessions lighter for the next two weeks'. That is the volume change, offered with Apply (ask-cant-face-it is the case where he did NOT ask, and asking comes first there). The 18 Nov run had the coach ANNOUNCE a volume drop with no card; this is the case where the card is the right answer.",
+  "messages": [
+    "work is mental for the next two weeks, can you make my sessions lighter until it calms down?"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_volume_change"
+        ]
+      }
+    ]
+  }
+}

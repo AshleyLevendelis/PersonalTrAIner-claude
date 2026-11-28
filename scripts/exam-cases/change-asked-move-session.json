@@ -1,0 +1,17 @@
+{
+  "name": "change-asked-move-session",
+  "why": "A change he ASKS for gets the offer (28 Nov 2026, 'can make changes to plans'): moving today's session to tomorrow is a session move, offered with Apply, never described as done and never answered with 'you can do that on the Exercise tab'.",
+  "messages": [
+    "something's come up tonight, can you move today's session to tomorrow?"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_session_move"
+        ]
+      }
+    ]
+  }
+}
