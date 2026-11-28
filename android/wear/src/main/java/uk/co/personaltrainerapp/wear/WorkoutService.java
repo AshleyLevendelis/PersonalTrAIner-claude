@@ -519,6 +519,10 @@ public class WorkoutService extends Service {
             e.put("startedAt", LIVE.startedAt);
             e.put("date", TodayStore.today());
             if (LIVE.kcal > 0) e.put("kcal", Math.round(LIVE.kcal));
+            // ITS STEPS AND DISTANCE TOO (his report 28 Nov 2026, "The watch and phone steps disagree"): the phone's card
+            // shows the watch's count while it runs, and End on the phone keeps it, never the phone's own sensor.
+            if (LIVE.steps > 0) e.put("steps", LIVE.steps);
+            if (LIVE.distanceM > 0) e.put("distanceM", Math.round(LIVE.distanceM));
             if (finishing) e.put("final", true); // the workout's last count: the phone saves it at once
             e.put("samples", new JSONArray(pending.toString()));
             PhoneLink.send(this, e);

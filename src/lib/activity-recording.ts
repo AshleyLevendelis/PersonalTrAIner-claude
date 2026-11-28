@@ -38,6 +38,7 @@ import { isPhoneApp } from './steps-store'
 import { addDays } from './session-move'
 import { tracksSteps } from './cardio-kinds'
 import { clearLiveSteps, liveStepsFor, startLiveSteps, stopLiveSteps } from './live-steps'
+import { watchCardioFor } from './watch-cardio-live'
 
 const ASKED_KEY = 'fitplan_activity_access_asked'
 /** A recording left running longer than this was forgotten, not walked: End says so. */
@@ -111,6 +112,8 @@ export interface GatheredFigures extends RecordingFigures {
   heartFromStrap: boolean
   /** The steps are the phone's own count (live-steps.ts), the health store having none yet. */
   stepsFromPhoneCounter: boolean
+  /** The steps and distance are the watch's own, from the watch app recording this same workout. */
+  stepsFromWatch: boolean
 }
 
 /**
@@ -155,13 +158,22 @@ export async function gatherFigures(r: Recording, body: BodyForEstimate, now: Da
       }
     }
   } catch { /* nothing read */ }
+  // THE WATCH'S OWN COUNT FIRST (his report 28 Nov 2026, "The watch and phone steps disagree with each other"): a watch
+  // recording this same walk was on the wrist the whole time, so its steps and distance are the walk's, over the
+  // health store's and the phone's own counter (watch-cardio-live.ts).
+  let stepsFromWatch = false
+  if (tracksSteps(r.activity)) {
+    const w = watchCardioFor(r.activity, r.startedAt)
+    if (w?.steps != null && w.steps > 0) { steps = w.steps; stepsFromWatch = true }
+    if (w?.distanceM != null && w.distanceM >= 10) distanceM = w.distanceM
+  }
   // THE PHONE'S OWN COUNT when the health store has none yet (a watch that syncs late): what he saw while walking.
   let stepsFromPhoneCounter = false
   if (tracksSteps(r.activity) && !(steps != null && steps > 0)) {
     const counted = liveStepsFor(r.startedAt)
     if (counted != null) { steps = counted; stepsFromPhoneCounter = true }
   }
-  return { ...recordingFigures({ start, end, steps, distanceM, deviceKcal, heart }, body), phoneRead, heartFromStrap, stepsFromPhoneCounter }
+  return { ...recordingFigures({ start, end, steps, distanceM, deviceKcal, heart }, body), phoneRead, heartFromStrap, stepsFromPhoneCounter, stepsFromWatch }
 }
 
 /** Write the recording down as a cardio log, with the effort he tapped. Null when nothing was saved. */

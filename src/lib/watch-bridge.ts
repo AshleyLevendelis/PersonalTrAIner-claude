@@ -21,6 +21,7 @@ import type { BodyForEstimate } from './activity-figures'
 import type { EffortKey } from './cardio-effort'
 import { isPhoneApp } from './steps-store'
 import { queueWatchSet } from './watch-session'
+import { tracksSteps } from './cardio-kinds'
 
 export interface WatchBridgeAdapter {
   publishToday(json: string): Promise<void>
@@ -93,6 +94,8 @@ export async function applyWatchEvents(events: readonly unknown[], ctx: WatchCon
         const samples = (e.samples as unknown[]).filter((s): s is [number, number] => Array.isArray(s) && s.length === 2 && num(s[0]) != null && num(s[1]) != null)
         if (samples.length) out.readings += (await import('./strap-live')).onWatchReadings(samples)
         await (await import('./session-calories')).noteWatchRunningKcal(ctx.profileId, e)
+        // Its running steps and distance (28 Nov 2026): the walk's figures, live on the phone's card and at End.
+        ;(await import('./watch-cardio-live')).noteWatchCardioLive(e)
       } else if (e.type === 'cardio-start' && typeof e.activity === 'string' && num(e.startedAt) != null) {
         const rec = await import('./recording-store')
         // Shown running on the phone; never over a workout already open there, and never one already logged (a late
@@ -138,12 +141,21 @@ async function fillFromWatch(profileId: string, date: string, e: Ev, startMs: nu
     const row = ((data ?? []) as Row[]).find(r => r.activity_name === e.activity && r.started_at != null && Math.abs(Date.parse(r.started_at) - startMs) < 120_000)
     if (!row?.id) return
     const km = num(e.distanceM)
-    const update = lateFill(row, {
-      minutes: 0, steps: num(e.steps), distanceKm: km != null && km >= 10 ? Math.round(km / 10) / 100 : null,
+    const watchKm = km != null && km >= 10 ? Math.round(km / 10) / 100 : null
+    const update: Record<string, unknown> = lateFill(row, {
+      minutes: 0, steps: num(e.steps), distanceKm: watchKm,
       kcal: num(e.kcal), kcalEstimated: false,
       avgHeartRate: num(e.avgBpm), maxHeartRate: num(e.maxBpm),
-    })
-    if (update) await supabase.from('cardio_logs').update(update).eq('id', row.id).eq('user_id', profileId)
+    }) ?? {}
+    // THE WATCH'S STEPS AND DISTANCE ARE THE WALK'S, WHICHEVER END WAS TAPPED FIRST (his report 28 Nov 2026, "The
+    // watch and phone steps disagree"): on the wrist the whole time, they replace what the phone read, as they do
+    // when the watch ends first (logWatchCardio). On foot only, as everywhere.
+    if (tracksSteps(row.activity_name)) {
+      const steps = num(e.steps)
+      if (steps != null && steps > 0 && steps !== row.steps) update.steps = Math.round(steps)
+      if (watchKm != null && watchKm !== row.distance_km) update.distance_km = watchKm
+    }
+    if (Object.keys(update).length) await supabase.from('cardio_logs').update(update).eq('id', row.id).eq('user_id', profileId)
   } catch { /* the phone's own late fill still runs */ }
 }
 

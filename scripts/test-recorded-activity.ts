@@ -241,6 +241,24 @@ async function main() {
     phone.stepsBetween = async () => 610
     const gw2 = await gatherFigures(walkEnd, body)
     check('...but when the store has steps, they win', gw2.steps === 610 && gw2.stepsFromPhoneCounter === false, gw2)
+    // THE WATCH'S COUNT FIRST (his report 28 Nov 2026, "The watch and phone steps disagree with each other"): the phone
+    // counted 1,180, the watch 2,138, the store 2,090. With the watch app recording this walk, its figures are the walk's.
+    const wl = await import('../src/lib/watch-cardio-live')
+    wl.__resetWatchCardioLiveForTests()
+    const wStart = Date.parse(walk.startedAt)
+    wl.noteWatchCardioLive({ type: 'hr', kind: 'cardio', activity: 'Walk', startedAt: wStart + 3000, steps: 700, distanceM: 520 })
+    wl.noteWatchCardioLive({ type: 'hr', kind: 'cardio', activity: 'Walk', startedAt: wStart + 3000, steps: 650, distanceM: 480 }) // a held-back batch
+    check('the watch\'s running count is kept, and an older batch arriving late never lowers it', wl.watchCardioFor('Walk', walk.startedAt)?.steps === 700 && wl.watchCardioFor('Walk', walk.startedAt)?.distanceM === 520, wl.watchCardioFor('Walk', walk.startedAt))
+    check('...and it is this walk\'s only: another start or another name takes none', wl.watchCardioFor('Walk', '2026-11-25T09:00:00.000Z') === null && wl.watchCardioFor('Run', walk.startedAt) === null)
+    const gw3 = await gatherFigures(walkEnd, body)
+    check('End on the phone: the watch\'s steps and distance win over the store\'s 610 and 3.84 km, and it says so', gw3.steps === 700 && gw3.distanceKm === 0.52 && gw3.stepsFromWatch === true && gw3.stepsFromPhoneCounter === false, gw3)
+    phone.stepsBetween = async () => 0
+    const gw4 = await gatherFigures(walkEnd, body)
+    check('...over the phone\'s own counter too', gw4.steps === 700 && gw4.stepsFromWatch === true && !gw4.stepsFromPhoneCounter, gw4)
+    wl.__resetWatchCardioLiveForTests()
+    const gw5 = await gatherFigures(walkEnd, body)
+    check('...and with no watch recording, the phone\'s figures stand as before', gw5.steps === 562 && !gw5.stepsFromWatch && gw5.distanceKm === 3.84, gw5)
+    phone.stepsBetween = async () => 610
     phone.stepsBetween = async () => 0
     const walkView = logRecording({ profileId: 'p1', date: '2026-11-25', recording: walkEnd, figures: gw, effort: 'easy' })
     check('logging keeps the counted steps, and clears the count', walkView?.steps === 562 && !store.get('fitplan_live_steps'), walkView)

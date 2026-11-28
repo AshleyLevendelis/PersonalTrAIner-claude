@@ -233,8 +233,27 @@ async function main() {
   const filledRow = db.cardio_logs.find(r => r.id === 'phone-walk')
   check('...a walk ended on the phone and then on the watch gets the watch\'s calories and steps, once', filledRow?.active_kcal === 131 && filledRow?.steps === 2900
     && db.cardio_logs.filter(r => r.activity_name === 'Walk' && r.started_at === new Date(lateStart).toISOString()).length === 1, filledRow)
+  // THE WATCH'S STEPS AND DISTANCE WIN WHICHEVER END WAS FIRST (his report 28 Nov 2026, "The watch and phone steps
+  // disagree"): his walk ended on the phone with the store's 2,090 steps and 1.47 km while the watch had 2,138 and 1.80.
+  const agreeStart = Date.parse('2026-11-27T22:00:00')
+  db.cardio_logs.push({ id: 'phone-walk-2', user_id: 'p1', date: '2026-11-27', activity_name: 'Walk', duration_minutes: 20, intensity_rpe: 3, started_at: new Date(agreeStart).toISOString(), completed_at: new Date(agreeStart + 20 * 60_000).toISOString(), active_kcal: 58, steps: 2090, distance_km: 1.47 })
+  db.cardio_logs.push({ id: 'phone-bike', user_id: 'p1', date: '2026-11-27', activity_name: 'Bike', duration_minutes: 20, intensity_rpe: 3, started_at: new Date(agreeStart).toISOString(), completed_at: new Date(agreeStart + 20 * 60_000).toISOString(), active_kcal: 140, steps: null, distance_km: null })
+  await applyWatchEvents([
+    { id: 'agree-end', type: 'cardio-end', activity: 'Walk', startedAt: agreeStart, endedAt: agreeStart + 20 * 60_000, effort: 'easy', kcal: 61, steps: 2138, distanceM: 1802 },
+    { id: 'agree-bike', type: 'cardio-end', activity: 'Bike', startedAt: agreeStart, endedAt: agreeStart + 20 * 60_000, effort: 'easy', kcal: 150, steps: 900, distanceM: 6000 },
+  ], ctx)
+  const agreed = db.cardio_logs.find(r => r.id === 'phone-walk-2'), bikeRow = db.cardio_logs.find(r => r.id === 'phone-bike')
+  check('...a walk the phone ended first takes the WATCH\'s steps and distance over the phone\'s, and keeps its own calories',
+    agreed?.steps === 2138 && agreed?.distance_km === 1.8 && agreed?.active_kcal === 58, agreed)
+  check('...and a bike never takes steps or distance from it', bikeRow?.steps == null && bikeRow?.distance_km == null, bikeRow)
+  // And while it runs: its running steps and distance ride with the heart rate, for the phone's live card.
+  await applyWatchEvents([{ id: 'hrs1', type: 'hr', samples: [[Date.now(), 104]], kind: 'cardio', activity: 'Walk', startedAt: agreeStart + 600_000, date: '2026-11-27', kcal: 40, steps: 1180, distanceM: 900 }], ctx)
+  const wlive = (await import('../src/lib/watch-cardio-live')).watchCardioFor('Walk', new Date(agreeStart + 600_000).toISOString())
+  check('the watch\'s running steps and distance reach the phone with its heart rate', wlive?.steps === 1180 && wlive?.distanceM === 900, wlive)
   const svcK = strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/WorkoutService.java'))
   check('the watch sends its running count with every heart rate batch', /e\.put\("type", "hr"\);[\s\S]{0,300}e\.put\("kind", LIVE\.kind\);[\s\S]{0,200}if \(LIVE\.kcal > 0\) e\.put\("kcal", Math\.round\(LIVE\.kcal\)\);/.test(svcK))
+  check('...and its steps and distance, in the same batch', /e\.put\("type", "hr"\);[\s\S]{0,600}if \(LIVE\.steps > 0\) e\.put\("steps", LIVE\.steps\);\s*if \(LIVE\.distanceM > 0\) e\.put\("distanceM", Math\.round\(LIVE\.distanceM\)\);[\s\S]{0,200}PhoneLink\.send/.test(svcK))
+  check('the phone\'s live card shows the watch\'s steps first, the phone\'s own sensor only without it', /const liveSteps = watchSteps \?\? phoneSteps/.test(strip(read('src/components/RecordActivityCard.tsx'))))
   check('the phone\'s recorder hands the watch\'s count to the log', /watchKcal: watchCardioKcalFor\(rec\.activity, rec\.startedAt\)/.test(read('src/components/RecordActivityCard.tsx')))
   rec.writeRecording({ activity: 'Bike', startedAt: new Date().toISOString() })
   await applyWatchEvents([{ ...end, id: 'c4', activity: 'Run', startedAt: startedAt + 3 * 3600_000, endedAt: startedAt + 3.5 * 3600_000 }], ctx)

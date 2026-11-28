@@ -16,6 +16,7 @@ import { estimatedMaxHeartRate, mostlyZone, ZONES, type HeartReading } from '@/l
 import { isPhoneApp } from '@/lib/steps-store'
 import { pairedStrap, liveHeartSource, useLiveHeartRate } from '@/lib/strap-live'
 import { startLiveSteps, useLiveSteps, useLiveStepsState } from '@/lib/live-steps'
+import { useWatchCardioSteps } from '@/lib/watch-cardio-live'
 import { readWatchHeart } from '@/lib/watch-workouts'
 import { watchCardioKcalFor } from '@/lib/session-calories'
 
@@ -71,7 +72,11 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
   const phone = isPhoneApp()
   const liveBpm = useLiveHeartRate()
   const recordingStart = rec && !rec.endedAt ? rec.startedAt : null
-  const liveSteps = useLiveSteps(recordingStart)
+  const phoneSteps = useLiveSteps(recordingStart)
+  // THE WATCH'S COUNT FIRST (his report 28 Nov 2026, "The watch and phone steps disagree"): when the watch app is
+  // recording this walk, the card shows the number on his wrist, never the phone's own sensor beside it.
+  const watchSteps = useWatchCardioSteps(rec && !rec.endedAt ? rec.activity : null, recordingStart)
+  const liveSteps = watchSteps ?? phoneSteps
   const stepsState = useLiveStepsState()
   // LIVE STEPS (his 27 Nov "steps if applicable"): counting from the phone's own step counter while a walk or run is
   // open, also after the app was closed and opened again mid-walk.
@@ -178,7 +183,9 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
             : pairedStrap()
             ? 'Your strap isn’t sending yet: check it’s on and the pads are damp. Your watch’s heart rate fills in when it syncs.'
             : 'Pair your strap for live heart rate: Profile, Steps from your phone, Heart rate strap. Your watch’s heart rate fills in when it syncs.'}
-          {phone && onFoot && (stepsState === 'denied'
+          {phone && onFoot && (watchSteps != null
+            ? ' Steps live from your watch.'
+            : stepsState === 'denied'
             ? ' Steps need "Physical activity" allowed for this app in your phone’s settings; they fill in from your watch when it syncs.'
             : stepsState === 'unavailable'
             ? ' This phone can’t count steps live; they fill in from your watch when it syncs.'
@@ -244,6 +251,9 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
               samples={samples} start={start} end={end} estimatedMax={estimatedMax}
             />
           </div>
+          {figures.stepsFromWatch && (
+            <p className="text-[0.71875rem] text-muted-foreground" data-record-steps-watch>Steps and distance from your watch.</p>
+          )}
           {figures.stepsFromPhoneCounter && (
             <p className="text-[0.71875rem] text-muted-foreground" data-record-steps-counted>Steps counted by your phone while you moved.</p>
           )}

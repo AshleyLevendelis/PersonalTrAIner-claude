@@ -143,6 +143,13 @@ if (platform === 'ios' || platform === 'android') {
     stop: async () => { calls.push({ stepCounter: 'stop' }) },
     onTotal: async (cb: (t: number) => void) => { subs.add(cb); return () => { subs.delete(cb) } },
   }
+  // THE WATCH APP SENDING ITS RUNNING COUNT (28 Nov 2026): window.__watchCardio(steps, distanceM) hands the app the
+  // message the watch sends with its heart rate, for the workout open on the phone, through the app's own reader.
+  ;(window as unknown as { __watchCardio: (steps: number, distanceM: number) => Promise<void> }).__watchCardio = async (steps, distanceM) => {
+    const r = (await import('@/lib/recording-store')).readRecording()
+    if (!r) return
+    ;(await import('@/lib/watch-cardio-live')).noteWatchCardioLive({ type: 'hr', kind: 'cardio', activity: r.activity, startedAt: Date.parse(r.startedAt), steps, distanceM })
+  }
   if (q.get('healthon') === '1') { try { localStorage.setItem('fitplan_health_steps_connected', '1') } catch { /* */ } }
   if (q.get('hearton') === '1') { try { localStorage.setItem('fitplan_health_heart_connected', '1') } catch { /* */ } }
   if (q.get('sleepon') === '1') { try { localStorage.setItem('fitplan_health_sleep_connected', '1') } catch { /* */ } }
