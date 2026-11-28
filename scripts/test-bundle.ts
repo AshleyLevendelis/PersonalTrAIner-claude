@@ -894,7 +894,9 @@ console.log('\n3. Nothing has crept back up')
   // merged tree (watch-now, set rows, summary's live cardio). MEASURED 3590; 10 kB over today. The app chunk has 2 kB
   // left (1719 of 1721): the next change to it moves that line too.
   // MOVED 28 Nov 2026: 3600 -> 3610, the route map (its own on-demand chunk). MEASURED 3600 with it.
-  const TOTAL_BUDGET_KB = 3610
+  // MOVED 28 Nov 2026: 3610 -> 3625, advise-then-allow fixes 1-6 and the coach's rest-day session. MEASURED 3610 on the
+  // branch head, exactly on the old line (the check is a strict "under"). The app chunk measured 1727 of 1735.
+  const TOTAL_BUDGET_KB = 3625
   // 23 Nov 2026, main merged on top: MEASURED 3311, under the line, so it did not move.
   // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)

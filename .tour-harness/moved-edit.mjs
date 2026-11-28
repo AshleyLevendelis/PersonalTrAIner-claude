@@ -215,8 +215,10 @@ await shoot('moved-edit-4-shortened')
 // the three is not refused: the sheet says what the day loses BEFORE the tap, naming the day on screen, and it goes.
 let floorText = ''
 let guard = 0
+let heldBefore = 0 // what the day held when the warning came up; since fix 6 a shortened day may already be at two
 for (; guard < 8 && !floorText; guard++) {
   const now = (await order()) || []
+  heldBefore = now.length
   const victim = now[now.length - 1]
   if (!victim) break
   if ((await openRowMenu(victim)) !== 'open') break
@@ -227,12 +229,14 @@ for (; guard < 8 && !floorText; guard++) {
   if (!/That leaves/.test(floorText)) { floorText = ''; await clickSel('[data-scope="today"]'); await wait(1100) }
   if (!floorText && await has('[data-testid="remove-exercise-sheet"]')) await escape()
 }
-check('5a. taking the third-to-last out says what the day loses, before the tap', /That leaves .+ with 2 exercises\. A short session still counts/.test(floorText), { floorText, guard, left: await order() })
-check(`5b. ...naming ${TODAY_NAME}, the day on screen`, floorText.includes(`leave ${TODAY_NAME} with 2`) || floorText.includes(`leaves ${TODAY_NAME} with 2`), floorText)
+const heldAfter = heldBefore - 1
+const heldWords = `${heldAfter} exercise${heldAfter === 1 ? '' : 's'}`
+check('5a. taking one out below three says what the day loses, before the tap', floorText.includes(`with ${heldWords}. A short session still counts`) && heldBefore >= 2, { floorText, guard, heldBefore, left: await order() })
+check(`5b. ...naming ${TODAY_NAME}, the day on screen`, floorText.includes(`leave ${TODAY_NAME} with ${heldWords}`) || floorText.includes(`leaves ${TODAY_NAME} with ${heldWords}`), floorText)
 check(`5c. ...never ${FROM_NAME}, the row it was written to`, floorText.length > 0 && !floorText.includes(FROM_NAME), floorText)
 check('5d. the warning is on screen where the tap is (inside the viewport)', await ev(`(() => { const n = document.querySelector('[data-testid="remove-balance-cost"]'); if (!n) return false; const r = n.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight && r.width > 0 })()`))
 await clickSel('[data-scope="today"]'); await wait(1300)
-check('5e. ...and "Just today" takes it out: the session now holds two', ((await order()) || []).length === 2, await order())
+check('5e. ...and "Just today" takes it out: the session now holds one fewer', ((await order()) || []).length === heldAfter, { heldAfter, now: await order() })
 await shoot('moved-edit-5-floor')
 
 
