@@ -21,8 +21,10 @@ const MAX_SAVED_NAMED = 8
 
 const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 function shift(date: string, days: number): string {
-  const t = Date.parse(`${date}T12:00:00Z`) + days * 86_400_000
-  return new Date(t).toISOString().slice(0, 10)
+  // Calendar arithmetic on the date's own parts (Date.UTC carries the month and year), never an instant's UTC date.
+  const [y, m, d] = date.split('-').map(Number)
+  const t = new Date(Date.UTC(y, m - 1, d + days))
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`
 }
 function weekday(date: string): string {
   return WEEKDAY[new Date(`${date}T12:00:00Z`).getUTCDay()]
