@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs'
 // ---------------------------------------------------------------------------
 // YOUR OWN WORKOUT (his request 25 Nov 2026). The rules under the screen, which verify:own-workout drives:
 //   1. a set's number runs on after every set already on that date for that lift, so it can never write over the
@@ -141,6 +142,26 @@ setPlanOnDate('p9', 'push', '2026-11-27', false, '2026-11-25T10:03:00.000Z')
 check('taken off it, still saved', ownPlansOn('p9', '2026-11-27').length === 0 && ownPlans('p9').length === 1)
 deleteOwnPlan('p9', 'push', '2026-11-25T10:04:00.000Z')
 check('deleted: gone from the list, sent as removed', ownPlans('p9').length === 0 && sent[sent.length - 1]?.deleted === true)
+
+console.log('\n8. The plan\'s hard stops hold on his own workout (his ruling 28 Nov 2026, "Same hard stop as the plan")')
+{
+  const { ownPlanHardStop } = await import('../src/lib/own-workout-plans')
+  const { getExerciseEntry } = await import('../src/lib/exercise-db')
+  const { effectiveLoadingCeilingKg, categorize } = await import('../src/lib/load-prescription')
+  const me = { equipment_access: 'home_gym', injuries: [], health_conditions: [] } as never
+  const db = newPlanLift('Dumbbell Bench Press')
+  const ceiling = effectiveLoadingCeilingKg(getExerciseEntry('Dumbbell Bench Press')!, categorize(getExerciseEntry('Dumbbell Bench Press')!), me)
+  const over = { ...empty, name: 'Push', items: [{ ...db, weight: String(ceiling + 5) }] }
+  const at = { ...empty, name: 'Push', items: [{ ...db, weight: String(ceiling) }] }
+  check('a weight over the plan\'s own ceiling for that lift is refused, with the reason and the most allowed', planProblem(over, me) === `Dumbbell Bench Press: ${ceiling + 5} kg is over ${ceiling} kg, the most your plan would ever give it with your kit, so it can't be saved. Lower it to ${ceiling} kg or less.`, planProblem(over, me))
+  check('...the ceiling itself is fine, and so is no weight', planProblem(at, me) === null && planProblem({ ...at, items: [{ ...db, weight: '' }] }, me) === null)
+  const pregnant = { ...(me as object), health_conditions: ['pregnancy'] } as never
+  const heavy = { ...empty, name: 'Legs', items: [{ ...newPlanLift('Goblet Squat'), reps: '5' }] }
+  check('while pregnant, reps under 8 are refused with the reason', planProblem(heavy, pregnant) === "Goblet Squat: while you're pregnant your plan keeps every set at 8 reps or more, so 5 can't be saved.", planProblem(heavy, pregnant))
+  check('...8 and up are fine, and the floor is only for pregnancy', planProblem({ ...heavy, items: [{ ...heavy.items[0], reps: '8-10' }] }, pregnant) === null && planProblem(heavy, me) === null)
+  check('the editor saves through the check with his profile', /planProblem\(p, profile\)/.test(readFileSync('src/components/exercise/OwnPlanEditor.tsx', 'utf8')))
+  void ownPlanHardStop
+}
 
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.log(`${failures} FAILED`); process.exit(1) }

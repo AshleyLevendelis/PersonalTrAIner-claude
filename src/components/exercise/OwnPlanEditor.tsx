@@ -43,7 +43,7 @@ export default function OwnPlanEditor({ profileId, plan: initial, isNew, equipme
     setP({ ...p, items })
   }
   const save = () => {
-    const problem = planProblem(p)
+    const problem = planProblem(p, profile)
     if (problem) { setNote(problem); return }
     const stamp = now()
     if (!saveOwnPlan(profileId, p, stamp)) { setNote("Couldn't keep it on your phone. Try again."); return }

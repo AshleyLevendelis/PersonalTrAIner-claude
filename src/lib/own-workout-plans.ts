@@ -13,7 +13,11 @@
  * nothing is saved until he ticks a set, exactly as an empty workout.
  */
 import { supabase } from './supabase'
-import { getExerciseId } from './exercise-db'
+import { getExerciseId, getExerciseEntry } from './exercise-db'
+import { effectiveLoadingCeilingKg, categorize } from './load-prescription'
+import { isPregnant } from './health-conditions'
+import { PREGNANCY_REP_FLOOR } from './pregnancy-rules'
+import type { UserProfile } from './types'
 import { type OwnWorkout, type OwnItem, type OwnLift, newOwnWorkout, nextOwnSetNumber } from './own-workout'
 
 export interface PlanLift {
@@ -129,9 +133,33 @@ export function planSummary(p: Pick<OwnPlan, 'items'>): string {
 }
 
 /** Why it cannot be saved yet, or null. A name and one thing in it; nothing else is required of him. */
-export function planProblem(p: Pick<OwnPlan, 'name' | 'items'>): string | null {
+export function planProblem(p: Pick<OwnPlan, 'name' | 'items'>, profile?: UserProfile | null): string | null {
   if (!p.name.trim()) return 'Give it a name.'
   if (p.items.length === 0) return 'Add an exercise or a cardio.'
+  return profile ? ownPlanHardStop(p.items, profile) : null
+}
+
+/**
+ * THE PLAN'S HARD STOPS HOLD ON A WORKOUT OF HIS OWN (his ruling 28 Nov 2026, "Same hard stop as the plan", over
+ * warn-then-allow and over no check): a weight he types over the load ceiling the plan itself would never pass for that
+ * lift with his kit, and, while pregnant, reps under the plan's floor of 8, are refused with the reason. One rule with the
+ * plan: the same ceiling (effectiveLoadingCeilingKg) and the same floor (PREGNANCY_REP_FLOOR). Logged sets are not this:
+ * a set he did is recorded, with the existing "is that right?" ask.
+ */
+export function ownPlanHardStop(items: readonly PlanItem[], profile: UserProfile): string | null {
+  for (const item of items) {
+    if (item.kind !== 'lift') continue
+    const entry = getExerciseEntry(item.name)
+    const kg = Number(String(item.weight).replace(',', '.').trim())
+    if (entry && item.weight.trim() && Number.isFinite(kg) && kg > 0) {
+      const ceiling = effectiveLoadingCeilingKg(entry, categorize(entry), profile)
+      if (kg > ceiling) return `${item.name}: ${kg} kg is over ${ceiling} kg, the most your plan would ever give it with your kit, so it can't be saved. Lower it to ${ceiling} kg or less.`
+    }
+    const reps = parseInt(String(item.reps).match(/\d+/)?.[0] ?? '', 10)
+    if (isPregnant(profile) && Number.isFinite(reps) && reps < PREGNANCY_REP_FLOOR) {
+      return `${item.name}: while you're pregnant your plan keeps every set at ${PREGNANCY_REP_FLOOR} reps or more, so ${reps} can't be saved.`
+    }
+  }
   return null
 }
 
