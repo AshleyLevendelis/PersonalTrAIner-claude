@@ -152,6 +152,16 @@ const c = await ev('document.body.innerText')
 check('C2. the app says today already has its session, and names it', /Today already has [^.]+ on it, so that's your session for today\./.test(c), c.slice(-300))
 check('C3. no card, nothing borrowed', (await ev(`document.querySelectorAll('[data-testid="proposal-card"]').length`)) === 0 && (await borrows()).length === 0)
 
+console.log('\n  D. A PAUSED PLAN (advise, then allow: the pause is said, the session is offered)')
+check('D0. a fresh chat, the plan paused, today a rest day', !!(await loadChat('&day=rest&paused=1')))
+check('D1. he asks to lift today', await say('Can I lift today?'))
+check('D2. AN OFFER, not "start it again first"', !!(await pendingOffer()) && !/Start it again first/.test(await ev('document.body.innerText')))
+const dOffer = (await offer())?.text ?? ''
+check('D3. ...saying the session sits outside the pause, which carries on', /Your plan is paused: this session is one of your own, nothing else becomes due, and the pause carries on\./.test(dOffer), dOffer)
+check('D4. ...with the same advice as any rest day', /planned rest day/.test(dOffer) && /20 to 30 minute walk/.test(dOffer), dOffer)
+check('D5. nothing borrowed before a tap', (await borrows()).length === 0)
+await shoot('train-today-paused')
+
 check('no uncaught error on any page', pageErrors.length === 0, pageErrors)
 console.log(`\n${ran} checks ran. ${failures === 0 ? 'A rest day takes a session when he asks, with the reasons on the card, and Undo puts the rest back.' : `${failures} check(s) FAILED.`}\n`)
 ws.close(); chrome.kill(); server.close()

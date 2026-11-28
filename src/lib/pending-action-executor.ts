@@ -281,13 +281,17 @@ export async function executeExerciseAdd(
     ({ mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'propose_exercise_add', error }] } })
 
   const { mapTier } = await import('./exercise-plan')
-  const { resolveAdditionRequest } = await import('./exercise-add-candidates')
+  const { resolveAdditionAnywhere } = await import('./exercise-add-candidates')
   // RE-RESOLVED AT CONFIRM, not trusted from the payload. The card may have
   // been sitting for a while, and equipment or injuries can have changed under
   // it — the same reason every other confirm re-runs its edit rather than
   // replaying a stored diff.
-  const entry = resolveAdditionRequest(payload.exerciseName, profile, exclusions)
-  if (!entry) return fail(`I can't add ${payload.exerciseName} — it isn't something I can prescribe with your equipment and injuries.`)
+  // The card's own lookup (28 Nov 2026): anything in the catalogue, the hard stops (injury, pregnancy, never-again)
+  // checked again here because they may have changed since the card was made.
+  const found = resolveAdditionAnywhere(payload.exerciseName, profile, exclusions)
+  if (!found) return fail(`I couldn't find ${payload.exerciseName} in the exercise list.`)
+  if ('stop' in found) return fail(found.stop)
+  const entry = found.entry
 
   const week = mesocycle.find(w => w.week_number === payload.weekNumber)
   const day = week?.days.find(d => d.day === payload.dayName)

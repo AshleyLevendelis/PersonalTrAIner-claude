@@ -51,6 +51,8 @@ export interface SessionEditResult {
   changed: boolean
   /** Why nothing happened, in words a person can read. Empty when `changed`. */
   refusal?: string
+  /** What the change costs, said before the tap when it works against the plan (advise, then allow: 28 Nov 2026). */
+  note?: string
 }
 
 /** Which weeks a scope reaches — mesocycle-edit's own rule, kept identical. */
@@ -89,7 +91,7 @@ export interface RemoveExerciseParams {
 /**
  * Take one exercise out of a session, without banning it from the plan.
  *
- * Refuses rather than empties: a session below MIN_EXERCISES_PER_SESSION is
+ * (Since 28 Nov 2026 below MIN_EXERCISES_PER_SESSION is advised in `note`, not refused; the last exercise is.) Was: a session below MIN_EXERCISES_PER_SESSION is
  * not a session. The superset partner it may orphan is repaired by
  * clearOrphanedSupersetLabels in the shared tail, which also undoes the
  * `rest: 'alternate'` that partner was carrying.
@@ -102,13 +104,15 @@ export function removeExerciseFromSession(params: RemoveExerciseParams): Session
   if (!week || !day || !target) {
     return { mesocycle, changed: false, refusal: "I couldn't find that exercise on that day." }
   }
-  if (day.exercises.length - 1 < MIN_EXERCISES_PER_SESSION) {
-    return {
-      mesocycle,
-      changed: false,
-      refusal: `That would leave ${dayName} with fewer than ${MIN_EXERCISES_PER_SESSION} exercises. Take the whole day off instead, or swap this one for something easier.`,
-    }
+  // ADVISE, THEN ALLOW (his ruling 28 Nov 2026): below three exercises is said, never refused. Only the LAST exercise
+  // is not taken out, because a session with nothing in it is a rest day, and that is the change to offer.
+  const left = day.exercises.length - 1
+  if (left < 1) {
+    return { mesocycle, changed: false, refusal: `${target.name} is the last exercise on ${dayName}. To skip the session, take ${dayName} as a rest day instead.` }
   }
+  const note = left < MIN_EXERCISES_PER_SESSION
+    ? `That leaves ${dayName} with ${left} exercise${left === 1 ? '' : 's'}. A short session still counts, but ${dayName} loses that work; swapping it for something easier keeps it.`
+    : undefined
 
   const weeks = new Set(targetWeekNumbers(mesocycle, weekNumber, scope))
   let changed = false
@@ -120,13 +124,13 @@ export function removeExerciseFromSession(params: RemoveExerciseParams): Session
     // is not what anyone asked for.
     const slot = d?.exercises[exIndex]
     if (!d || !slot || !sameSlot(slot, target)) return w
-    if (d.exercises.length - 1 < MIN_EXERCISES_PER_SESSION) return w
+    if (d.exercises.length - 1 < 1) return w
     changed = true
     const trimmed = { ...d, exercises: d.exercises.filter((_, i) => i !== exIndex) }
     return settleWeek({ ...w, days: w.days.map(x => (x.day === dayName ? trimmed : x)) }, dayName, profile).week
   })
   return changed
-    ? { mesocycle: next, changed: true }
+    ? { mesocycle: next, changed: true, ...(note ? { note } : {}) }
     : { mesocycle, changed: false, refusal: "I couldn't find that exercise on that day." }
 }
 

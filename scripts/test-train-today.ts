@@ -7,7 +7,7 @@
  * The screen in verify:train-today.
  */
 import { readFileSync } from 'node:fs'
-import { planTrainToday, asksForWeightsSession } from '../src/lib/train-today'
+import { planTrainToday, asksForWeightsSession, trainAnywayChoices } from '../src/lib/train-today'
 import type { WorkoutDay } from '../src/lib/types'
 
 let failures = 0
@@ -94,6 +94,28 @@ check('Exercise re-reads the borrow when the coach makes one', /subscribeBorrowe
 const fn = readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
 check('the coach has the tool and a handler that returns its card', /name: "propose_train_today"/.test(fn) && /if \(name === "propose_train_today"\)[\s\S]{0,400}kind: "propose_train_today"/.test(fn))
 check('the coach is told his ruling: offer with the reason, never "I can\'t" alone', /whatever I ask it but give reasons or advise around it/.test(fn) && /"I can't" and "there's nothing to change" are never the whole reply/.test(fn))
+
+console.log('\n5. The screen\'s "Train anyway": every session, a done one as a repeat, with the reason')
+{
+  const p = plan(four)
+  const c = trainAnywayChoices({ plan: p, todayName: 'Wednesday', todayDate: '2026-09-16', week: week(p, { Monday: 'missed', Tuesday: 'done' }) })
+  check('not yet trained first (Monday, Thursday, Friday), then the done one (Tuesday)', c.options.map(o => o.day).join() === 'Monday,Thursday,Friday,Tuesday', c.options.map(o => o.day))
+  check('the done one is a repeat, and says so', c.options[3]?.repeat === true && /Tuesday · Upper Push · done, repeat it/.test(c.options[3]?.label ?? ''), c.options[3])
+  check('the others are not', c.options.slice(0, 3).every(o => !o.repeat))
+  check('today\'s own day is never offered', !c.options.some(o => o.day === 'Wednesday'))
+  // A day whose own session moved away holds a session in its plan row: it is still not offered onto itself.
+  const moved = trainAnywayChoices({ plan: p, todayName: 'Monday', todayDate: '2026-09-14', week: week(p, { Monday: 'moved' }) })
+  check('...even when its plan row holds a session (a moved-away Monday is not offered Monday\'s)', moved.options.length === 3 && !moved.options.some(o => o.day === 'Monday'), moved.options.map(o => o.day))
+  check('the advice is the coach card\'s first line', /^Today is a planned rest day\. Training is fine if you feel fresh; the cost is less recovery before tomorrow's Lower Hinge\.$/.test(c.advice ?? ''), c.advice)
+  const all = trainAnywayChoices({ plan: p, todayName: 'Saturday', todayDate: '2026-09-19', week: week(p, { Monday: 'done', Tuesday: 'done', Thursday: 'done', Friday: 'partial' }) })
+  check('ALL DONE: still four choices (was none, and the button vanished), every one a repeat', all.options.length === 4 && all.options.every(o => o.repeat), all.options)
+  const none = trainAnywayChoices({ plan: plan({}), todayName: 'Saturday', todayDate: '2026-09-19', week: week(plan({}), {}) })
+  check('a plan with no sessions offers nothing and no advice', none.options.length === 0 && none.advice === null)
+  const card = readFileSync('src/components/exercise/RestDayCard.tsx', 'utf8')
+  const n = (card.match(/<TrainAnyway options=/g) ?? []).length
+  check('the rest, recovery and moved-away cards all carry it', n === 3, n)
+  check('the advice is drawn above the choices', /train-anyway-advice[\s\S]{0,400}train-anyway-option/.test(card))
+}
 
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.error(`${failures} FAILED`); process.exit(1) }

@@ -124,3 +124,29 @@ export function asksForWeightsSession(said: string): boolean {
   if (/\b(run|running|jog|ride|cycle|cycling|bike|swim|swimming|walk|hike|class|yoga|pilates|cardio)\b/.test(t)) return false
   return /\b(weights?|lift|lifting|strength|gym|resistance|weight session|workout|session|train(ing)?)\b/.test(t)
 }
+
+export interface TrainAnywayChoice { day: string; label: string; repeat: boolean }
+
+/**
+ * THE SCREEN'S "TRAIN ANYWAY" CHOICES, the same picture the coach's card is built from (28 Nov 2026, his "fix
+ * everything one by one"): every session of the week but today's own, the ones not yet trained first, then the ones
+ * already done this week, marked as a repeat (until today they were left out and, all done, the button vanished:
+ * advice now, never a block). `advice` is the coach card's first line: what the rest day is for and what training
+ * through it costs.
+ */
+export function trainAnywayChoices(input: {
+  plan: WorkoutDay[]
+  todayName: string
+  todayDate: string
+  week: TrainTodayCell[]
+  borrowedOn?: (date: string) => string | null
+}): { options: TrainAnywayChoice[]; advice: string | null } {
+  const open = trainAnywayOptions(input)
+  const openDays = new Set(open.map(o => o.day))
+  const repeats = input.plan
+    .filter(d => d.exercises.length > 0 && d.day !== input.todayName && !openDays.has(d.day))
+    .map(d => ({ day: d.day, label: `${d.focus ? `${d.day} · ${d.focus}` : d.day} · done, repeat it`, repeat: true }))
+  const options = [...open.map(o => ({ ...o, repeat: false })), ...repeats]
+  const plan = options.length > 0 ? planTrainToday({ ...input, todayHasSession: false }) : null
+  return { options, advice: plan && plan.ok ? plan.advice[0] : null }
+}

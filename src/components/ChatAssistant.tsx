@@ -141,7 +141,7 @@ import { reasonChipsFor, reasonQuestion, equipmentNothingToChange, type Reasoned
 import { assessMealEdit, mealAskKey, type MealEditKind, type MealEditContext } from '@/lib/meal-tradeoff'
 import { settleWeek } from '@/lib/settle-week'
 import { shortenOrFloor, SHORTEST_VERSION_MINUTES } from '@/lib/exercise-plan'
-import { resolveAdditionRequest } from '@/lib/exercise-add-candidates'
+import { resolveAdditionAnywhere } from '@/lib/exercise-add-candidates'
 import { dayLengthParts, formatDayLength } from '@/lib/session-duration'
 import { planDaysForDate } from '@/lib/plan-week'
 import { restoreMesocycle } from '@/lib/mesocycle-persistence'
@@ -3280,10 +3280,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // writes to. Anything a person reads uses `on.sayDay`.
     const dayName = day.day
 
-    const entry = resolveAdditionRequest(item, poolProfile, exerciseExclusions)
-    if (!entry) {
-      return { ok: false, reason: `I can't add ${item} — it isn't something I can prescribe with your equipment and injuries. Tell me what you have available and I'll find the closest thing.` }
-    }
+    // ANY EXERCISE IN THE CATALOGUE (his ruling 28 Nov 2026, "advise, then allow"): outside his kit, style or level it
+    // is added with the warning on the card; an injury, the pregnancy rules or his never-again list stop it.
+    const found = resolveAdditionAnywhere(item, poolProfile, exerciseExclusions)
+    if (!found) return { ok: false, reason: `I couldn't find ${item} in the exercise list. What's it called, or what does it work?` }
+    if ('stop' in found) return { ok: false, reason: found.stop }
+    const entry = found.entry
+    const fitWarnings = found.warnings
 
     const scope: SwapScope = rawArgs.scope === 'permanent' ? 'permanent' : 'today'
     const trial = addExerciseToSession({
@@ -3320,6 +3323,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         ],
         unchanged: [`Everything else on ${on.sayDay}`],
         implications: [
+          // Outside his kit, style or level: the screen search's own warning, first (28 Nov 2026).
+          ...fitWarnings.map(text => ({ severity: 'warn' as const, text })),
           // HER RULING, 13 Sep 2026: the session gets longer and the app says
           // so. It does NOT quietly take something out to pay for the work she
           // asked for, and the card says that too, so nobody has to wonder.
@@ -3517,6 +3522,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         rows: [{ field: on.sayDay, before: target.exerciseName, after: '— removed' }],
         unchanged: [`Everything else on ${on.sayDay}`],
         implications: [
+          // Below three exercises: said, then allowed (28 Nov 2026).
+          ...(trial.note ? [{ severity: 'warn' as const, text: on.say(trial.note) }] : []),
           { severity: 'info', text: 'The session gets shorter. Weights on the rest of it are re-checked when you confirm.' },
           // Her ruling, 13 Sep 2026: the balancing may touch another day, and
           // the card says so before she confirms. Info, not warn — it is the
@@ -4448,7 +4455,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     diff: import('@/lib/pending-actions-store').ProposalDiff
   } | { ok: false; reason: string } => {
     const date = activeSession.date
-    if (isPausedOn(date, planPausedSince(profile.id))) return { ok: false, reason: 'Your plan is paused, so nothing is due today. Start it again first and today can take a session.' }
+    // A PAUSED PLAN CAN STILL TAKE A SESSION (28 Nov 2026, advise then allow; the screen's "Train it anyway" already
+    // could): the card says it sits outside the pause and that nothing becomes due.
+    const paused = isPausedOn(date, planPausedSince(profile.id))
     const todayName = new Date(`${date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
     const borrowed = readBorrowedDay(profile.id, date)
     const own = todayResolved.day
@@ -4471,7 +4480,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       diff: {
         lead: ask(plan.lead),
         rows: [{ field: 'Today', before: 'Rest day', after: `${plan.day}'s ${plan.focus}` }],
-        implications: plan.advice.map(text => ({ severity: 'info' as const, text })),
+        implications: [
+          ...(paused ? [{ severity: 'info' as const, text: "Your plan is paused: this session is one of your own, nothing else becomes due, and the pause carries on." }] : []),
+          ...plan.advice.map(text => ({ severity: 'info' as const, text })),
+        ],
         reversible: true,
       },
     }

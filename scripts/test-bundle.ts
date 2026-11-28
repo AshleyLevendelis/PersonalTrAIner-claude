@@ -542,7 +542,9 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 27 Nov 2026: 1713 -> 1721, the same merge. MEASURED 1712 on the merged tree.
   // MOVED 28 Nov 2026: 1721 -> 1725. MEASURED 1721 on main (b4682c62, the gym dry run fixes filled the last kB) and 1721
   // with the route map, which loads on demand and is not in this chunk.
-  const APP_CHUNK_BUDGET_KB = 1725
+  // MOVED 28 Nov 2026: 1725 -> 1735, advise-then-allow (the coach's rest-day session and the shared "Train anyway").
+  // MEASURED 1726 with them.
+  const APP_CHUNK_BUDGET_KB = 1735
   // 23 Nov 2026, main merged on top: MEASURED 1635, under the line, so it did not move.
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')

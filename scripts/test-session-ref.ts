@@ -255,10 +255,10 @@ console.log('\n5. The real edits, through the reference')
     shorten.refusal == null || (!/Monday/.test(sayDayIn(shorten.refusal, ref)) ), shorten.refusal && sayDayIn(shorten.refusal, ref))
 
   const remove = removeExerciseFromSession({ mesocycle: MESO, profile, weekNumber: WEEK.week_number, dayName: key, exIndex: 2, scope: 'today' })
-  check('removing from a three-exercise session meets the FLOOR, not "couldn\'t find"', !remove.changed && /fewer than 3 exercises/.test(remove.refusal ?? ''), remove.refusal)
-  const said = sayDayIn(remove.refusal ?? '', ref)
-  check('the floor\'s refusal names the day on screen: "That would leave Friday with fewer than 3 exercises…"',
-    said === 'That would leave Friday with fewer than 3 exercises. Take the whole day off instead, or swap this one for something easier.', said)
+  check('removing from a three-exercise session GOES THROUGH, with a warning (advise, then allow: 28 Nov 2026)', remove.changed && /with 2 exercises/.test(remove.note ?? ''), remove.note ?? remove.refusal)
+  const said = sayDayIn(remove.note ?? '', ref)
+  check('the warning names the day on screen: "That leaves Friday with 2 exercises…"',
+    said === 'That leaves Friday with 2 exercises. A short session still counts, but Friday loses that work; swapping it for something easier keeps it.', said)
   check('...and never the plan row', !/Monday/.test(said), said)
 
   // An ordinary day is untouched by any of this.

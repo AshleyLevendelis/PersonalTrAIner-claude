@@ -494,6 +494,27 @@ check(`11g. ...written to ${recDate}, the day it belongs to, not to today`, mine
 await shoot('rest-day-11-peek-past-logged')
 
 const errs = await ev(`(window.__errors ?? []).length`)
+// 12. "TRAIN ANYWAY" ON A RECOVERY DAY TOO, WITH THE REASON FIRST (his ruling 28 Nov 2026, "advise, then allow"). It
+// lived on the plain rest day's card alone; a scheduled recovery or cardio day had no way to lift.
+console.log('\n12. Train anyway on a recovery day, the reason above the choices\n')
+await send('Page.navigate', { url: `${BASE}&today=${suggested?.date ?? ''}&n=recovery-train#/tab/exercise` })
+await wait(4000)
+check('12a. the recovery day\'s card offers "Train anyway"', !!(await ev(`!!document.querySelector('[data-testid="train-anyway"]')`)))
+await tap('[data-testid="train-anyway"]')
+await wait(600)
+const pick12 = await ev(`(() => { const p = document.querySelector('[data-testid="train-anyway-picker"]'); if (!p) return null;
+  const a = p.querySelector('[data-testid="train-anyway-advice"]'); const o = [...p.querySelectorAll('[data-testid="train-anyway-option"]')];
+  return { advice: a ? a.innerText.trim() : '', options: o.map(b => b.textContent.trim()), adviceFirst: !!a && !!o[0] && !!(a.compareDocumentPosition(o[0]) & Node.DOCUMENT_POSITION_FOLLOWING), h: o.map(b => Math.round(b.getBoundingClientRect().height)) } })()`)
+check('12b. opened, it says what training today costs, ABOVE the choices', !!pick12 && /^Today is a planned rest day\. Training is fine if you feel fresh; the cost is less recovery before .+\.$/.test(pick12.advice) && pick12.adviceFirst, pick12)
+check('12c. ...and lists the week\'s sessions, each naming its session', (pick12?.options ?? []).length > 0 && pick12.options.every(t => /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) · \S/.test(t)), pick12?.options)
+check('12d. ...each a full-size tap', (pick12?.h ?? []).length > 0 && pick12.h.every(h => h >= 44), pick12?.h)
+await shoot('rest-day-recovery-train-anyway')
+const first12 = (pick12?.options ?? [])[0]?.split(' · ')[0]
+await tap('[data-testid="train-anyway-option"]')
+await wait(1200)
+const whose12 = await text('[data-testid="borrowed-from"]')
+check('12e. a tap borrows that session onto the recovery day', !!first12 && whose12 === `${first12}'s session`, { first12, whose12 })
+
 check('9. nothing on the page threw', !errs, errs)
 
 // COUNTED, not written down: a hardcoded total goes stale the first time a

@@ -19,13 +19,23 @@ earlier ruling of his and wait for his word.
    ("Thursday is down as a rest day you chose. This changes its session in case you train it after all; log a set and
    it counts as a session again."). No write clears the mark: a logged set already outranks it. A session moved away
    is edited where it now sits. `test:session-ref` §4 (4/4 mutations), `verify:what-happened` 11b2-11b6 (1/1).
-2. [ ] **"Train anyway" on every kind of day, and a session already done this week can be repeated.** The screen
+2. [x] **"Train anyway" on every kind of day, and a session already done this week can be repeated.** The screen
    offers it only on a plain rest day and drops trained sessions (the coach already repeats one, with advice).
-3. [ ] **Removing an exercise below three is allowed, with advice** (session-edit.ts floor; both surfaces).
-4. [ ] **The coach can add any catalogue exercise, warned for kit, style and skill** (the screen's search already
-   does). Injury and pregnancy exclusions stay stops.
-5. [ ] **A paused plan can still take a session today, with advice** (the screen already allows it; the coach
-   refuses).
+   DONE 28 Nov 2026: one shared control on the rest, recovery/cardio and moved-away cards; opened, it says what training
+   today costs (the coach card's first line, train-today.ts) above the week's sessions; a done one is last, "done,
+   repeat it". `test:train-today` §5 (4/5 by logic, the fifth by `verify:rest-day` 12a-12e).
+3. [x] **Removing an exercise below three is allowed, with advice** (session-edit.ts floor; both surfaces). DONE
+   28 Nov 2026: "That leaves Friday with 2 exercises. A short session still counts, but Friday loses that work;
+   swapping it for something easier keeps it." on the screen's sheet and the coach's card; only the LAST exercise is
+   redirected (that is a rest day). `test:session-edit`, `test:session-ref` §5 (4/4), `verify:moved-edit` §5.
+4. [x] **The coach can add any catalogue exercise, warned for kit, style and skill** (the screen's search already
+   does). Injury and pregnancy exclusions stay stops. DONE 28 Nov 2026 (`resolveAdditionAnywhere`, card and confirm):
+   the screen search's warning on the card; injury, pregnancy and never-again refuse in words. `test:exercise-add`
+   (7/7). **Found on the way, HIS:** the screen's add and swap searches let him pick a move his injuries list rules
+   out, with a warning (his 13 Sep "show everything, warn me"), which is not the hard stop he kept on 28 Nov.
+5. [x] **A paused plan can still take a session today, with advice** (the screen already allows it; the coach
+   refuses). DONE 28 Nov 2026: the card says "Your plan is paused: this session is one of your own, nothing else
+   becomes due, and the pause carries on." `verify:train-today` D (1/1).
 6. [ ] **Shortening past its floors** (main lift, three exercises): say what is lost, then allow.
 7. [ ] **Volume change and "make it lighter" in a deload week or at a set floor**: say which limit, then allow.
 8. [ ] **A different kind of session on any day this week**, not only today; a started session takes an added block.

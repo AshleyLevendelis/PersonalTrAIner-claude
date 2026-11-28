@@ -26,7 +26,8 @@ import { readCardioLogsForDate } from '@/lib/cardio-log-store'
 import { cardioLine, splitActivity } from '@/lib/cardio-lines'
 import { calibrationCueText } from './CalibrationCue'
 import { planDaysForDate } from '@/lib/plan-week'
-import { readBorrowedDay, writeBorrowedDay, trainAnywayOptions, nextTrainingDayName, subscribeBorrowedDay } from '@/lib/borrowed-day'
+import { readBorrowedDay, writeBorrowedDay, nextTrainingDayName, subscribeBorrowedDay } from '@/lib/borrowed-day'
+import { trainAnywayChoices } from '@/lib/train-today'
 import { TOUR_PRACTICE_STOPS, TOUR_OPENS, setTourPracticeDay, useTourStage } from '@/lib/tour-stage'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId, getExerciseEntry } from '@/lib/exercise-db'
@@ -923,7 +924,9 @@ export function TodayPanel({
       result.mesocycle.find(w => w.week_number === liveWeek),
       target.planDayName,
     )
-    return { cost: say(impact.cost), balancing: say(impact.balancing) }
+    // Below three exercises, said first (28 Nov 2026, advise then allow).
+    const cost = [say(result.note ?? null), say(impact.cost)].filter(Boolean).join(' ')
+    return { cost: cost || null, balancing: say(impact.balancing) }
   }
 
   const tourWhatHappenedCell = tourStage === TOUR_OPENS.whatHappened
@@ -1135,12 +1138,16 @@ export function TodayPanel({
   // is the defect this whole change exists to remove.
   // Each with its session's name, and never a session already trained this
   // week (run 5, M45) — the strip's own day states decide that.
-  const trainAnyway = trainAnywayOptions({
+  // AND A SESSION ALREADY DONE THIS WEEK IS OFFERED AS A REPEAT, with what training today costs above the choices
+  // (28 Nov 2026, his "advise, then allow"): train-today.ts, the coach card's own picture.
+  const trainAnywayPick = trainAnywayChoices({
     plan: liveWeekPlan,
     todayName,
+    todayDate: today,
     week: weekTrain.days,
     borrowedOn: date => readBorrowedDay(profileId, date),
   })
+  const trainAnyway = trainAnywayPick.options
 
   // THE SECOND-SPORT VOLUME NOTICE — Ashley's ruling, 6 Sep 2026: when a sport
   // counts as training load the plan comes down one recovery notch, the card
@@ -1847,6 +1854,9 @@ export function TodayPanel({
           tomorrow={tomorrowPreview}
           onPeek={peekByName}
           onDoItToday={handleDoItToday}
+          trainAnywayOptions={trainAnyway}
+          trainAnywayAdvice={trainAnywayPick.advice}
+          onTrainAnyway={setBorrowedDayName}
         />
       ) : isRestDay ? (
         <RestDayCard
@@ -1855,6 +1865,7 @@ export function TodayPanel({
           tomorrow={tomorrowPreview}
           onPeek={peekByName}
           trainAnywayOptions={trainAnyway}
+          trainAnywayAdvice={trainAnywayPick.advice}
           onTrainAnyway={setBorrowedDayName}
           onAddCardio={handleAddCardio}
         />
@@ -1866,6 +1877,9 @@ export function TodayPanel({
           onPeek={peekByName}
           onAddCardio={handleAddCardio}
           raceDate={profile?.running_goal ? profile?.running_race_date ?? null : null}
+          trainAnywayOptions={trainAnyway}
+          trainAnywayAdvice={trainAnywayPick.advice}
+          onTrainAnyway={setBorrowedDayName}
         />
       ) : (
         <div className="space-y-3">
