@@ -75,7 +75,8 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
   const phoneSteps = useLiveSteps(recordingStart)
   // THE WATCH'S COUNT FIRST (his report 28 Nov 2026, "The watch and phone steps disagree"): when the watch app is
   // recording this walk, the card shows the number on his wrist, never the phone's own sensor beside it.
-  const watchSteps = useWatchCardioSteps(rec && !rec.endedAt ? rec.activity : null, recordingStart)
+  // Only while the watch is sending (its last count within a minute): a watch gone quiet hands the tile back.
+  const watchSteps = useWatchCardioSteps(rec && !rec.endedAt ? rec.activity : null, recordingStart, now)
   const liveSteps = watchSteps ?? phoneSteps
   const stepsState = useLiveStepsState()
   // LIVE STEPS (his 27 Nov "steps if applicable"): counting from the phone's own step counter while a walk or run is
@@ -251,8 +252,10 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
               samples={samples} start={start} end={end} estimatedMax={estimatedMax}
             />
           </div>
-          {figures.stepsFromWatch && (
-            <p className="text-[0.71875rem] text-muted-foreground" data-record-steps-watch>Steps and distance from your watch.</p>
+          {(figures.stepsFromWatch || figures.distanceFromWatch) && (
+            <p className="text-[0.71875rem] text-muted-foreground" data-record-steps-watch>
+              {figures.stepsFromWatch && figures.distanceFromWatch ? 'Steps and distance from your watch.' : figures.stepsFromWatch ? 'Steps from your watch.' : 'Distance from your watch.'}
+            </p>
           )}
           {figures.stepsFromPhoneCounter && (
             <p className="text-[0.71875rem] text-muted-foreground" data-record-steps-counted>Steps counted by your phone while you moved.</p>

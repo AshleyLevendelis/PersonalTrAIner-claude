@@ -205,6 +205,25 @@ function saveCardioLogUnchecked(input: CardioLogInput): CardioLogView {
   return pendingToView(pending)
 }
 
+/**
+ * Figures arriving for a log still waiting in the phone's queue (the watch's steps for a walk logged with no signal,
+ * 28 Nov 2026): written into the queued entry, in the database's column names. True when it was there to fill.
+ */
+export function patchQueuedCardioLog(clientId: string, update: Record<string, unknown>): boolean {
+  const items = loadPending()
+  const item = items.find(i => i.clientId === clientId && i.status !== 'synced')
+  if (!item) return false
+  const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
+  if (n(update.steps) != null) item.steps = n(update.steps)
+  if (n(update.distance_km) != null) item.distanceKm = n(update.distance_km)
+  if (n(update.active_kcal) != null) { item.activeKcal = n(update.active_kcal); item.kcalEstimated = update.kcal_estimated === true }
+  if (n(update.avg_heart_rate) != null) item.avgHeartRate = n(update.avg_heart_rate)
+  if (n(update.max_heart_rate) != null) item.maxHeartRate = n(update.max_heart_rate)
+  savePending(items)
+  notify()
+  return true
+}
+
 export function retryFailedCardioLog(clientId: string): void {
   const items = loadPending()
   const item = items.find(i => i.clientId === clientId)
@@ -444,6 +463,12 @@ async function syncPass(items: PendingCardioLog[]): Promise<void> {
         // side since the server fetch already carries them.
         target.status = 'synced'
         target.id = insertedId
+        // FIGURES THAT ARRIVED WHILE THE INSERT WAS IN FLIGHT (patchQueuedCardioLog): the row went up without them.
+        const late: Record<string, unknown> = {}
+        const sent = { ...recordedShape(item), distance_km: item.distanceKm ?? null, avg_heart_rate: item.avgHeartRate || null }
+        const now = { ...recordedShape(target), distance_km: target.distanceKm ?? null, avg_heart_rate: target.avgHeartRate || null } as Record<string, unknown>
+        for (const [k, v] of Object.entries(now)) if (v != null && (sent as Record<string, unknown>)[k] !== v) late[k] = v
+        if (insertedId && Object.keys(late).length) await supabase.from('cardio_logs').update(late).eq('id', insertedId)
         // INTO THE PHONE'S COPY BEFORE IT STOPS BEING "PENDING", so there is
         // no instant in which a saved log is in neither place.
         if (insertedId) recordSynced({ kind: 'insert', row: { ...serverShape(target), id: insertedId } })

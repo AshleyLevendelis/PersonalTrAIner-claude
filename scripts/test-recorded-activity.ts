@@ -242,23 +242,58 @@ async function main() {
     const gw2 = await gatherFigures(walkEnd, body)
     check('...but when the store has steps, they win', gw2.steps === 610 && gw2.stepsFromPhoneCounter === false, gw2)
     // THE WATCH'S COUNT FIRST (his report 28 Nov 2026, "The watch and phone steps disagree with each other"): the phone
-    // counted 1,180, the watch 2,138, the store 2,090. With the watch app recording this walk, its figures are the walk's.
+    // counted 1,180, the watch 2,138, the store 2,090. With the watch app recording this walk, its STEPS are the walk's,
+    // but only its count from the end of the walk; its DISTANCE only with its own GPS route (the lead's review).
     const wl = await import('../src/lib/watch-cardio-live')
+    const wStart = Date.parse(walk.startedAt), wEnd = Date.parse(walkEnd.endedAt!)
+    const batch = (at: number, steps: number | null, distanceM: number | null, extra: Record<string, unknown> = {}) =>
+      wl.noteWatchCardioLive({ type: 'hr', kind: 'cardio', activity: 'Walk', startedAt: wStart + 3000, at, steps, distanceM, ...extra })
     wl.__resetWatchCardioLiveForTests()
-    const wStart = Date.parse(walk.startedAt)
-    wl.noteWatchCardioLive({ type: 'hr', kind: 'cardio', activity: 'Walk', startedAt: wStart + 3000, steps: 700, distanceM: 520 })
-    wl.noteWatchCardioLive({ type: 'hr', kind: 'cardio', activity: 'Walk', startedAt: wStart + 3000, steps: 650, distanceM: 480 }) // a held-back batch
-    check('the watch\'s running count is kept, and an older batch arriving late never lowers it', wl.watchCardioFor('Walk', walk.startedAt)?.steps === 700 && wl.watchCardioFor('Walk', walk.startedAt)?.distanceM === 520, wl.watchCardioFor('Walk', walk.startedAt))
-    check('...and it is this walk\'s only: another start or another name takes none', wl.watchCardioFor('Walk', '2026-11-25T09:00:00.000Z') === null && wl.watchCardioFor('Run', walk.startedAt) === null)
+    batch(wEnd - 20_000, 700, 520)
+    batch(wEnd - 25_000, 650, 480) // a held-back batch from earlier, arriving late
+    check('the watch\'s count is kept by its own time, and a batch arriving late never lowers a later one', wl.watchCardioAt('Walk', walk.startedAt, wEnd)?.steps === 700, wl.watchCardioAt('Walk', walk.startedAt, wEnd))
+    check('...the same walk by name in any case and a start within two minutes; another start or name takes none',
+      wl.watchCardioAt('walk', new Date(wStart + 90_000).toISOString(), wEnd)?.steps === 700 && wl.watchCardioAt('Walk', new Date(wStart + 130_000).toISOString(), wEnd) === null && wl.watchCardioAt('Run', walk.startedAt, wEnd) === null)
     const gw3 = await gatherFigures(walkEnd, body)
-    check('End on the phone: the watch\'s steps and distance win over the store\'s 610 and 3.84 km, and it says so', gw3.steps === 700 && gw3.distanceKm === 0.52 && gw3.stepsFromWatch === true && gw3.stepsFromPhoneCounter === false, gw3)
+    check('End on the phone, no GPS route: the WATCH\'s steps (700) over the store\'s 610, the STORE\'s distance (3.84 km), each labelled by its source',
+      gw3.steps === 700 && gw3.stepsFromWatch === true && gw3.distanceKm === 3.84 && gw3.distanceFromWatch === false && gw3.stepsFromPhoneCounter === false, gw3)
+    batch(wEnd - 10_000, 720, 540, { gps: true })
+    const gw3g = await gatherFigures(walkEnd, body)
+    check('...with its own GPS route, the watch\'s distance too (0.54 km)', gw3g.steps === 720 && gw3g.distanceKm === 0.54 && gw3g.distanceFromWatch === true, gw3g)
+    batch(wEnd + 5 * 60_000, 1500, 1100)
+    const gw3a = await gatherFigures(walkEnd, body)
+    check('a count the watch sent AFTER End (the watch still running) is not the walk\'s: the last one before End stands', gw3a.steps === 720 && gw3a.distanceKm === 0.54, gw3a)
     phone.stepsBetween = async () => 0
     const gw4 = await gatherFigures(walkEnd, body)
-    check('...over the phone\'s own counter too', gw4.steps === 700 && gw4.stepsFromWatch === true && !gw4.stepsFromPhoneCounter, gw4)
-    wl.__resetWatchCardioLiveForTests()
-    const gw5 = await gatherFigures(walkEnd, body)
-    check('...and with no watch recording, the phone\'s figures stand as before', gw5.steps === 562 && !gw5.stepsFromWatch && gw5.distanceKm === 3.84, gw5)
+    check('...the watch\'s steps win over the phone\'s own counter too', gw4.steps === 720 && gw4.stepsFromWatch === true && !gw4.stepsFromPhoneCounter, gw4)
     phone.stepsBetween = async () => 610
+    // A WATCH THAT WENT QUIET: its last count was 3 minutes before End (died, or lost the phone). A part count never
+    // beats a complete one, so the store's 610 and 3.84 km stand, unlabelled.
+    wl.__resetWatchCardioLiveForTests()
+    batch(wEnd - 3 * 60_000, 300, 200, { gps: true })
+    const gw6 = await gatherFigures(walkEnd, body)
+    check('a watch gone quiet 3 minutes before End: the store\'s 610 and 3.84 km stand, nothing labelled the watch\'s', gw6.steps === 610 && gw6.distanceKm === 3.84 && !gw6.stepsFromWatch && !gw6.distanceFromWatch, gw6)
+    check('...and the watch\'s count is still taken when its last batch is within the minute before End', (wl.__resetWatchCardioLiveForTests(), batch(wEnd - 50_000, 300, null), (await gatherFigures(walkEnd, body)).steps === 300))
+    // STEPS WITHOUT DISTANCE, and a store with no distance: the watch's distance fills an empty store only.
+    wl.__resetWatchCardioLiveForTests()
+    batch(wEnd - 5_000, 800, null)
+    const gw7 = await gatherFigures(walkEnd, body)
+    check('a watch with steps and no distance: its steps, the store\'s distance', gw7.steps === 800 && gw7.distanceKm === 3.84 && gw7.stepsFromWatch && !gw7.distanceFromWatch, gw7)
+    const keepDist = phone.distanceMetersBetween
+    phone.distanceMetersBetween = async () => 0
+    batch(wEnd - 4_000, 810, 600)
+    const gw8 = await gatherFigures(walkEnd, body)
+    check('...a store with no distance takes the watch\'s, labelled as the watch\'s', gw8.distanceKm === 0.6 && gw8.distanceFromWatch === true, gw8)
+    phone.distanceMetersBetween = keepDist
+    // A WORKOUT THE WATCH'S OWN RECORDER WROTE (watch-workouts.ts) goes through the same reader, so the same rule.
+    const ww = await import('../src/lib/watch-workouts')
+    const viaWatch = await ww.logWatchWorkout({ profileId: 'p1', body, effort: 'easy', workout: { id: 'hc1', type: 'walking', start: walk.startedAt, end: walkEnd.endedAt!, kcal: null, distanceM: null, source: 'Samsung Health' } })
+    check('a watch workout picked up from the phone takes the same count: the watch app\'s 810 steps', viaWatch?.steps === 810, viaWatch)
+    wl.__resetWatchCardioLiveForTests()
+    const viaStore = await ww.logWatchWorkout({ profileId: 'p1', body, effort: 'easy', workout: { id: 'hc2', type: 'walking', start: walk.startedAt, end: walkEnd.endedAt!, kcal: null, distanceM: null, source: 'Samsung Health' } })
+    check('...and with no watch app recording, the store\'s 610', viaStore?.steps === 610, viaStore)
+    const gw5 = await gatherFigures(walkEnd, body)
+    check('...and the recorder with no watch recording reads the phone exactly as before', gw5.steps === 610 && !gw5.stepsFromWatch && gw5.distanceKm === 3.84 && !gw5.distanceFromWatch, gw5)
     phone.stepsBetween = async () => 0
     const walkView = logRecording({ profileId: 'p1', date: '2026-11-25', recording: walkEnd, figures: gw, effort: 'easy' })
     check('logging keeps the counted steps, and clears the count', walkView?.steps === 562 && !store.get('fitplan_live_steps'), walkView)

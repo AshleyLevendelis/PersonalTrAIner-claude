@@ -100,6 +100,10 @@ check('A12c. ...and says where the steps come from', /Steps live from your watch
 await ev(`window.__stepsSend(40)`); await wait(400)
 check('A12d. ...and the phone\'s own sensor moving does not take the tile back', (await ev(`document.querySelector('[data-record-live-steps]')?.textContent.trim() ?? null`)) === '2,138')
 await shoot('record-activity-2b-watch-steps')
+// THE LEAD'S REVIEW, 28 Nov 2026: a watch that has gone quiet (its last count two minutes old) hands the tile back.
+await ev(`window.__watchCardioReset()`)
+await ev(`window.__watchCardio(900, 700, { ageMs: 120000 })`); await wait(1500)
+check('A12e. a watch gone quiet (last count 2 minutes old): the tile is the phone\'s own count again (540), and says so', (await ev(`document.querySelector('[data-record-live-steps]')?.textContent.trim() ?? null`)) === '540' && /Steps count live while the phone is on you\./.test((await what()) ?? ''), [await ev(`document.querySelector('[data-record-live]')?.innerText ?? null`), await what()])
 await openChooser()
 check('A13. with one recording, the chooser offers no second cardio to start', (await ev(`!!document.querySelector('[data-testid="own-choose-cardio"]')`)) === true ? false : true)
 await clickAt(`document.querySelector('[data-testid="own-chooser-cancel"]')`)
@@ -108,10 +112,10 @@ await ev(`document.querySelector('[data-record-end]').scrollIntoView({ block: 'c
 await clickAt(`document.querySelector('[data-record-end]')`)
 await until(card, v => v === 'ended', 20)
 await until(() => ev(`!!document.querySelector('[data-record-figures] [data-figure="time"]')`), v => v === true, 40)
-// The watch app recorded this walk (A12b), so its steps and distance are the walk's over the phone's 6,400 and 3.84 km
-// (his report 28 Nov 2026, "The watch and phone steps disagree"); the phone-only path is held by test:recorded-activity.
-check('A14. End shows the WATCH\'s steps, over the 6,400 the phone read: 2,138', /^2,138 steps$/i.test((await figure('steps')) ?? ''), await figure('steps'))
-check('A15. ...and its distance: 1.8 km, and says they are the watch\'s', (await ev(`!!document.querySelector('[data-record-steps-watch]')`)) === true && /^1\.8 km distance$/i.test((await figure('distance')) ?? ''), await figure('distance'))
+// The watch went quiet well before End (A12e), so its count is not the walk's: the phone's store stands (the section E
+// walk is the one ended with the watch sending).
+check('A14. End shows the steps the phone read: 6,400', /^6,400 steps$/i.test((await figure('steps')) ?? ''), await figure('steps'))
+check('A15. ...the distance: 3.84 km, and nothing is labelled as the watch\'s', /^3\.84 km distance$/i.test((await figure('distance')) ?? '') && (await ev(`!!document.querySelector('[data-record-steps-watch]')`)) === false, await figure('distance'))
 check('A16. ...and the watch\'s calories, not an estimate: 300 kcal', /^300 kcal active$/i.test((await figure('kcal')) ?? '') && (await ev(`!!document.querySelector('[data-record-estimate]')`)) === false, await figure('kcal'))
 const windows = JSON.parse((await ev(`JSON.stringify((window.__healthCalls ?? []).filter(c => c && c.kcal))`)) ?? '[]')
 check('A17. the phone was asked for the window from Start to End', windows.length >= 1 && Date.parse(windows[0].kcal[1]) - Date.parse(windows[0].kcal[0]) >= 2000, windows)
@@ -124,9 +128,9 @@ await ev(`document.querySelector('[data-record-card] [role="radiogroup"]').scrol
 await clickAt(`[...document.querySelectorAll('[data-record-card] [role="radiogroup"] button')].find(b => /Steady/.test(b.textContent))`)
 await until(card, v => v === 'logged', 20)
 const saved = (await rows()).filter(r => r.name === 'Walk')
-check('A20. one tap logs it: ONE row, called Walk, with its steps, distance, the watch\'s calories and its true start', saved.length === 1 && saved[0].steps === 2138 && saved[0].km === 1.8 && saved[0].kcal === 300 && saved[0].est === false && !!saved[0].started && saved[0].rpe === 5, saved)
+check('A20. one tap logs it: ONE row, called Walk, with its steps, distance, the watch\'s calories and its true start', saved.length === 1 && saved[0].steps === 6400 && saved[0].km === 3.84 && saved[0].kcal === 300 && saved[0].est === false && !!saved[0].started && saved[0].rpe === 5, saved)
 const onCard = await ev(`(() => { const n = document.querySelector('[data-record-logged]'); if (!n) return null; const r = n.getBoundingClientRect(); return { text: n.textContent, inView: r.top >= 0 && r.bottom <= innerHeight } })()`)
-check('A21. the card stays as the summary and says so, on screen where he tapped: "Logged · felt Steady"', /Logged · felt Steady\. It’s on your week and the coach can see it\./.test(onCard?.text ?? '') && onCard?.inView === true && /^2,138 steps$/i.test((await figure('steps')) ?? ''), onCard)
+check('A21. the card stays as the summary and says so, on screen where he tapped: "Logged · felt Steady"', /Logged · felt Steady\. It’s on your week and the coach can see it\./.test(onCard?.text ?? '') && onCard?.inView === true && /^6,400 steps$/i.test((await figure('steps')) ?? ''), onCard)
 await ev(`document.querySelector('[data-record-card]').scrollIntoView({ block: 'start' })`)
 await shoot('record-activity-4-logged')
 await ev(`document.querySelector('[data-record-done]').scrollIntoView({ block: 'center' })`)
@@ -239,5 +243,23 @@ check('D5. logged with no heart rate: "Heart rate fills in when your watch syncs
 await shoot('record-activity-6-heart-later')
 const tx = await ev(`document.body.innerText`)
 check('D4. nothing leaked onto the page', !/undefined|NaN|\[object Object\]/.test(tx ?? ''))
+
+console.log('\n  E. A WALK ENDED ON THE PHONE WITH THE WATCH APP STILL SENDING (his report 28 Nov 2026)')
+await openExercise('&clear-storage=1&health=android')
+await openChooser()
+await pick('Walk')
+await clickAt(`document.querySelector('[data-testid="own-cardio-start"]')`)
+await until(card, v => v === 'recording', 30)
+await wait(500)
+await ev(`window.__watchCardio(2138, 1802)`); await wait(400)
+check('E1. the watch is sending: the tile is its 2,138', (await ev(`document.querySelector('[data-record-live-steps]')?.textContent.trim() ?? null`)) === '2,138')
+await ev(`document.querySelector('[data-record-end]').scrollIntoView({ block: 'center' })`)
+await clickAt(`document.querySelector('[data-record-end]')`)
+await until(() => ev(`!!document.querySelector('[data-record-figures] [data-figure="time"]')`), v => v === true, 40)
+check('E2. End: the WATCH\'s 2,138 steps, over the 6,400 the phone\'s store holds', /^2,138 steps$/i.test((await figure('steps')) ?? ''), await figure('steps'))
+check('E3. ...the STORE\'s distance (3.84 km: the watch kept no GPS route), and the line says only the steps are the watch\'s',
+  /^3\.84 km distance$/i.test((await figure('distance')) ?? '') && (await ev(`document.querySelector('[data-record-steps-watch]')?.textContent.trim() ?? null`)) === 'Steps from your watch.', [await figure('distance'), await ev(`document.querySelector('[data-record-steps-watch]')?.textContent ?? null`)])
+await ev(`document.querySelector('[data-record-card]').scrollIntoView({ block: 'start' })`)
+await shoot('record-activity-7-watch-steps-end')
 
 await finish('verify:record-activity passed: cardio starts from Exercise, End reads the phone, steps only on foot, one tap logs it.')
