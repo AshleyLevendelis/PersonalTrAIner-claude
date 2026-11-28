@@ -106,6 +106,9 @@ public class WorkoutService extends Service {
          * summary, the logged time and the zones read this, never the moment Log was tapped a while later.
          */
         long endedAt;
+        /** The GPS route kept for this workout: its length along the kept points, and when its first and last were. */
+        double routeMetres;
+        long firstRouteAt, lastRouteAt;
         int bpm;
         long bpmAt;
         long steps = -1;      // -1: not recorded for this activity
@@ -318,7 +321,7 @@ public class WorkoutService extends Service {
 
     private void begin(String kind, String activity) {
         Live l = LIVE;
-        l.running = true; l.kind = kind; l.activity = activity; l.startedAt = System.currentTimeMillis(); l.endedAt = 0;
+        l.running = true; l.kind = kind; l.activity = activity; l.startedAt = System.currentTimeMillis(); l.endedAt = 0; l.routeMetres = 0; l.firstRouteAt = 0; l.lastRouteAt = 0;
         l.bpm = 0; l.bpmAt = 0; l.maxBpm = 0; l.sumBpm = 0; l.readings = 0; l.lastZoneAt = 0; l.lastZone = 0;
         java.util.Arrays.fill(l.zoneMs, 0);
         boolean onFoot = "cardio".equals(kind) && isOnFoot(activity, onFootPlanned);
@@ -445,6 +448,21 @@ public class WorkoutService extends Service {
 
     // ---------------------------------------------------------------- the route (his ruling 28 Nov 2026, "Save the route")
 
+    /** A route this long or longer is a walk's, not GPS jitter at a door or indoors. */
+    static final double REAL_ROUTE_MIN_M = 200;
+
+    /**
+     * THE ROUTE'S OWN LENGTH, OR -1 (the lead's second review, 28 Nov 2026): only a real route is a distance. At least
+     * 200 m along the kept points, and the points spanning at least half the workout so far, so a fix caught at the
+     * door, or jitter indoors, is never sent as a distance. Health Services' DISTANCE_TOTAL is not this.
+     */
+    static long realRouteMetres(Live l, long now) {
+        long upTo = l.endedAt > 0 ? l.endedAt : now;
+        long elapsed = upTo - l.startedAt;
+        if (l.routeMetres < REAL_ROUTE_MIN_M || l.firstRouteAt == 0 || elapsed <= 0) return -1;
+        return (l.lastRouteAt - l.firstRouteAt) * 2 >= elapsed ? Math.round(l.routeMetres) : -1;
+    }
+
     /** GPS on for this workout: on foot, with his permission. */
     private boolean gps;
     /** Points not yet sent: [ms, lat, lng]. */
@@ -473,6 +491,9 @@ public class WorkoutService extends Service {
         double lat = d.getLatitude(), lng = d.getLongitude();
         if (Math.abs(lat) > 90 || Math.abs(lng) > 180 || (lat == 0 && lng == 0)) return;
         if (!Double.isNaN(lastKeptLat) && metres(lastKeptLat, lastKeptLng, lat, lng) < ROUTE_STEP_M) return;
+        if (!Double.isNaN(lastKeptLat)) LIVE.routeMetres += metres(lastKeptLat, lastKeptLng, lat, lng);
+        if (LIVE.firstRouteAt == 0) LIVE.firstRouteAt = at;
+        LIVE.lastRouteAt = at;
         lastKeptLat = lat; lastKeptLng = lng;
         try { route.put(new JSONArray().put(at).put(round5(lat)).put(round5(lng))); } catch (Exception ignored) { /* a number that will not go in is skipped */ }
     }
@@ -519,6 +540,15 @@ public class WorkoutService extends Service {
             e.put("startedAt", LIVE.startedAt);
             e.put("date", TodayStore.today());
             if (LIVE.kcal > 0) e.put("kcal", Math.round(LIVE.kcal));
+            // ITS STEPS AND DISTANCE TOO (his report 28 Nov 2026, "The watch and phone steps disagree"): the phone's card
+            // shows the watch's count while it runs, and End on the phone keeps it, never the phone's own sensor.
+            if (LIVE.steps > 0) e.put("steps", LIVE.steps);
+            if (LIVE.distanceM > 0) e.put("distanceM", Math.round(LIVE.distanceM));
+            // Stamped with the watch's own time, so the phone knows WHEN this count was (never one sent after End).
+            e.put("at", System.currentTimeMillis());
+            // The GPS route's own length, only when it is a real route: the one distance the phone prefers.
+            long routeM = realRouteMetres(LIVE, System.currentTimeMillis());
+            if (routeM > 0) e.put("routeM", routeM);
             if (finishing) e.put("final", true); // the workout's last count: the phone saves it at once
             e.put("samples", new JSONArray(pending.toString()));
             PhoneLink.send(this, e);

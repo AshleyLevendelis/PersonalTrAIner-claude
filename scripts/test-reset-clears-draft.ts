@@ -127,7 +127,8 @@ const KEYS: Record<string, { clear: boolean; why: string }> = {
   fitplan_watch_heart_seen: { clear: false, why: "when the watch app last sent heart rate to this phone (27 Nov 2026): about this phone's watch, not the plan" },
   fitplan_watch_sets: { clear: true, why: "sets ticked on the watch for the old plan's session (27 Nov 2026): they must never tick the new plan's rows" },
   fitplan_activity_recording: { clear: false, why: 'a walk or run being recorded right now (25 Nov 2026) — a New Plan mid-walk must not lose the walk' },
-  fitplan_watch_cardio_kcal: { clear: false, why: "the watch's calories for a logged walk or run (27 Nov 2026), matched to the log by its times: history, which a New Plan never takes" },
+  fitplan_watch_cardio_live: { clear: false, why: "the watch's running steps, distance and calories for a walk or run (28 Nov 2026), matched to the log by its times: history, which a New Plan never takes" },
+  fitplan_watch_fill_retry: { clear: false, why: "the watch's figures for a logged walk that could not be written yet (28 Nov 2026): logged work waiting to land, like the dead-letter queues" },
   fitplan_routes_v1: { clear: false, why: "the route of a logged walk, jog or run (28 Nov 2026): history, kept with the walk, which a New Plan never takes" },
   fitplan_activity_access_asked: { clear: false, why: 'this phone was asked once for steps, distance and calories — the phone\'s, not the plan\'s' },
 

@@ -143,6 +143,15 @@ if (platform === 'ios' || platform === 'android') {
     stop: async () => { calls.push({ stepCounter: 'stop' }) },
     onTotal: async (cb: (t: number) => void) => { subs.add(cb); return () => { subs.delete(cb) } },
   }
+  // THE WATCH APP SENDING ITS RUNNING COUNT (28 Nov 2026): window.__watchCardio(steps, distanceM) hands the app the
+  // message the watch sends with its heart rate, for the workout open on the phone, through the app's own reader.
+  // `ageMs` stamps the count that long ago by the watch's clock (a watch gone quiet); `routeM` is a real route's length.
+  ;(window as unknown as { __watchCardio: (steps: number, distanceM: number, o?: { ageMs?: number; routeM?: number }) => Promise<void> }).__watchCardio = async (steps, distanceM, o = {}) => {
+    const r = (await import('@/lib/recording-store')).readRecording()
+    if (!r) return
+    ;(await import('@/lib/watch-cardio-live')).noteWatchCardioLive({ type: 'hr', kind: 'cardio', activity: r.activity, startedAt: Date.parse(r.startedAt), steps, distanceM, at: Date.now() - (o.ageMs ?? 0), ...(o.routeM ? { routeM: o.routeM } : {}) })
+  }
+  ;(window as unknown as { __watchCardioReset: () => Promise<void> }).__watchCardioReset = async () => { (await import('@/lib/watch-cardio-live')).__resetWatchCardioLiveForTests() }
   if (q.get('healthon') === '1') { try { localStorage.setItem('fitplan_health_steps_connected', '1') } catch { /* */ } }
   if (q.get('hearton') === '1') { try { localStorage.setItem('fitplan_health_heart_connected', '1') } catch { /* */ } }
   if (q.get('sleepon') === '1') { try { localStorage.setItem('fitplan_health_sleep_connected', '1') } catch { /* */ } }

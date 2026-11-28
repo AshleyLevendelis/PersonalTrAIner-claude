@@ -323,6 +323,8 @@ public class MainActivity extends Activity {
             if (zone > 0) e.put("zone", zone);
             if (l.steps >= 0) e.put("steps", l.steps);
             if (l.distanceM >= 0) e.put("distanceM", Math.round(l.distanceM));
+            long routeM = WorkoutService.realRouteMetres(l, System.currentTimeMillis());
+            if (routeM > 0) e.put("routeM", routeM); // the length of its own real GPS route
             if (l.kcal > 0) e.put("kcal", Math.round(l.kcal));
             if (l.readings > 0) { e.put("avgBpm", Math.round(l.sumBpm / (double) l.readings)); e.put("maxBpm", l.maxBpm); }
             PhoneLink.send(this, e);

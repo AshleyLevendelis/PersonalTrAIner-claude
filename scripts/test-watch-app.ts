@@ -24,6 +24,9 @@ Object.defineProperty(globalThis, 'navigator', { value: { onLine: false }, confi
 
 type Row = Record<string, unknown>
 const db: Record<string, Row[]> = { cardio_logs: [] }
+/** A request of this kind waits on the promise (to put a second write inside its round trip), or fails once. */
+const hold: Partial<Record<string, Promise<void>>> = {}
+const failNext: Partial<Record<string, boolean>> = {}
 function fakeFrom(table: string) {
   const filters: ((r: Row) => boolean)[] = []
   let op: 'select' | 'insert' | 'delete' | 'update' | 'upsert' = 'select'
@@ -46,7 +49,7 @@ function fakeFrom(table: string) {
     lte: (c: string, v: unknown) => { filters.push(r => String(r[c]) <= String(v)); return api },
     in: (c: string, v: unknown[]) => { filters.push(r => v.includes(r[c])); return api },
     order: () => api, single: () => api, maybeSingle: () => api,
-    then: (res: (v: unknown) => void, rej?: (e: unknown) => void) => Promise.resolve().then(() => res(exec()), rej),
+    then: (res: (v: unknown) => void, rej?: (e: unknown) => void) => (hold[op] ?? Promise.resolve()).then(() => res(failNext[op] ? (failNext[op] = false, { data: null, error: { message: 'down' } }) : exec()), rej),
   }
   return api
 }
@@ -215,9 +218,10 @@ async function main() {
   check('a running count inside the minute waits, and the watch\'s final count is saved at once', held === 87 && db.workout_sessions[0].active_kcal === 104, { held, now: db.workout_sessions[0].active_kcal })
   // (2) A walk the watch app runs and the phone ends: its count is the log's calories, never over a device figure.
   const walkStart = Date.parse('2026-11-27T19:00:00')
-  await applyWatchEvents([{ id: 'hrk2', type: 'hr', samples: [[Date.now(), 110]], kind: 'cardio', activity: 'Walk', startedAt: walkStart, date: '2026-11-27', kcal: 96 }], ctx)
-  check('...a walk the watch is running is known by its count, matched by name and start', calMod.watchCardioKcalFor('Walk', new Date(walkStart + 30_000).toISOString()) === 96
-    && calMod.watchCardioKcalFor('Run', new Date(walkStart).toISOString()) === null && calMod.watchCardioKcalFor('Walk', new Date(walkStart + 10 * 60_000).toISOString()) === null)
+  const walkEndIso = new Date(walkStart + 20 * 60_000).toISOString()
+  await applyWatchEvents([{ id: 'hrk2', type: 'hr', samples: [[walkStart + 19 * 60_000, 110]], kind: 'cardio', activity: 'Walk', startedAt: walkStart, date: '2026-11-27', kcal: 96, at: walkStart + 19.5 * 60_000 }], ctx)
+  check('...a walk the watch is running is known by its count at End, matched by name and start', calMod.watchCardioKcalFor('Walk', new Date(walkStart + 30_000).toISOString(), walkEndIso) === 96
+    && calMod.watchCardioKcalFor('Run', new Date(walkStart).toISOString(), walkEndIso) === null && calMod.watchCardioKcalFor('Walk', new Date(walkStart + 10 * 60_000).toISOString(), walkEndIso) === null)
   const ar = await import('../src/lib/activity-recording')
   const fig = (kcal: number | null, est = false) => ({ minutes: 20, steps: null, distanceKm: null, kcal, kcalEstimated: est, avgHeartRate: null, maxHeartRate: null })
   const recW = { activity: 'Walk', startedAt: new Date(walkStart).toISOString(), endedAt: new Date(walkStart + 20 * 60_000).toISOString() }
@@ -233,9 +237,117 @@ async function main() {
   const filledRow = db.cardio_logs.find(r => r.id === 'phone-walk')
   check('...a walk ended on the phone and then on the watch gets the watch\'s calories and steps, once', filledRow?.active_kcal === 131 && filledRow?.steps === 2900
     && db.cardio_logs.filter(r => r.activity_name === 'Walk' && r.started_at === new Date(lateStart).toISOString()).length === 1, filledRow)
+  // THE WATCH'S STEPS WIN WHICHEVER END WAS FIRST (his report 28 Nov 2026, "The watch and phone steps disagree"): his
+  // walk ended on the phone with the store's 2,090 steps and 1.47 km while the watch had 2,138 and 1.80. The lead's
+  // review: only when the two Ends are within two minutes, distance only from the watch's own GPS route.
+  const agreeStart = Date.parse('2026-11-27T00:30:00')
+  const phoneRow = (id: string, activity: string, startMs: number, endMs: number, extra: Row = {}) => db.cardio_logs.push({ id, user_id: 'p1', date: '2026-11-27', activity_name: activity, duration_minutes: Math.round((endMs - startMs) / 60000), intensity_rpe: 3, started_at: new Date(startMs).toISOString(), completed_at: new Date(endMs).toISOString(), active_kcal: 58, steps: 2090, distance_km: 1.47, ...extra })
+  const watchEnd = (id: string, activity: string, startMs: number, endMs: number, extra: Row = {}) => ({ id, type: 'cardio-end', activity, startedAt: startMs, endedAt: endMs, effort: 'easy', kcal: 61, steps: 2138, distanceM: 1802, ...extra })
+  phoneRow('phone-walk-2', 'Walk', agreeStart, agreeStart + 20 * 60_000)
+  phoneRow('phone-bike', 'Bike', agreeStart, agreeStart + 20 * 60_000, { active_kcal: 140, steps: null, distance_km: null })
+  await applyWatchEvents([
+    watchEnd('agree-end', 'walk', agreeStart + 30_000, agreeStart + 20 * 60_000 + 40_000), // a name in another case, a start 30 s apart, End 40 s later
+    watchEnd('agree-bike', 'Bike', agreeStart, agreeStart + 20 * 60_000, { kcal: 150, steps: 900, distanceM: 6000 }),
+  ], ctx)
+  const agreed = db.cardio_logs.find(r => r.id === 'phone-walk-2'), bikeRow = db.cardio_logs.find(r => r.id === 'phone-bike')
+  check('...a walk the phone ended first takes the WATCH\'s steps (2,138), keeps the phone\'s distance with no GPS route (1.47) and its own calories',
+    agreed?.steps === 2138 && agreed?.distance_km === 1.47 && agreed?.active_kcal === 58, agreed)
+  check('...matched in any case of name, and never logged a second time', db.cardio_logs.filter(r => String(r.activity_name).toLowerCase() === 'walk' && r.started_at === new Date(agreeStart).toISOString()).length === 1
+    && (await getCardioLogsForDateMerged('p1', '2026-11-27')).filter(l => l.started_at != null && Math.abs(Date.parse(l.started_at) - agreeStart) < 120_000 && /walk/i.test(l.activity_name)).length === 1)
+  check('...and a bike never takes steps or distance from it', bikeRow?.steps == null && bikeRow?.distance_km == null, bikeRow)
+  const gpsStart = agreeStart + 3600_000
+  phoneRow('phone-walk-gps', 'Walk', gpsStart, gpsStart + 20 * 60_000)
+  await applyWatchEvents([watchEnd('gps-end', 'Walk', gpsStart, gpsStart + 20 * 60_000, { routeM: 1750 })], ctx)
+  check('...with a real GPS route, the ROUTE\'s length (1.75) replaces the phone\'s, never the watch\'s other distance (1.80)', db.cardio_logs.find(r => r.id === 'phone-walk-gps')?.distance_km === 1.75, db.cardio_logs.find(r => r.id === 'phone-walk-gps'))
+  // THE WATCH ENDED HALF AN HOUR AFTER THE PHONE: its figures cover time the log does not, so none are taken.
+  const lateWatch = agreeStart + 2 * 3600_000
+  phoneRow('phone-walk-late', 'Walk', lateWatch, lateWatch + 20 * 60_000, { steps: null })
+  await applyWatchEvents([watchEnd('late-watch', 'Walk', lateWatch, lateWatch + 50 * 60_000, { steps: 5200, routeM: 4000 })], ctx)
+  const lw = db.cardio_logs.find(r => r.id === 'phone-walk-late')
+  check('a watch ended 30 minutes after the phone gives the 20-minute log nothing (not even an empty field)', lw?.steps == null && lw?.distance_km === 1.47 && lw?.active_kcal === 58, lw)
+  // A ZERO FROM THE WATCH is "nothing counted", on both paths: never over the phone's real figure.
+  const zeroStart = agreeStart + 3 * 3600_000
+  phoneRow('phone-walk-zero', 'Walk', zeroStart, zeroStart + 20 * 60_000)
+  await applyWatchEvents([watchEnd('zero-end', 'Walk', zeroStart, zeroStart + 20 * 60_000, { steps: 0, distanceM: 0, routeM: 0, kcal: 0 })], ctx)
+  const zr = db.cardio_logs.find(r => r.id === 'phone-walk-zero')
+  check('a watch that counted 0 leaves the phone-first log\'s 2,090, 1.47 and 58 kcal', zr?.steps === 2090 && zr?.distance_km === 1.47 && zr?.active_kcal === 58, zr)
+  const zeroFirst = agreeStart + 4 * 3600_000
+  await applyWatchEvents([watchEnd('zero-first', 'Run', zeroFirst, zeroFirst + 20 * 60_000, { steps: 0, distanceM: 0, routeM: 0, kcal: 0 })], ctx)
+  const zf = (await getCardioLogsForDateMerged('p1', '2026-11-27')).find(l => l.activity_name === 'Run' && l.started_at === new Date(zeroFirst).toISOString())
+  check('...and ended on the watch first, a 0 gives way to the phone\'s own store (999 steps)', zf?.steps === 999, zf)
+  const hcz = (globalThis as { __healthAdapterForTest?: Record<string, unknown> }).__healthAdapterForTest!
+  hcz.activeKcalBetween = async () => 77
+  const zeroKcal = agreeStart + 4.2 * 3600_000
+  await applyWatchEvents([watchEnd('zero-kcal', 'Run', zeroKcal, zeroKcal + 20 * 60_000, { kcal: 0 })], ctx)
+  delete hcz.activeKcalBetween
+  const zk = (await getCardioLogsForDateMerged('p1', '2026-11-27')).find(l => l.activity_name === 'Run' && l.started_at === new Date(zeroKcal).toISOString())
+  check('...and a watch 0 for calories gives way to the phone\'s real 77 kcal', zk?.active_kcal === 77, zk)
+  // ENDED ON THE WATCH FIRST, NO GPS ROUTE, and the phone's store holds a distance: the store's distance stands.
+  const hc = (globalThis as { __healthAdapterForTest?: Record<string, unknown> }).__healthAdapterForTest!
+  hc.distanceMetersBetween = async () => 1470
+  const noGps = agreeStart + 4.5 * 3600_000
+  await applyWatchEvents([watchEnd('nogps-first', 'Jog', noGps, noGps + 20 * 60_000)], ctx)
+  await applyWatchEvents([watchEnd('gps-first', 'Hike', noGps, noGps + 20 * 60_000, { routeM: 1750 })], ctx)
+  delete hc.distanceMetersBetween
+  const day = await getCardioLogsForDateMerged('p1', '2026-11-27')
+  const ng = day.find(l => l.activity_name === 'Jog'), gp = day.find(l => l.activity_name === 'Hike')
+  check('ended on the watch first: its steps, but the STORE\'s distance (1.47) with no real route, and the route\'s length (1.75) with one',
+    ng?.steps === 2138 && Number(ng?.distance_km) === 1.47 && Number(gp?.distance_km) === 1.75, [ng, gp])
+  // A LOG STILL IN THE PHONE'S QUEUE (no signal when it was ended on the phone): the watch's figures go into the queue.
+  const queuedStart = agreeStart + 5 * 3600_000
+  const { saveCardioLog } = await import('../src/lib/cardio-log-store')
+  saveCardioLog({ userId: 'p1', date: '2026-11-27', activityName: 'Walk', durationMinutes: 20, intensityRpe: 3, startedAt: new Date(queuedStart).toISOString(), endedAt: new Date(queuedStart + 20 * 60_000).toISOString(), steps: 2090, distanceKm: 1.47 })
+  await applyWatchEvents([watchEnd('queued-end', 'Walk', queuedStart, queuedStart + 20 * 60_000)], ctx)
+  const queued = (await getCardioLogsForDateMerged('p1', '2026-11-27')).filter(l => l.started_at === new Date(queuedStart).toISOString())
+  check('a phone log still queued (no signal) takes the watch\'s steps in the queue, once', queued.length === 1 && queued[0].steps === 2138 && queued[0].syncStatus === 'pending', queued)
+  // A FILL THAT CANNOT BE WRITTEN IS KEPT AND TRIED AGAIN (the lead's second review): the database refuses once.
+  const retryStart = agreeStart + 6 * 3600_000
+  phoneRow('phone-walk-retry', 'Walk', retryStart, retryStart + 20 * 60_000)
+  failNext.update = true
+  await applyWatchEvents([watchEnd('retry-end', 'Walk', retryStart, retryStart + 20 * 60_000)], ctx)
+  const before = db.cardio_logs.find(r => r.id === 'phone-walk-retry')?.steps
+  const keptFills = JSON.parse(store.get('fitplan_watch_fill_retry') ?? '[]')
+  const { retryWaitingFills } = await import('../src/lib/watch-bridge')
+  const landed = await retryWaitingFills(ctx)
+  check('a refused update keeps the watch\'s figures and the next pass writes them (2,090 -> 2,138), then forgets them',
+    before === 2090 && keptFills.length === 1 && landed === 1 && db.cardio_logs.find(r => r.id === 'phone-walk-retry')?.steps === 2138 && !store.get('fitplan_watch_fill_retry'), { before, kept: keptFills.length, landed })
+  // THE QUEUE'S CATCH-UP NEVER ERASES A WRITE MADE DURING IT (the lead's second review, a MUST): a log is sent, the
+  // watch's steps reach it while the insert is in flight, and a second log is saved while the catch-up update is.
+  const cls = await import('../src/lib/cardio-log-store')
+  const raceStart = agreeStart + 7 * 3600_000
+  const first = cls.saveCardioLog({ userId: 'p1', date: '2026-11-27', activityName: 'Walk', durationMinutes: 20, intensityRpe: 3, startedAt: new Date(raceStart).toISOString(), endedAt: new Date(raceStart + 20 * 60_000).toISOString(), steps: 2090 })!
+  let openInsert!: () => void, openUpdate!: () => void
+  hold.insert = new Promise<void>(r => { openInsert = r })
+  hold.update = new Promise<void>(r => { openUpdate = r })
+  ;(globalThis as { navigator: { onLine: boolean } }).navigator.onLine = true
+  const flushing = cls.flushPending()
+  await new Promise(r => setTimeout(r, 0))
+  cls.patchQueuedCardioLog(first.clientId!, { steps: 2138 }) // the watch's steps, while the insert is in flight
+  openInsert(); delete hold.insert
+  await new Promise(r => setTimeout(r, 0)); await new Promise(r => setTimeout(r, 0))
+  ;(globalThis as { navigator: { onLine: boolean } }).navigator.onLine = false
+  const second = cls.saveCardioLog({ userId: 'p1', date: '2026-11-27', activityName: 'Row', durationMinutes: 10, intensityRpe: 3 })! // saved during the catch-up
+  openUpdate(); delete hold.update
+  await flushing
+  const queue = JSON.parse(store.get('fitplan_cardio_pending_v1') ?? '[]') as { clientId: string; status: string; lateFigures?: unknown }[]
+  const sentRow = db.cardio_logs.find(r => r.started_at === new Date(raceStart).toISOString())
+  check('a log saved while the catch-up update was in flight survives it', queue.some(i => i.clientId === second.clientId), queue.map(i => i.clientId))
+  check('...and the steps that arrived during the insert reach the database row (2,138), the mark then cleared', sentRow?.steps === 2138 && !queue.find(i => i.clientId === first.clientId)?.lateFigures, sentRow)
+  // And while it runs: its running steps and distance ride with the heart rate, stamped with the watch's own time.
+  await applyWatchEvents([{ id: 'hrs1', type: 'hr', samples: [[agreeStart + 599_000, 104]], kind: 'cardio', activity: 'Walk', startedAt: agreeStart + 600_000, date: '2026-11-27', kcal: 40, steps: 1180, distanceM: 900, at: agreeStart + 610_000 }], ctx)
+  const wlive = (await import('../src/lib/watch-cardio-live')).watchCardioAt('Walk', new Date(agreeStart + 600_000).toISOString(), agreeStart + 620_000)
+  check('the watch\'s running steps and distance reach the phone with its heart rate, at the watch\'s own time', wlive?.steps === 1180 && wlive?.distanceM === 900 && wlive?.at === agreeStart + 610_000, wlive)
   const svcK = strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/WorkoutService.java'))
   check('the watch sends its running count with every heart rate batch', /e\.put\("type", "hr"\);[\s\S]{0,300}e\.put\("kind", LIVE\.kind\);[\s\S]{0,200}if \(LIVE\.kcal > 0\) e\.put\("kcal", Math\.round\(LIVE\.kcal\)\);/.test(svcK))
-  check('the phone\'s recorder hands the watch\'s count to the log', /watchKcal: watchCardioKcalFor\(rec\.activity, rec\.startedAt\)/.test(read('src/components/RecordActivityCard.tsx')))
+  check('...and its steps, distance, its own time, and a real route\'s own length, in the same batch', /e\.put\("type", "hr"\);[\s\S]{0,600}if \(LIVE\.steps > 0\) e\.put\("steps", LIVE\.steps\);\s*if \(LIVE\.distanceM > 0\) e\.put\("distanceM", Math\.round\(LIVE\.distanceM\)\);[\s\S]{0,200}e\.put\("at", System\.currentTimeMillis\(\)\);[\s\S]{0,200}long routeM = realRouteMetres\(LIVE, System\.currentTimeMillis\(\)\);\s*if \(routeM > 0\) e\.put\("routeM", routeM\);[\s\S]{0,200}PhoneLink\.send/.test(svcK))
+  const realRoute = svcK.slice(svcK.indexOf('static long realRouteMetres('), svcK.indexOf('static long realRouteMetres(') + 500)
+  check('...a REAL route only: at least 200 m, its points spanning at least half the workout (a fix at the door or indoor jitter is not a distance)',
+    /static final double REAL_ROUTE_MIN_M = 200;/.test(svcK) && /if \(l\.routeMetres < REAL_ROUTE_MIN_M \|\| l\.firstRouteAt == 0 \|\| elapsed <= 0\) return -1;/.test(realRoute) && /return \(l\.lastRouteAt - l\.firstRouteAt\) \* 2 >= elapsed \? Math\.round\(l\.routeMetres\) : -1;/.test(realRoute))
+  check('...its length is added along the kept points, and a new workout starts at none', /if \(!Double\.isNaN\(lastKeptLat\)\) LIVE\.routeMetres \+= metres\(lastKeptLat, lastKeptLng, lat, lng\);\s*if \(LIVE\.firstRouteAt == 0\) LIVE\.firstRouteAt = at;\s*LIVE\.lastRouteAt = at;\s*lastKeptLat = lat;/.test(svcK)
+    && /l\.endedAt = 0; l\.routeMetres = 0; l\.firstRouteAt = 0; l\.lastRouteAt = 0;/.test(svcK))
+  check('...and the watch\'s End sends the same', /long routeM = WorkoutService\.realRouteMetres\(l, System\.currentTimeMillis\(\)\);\s*if \(routeM > 0\) e\.put\("routeM", routeM\);/.test(strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/MainActivity.java'))))
+  check('the phone\'s live card shows the watch\'s steps first, the phone\'s own sensor only without it', /const liveSteps = watchSteps \?\? phoneSteps/.test(strip(read('src/components/RecordActivityCard.tsx'))))
+  check('the phone\'s recorder hands the watch\'s count AT END to the log', /watchKcal: rec\.endedAt \? watchCardioKcalFor\(rec\.activity, rec\.startedAt, rec\.endedAt\) : null/.test(read('src/components/RecordActivityCard.tsx')))
   rec.writeRecording({ activity: 'Bike', startedAt: new Date().toISOString() })
   await applyWatchEvents([{ ...end, id: 'c4', activity: 'Run', startedAt: startedAt + 3 * 3600_000, endedAt: startedAt + 3.5 * 3600_000 }], ctx)
   check('logging a watch workout leaves a different open workout on the phone as it was', rec.readRecording()?.activity === 'Bike')
@@ -427,6 +539,10 @@ async function main() {
     const got = await rt.readRoute('p1', 'Walk', new Date(rStart + 20_000).toISOString())
     check('a route from the watch is kept with its walk: each point once, in time order, nonsense dropped',
       got?.points.length === 5 && got.points.every((p, i, a) => i === 0 || p[0] > a[i - 1][0]), got?.points)
+    const dbRoutes = db.workout_routes; db.workout_routes = [] // the phone's copy alone
+    const anyCase = await rt.readRoute('p1', ' walk ', new Date(rStart + 90_000).toISOString())
+    db.workout_routes = dbRoutes
+    check('...found on the phone by the one same-workout rule: the name in any case, a start 90 s off', anyCase?.points.length === 5, anyCase)
     const row = (db.workout_routes ?? [])[0]
     check('...saved to his account, under his profile, with the whole route', db.workout_routes?.length === 1 && row?.user_id === 'p1' && (row?.points as unknown[])?.length === 5 && row?.activity === 'Walk', row)
     store.delete('fitplan_routes_v1')

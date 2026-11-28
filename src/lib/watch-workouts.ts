@@ -26,6 +26,7 @@ import type { WatchWorkout } from './health-steps'
 import type { BodyForEstimate } from './activity-figures'
 import type { CardioLogView } from './cardio-log-store'
 import type { EffortKey } from './cardio-effort'
+import { watchKcal, watchMetres } from './watch-cardio-live'
 
 const WATCH_WORKOUTS_CONNECTED_KEY = 'fitplan_health_workouts_connected'
 const DISMISSED_KEY = 'fitplan_watch_workouts_dismissed'
@@ -247,8 +248,12 @@ export async function logWatchWorkout(p: {
   const { rpeToStore } = await import('./cardio-effort')
   const w = p.workout
   const f = await gatherFigures({ activity: watchActivityName(w.type), startedAt: w.start, endedAt: w.end }, p.body)
-  const ownKcal = w.kcal != null && w.kcal > 0 ? Math.round(w.kcal) : null
-  const ownKm = w.distanceM != null && w.distanceM > 0 ? Math.round(w.distanceM / 10) / 100 : null
+  // THE SAME RULES AS EVERY WATCH PATH (the lead's review, 28 Nov 2026): a zero is "nothing counted" and the recorder's
+  // own figures are bounded like a recording's; its distance stands unless the watch app kept a real GPS route of its
+  // own for this workout (gatherFigures: distanceFromRoute), which beats any other distance.
+  const ownKcal = watchKcal(w.kcal)
+  const ownM = watchMetres(w.distanceM)
+  const ownKm = ownM != null ? Math.round(ownM / 10) / 100 : null
   return saveCardioLog({
     userId: p.profileId,
     date: localDateOf(w.start),
@@ -257,7 +262,7 @@ export async function logWatchWorkout(p: {
     intensityRpe: rpeToStore(p.effort, p.asPlanned?.targetRpe),
     avgHeartRate: f.avgHeartRate,
     maxHeartRate: f.maxHeartRate,
-    distanceKm: ownKm ?? (countsSteps(w.type) ? f.distanceKm : null),
+    distanceKm: countsSteps(w.type) && f.distanceFromRoute ? f.distanceKm : ownKm ?? (countsSteps(w.type) ? f.distanceKm : null),
     startedAt: w.start,
     endedAt: w.end,
     steps: countsSteps(w.type) ? f.steps : null,

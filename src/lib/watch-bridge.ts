@@ -21,6 +21,8 @@ import type { BodyForEstimate } from './activity-figures'
 import type { EffortKey } from './cardio-effort'
 import { isPhoneApp } from './steps-store'
 import { queueWatchSet } from './watch-session'
+import { tracksSteps } from './cardio-kinds'
+import { sameWorkout, watchKcal, watchMetres, watchSteps } from './watch-cardio-live'
 
 export interface WatchBridgeAdapter {
   publishToday(json: string): Promise<void>
@@ -93,6 +95,8 @@ export async function applyWatchEvents(events: readonly unknown[], ctx: WatchCon
         const samples = (e.samples as unknown[]).filter((s): s is [number, number] => Array.isArray(s) && s.length === 2 && num(s[0]) != null && num(s[1]) != null)
         if (samples.length) out.readings += (await import('./strap-live')).onWatchReadings(samples)
         await (await import('./session-calories')).noteWatchRunningKcal(ctx.profileId, e)
+        // Its running steps and distance (28 Nov 2026): the walk's figures, live on the phone's card and at End.
+        ;(await import('./watch-cardio-live')).noteWatchCardioLive(e)
       } else if (e.type === 'cardio-start' && typeof e.activity === 'string' && num(e.startedAt) != null) {
         const rec = await import('./recording-store')
         // Shown running on the phone; never over a workout already open there, and never one already logged (a late
@@ -100,7 +104,7 @@ export async function applyWatchEvents(events: readonly unknown[], ctx: WatchCon
         const startMs = num(e.startedAt)!
         const { getCardioLogsForDateMerged } = await import('./cardio-log-store')
         const logged = (await getCardioLogsForDateMerged(ctx.profileId, localDate(startMs))).some(l =>
-          l.activity_name === e.activity && l.started_at != null && Math.abs(Date.parse(l.started_at) - startMs) < 120_000)
+          l.started_at != null && sameWorkout(l.activity_name, Date.parse(l.started_at), e.activity as string, startMs))
         if (!logged && !rec.readRecording()) { rec.writeRecording({ activity: e.activity, startedAt: new Date(startMs).toISOString() }); out.started++ }
       } else if (e.type === 'lift-end' && typeof e.date === 'string') {
         // A WEIGHTS SESSION ENDED ON THE WATCH (his request 27 Nov 2026): its calories, kept with the day's session.
@@ -128,23 +132,85 @@ export async function applyWatchEvents(events: readonly unknown[], ctx: WatchCon
   return out
 }
 
-/** The watch's figures into a log of the same workout the phone already made: only what that log is missing. */
-async function fillFromWatch(profileId: string, date: string, e: Ev, startMs: number): Promise<void> {
+/** How far apart the phone's End and the watch's End may be for the watch's figures to describe the phone's log. */
+const SAME_END_MS = 120_000
+
+/**
+ * A FILL THAT COULD NOT BE WRITTEN IS KEPT AND TRIED AGAIN (the lead's second review, 28 Nov 2026): the event has left
+ * the watch's queue, and the phone's own late fill only fills empty fields, so a dropped correction would be lost for
+ * good. Kept on the phone by event id, tried on every pass of the bridge, given up after a week.
+ */
+const FILL_RETRY_KEY = 'fitplan_watch_fill_retry'
+const FILL_RETRY_FOR_MS = 7 * 24 * 3600_000
+type WaitingFill = { e: Ev; firstAt: number }
+function readWaitingFills(): WaitingFill[] {
+  try { const v = JSON.parse(localStorage.getItem(FILL_RETRY_KEY) ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] }
+}
+function writeWaitingFills(list: WaitingFill[]): void {
+  try { if (list.length) localStorage.setItem(FILL_RETRY_KEY, JSON.stringify(list.slice(-20))); else localStorage.removeItem(FILL_RETRY_KEY) } catch { /* tried again next time it is sent */ }
+}
+function keepFillForRetry(e: Ev, now = Date.now()): void {
+  const list = readWaitingFills().filter(w => w.e.id !== e.id)
+  const first = readWaitingFills().find(w => w.e.id === e.id)?.firstAt ?? now
+  writeWaitingFills([...list, { e, firstAt: first }])
+}
+/** Tries every waiting fill again; those that land (or have waited a week) are forgotten. */
+export async function retryWaitingFills(ctx: WatchContext, now = Date.now()): Promise<number> {
+  const waiting = readWaitingFills()
+  if (!waiting.length) return 0
+  writeWaitingFills([])
+  let landed = 0
+  for (const w of waiting) {
+    if (now - w.firstAt > FILL_RETRY_FOR_MS) continue
+    const startMs = num(w.e.startedAt), endMs = num(w.e.endedAt)
+    if (startMs == null || endMs == null) continue
+    if (await fillFromWatch(ctx.profileId, localDate(startMs), w.e, startMs, endMs)) landed++
+    else keepFillForRetry(w.e, w.firstAt)
+  }
+  return landed
+}
+
+/**
+ * The watch's figures into a log of the same workout the phone already made (ended on the phone first).
+ *
+ * THE WATCH'S STEPS ARE THE WALK'S, WHICHEVER END WAS TAPPED FIRST (his report 28 Nov 2026, "The watch and phone steps
+ * disagree"), but only when the two Ends are within two minutes (the lead's review): ending on the phone does not end
+ * the watch, and a watch ended half an hour later counted half an hour the log does not cover. Outside that window the
+ * watch's figures describe a different stretch of time and nothing is taken from them. Distance replaces the phone's
+ * only with the watch's own GPS route; otherwise it, the calories and heart rate fill only what the log lacks. A log
+ * still queued on the phone (no signal) is filled in the queue, so the watch's figures are not lost.
+ */
+async function fillFromWatch(profileId: string, date: string, e: Ev, startMs: number, endMs: number): Promise<boolean> {
   try {
-    const { supabase } = await import('./supabase')
+    const store = await import('./cardio-log-store')
     const { lateFill } = await import('./activity-recording')
-    const { data } = await supabase.from('cardio_logs').select('*').eq('user_id', profileId).eq('date', date)
-    type Row = { id?: string; activity_name?: string | null; started_at?: string | null; steps?: number | null; distance_km?: number | null; active_kcal?: number | null; kcal_estimated?: boolean | null; avg_heart_rate?: number | null; max_heart_rate?: number | null }
-    const row = ((data ?? []) as Row[]).find(r => r.activity_name === e.activity && r.started_at != null && Math.abs(Date.parse(r.started_at) - startMs) < 120_000)
-    if (!row?.id) return
-    const km = num(e.distanceM)
-    const update = lateFill(row, {
-      minutes: 0, steps: num(e.steps), distanceKm: km != null && km >= 10 ? Math.round(km / 10) / 100 : null,
-      kcal: num(e.kcal), kcalEstimated: false,
+    const row = (await store.getCardioLogsForDateMerged(profileId, date)).find(r =>
+      r.started_at != null && sameWorkout(r.activity_name, Date.parse(r.started_at), e.activity as string, startMs))
+    if (!row) return false // the phone's log is not readable yet: tried again
+    // Up to two minutes after the phone's End is accepted here, while the phone's own summary cuts at End: the watch's
+    // End event carries only its final count, so a watch ended a little later is the same walk give or take its last
+    // two minutes (the lead's note, 28 Nov 2026). Further apart, it describes other time and nothing is taken.
+    const rowEnd = row.completed_at ? Date.parse(row.completed_at) : NaN
+    if (!Number.isFinite(rowEnd) || Math.abs(rowEnd - endMs) > SAME_END_MS) return true
+    const steps = watchSteps(e.steps), metres = watchMetres(e.distanceM), routeM = watchMetres(e.routeM)
+    const km = (m: number | null) => (m != null ? Math.round(m / 10) / 100 : null)
+    const update: Record<string, unknown> = lateFill(row, {
+      minutes: 0, steps, distanceKm: km(metres),
+      kcal: watchKcal(e.kcal), kcalEstimated: false,
       avgHeartRate: num(e.avgBpm), maxHeartRate: num(e.maxBpm),
-    })
-    if (update) await supabase.from('cardio_logs').update(update).eq('id', row.id).eq('user_id', profileId)
-  } catch { /* the phone's own late fill still runs */ }
+    }) ?? {}
+    if (tracksSteps(row.activity_name)) {
+      if (steps != null && steps !== row.steps) update.steps = steps
+      // Distance replaces the phone's only as the length of the watch's own real GPS route.
+      if (routeM != null && km(routeM) !== row.distance_km) update.distance_km = km(routeM)
+    }
+    if (!Object.keys(update).length) return true
+    if (row.syncStatus === 'pending' || row.syncStatus === 'failed') return store.patchQueuedCardioLog(row.clientId!, update)
+    if (!row.id) return false
+    const { supabase } = await import('./supabase')
+    const { error } = await supabase.from('cardio_logs').update(update).eq('id', row.id).eq('user_id', profileId)
+    return !error
+  } catch { return false }
 }
 
 /** A cardio workout ended on the watch, logged once. False when it was already logged or could not be. */
@@ -156,30 +222,32 @@ async function logWatchCardio(e: Ev, ctx: WatchContext): Promise<boolean> {
   const { getCardioLogsForDateMerged } = await import('./cardio-log-store')
   // ENDED ON THE PHONE TOO: a log of this workout (the same name, started within two minutes) is not made again.
   const already = (await getCardioLogsForDateMerged(ctx.profileId, date)).some(l =>
-    l.activity_name === e.activity && l.started_at != null && Math.abs(Date.parse(l.started_at) - startMs) < 120_000)
+    l.started_at != null && sameWorkout(l.activity_name, Date.parse(l.started_at), e.activity as string, startMs))
   const store = await import('./recording-store')
   const open = store.readRecording()
-  const ours = open && open.activity === e.activity && Math.abs(Date.parse(open.startedAt) - startMs) < 120_000
+  const ours = !!open && sameWorkout(open.activity, Date.parse(open.startedAt), e.activity, startMs)
   if (already) {
     if (ours) store.writeRecording(null)
-    // ENDED ON THE PHONE FIRST (27 Nov 2026): the log is there, so the watch's own figures fill what it lacks (its
-    // calories over none or an estimate, steps, distance, heart rate), never over a figure it already has.
-    await fillFromWatch(ctx.profileId, date, e, startMs)
+    // ENDED ON THE PHONE FIRST (27 Nov 2026): the log is there, so the watch's own figures go into it (fillFromWatch),
+    // and one that cannot be written now is kept and tried again, never dropped.
+    if (!(await fillFromWatch(ctx.profileId, date, e, startMs, endMs))) keepFillForRetry(e)
     return false
   }
   const recording = { activity: e.activity, startedAt: new Date(startMs).toISOString(), endedAt: new Date(endMs).toISOString() }
   const { gatherFigures, logRecording } = await import('./activity-recording')
   const { recordingFigures } = await import('./activity-figures')
   const phone = await gatherFigures(recording, ctx.body, new Date(endMs))
-  // On the wrist the whole time, the watch's own steps, distance and calories win; heart rate is the readings it sent
-  // (gathered above), else its own average and highest.
+  // On the wrist the whole time, the watch's own steps and calories win, and its distance when it is the length of a
+  // real GPS route of its own (else the phone's, else the watch's other distance); a zero from the watch is "nothing
+  // counted", never over a real figure.
+  // Heart rate is the readings it sent (gathered above), else its own average and highest.
   const watchHeart = num(e.avgBpm) != null && num(e.maxBpm) != null ? { avg: num(e.avgBpm)!, max: num(e.maxBpm)! } : null
   const figures = recordingFigures({
     start: new Date(startMs),
     end: new Date(endMs),
-    steps: num(e.steps) ?? phone.steps,
-    distanceM: num(e.distanceM) ?? (phone.distanceKm != null ? phone.distanceKm * 1000 : null),
-    deviceKcal: num(e.kcal) ?? (phone.kcalEstimated ? null : phone.kcal),
+    steps: watchSteps(e.steps) ?? phone.steps,
+    distanceM: watchMetres(e.routeM) ?? (phone.distanceKm != null ? phone.distanceKm * 1000 : watchMetres(e.distanceM)),
+    deviceKcal: watchKcal(e.kcal) ?? (phone.kcalEstimated ? null : phone.kcal),
     heart: phone.avgHeartRate != null && phone.maxHeartRate != null ? { avg: phone.avgHeartRate, max: phone.maxHeartRate } : watchHeart,
   }, ctx.body)
   const view = logRecording({ profileId: ctx.profileId, date, recording, figures, effort })
@@ -205,6 +273,7 @@ export function startWatchBridge(context: () => WatchContext | null): () => void
         if (!a || !ctx) return
         const events = await a.drain()
         if (events.length) await applyWatchEvents(events, ctx)
+        await retryWaitingFills(ctx)
       } while (again && !stopped)
     } catch { /* tried again on the next signal */ } finally { running = false }
   }

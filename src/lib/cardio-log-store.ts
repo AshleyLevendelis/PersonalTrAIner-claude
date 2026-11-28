@@ -72,6 +72,8 @@ interface PendingCardioLog extends CardioLogInput {
    * offering it. Absent on entries written before that; they fall back.
    */
   savedAtMs?: number
+  /** Figures that reached the log after its insert left, still to be sent by its id (sendLateFigures). */
+  lateFigures?: Record<string, unknown>
 }
 
 export interface CardioLogView extends CardioLog {
@@ -203,6 +205,25 @@ function saveCardioLogUnchecked(input: CardioLogInput): CardioLogView {
   notify()
   void flushPending()
   return pendingToView(pending)
+}
+
+/**
+ * Figures arriving for a log still waiting in the phone's queue (the watch's steps for a walk logged with no signal,
+ * 28 Nov 2026): written into the queued entry, in the database's column names. True when it was there to fill.
+ */
+export function patchQueuedCardioLog(clientId: string, update: Record<string, unknown>): boolean {
+  const items = loadPending()
+  const item = items.find(i => i.clientId === clientId && i.status !== 'synced')
+  if (!item) return false
+  const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
+  if (n(update.steps) != null) item.steps = n(update.steps)
+  if (n(update.distance_km) != null) item.distanceKm = n(update.distance_km)
+  if (n(update.active_kcal) != null) { item.activeKcal = n(update.active_kcal); item.kcalEstimated = update.kcal_estimated === true }
+  if (n(update.avg_heart_rate) != null) item.avgHeartRate = n(update.avg_heart_rate)
+  if (n(update.max_heart_rate) != null) item.maxHeartRate = n(update.max_heart_rate)
+  savePending(items)
+  notify()
+  return true
 }
 
 export function retryFailedCardioLog(clientId: string): void {
@@ -354,7 +375,7 @@ function savedAt(item: PendingCardioLog): number {
 
 function pruneAgedSynced(items: PendingCardioLog[]): PendingCardioLog[] {
   const cutoff = Date.now() - CARDIO_UNDO_WINDOW_MS
-  return items.filter(i => i.status !== 'synced' || savedAt(i) > cutoff)
+  return items.filter(i => i.status !== 'synced' || savedAt(i) > cutoff || !!i.lateFigures)
 }
 
 let flushPromise: Promise<void> | null = null
@@ -389,13 +410,32 @@ export function flushPending(): Promise<void> {
   return flushPromise
 }
 
+/**
+ * Figures that reached a log after its insert left (pruneAgedSynced keeps such an entry until they are sent): one
+ * update by the row's id. The queue is read again after the await and only this entry's mark is changed, so a log
+ * saved, patched or deleted meanwhile is never overwritten. A failed update keeps the mark and is tried again.
+ */
+async function sendLateFigures(clientId: string): Promise<boolean> {
+  const before = loadPending().find(i => i.clientId === clientId)
+  if (!before?.id || !before.lateFigures) return true
+  const late = before.lateFigures
+  const { error } = await supabase.from('cardio_logs').update(late).eq('id', before.id)
+  if (error) return false
+  const after = loadPending()
+  const entry = after.find(i => i.clientId === clientId)
+  if (entry && entry.lateFigures === undefined) return true
+  if (entry && JSON.stringify(entry.lateFigures) === JSON.stringify(late)) { delete entry.lateFigures; savePending(after) }
+  return true
+}
+
 async function doFlush(): Promise<void> {
   savePending(pruneAgedSynced(loadPending()))
+  for (const i of loadPending().filter(i => i.status === 'synced' && i.lateFigures)) await sendLateFigures(i.clientId)
   const items = loadPending()
   try {
     await syncPass(items)
   } finally {
-    if (loadPending().some(i => i.status === 'pending')) scheduleRetry()
+    if (loadPending().some(i => i.status === 'pending' || (i.status === 'synced' && i.lateFigures))) scheduleRetry()
   }
 }
 
@@ -444,10 +484,19 @@ async function syncPass(items: PendingCardioLog[]): Promise<void> {
         // side since the server fetch already carries them.
         target.status = 'synced'
         target.id = insertedId
+        // FIGURES THAT ARRIVED WHILE THE INSERT WAS IN FLIGHT (patchQueuedCardioLog): the row went up without them, so
+        // they are kept on the entry and sent AFTER the queue is saved (sendLateFigures), never across an await that a
+        // second write to the queue could land inside (the lead's second review, 28 Nov 2026).
+        const late: Record<string, unknown> = {}
+        const sent = { ...recordedShape(item), distance_km: item.distanceKm ?? null, avg_heart_rate: item.avgHeartRate || null }
+        const now = { ...recordedShape(target), distance_km: target.distanceKm ?? null, avg_heart_rate: target.avgHeartRate || null } as Record<string, unknown>
+        for (const [k, v] of Object.entries(now)) if (v != null && (sent as Record<string, unknown>)[k] !== v) late[k] = v
+        if (Object.keys(late).length) target.lateFigures = late
         // INTO THE PHONE'S COPY BEFORE IT STOPS BEING "PENDING", so there is
         // no instant in which a saved log is in neither place.
         if (insertedId) recordSynced({ kind: 'insert', row: { ...serverShape(target), id: insertedId } })
         savePending(current)
+        if (target.lateFigures) await sendLateFigures(item.clientId)
       }
       consecutiveFailures = 0
       notify()

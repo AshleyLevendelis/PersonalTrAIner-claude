@@ -11,6 +11,7 @@
 // streets under the line (his ruling "Streets, OpenStreetMap") are fetched as map squares by area, never by route.
 // ---------------------------------------------------------------------------
 import { supabase } from './supabase'
+import { SAME_START_MS, sameWorkout } from './watch-cardio-live'
 
 export type RoutePoint = [number, number, number] // [ms, lat, lng]
 
@@ -22,8 +23,8 @@ export interface WorkoutRoute {
 }
 
 const STORE = 'fitplan_routes_v1'
-/** Two minutes either side: the start the watch sent and the one on the log are the same instant, give or take a sync. */
-const SAME_START_MS = 120_000
+// ONE SAME-WORKOUT RULE ON EVERY WATCH PATH (the lead's review, 28 Nov 2026): the same name in any case, started within
+// two minutes (watch-cardio-live.ts sameWorkout). The database queries below use the same two-minute window.
 const listeners = new Set<() => void>()
 
 const isPoint = (p: unknown): p is RoutePoint => Array.isArray(p) && p.length === 3
@@ -51,7 +52,7 @@ export async function noteWatchRoute(profileId: string, e: Record<string, unknow
   const incoming = Array.isArray(e.points) ? (e.points as unknown[]).filter(isPoint) : []
   if (startedAt == null || !activity || !date || incoming.length === 0) return false
   const routes = readStore()
-  let route = routes.find(r => r.activity === activity && r.startedAt === startedAt)
+  let route = routes.find(r => sameWorkout(r.activity, r.startedAt, activity, startedAt))
   if (!route) { route = { activity, startedAt, date, points: [] }; routes.push(route) }
   const seen = new Set(route.points.map(p => p[0]))
   for (const p of incoming) if (!seen.has(p[0])) { route.points.push(p); seen.add(p[0]) }
@@ -71,13 +72,13 @@ export async function noteWatchRoute(profileId: string, e: Record<string, unknow
 export async function readRoute(profileId: string, activity: string, startedAtIso: string): Promise<WorkoutRoute | null> {
   const start = Date.parse(startedAtIso)
   if (!Number.isFinite(start)) return null
-  const local = readStore().find(r => r.activity === activity && Math.abs(r.startedAt - start) < SAME_START_MS)
+  const local = readStore().find(r => sameWorkout(r.activity, r.startedAt, activity, start))
   if (local && local.points.length >= 2) return local
   try {
     const { data, error } = await supabase.from('workout_routes').select('*').eq('user_id', profileId)
       .gte('started_at', new Date(start - SAME_START_MS).toISOString()).lte('started_at', new Date(start + SAME_START_MS).toISOString())
     if (error || !Array.isArray(data)) return null
-    const row = (data as { activity?: string; started_at?: string; date?: string; points?: unknown }[]).find(r => r.activity === activity)
+    const row = (data as { activity?: string; started_at?: string; date?: string; points?: unknown }[]).find(r => sameWorkout(r.activity, Date.parse(r.started_at ?? ''), activity, start))
     const points = Array.isArray(row?.points) ? (row!.points as unknown[]).filter(isPoint) : []
     return row && points.length >= 2 ? { activity, startedAt: Date.parse(row.started_at ?? '') || start, date: row.date ?? '', points } : null
   } catch { return null }
@@ -85,7 +86,7 @@ export async function readRoute(profileId: string, activity: string, startedAtIs
 
 /** "Delete route": gone from the phone and the database; the walk itself stays logged. True once the database agrees. */
 export async function deleteRoute(profileId: string, route: Pick<WorkoutRoute, 'activity' | 'startedAt'>): Promise<boolean> {
-  writeStore(readStore().filter(r => !(r.activity === route.activity && Math.abs(r.startedAt - route.startedAt) < SAME_START_MS)))
+  writeStore(readStore().filter(r => !sameWorkout(r.activity, r.startedAt, route.activity, route.startedAt)))
   // The screens are told only once the database has answered: told before, a map re-reads the row still there and
   // draws the route straight back (found by verify:watch-sets 8c, 28 Nov 2026).
   try {
