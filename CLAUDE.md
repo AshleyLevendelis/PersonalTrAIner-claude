@@ -1923,6 +1923,29 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   excludes; the load ceilings; the pregnancy exercise rules. A floor or filter that is not one of those four is
   advice, never a block (it REPLACES, for training, the 14 Sep "four tiers" only in that tier 3 is always one tap
   from done). The fix list: `docs/plans/advise-then-allow.md`.
+- **A day may hold two sessions: his ruling 28 Nov 2026, "Allow, with a warning"** (over cardio only and over one a
+  day): it REVERSES his 8 Sep "a day never holds two sessions". Training on a day that already has a session, moving
+  a session onto a busy day and cardio on top are allowed on both surfaces; the card states the recovery cost first.
+- **His three answers of 28 Nov 2026 on advise-then-allow**: (1) **"Stop it on the screen too"**: a move his injuries
+  list excludes is greyed with the reason in the screen's add and swap searches and cannot be picked (narrows his
+  13 Sep "show everything, warn me" for injuries only). (2) **Near-copies "Yes, with a note"**: he may add or swap in
+  a near-copy, priced from its parent, the card naming the plan's own choice; the generator never picks one (narrows
+  his 3 Nov "Searchable, log-only" to the generator). (3) **Shortening: "Keep it whole, say the real time"**: when
+  warm-up and main lift alone exceed the time asked, the main lift keeps every set and the card says the real minutes.
+- **What the coach may say, his four answers of 28 Nov 2026**: (1) **price: "Never mention price"** (over "nothing to pay
+  inside the app" and over "free"): asked about cost, the coach says it can't speak to pricing; it never calls the app
+  free. (2) **his own workouts: "Comment, kindly"**: treated like any session (what it means for the next days, a
+  better option if there is one), never a telling-off. (3) **pregnancy week: "Say the week, plainly"**: the week explains
+  a plan change, nothing medical beyond it, the midwife or GP for health questions. (4) **an unlogged watch workout:
+  "Mention it once, in its daily message"**: folded into the day's first unprompted message, within his limit, with a
+  one-tap Log; never its own notification, never twice.
+- **His three answers of 28 Nov 2026, afternoon**: (1) **merging: "Yes, merge without asking"**: the lead merges a
+  reviewed branch to `main` after a full sweep and tells him what changed on his phone; deploys and migrations stay
+  his. (2) **his own workout's typed weights: "Same hard stop as the plan"** (over warn-then-allow, my recommendation,
+  and over no check): the kit's load ceilings and, when pregnant, the 8-rep floor hold on a workout of his own too;
+  over them is refused with the reason. (3) **"never again" bans: "Greyed out, can't pick"**: on the screen's add and
+  swap lists a banned move is shown with the reason and cannot be picked, as the chat refuses it (narrows his 13 Sep
+  "show everything, warn me" for bans; never-again joins the hard stops on both surfaces).
 - **The app does what he asks and advises around it: his ruling 28 Nov 2026** ("The app should be able to do whatever I
   ask it but give reasons or advise around it. Ie make suggestions for changes or recommendations to not train with
   reasons why"): a request the plan advises against is offered with its cost and the better option; only the unsafe is
@@ -2653,6 +2676,7 @@ building phase. So just update the weight. No message."*
 
 ## Git and deploy
 
+- **Merging to `main`: his ruling 28 Nov 2026, "Yes, merge without asking"**, after review and a full sweep (see "His three answers of 28 Nov 2026, afternoon").
 - Push finished work to the session's designated working branch (e.g. `claude/…`) without asking. Ashley ruled on this 29 Aug 2026, choosing "push it, and stop asking me about pushes" over keeping the old ask-every-time rule, because the interruption cost more than it protected. This replaces the previous "commit, never push" default.
 - The relaxation is branch-scoped and stops there. `main` and anything that reaches live users still need Ashley to say so explicitly, every time: merging to `main`, any production deploy, any migration.
 - Do not trust or report "N commits ahead of origin" without verifying against origin — that line has been wrong repeatedly.
