@@ -36,7 +36,11 @@ earlier ruling of his and wait for his word.
 5. [x] **A paused plan can still take a session today, with advice** (the screen already allows it; the coach
    refuses). DONE 28 Nov 2026: the card says "Your plan is paused: this session is one of your own, nothing else
    becomes due, and the pause carries on." `verify:train-today` D (1/1).
-6. [ ] **Shortening past its floors** (main lift, three exercises): say what is lost, then allow.
+6. [x] **Shortening past its floors** (main lift, three exercises): say what is lost, then allow. DONE 28 Nov 2026: measured, 10-20 minutes
+   asked gave 27-31; now the session keeps its warm-up and main lift (every set, his 13 Sep ruling) and says what
+   waits and the real minutes (~23 for 15 asked). "Shortest version" keeps its three-exercise definition. 15 minutes
+   added to the screen's choices. `test:today-only` (4/4), `verify:shorten-today`. OPEN, HIS: cutting main-lift sets
+   when even that is over the time (reverses 13 Sep).
 7. [ ] **Volume change and "make it lighter" in a deload week or at a set floor**: say which limit, then allow.
 8. [ ] **A different kind of session on any day this week**, not only today; a started session takes an added block.
 9. [ ] **An exercise added to a rest day makes it a training day** (session-edit.ts: "Make it a training day

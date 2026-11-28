@@ -91,6 +91,8 @@ console.log('\n[2] her ruling: the main lift is protected, across a spread of pr
     ['functional', 'beginner', 'bodyweight'],
   ]
   let examined = 0
+  let pastFloorDays = 0
+  let closerDays = 0
   for (const [goal, exp, equip] of spread) {
     const key = `today-only|${goal}|${exp}|${equip}`
     const profile = buildProfile(goal, exp, equip)
@@ -112,10 +114,18 @@ console.log('\n[2] her ruling: the main lift is protected, across a spread of pr
         check(`${key} ${day.day}: ${lift} survives`, !!kept, after.exercises.map(e => e.name))
         check(`${key} ${day.day}: ...with every set`, kept?.sets === before.get(lift), { was: before.get(lift), now: kept?.sets })
       }
-      check(`${key} ${day.day}: never goes below three exercises`, after.exercises.length >= 3, after.exercises.length)
+      // ADVISE, THEN ALLOW (his ruling 28 Nov 2026): below three exercises only when the time asks for it, and SAID.
+      check(`${key} ${day.day}: below three exercises only with the note saying what it kept`, after.exercises.length >= 3 || /^To fit 20 minutes this keeps your warm-up and .+ only; the rest of .+ waits for next time, and it still counts as a session\./.test(r.note ?? ''), { n: after.exercises.length, note: r.note })
+      const floor = shortenDayTo(week, day.day, profile, 20, false)
+      const floorDay = floor.week.days.find(d => d.day === day.day)!
+      check(`${key} ${day.day}: the "Shortest version" path (no past-the-floor) still keeps three`, !floor.changed || floorDay.exercises.length >= 3, floorDay.exercises.length)
+      check(`${key} ${day.day}: and says nothing past the floor`, !floor.note)
+      if (r.note && floor.changed) { pastFloorDays++; if (r.achievedMinutes < floor.achievedMinutes) closerDays++ }
     }
   }
   check('the sweep actually shortened something to examine', examined > 0, examined)
+  check('20 minutes asked: some days go past the usual floor (the time asked for is now reached for)', pastFloorDays > 0, pastFloorDays)
+  check('...and every one of them comes closer to 20 minutes than the floor did', closerDays === pastFloorDays && closerDays > 0, { pastFloorDays, closerDays })
 
   // AND A DAY WHERE THE PROTECTION IS THE ONLY THING SAVING IT.
   //

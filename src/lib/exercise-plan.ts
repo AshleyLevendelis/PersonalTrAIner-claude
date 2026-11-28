@@ -7971,6 +7971,8 @@ export interface DayShortening {
   fillerMinutesRemoved: number
   /** Why nothing happened, in words a person can read. Empty when `changed`. */
   refusal?: string
+  /** Said before the tap when the cut went below the usual floor to fit the time (advise, then allow: 28 Nov 2026). */
+  note?: string
 }
 
 /**
@@ -7993,6 +7995,8 @@ export function shortenDayTo(
   dayName: string,
   profile: UserProfile,
   minutes: number,
+  /** False for "Shortest version" (his 13 Nov strategy): that one is defined as the floor itself. */
+  pastFloor = true,
 ): DayShortening {
   const day = week.days.find(d => d.day === dayName)
   const nothing = (refusal: string): DayShortening =>
@@ -8038,6 +8042,31 @@ export function shortenDayTo(
   const shortened: WorkoutDay = { ...sized, exercises: sized.exercises.map(e => ({ ...e })) }
   trimWeekRestForBudget([shortened], budgetSeconds, undefined, policy.minLoadedMainLiftRestSeconds, profile.training_style || 'hybrid')
 
+  // PAST THE FLOOR WHEN THE TIME ASKS FOR IT (his ruling 28 Nov 2026, "advise, then allow"). Measured that day: asked
+  // for 10, 15 or 20 minutes, the floor (the main lifts kept whole, three exercises) gave 27-31 minutes, so "I've
+  // only got 15 minutes" got a 30-minute session. Now, still over by more than two minutes, the session keeps its
+  // movement prep and its main lift only (CSCS, mine: the main lift carries the block's progression, and the
+  // accessories are the adjustable volume). The main lift keeps every set: his 13 Sep 2026 ruling protects it, and a
+  // second lift on the day (two tier-1s) goes before the first. Said before the tap, in `note`, with the minutes it
+  // really takes when even that is over.
+  let note: string | undefined
+  if (pastFloor && estimateDaySeconds(shortened) > budgetSeconds + 120) {
+    const primers = new Set(shortened.exercises.filter(e => findEntry(e.name)?.mechanics_tier === 'primer').map(e => e.name))
+    const mains = shortened.exercises.filter(e => mainLiftNamesOf(yielded).has(e.name))
+    let keep = [...mains]
+    const lean = (k: typeof keep): WorkoutDay => ({ ...shortened, exercises: shortened.exercises.filter(e => primers.has(e.name) || k.includes(e)).map(e => ({ ...e })) })
+    let leanDay = lean(keep)
+    while (keep.length > 1 && estimateDaySeconds(leanDay) > budgetSeconds) { keep = keep.slice(0, -1); leanDay = lean(keep) }
+    if (keep.length > 0 && leanDay.exercises.length < shortened.exercises.length) {
+      const lifts = leanDay.exercises.filter(e => !primers.has(e.name))
+      const named = lifts.map(e => `${e.name} (${e.sets} sets)`).join(' and ')
+      const took = Math.round(estimateDaySeconds(leanDay) / 60)
+      note = `To fit ${minutes} minutes this keeps your warm-up and ${named} only; the rest of ${dayName} waits for next time, and it still counts as a session.`
+        + (took > minutes + 2 ? ` It takes about ${took} minutes, the shortest that keeps every set of the main lift.` : '')
+      shortened.exercises = leanDay.exercises
+    }
+  }
+
   const keptBefore = new Map(day.exercises.map(ex => [ex.name, ex.sets]))
   const droppedExercises = day.exercises.filter(ex => !shortened.exercises.some(e => e.name === ex.name)).map(ex => ex.name)
   let setsRemoved = 0
@@ -8065,6 +8094,7 @@ export function shortenDayTo(
     setsRemoved,
     achievedMinutes: Math.round(after / 60),
     fillerMinutesRemoved,
+    ...(note ? { note } : {}),
   }
 }
 
@@ -8080,7 +8110,7 @@ export const SHORTEST_VERSION_MINUTES = 0
 
 export function shortenOrFloor(week: MesocycleWeek, dayName: string, profile: UserProfile, minutes: number): DayShortening {
   if (minutes !== SHORTEST_VERSION_MINUTES) return shortenDayTo(week, dayName, profile, minutes)
-  const r = shortenDayTo(week, dayName, profile, 1)
+  const r = shortenDayTo(week, dayName, profile, 1, false)
   if (!r.changed) return { ...r, refusal: r.refusal?.startsWith('There\'s no session') ? r.refusal : `${dayName}'s session is already as short as it goes while keeping your main lift.` }
   return { ...r, week: { ...r.week, days: r.week.days.map(d => (d.day === dayName ? { ...d, shortened_to_minutes: r.achievedMinutes } : d)) } }
 }

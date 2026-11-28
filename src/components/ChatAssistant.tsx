@@ -4195,7 +4195,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     ]
     // SAY IT WHEN IT COULD NOT GET THERE, rather than showing a card headed
     // "25 min" for a session that takes 32.
-    if (!floor && trial.achievedMinutes > minutes) {
+    // PAST THE FLOOR (28 Nov 2026, advise then allow): what was kept and what waits, before the tap.
+    if (trial.note) implications.push({ severity: 'warn', text: on.say(trial.note) })
+    else if (!floor && trial.achievedMinutes > minutes) {
       implications.push({ severity: 'warn', text: `${minutes} minutes isn't reachable without cutting into your main lift — about ${trial.achievedMinutes} is the closest.` })
     }
     // SAY WHAT ACTUALLY COMES OFF when it is only the padding — otherwise the
@@ -4219,7 +4221,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           { field: 'Time', before: formatDayLength(dayLengthParts(day)), after: `~${trial.achievedMinutes} min` },
           { field: 'Exercises', before: String(day.exercises.length), after: String(after.exercises.length) },
         ],
-        unchanged: [`Your main lift — every set of it`],
+        unchanged: trial.note ? [] : [`Your main lift — every set of it`],
         implications,
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         reversible: true,

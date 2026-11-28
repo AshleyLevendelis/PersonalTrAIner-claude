@@ -651,8 +651,8 @@ export function TodayPanel({
     const next = mesocycle.map(w => (w.week_number === liveWeek ? settled.week : w))
     const failed = await applySessionEdit({ mesocycle: next, changed: true }, 'today')
     if (failed) return failed
-    // No words of its own: the line under the session's length already says it was shortened and for how long.
-    keepWayBack('shorten', next, null)
+    // No words of its own, unless it went past the usual floor (28 Nov 2026): then the line says what it kept.
+    keepWayBack('shorten', next, say(result.note ?? null))
     return null
   }
 
