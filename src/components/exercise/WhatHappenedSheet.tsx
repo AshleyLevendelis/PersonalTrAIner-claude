@@ -171,9 +171,10 @@ export function WhatHappenedSheet({
     isDone, hasSession, movedAway: !!movedAway, beforePlan, isPast, isToday,
     declared: { missed: declared.missed, rest: declared.rest, swapped: !!declared.swapped },
     canShorten: !!onShorten, canLighter: !!onLighter, canRebuild: !!onRebuild,
-    canKind: !!onKindPlan && !!onKindConfirm && kindOptions.length > 0,
+    // A later day only where this week's view holds its cell, so a rest or swap he declared on it is seen (fix 8).
+    canKind: !!onKindPlan && !!onKindConfirm && kindOptions.length > 0 && (isToday || !!cell),
     partlyLogged, activityOnly,
-  }) : []), [target, isDone, hasSession, movedAway, beforePlan, isPast, isToday, declared.missed, declared.rest, declared.swapped, onShorten, onLighter, onRebuild, onKindPlan, onKindConfirm, kindOptions.length, partlyLogged, activityOnly])
+  }) : []), [target, cell, isDone, hasSession, movedAway, beforePlan, isPast, isToday, declared.missed, declared.rest, declared.swapped, onShorten, onLighter, onRebuild, onKindPlan, onKindConfirm, kindOptions.length, partlyLogged, activityOnly])
 
   // Every day this week the resolver would accept as a destination — the
   // same function, the same rules (a free day, inside this mesocycle week,
@@ -265,7 +266,10 @@ export function WhatHappenedSheet({
     setPhase('kind_offer')
   }
   const runKind = () => runEdit(() => onKindConfirm!(kindOffer!))
-  const kindWords = kindOffer ? buildSessionKindTodayProposal(kindOffer, 'today') : null
+  // THE DAY IN ITS OWN NAME (fix 8): "today" for today, the weekday for a later day; a started day ADDS a block.
+  const kindWhen = isToday ? 'today' : dayName
+  const kindVerbLabel = isToday && partlyLogged ? 'Add a different kind of block' : isToday ? 'A different kind of session today' : `A different kind of session on ${dayName}`
+  const kindWords = kindOffer ? buildSessionKindTodayProposal(kindOffer, kindWhen) : null
 
   /**
    * Only times genuinely shorter than the session in front of them, with a
@@ -451,7 +455,7 @@ export function WhatHappenedSheet({
               <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={() => setPhase('rebuild')} data-verb="rebuild">Give me a different session</Button>
             )}
             {verbs.includes('kind') && (
-              <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={() => setPhase('kind')} data-verb="kind">A different kind of session today</Button>
+              <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={() => setPhase('kind')} data-verb="kind">{kindVerbLabel}</Button>
             )}
             {verbs.includes('lighter') && (
               <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={planLighter} data-verb="lighter">Make it easier today</Button>
@@ -518,11 +522,13 @@ export function WhatHappenedSheet({
 
         {phase === 'kind' && (
           <div className="space-y-2" data-testid="what-happened-kind">
-            <p className="text-sm">What kind of session?</p>
-            {/* WHAT CHANGES, BEFORE THE TAP — her 20 Oct ruling in her terms. */}
-            <p className="text-xs text-muted-foreground">
-              The whole session changes for today, main lift included. Your main lift is back the next time it&rsquo;s due,
-              and missing it today doesn&rsquo;t change its weight. Nothing changes until you&rsquo;ve seen the session.
+            <p className="text-sm">{isToday && partlyLogged ? 'What kind of block?' : 'What kind of session?'}</p>
+            {/* WHAT CHANGES, BEFORE THE TAP — her 20 Oct ruling in her terms; a started session keeps its sets (fix 8). */}
+            <p className="text-xs text-muted-foreground" data-testid="kind-what-changes">
+              {isToday && partlyLogged
+                ? <>You&rsquo;ve started today&rsquo;s session, so it stays as it is and a block of the new kind goes on the end. Nothing changes until you&rsquo;ve seen it.</>
+                : <>The whole session changes for {isToday ? 'today' : `${dayName}, this week only`}, main lift included: a main lift is back the
+                  next time it&rsquo;s due, and missing it doesn&rsquo;t change its weight. Nothing changes until you&rsquo;ve seen the session.</>}
             </p>
             <Input value={kindMoves} onChange={e => setKindMoves(e.target.value)} placeholder="Any moves you want in it? e.g. box jumps" aria-label="Moves you want in it" data-testid="kind-moves" />
             <div className="grid gap-2">
@@ -547,7 +553,7 @@ export function WhatHappenedSheet({
               {kindWords.notes.map((note, i) => <p key={i} className="text-xs text-muted-foreground">{note}</p>)}
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" className="min-h-11" disabled={busy} onClick={runKind} data-testid="kind-confirm">Use this session</Button>
+              <Button size="sm" className="min-h-11" disabled={busy} onClick={runKind} data-testid="kind-confirm">{kindOffer.added ? 'Add this block' : 'Use this session'}</Button>
               <Button variant="ghost" size="sm" className="min-h-11" disabled={busy} onClick={() => { setKindOffer(null); setPhase('kind') }}>Back</Button>
             </div>
           </div>

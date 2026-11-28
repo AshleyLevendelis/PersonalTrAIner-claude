@@ -6,7 +6,8 @@ import {
   sessionKindsFor, sessionKindFrom, describeKindToday, kindTodayOf, type SessionKind, type SessionKindOffer, type SessionKindPlan,
 } from '../src/lib/session-kind'
 import { isMainLiftSlot } from '../src/lib/mesocycle-edit'
-import { EXERCISE_DATABASE, isContraindicatedFor, type ExerciseEntry } from '../src/lib/exercise-db'
+import { EXERCISE_DATABASE, isContraindicatedFor, getExerciseEntry, type ExerciseEntry } from '../src/lib/exercise-db'
+const getEntryTier = (n: string) => getExerciseEntry(n)?.mechanics_tier
 import { isExternallyLoaded, categorize } from '../src/lib/load-prescription'
 import { estimateDaySeconds, getSessionMaximumSeconds, getSessionMinimumSeconds } from '../src/lib/session-duration'
 import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from '../src/lib/types'
@@ -114,10 +115,13 @@ check('every fixture offer was built', [cardio, functional, bodybuilding, miniCa
 console.log('\n1. Refusals, each in words')
 // ---------------------------------------------------------------------------
 {
+  // ADVISE, THEN ALLOW (his ruling 28 Nov 2026, fix 8; "Allow, with a warning" for two sessions on a day): a rest day
+  // takes the session with the recovery cost first; a started session keeps every set and takes an added block.
+  // Section 9 holds both in full; these two pin that the old refusals are gone.
   const rest = await plan(M_FULL, FULL, 'cardio', { day: 'Tuesday' })
-  check('a rest day is refused', !rest.ok && /no session on Tuesday/.test(rest.refusal), rest)
+  check('a rest day is no longer refused: it takes the session, the recovery cost first', rest.ok && /^Today is a rest day/.test(rest.offer.advice[0] ?? ''), rest.ok ? rest.offer.advice : rest)
   const logged = await plan(M_FULL, FULL, 'cardio', { logged: 1 })
-  check('a session with a working set logged is refused — it is not redrawn underneath her', !logged.ok && /already logged sets/.test(logged.refusal), logged)
+  check('a started session is not redrawn: it takes an added block', logged.ok && logged.offer.added, logged.ok ? { added: logged.offer.added } : logged)
   const own = await plan(M_FULL, FULL, 'hybrid')
   check('her own style is refused and pointed at the rebuild, which keeps her main lift', !own.ok && /already how you train/.test(own.refusal) && /different session/.test(own.refusal), own)
   const allCardio = EXERCISE_DATABASE.filter(e => e.mechanics_tier === 'cardio').map(e => e.name)
@@ -423,6 +427,89 @@ console.log('\n14. A day of conditioning: no main lift, its blocks "Conditioning
   check('a lifting day with intervals at the end keeps "Finisher" for them', !isConditioningDay(liftDay) && sectionLabelFor(groupExercises(liftDay)[1], false, isConditioningDay(liftDay)) === 'Finisher')
   check('one steady block reads in minutes; intervals keep rounds', prescribedDose({ sets: 1, reps: '1200s', prescription_type: 'steady_state' }) === '20 min' && prescribedDose({ sets: 6, reps: '45s', prescription_type: 'intervals' }) === '6 × 45s' && prescribedDose({ sets: 3, reps: '8', prescription_type: 'reps' }) === '3 × 8')
   check('a timed box takes up to three hours of seconds; a reps box stays at 999', maxCountFor('steady_state') === 10800 && maxCountFor('intervals') === 10800 && maxCountFor('time') === 10800 && maxCountFor('reps') === 999)
+}
+
+console.log('\n15. Advise, then allow (fix 8): an added block on a started session, a rest day, a later day this week')
+{
+  const live = dayIn(M_FULL, 2, 'Monday')!
+  const call = (o: { kind?: SessionKind; logged?: number; day?: string; say?: string; meso?: MesocycleWeek[] } = {}) =>
+    planSessionKindToday({ mesocycle: o.meso ?? M_FULL, profile: FULL, weekNumber: 2, dayName: o.day ?? 'Monday', kind: o.kind ?? 'cardio', moves: [], exclusions: [], loggedSets: o.logged ?? 0, sayDay: o.say })
+  // (a) THE ADDED BLOCK
+  const add = await call({ logged: 2 })
+  const off = add.ok ? add.offer : null
+  check('a started session takes an added block', !!off?.added, add)
+  check('...the reason first: it stays as it is, and the cost of two kinds of work', !!off && /^You've started today's session, so it stays as it is and this adds a cardio block after it\./.test(off.advice[0] ?? '') && /next session to feel a little heavier/.test(off.advice[0] ?? ''), off?.advice)
+  const dayAfter = off ? off.week.days.find(d => d.day === 'Monday')! : null
+  check('...the started session is kept EXACTLY, every exercise and set, the block after it', !!dayAfter && J(dayAfter.exercises.slice(0, live.exercises.length)) === J(live.exercises) && dayAfter.exercises.length > live.exercises.length, dayAfter?.exercises.map(e => e.name))
+  check('...the offer\'s session is the block alone, and none of it is already on the day', !!off && !!dayAfter && J(off.session) === J(dayAfter.exercises.slice(live.exercises.length)) && off.session.every(e => !live.exercises.some(x => x.name === e.name)))
+  check('...no second warm-up in the block', !!off && off.session.every(e => e.tier !== 'tier_0_primer'), off?.session.map(e => [e.name, e.tier]))
+  check('...about twenty minutes, never past twenty-five', !!off && off.minutes > 0 && off.minutes <= 25, off?.minutes)
+  check('...the marker names the block, and keeps the started day as it was', !!dayAfter?.kind_today && J(dayAfter.kind_today.addedAfter) === J(off!.session.map(e => e.name)) && J(dayAfter.kind_today.planned.exercises) === J(live.exercises))
+  check('...no main lift is dropped by adding', !!off && off.droppedMainLift === null)
+  const words = off ? buildSessionKindTodayProposal(off, 'today') : null
+  check('...the words: "add a cardio block", the reason first, the minutes on top', !!words && /add a cardio block after today's session/.test(words.lead) && words.notes[0] === off!.advice[0] && words.notes.some(n => /minutes on top of your session/.test(n)), words)
+  check('...the line on the card names the block', !!off && describeKindToday([off.week], 2, 'Monday') === `A cardio block was added after today's session: ${off.session.map(e => e.name).join(', ')}.`, off ? describeKindToday([off.week], 2, 'Monday') : null)
+  // HYBRID binds the "no second main lift" rule: its main block takes a tier-1 compound first.
+  const hyFresh = await planSessionKindToday({ mesocycle: M_ONE, profile: ONE, weekNumber: 2, dayName: oneHybrid!.dayName, kind: 'hybrid', moves: [], exclusions: [], loggedSets: 0 })
+  const hyAdd = await planSessionKindToday({ mesocycle: M_ONE, profile: ONE, weekNumber: 2, dayName: oneHybrid!.dayName, kind: 'hybrid', moves: [], exclusions: [], loggedSets: 2 })
+  check('the case binds: a hybrid SESSION opens with a heavy main lift', hyFresh.ok && hyFresh.offer.session.some(e => getEntryTier(e.name) === 'tier1_compound'), hyFresh.ok ? hyFresh.offer.session.map(e => [e.name, getEntryTier(e.name)]) : hyFresh)
+  check('...but a hybrid BLOCK added after a started session takes no second heavy main lift', hyAdd.ok && hyAdd.offer.session.every(e => getEntryTier(e.name) !== 'tier1_compound'), hyAdd.ok ? hyAdd.offer.session.map(e => [e.name, getEntryTier(e.name)]) : hyAdd)
+  // A MOVE HE NAMES that the started session already holds is not put in twice.
+  const liveName = live.exercises.find(e => e.tier !== 'tier_0_primer' && getEntryTier(e.name) === 'tier2_compound')?.name ?? live.exercises[1].name
+  const dup = await planSessionKindToday({ mesocycle: M_FULL, profile: FULL, weekNumber: 2, dayName: 'Monday', kind: 'bodybuilding', moves: [liveName], exclusions: [], loggedSets: 2 })
+  const dupDay = dup.ok ? dup.offer.week.days.find(d => d.day === 'Monday')! : null
+  check('a named move already in the started session appears once on the day, never twice', !!dupDay && dupDay.exercises.filter(e => e.name === liveName).length === 1, dupDay?.exercises.map(e => e.name))
+  check('...and it is SAID, never silently dropped', dup.ok && dup.offer.asked.some(a => a.reason === `${liveName} ${/[^s]s(\s*\([^)]*\))?$/.test(liveName) ? 'are' : 'is'} already in today's session, so I haven't added ${/[^s]s(\s*\([^)]*\))?$/.test(liveName) ? 'them' : 'it'} again.`), dup.ok ? dup.offer.asked : dup)
+  const funcAdd = await call({ logged: 2, kind: 'functional' })
+  check('a functional block takes no explosive warm-up and no second heavy main lift', funcAdd.ok && funcAdd.offer.session.every(e => e.tier !== 'tier_0_primer' && getEntryTier(e.name) !== 'tier1_compound'), funcAdd.ok ? funcAdd.offer.session.map(e => [e.name, getEntryTier(e.name)]) : funcAdd)
+  // (b) UNDO OF AN ADDED BLOCK
+  const written = off ? confirmSessionKindToday(M_FULL, off) : null
+  const m2 = written?.ok ? written.mesocycle : M_FULL
+  const u1 = undoSessionKindToday(m2, 2, 'Monday', 2, live.exercises.slice(0, 1).map(e => e.name))
+  check('Undo takes the block off while none of IT is logged, leaving the started session exactly', u1.ok && J(dayIn(u1.mesocycle, 2, 'Monday')) === J(live), u1.ok ? undefined : u1)
+  const u2 = off ? undoSessionKindToday(m2, 2, 'Monday', 3, [off.session[0].name]) : null
+  check('...and keeps it once a set in the block is logged, saying so', !!u2 && !u2.ok && /logged sets in the cardio block/.test(u2.refusal), u2)
+  const u3 = undoSessionKindToday(m2, 2, 'Monday', 2)
+  check('...without the names, any logged set keeps it (the safe side), and the reason is true', !u3.ok && /^Sets are logged on that day/.test(u3.refusal), u3)
+  // A CHANGE SINCE THE BLOCK WENT ON: an exercise added after it (and logged) must never lose its row to the Undo.
+  const m2b = m2.map(w => w.week_number !== 2 ? w : { ...w, days: w.days.map(d => d.day !== 'Monday' ? d : { ...d, exercises: [...d.exercises, { ...d.exercises[1], name: 'Plank' }] }) })
+  const u5 = undoSessionKindToday(m2b, 2, 'Monday', 3, [live.exercises[0].name, 'Plank'])
+  check('Undo refuses once the day changed since the block went on, so nothing logged loses its row', !u5.ok && /changed that session since the cardio block went on/.test(u5.refusal), u5)
+  // THE SAME KIND AGAIN once the started sets are gone (count 0): it replaces the day, it is not "already a cardio session".
+  const againKind = await call({ meso: m2, kind: 'cardio' })
+  check('the same kind on a day carrying an added block (nothing logged now) replaces the day, never "already"', againKind.ok && !againKind.offer.added && J(kindTodayOf(againKind.offer.week.days.find(d => d.day === 'Monday'))?.planned.exercises) === J(live.exercises), againKind.ok ? undefined : againKind)
+  const twice = await call({ logged: 2, meso: m2, kind: 'functional' })
+  check('a second added block is refused in words until the first is put back', !twice.ok && /already added after today's session/.test(twice.refusal), twice)
+  // A day swapped to another kind and then started takes a block; Undo gives back the swapped day, marker and all.
+  const swappedOffer = offerOf(await call({ kind: 'functional' }))
+  const m3 = swappedOffer ? (confirmSessionKindToday(M_FULL, swappedOffer) as { ok: true; mesocycle: MesocycleWeek[] }).mesocycle : M_FULL
+  const onSwapped = await call({ logged: 2, meso: m3, kind: 'cardio' })
+  const m4 = onSwapped.ok ? (confirmSessionKindToday(m3, onSwapped.offer) as { ok: true; mesocycle: MesocycleWeek[] }).mesocycle : m3
+  const u4 = undoSessionKindToday(m4, 2, 'Monday', 2, [])
+  check('a swapped day, started, takes a block; Undo gives back the swapped day with its own marker', onSwapped.ok && u4.ok && J(dayIn(u4.mesocycle, 2, 'Monday')) === J(dayIn(m3, 2, 'Monday')), u4)
+  // ...and a new kind on that day (nothing logged now) starts from the day AS PLANNED, never the swapped session.
+  const fromSwapped = await call({ meso: m4, kind: 'bodybuilding' })
+  check('a new kind on a swapped-then-blocked day starts from the day as planned', fromSwapped.ok && J(kindTodayOf(fromSwapped.offer.week.days.find(d => d.day === 'Monday'))?.planned.exercises) === J(live.exercises), fromSwapped.ok ? kindTodayOf(fromSwapped.offer.week.days.find(d => d.day === 'Monday'))?.planned.focus : fromSwapped)
+  // (c) A REST DAY
+  const restDay = dayIn(M_FULL, 2, 'Tuesday')!
+  const rest = await call({ day: 'Tuesday', say: 'Tuesday' })
+  check('a rest day takes a session, the recovery cost first, in the day\'s name', rest.ok && /^Tuesday is a rest day, there to let you recover\./.test(rest.offer.advice[0] ?? ''), rest.ok ? rest.offer.advice : rest)
+  const mR = rest.ok ? (confirmSessionKindToday(M_FULL, rest.offer) as { ok: true; mesocycle: MesocycleWeek[] }).mesocycle : M_FULL
+  const uR = undoSessionKindToday(mR, 2, 'Tuesday', 0)
+  check('...and Undo gives the rest day back exactly', rest.ok && uR.ok && J(dayIn(uR.mesocycle, 2, 'Tuesday')) === J(restDay), uR)
+  // A PLANNED ACTIVITY day is a training day, never called a recovery day.
+  const actMeso = M_FULL.map(w => w.week_number !== 2 ? w : { ...w, days: w.days.map(d => d.day !== 'Tuesday' ? d : { ...d, plannedActivity: { activity: 'Brisk walk', duration: 20, targetRpe: 3, timing: 'standalone', reason: 'Easy movement' } as never }) })
+  const act = await call({ day: 'Tuesday', say: 'Tuesday', meso: actMeso })
+  check('a planned-activity day says the session replaces it, never "there to let you recover"', act.ok && act.offer.advice[0] === 'This replaces the planned activity on Tuesday, just this week.', act.ok ? act.offer.advice : act)
+  // (d) A LATER DAY THIS WEEK, in its own name
+  const thu = await call({ say: 'Thursday', kind: 'functional', meso: M_FULL })
+  const thuWords = thu.ok ? buildSessionKindTodayProposal(thu.offer, 'Thursday') : null
+  check('a later day\'s offer says "Just this week", never "Just today"', !!thuWords && thuWords.notes.some(n => /^Just this week/.test(n)) && !thuWords.notes.some(n => /^Just today/.test(n)), thuWords?.notes)
+  check('...its dropped main lift is "out on Thursday", never "out today"', !!thuWords && thuWords.notes.some(n => / is out on Thursday\b| are out on Thursday\b/.test(n)) && !thuWords.notes.some(n => /out today/.test(n)), thuWords?.notes)
+  check('...and its line says the day, "just this week"', thu.ok && /^Thursday is a functional session instead of .+, just this week\./.test(describeKindToday([thu.offer.week], 2, 'Monday', 'Thursday') ?? ''), thu.ok ? describeKindToday([thu.offer.week], 2, 'Monday', 'Thursday') : thu)
+  const thuNamed = await call({ say: 'Thursday', kind: 'functional', meso: M_FULL })
+  const named = await planSessionKindToday({ mesocycle: M_FULL, profile: FULL, weekNumber: 2, dayName: 'Monday', kind: 'functional', moves: ['zorbing'], exclusions: [], loggedSets: 0, sayDay: 'Thursday' })
+  check('...a move it cannot place says "Thursday\'s session", never "today\'s"', named.ok && named.offer.asked.some(a => /isn't in Thursday's session/.test(a.reason ?? '')) && thuNamed.ok, named.ok ? named.offer.asked : named)
 }
 
 console.log(`\n${ran} checks ran`)

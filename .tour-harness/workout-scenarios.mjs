@@ -64,7 +64,9 @@ const vPart = await verbs()
 check('A4. IT DOES NOT OFFER "missed", "rest", "move" OR "something else" ON A DAY ALREADY TRAINED ON',
   Array.isArray(vPart) && !vPart.some(v => ['missed', 'rest', 'move', 'something_else'].includes(v)), vPart)
 check('A5. ...and still offers the changes that act on what is left', Array.isArray(vPart) && vPart.includes('shorten'), vPart)
-check('A6. ...and does not offer to redraw a started session', Array.isArray(vPart) && !vPart.includes('rebuild') && !vPart.includes('kind'), vPart)
+check('A6. ...and does not offer to redraw a started session', Array.isArray(vPart) && !vPart.includes('rebuild'), vPart)
+// ADVISE, THEN ALLOW (fix 8, 28 Nov 2026): "a different kind" on a started session ADDS a block after it, never a redraw.
+check('A6b. ...while a different kind is offered, as a block added after it', Array.isArray(vPart) && vPart.includes('kind'), vPart)
 await shoot('workout-scenarios-part-trained')
 await escape()
 

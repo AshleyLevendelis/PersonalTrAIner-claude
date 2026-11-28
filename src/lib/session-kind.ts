@@ -74,6 +74,10 @@ export interface SessionKindOffer {
   plannedFocus: string
   droppedMainLift: { name: string; backOn: string | null } | null
   asked: AskedMove[]
+  /** The reasons, said before everything else (advise, then allow, fix 8): a rest day, a started session. */
+  advice: string[]
+  /** A block ADDED after a started session, not the day replaced. `session` is then the block alone. */
+  added: boolean
 }
 
 export type SessionKindPlan = { ok: true; offer: SessionKindOffer } | { ok: false; refusal: string }
@@ -90,9 +94,23 @@ export interface PlanSessionKindParams {
   moves?: string[]
   /** The compiled exclusion list — bans and dislikes. */
   exclusions: string[]
-  /** Working sets already logged today. A started session is never redrawn. */
+  /** Working sets already logged on the day. A started session is never redrawn: it takes an added block. */
   loggedSets: number
+  /** The day as he sees it in a sentence ("today", "Thursday"). Defaults to "today". */
+  sayDay?: string
 }
+
+/**
+ * AN ADDED BLOCK'S LENGTH (advise, then allow, fix 8; CSCS, mine): after part of a session he is warm and partly
+ * tired, so the block is about twenty minutes of the kind's own work, no second warm-up, and no second heavy main
+ * lift where anything else can fill a place. Twenty minutes is a conditioning session's floor (the 27 Nov "real
+ * work" line) and a sensible cap on top of training already done.
+ */
+const ADDED_BLOCK_SECONDS = 20 * 60
+const ADDED_BLOCK_CEILING_SECONDS = 25 * 60
+
+/** What a day's exercises are, by name and sets: an added block comes off only while the day is still this. */
+const exerciseFingerprint = (list: Exercise[]) => list.map(e => `${e.name}:${e.sets ?? 0}`).join('|')
 
 // ---------------------------------------------------------------------------
 // THE SESSIONS — the CSCS call, recorded in BACKLOG with its basis.
@@ -225,24 +243,36 @@ function kitWords(items: string[]): string {
  */
 export async function planSessionKindToday(p: PlanSessionKindParams): Promise<SessionKindPlan> {
   const { mesocycle, profile, weekNumber, dayName, kind } = p
+  const sayDay = p.sayDay ?? 'today'
+  const isToday = sayDay.toLowerCase() === 'today'
+  const daysSession = isToday ? "today's session" : `${sayDay}'s session`
   const option = SESSION_KINDS.find(k => k.kind === kind)
   if (!option) return { ok: false, refusal: "I can't build that kind of session." }
   const week = mesocycle.find(w => w.week_number === weekNumber)
   const live = week?.days.find(d => d.day === dayName)
-  if (!week || !live) return { ok: false, refusal: "I couldn't find today on your plan." }
+  if (!week || !live) return { ok: false, refusal: `I couldn't find ${isToday ? 'today' : sayDay} on your plan.` }
 
   // THE PLANNED DAY IS THE BASE, ALWAYS. A second request on a day already
   // swapped ("actually, make it functional") starts from what was planned, so
   // the main lift, the Undo and the offer all mean the session she was given.
+  // ADVISE, THEN ALLOW (his ruling 28 Nov 2026, fix 8; "Allow, with a warning" for two sessions on a day). A started
+  // session is never redrawn underneath him: it keeps every set and takes a block of the new kind on the end. A rest
+  // day takes the session, with the recovery cost first. Neither was possible before.
+  const addedMode = p.loggedSets > 0
   const marker = kindTodayOf(live)
-  const planned = marker?.planned ?? live
-  if (planned.exercises.length === 0) {
-    return { ok: false, refusal: `There's no session on ${dayName} to swap — it's a ${planned.plannedActivity ? 'planned activity' : 'rest'} day.` }
+  // An added block's marker keeps the started day as `planned`; replacing the day starts from what was PLANNED before
+  // any of it (the swapped day's own plan, if it had been swapped first).
+  const planned = addedMode ? live : marker?.addedAfter ? (marker.replaced?.planned ?? marker.planned) : (marker?.planned ?? live)
+  const advice: string[] = []
+  if (addedMode) {
+    if (marker?.addedAfter) return { ok: false, refusal: `A ${marker.label.toLowerCase()} block is already added after ${daysSession}. Put it back first if you want a different one.` }
+    advice.push(`You've started ${daysSession}, so it stays as it is and this adds a ${option.label.toLowerCase()} block after it. Two kinds of work in one day is fine; skip anything left of the planned session you won't get to, and expect your next session to feel a little heavier.`)
+  } else if (planned.exercises.length === 0 && planned.plannedActivity) {
+    advice.push(`This replaces the planned activity on ${isToday ? 'today' : sayDay}, just ${isToday ? 'for today' : 'this week'}.`)
+  } else if (planned.exercises.length === 0) {
+    advice.push(`${isToday ? 'Today' : sayDay} is a rest day, there to let you recover. An easy session costs little; a hard one makes your next planned session harder, so keep it comfortable if you can.`)
   }
-  if (p.loggedSets > 0) {
-    return { ok: false, refusal: "You've already logged sets in today's session, so I'll leave it as it is — a session you've started isn't one to redraw underneath you." }
-  }
-  if (marker?.kind === kind) return { ok: false, refusal: `Today is already a ${option.label.toLowerCase()} session.` }
+  if (!addedMode && marker?.kind === kind && !marker.addedAfter) return { ok: false, refusal: `${isToday ? 'Today' : sayDay} is already a ${option.label.toLowerCase()} session.` }
   if (option.style && option.style === (profile.training_style || 'hybrid')) {
     return { ok: false, refusal: `${option.label} is already how you train. For a different session of the same kind, "Give me a different session" rebuilds it and keeps your main lift.` }
   }
@@ -276,7 +306,7 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
       if (r.resolution === 'ambiguous') { asked.push({ said, reason: `I wasn't sure which ${said} you meant, so I left it out.` }); continue }
       const job = NOT_IN_CATALOGUE.find(n => n.re.test(said))
       if (job) standIns.push({ said, block: job.block })
-      else asked.push({ said, reason: `There's no ${said} in the app's exercise list, so it isn't in today's session.` })
+      else asked.push({ said, reason: `There's no ${said} in the app's exercise list, so it isn't in ${daysSession}.` })
       continue
     }
     // A near-copy resolves by name but is never put in a session (her ruling "Searchable, log-only"): say so, rather
@@ -286,7 +316,7 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
     // A MACHINE VERSION (4 Nov 2026, her "Machines swappable only") goes in as itself, judged as its parent: the pool
     // holds catalogue lifts only, so membership, a ban and the injury check read the lift it is a version of.
     const entry = copy && !copy.retired ? copy : undefined
-    if (!entry) { asked.push({ said, reason: `There's no ${said} in the app's exercise list, so it isn't in today's session.` }); continue }
+    if (!entry) { asked.push({ said, reason: `There's no ${said} in the app's exercise list, so it isn't in ${daysSession}.` }); continue }
     const poolName = entry.parent ?? entry.name
     if (!namedPool.some(e => e.name === poolName)) {
       if (exclusions.some(x => x.toLowerCase() === entry.name.toLowerCase() || x.toLowerCase() === poolName.toLowerCase())) {
@@ -302,6 +332,11 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
       } else {
         asked.push({ said, reason: `${entry.name} ${plural(entry.name) ? 'are' : 'is'} above the level your plan is set at, so I've left ${plural(entry.name) ? 'them' : 'it'} out.` })
       }
+      continue
+    }
+    // A MOVE THE STARTED SESSION ALREADY HOLDS is not added again, and is said, never silently dropped.
+    if (addedMode && live.exercises.some(x => x.name === entry.name)) {
+      asked.push({ said, reason: `${entry.name} ${plural(entry.name) ? 'are' : 'is'} already in ${daysSession}, so I haven't added ${plural(entry.name) ? 'them' : 'it'} again.` })
       continue
     }
     const home = recipe.order.find(b => !claimed.has(b.id) && blockAccepts(b, entry))
@@ -333,7 +368,8 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
   const taken = new Set<string>([...claimed.values(), ...extras].map(e => e.name))
   if (plannedMain) taken.add(plannedMain)
   let highImpact = [...claimed.values(), ...extras].filter(e => e.joint_stress === 'high' && e.mechanics_tier === 'cardio').length
-  let mainTaken = [...claimed.values(), ...extras].some(e => e.mechanics_tier === T1)
+  // An added block takes no second heavy main lift where anything else fills the place (ADDED_BLOCK_SECONDS).
+  let mainTaken = addedMode || [...claimed.values(), ...extras].some(e => e.mechanics_tier === T1)
   const usedGroups = new Map<string, number>()
   const useGroup = (e: ExerciseEntry) => { const g = e.substitution_group ?? e.name; usedGroups.set(g, (usedGroups.get(g) ?? 0) + 1) }
   for (const e of [...claimed.values(), ...extras]) if (e.mechanics_tier === 'cardio') useGroup(e)
@@ -343,6 +379,8 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
     for (const b of recipe.order) {
       const named = claimed.get(b.id)
       if (named) { picks.set(b.id, named); continue }
+      // No second warm-up in an added block: he is already warm.
+      if (addedMode && b.tiers.every(t => t === 'primer')) continue
       let candidates = pool.filter(e => blockAccepts(b, e) && !taken.has(e.name))
       if (b.tiers.includes('cardio')) {
         candidates = candidates.filter(e => (usedGroups.get(e.substitution_group ?? e.name) ?? 0) < GROUP_LIMIT)
@@ -358,6 +396,8 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
       // a one-off day should not hand her tomorrow's session early, and one
       // lift on two days would have to share one weight.
       if (candidates.some(e => !weekly.has(e.name))) candidates = candidates.filter(e => !weekly.has(e.name))
+      // An added block never repeats what the started session holds: a hard rule there, not a preference.
+      if (addedMode) candidates = candidates.filter(e => !live.exercises.some(x => x.name === e.name))
       if (candidates.length === 0) continue
       const ranked = orderCandidates(candidates, policy, profile.training_experience || 'novice', {
         trackPatterns: b.patterns.length > 0 ? b.patterns : ['activation'],
@@ -450,13 +490,16 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
 
   // SIZED TO HER SESSION LENGTH: blocks in priority order while the day, with
   // its own warm-up, fits the length she set. What she named is never sized out.
-  const target = getDurationBudgetSeconds(profile.session_duration_preference || '45-60')
-  const ceiling = getSessionMaximumSeconds(profile.session_duration_preference || '45-60')
-  const dayOf = (list: typeof pricedBlocks): WorkoutDay => rebuildWarmup({
-    day: dayName,
-    focus: `${option.label} session`,
-    exercises: [...list].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)).map(x => ({ ...x.ex })),
-  }, profile)
+  const target = addedMode ? ADDED_BLOCK_SECONDS : getDurationBudgetSeconds(profile.session_duration_preference || '45-60')
+  const ceiling = addedMode ? ADDED_BLOCK_CEILING_SECONDS : getSessionMaximumSeconds(profile.session_duration_preference || '45-60')
+  const dayOf = (list: typeof pricedBlocks): WorkoutDay => {
+    const day: WorkoutDay = {
+      day: dayName,
+      focus: `${option.label} session`,
+      exercises: [...list].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)).map(x => ({ ...x.ex })),
+    }
+    return addedMode ? day : rebuildWarmup(day, profile)
+  }
   const working = (list: typeof pricedBlocks) => list.filter(x => x.ex.tier !== 'tier_0_primer').length
   let chosen = pricedBlocks.filter(x => x.required)
   for (const id of [...recipe.priority]) {
@@ -481,10 +524,11 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
       said: st.said,
       reason: stand && block
         ? `There's no ${st.said} in the app's exercise list, so ${stand} ${plural(stand) ? 'do' : 'does'} ${block.job}.`
-        : `There's no ${st.said} in the app's exercise list, so it isn't in today's session.`,
+        : `There's no ${st.said} in the app's exercise list, so it isn't in ${daysSession}.`,
     })
   }
-  if (working(chosen) < 2) {
+  // An added block can be ONE piece (twenty minutes steady on a machine is a whole block); a session needs two.
+  if (working(chosen) < (addedMode ? 1 : 2)) {
     return { ok: false, refusal: `I can't build a ${option.label.toLowerCase()} session from what your kit, injuries and exercises to avoid leave, so ${dayName} stays as planned.` }
   }
   // THE TIME LEFT GOES ON WORK, the way generation's own duration top-up does
@@ -525,6 +569,39 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
   // a push:pull ratio over a week that has simply lost one session. A missed
   // day and an activity swap leave the rest of the week alone for the same
   // reason, and so does this: the planned week resumes tomorrow as written.
+  if (addedMode) {
+    // THE STARTED SESSION STAYS EXACTLY AS IT WAS: the block goes on the end, and nothing the settling tail would
+    // redo (set hierarchy, warm-up, weights) touches a lift he has logged sets against.
+    const block = dayOf(chosen).exercises.filter(e => !live.exercises.some(x => x.name === e.name))
+    const kept = { ...live }
+    delete kept.kind_today
+    const addedMarker: KindTodayMarker = {
+      kind, label: option.label, planned: kept, droppedMainLift: null,
+      addedAfter: block.map(e => e.name),
+      ...(marker ? { replaced: marker } : {}),
+    }
+    if (block.length === 0) return { ok: false, refusal: `I can't build a ${option.label.toLowerCase()} block from what your kit, injuries and exercises to avoid leave that isn't already in ${daysSession}.` }
+    const addedExercises = [...live.exercises, ...block]
+    addedMarker.addedLeft = exerciseFingerprint(addedExercises)
+    const addedDay: WorkoutDay = { ...live, exercises: addedExercises, kind_today: addedMarker }
+    const blockSeconds = estimateDaySeconds({ day: dayName, focus: addedDay.focus, exercises: block })
+    return {
+      ok: true,
+      offer: {
+        kind, label: option.label, weekNumber, dayName,
+        baseSignature: signatureOf(live, null),
+        week: { ...week, days: week.days.map(d => (d.day === dayName ? addedDay : d)) },
+        session: block,
+        minutes: Math.round(blockSeconds / 60),
+        overLength: blockSeconds > ceiling,
+        plannedFocus: live.focus,
+        droppedMainLift: null,
+        asked,
+        advice,
+        added: true,
+      },
+    }
+  }
   const fresh: WorkoutDay = {
     day: dayName,
     focus: `${option.label} session`,
@@ -557,6 +634,8 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
       plannedFocus: planned.focus,
       droppedMainLift: plannedMain ? { name: plannedMain, backOn: nextTimeDue(mesocycle, weekNumber, dayName, plannedMain) } : null,
       asked,
+      advice,
+      added: false,
     },
   }
 }
@@ -572,7 +651,7 @@ export function confirmSessionKindToday(
 ): { ok: true; mesocycle: MesocycleWeek[] } | { ok: false; refusal: string } {
   const live = mesocycle.find(w => w.week_number === offer.weekNumber)?.days.find(d => d.day === offer.dayName)
   if (!live || signatureOf(live, null) !== offer.baseSignature) {
-    return { ok: false, refusal: "Today's session has changed since I put that together, so nothing was changed. Ask again and I'll build it from what's there now." }
+    return { ok: false, refusal: "That session has changed since I put this together, so nothing was changed. Ask again and I'll build it from what's there now." }
   }
   return { ok: true, mesocycle: mesocycle.map(w => (w.week_number === offer.weekNumber ? offer.week : w)) }
 }
@@ -588,11 +667,27 @@ export function undoSessionKindToday(
   weekNumber: number,
   dayName: string,
   loggedSets: number,
+  /** The names of the exercises with working sets logged on the day: an added block comes off while none of IT is logged. */
+  loggedNames?: string[],
 ): { ok: true; mesocycle: MesocycleWeek[]; restored: string } | { ok: false; refusal: string } {
   const week = mesocycle.find(w => w.week_number === weekNumber)
   const day = week?.days.find(d => d.day === dayName)
   const marker = kindTodayOf(day)
-  if (!week || !day || !marker) return { ok: false, refusal: "Today is the session that was planned, so there's nothing to put back." }
+  if (!week || !day || !marker) return { ok: false, refusal: "That day is the session that was planned, so there's nothing to put back." }
+  if (marker.addedAfter) {
+    // AN ADDED BLOCK comes off while none of it is logged; without the names, any logged set holds it (the safe side).
+    // ONLY WHILE THE DAY IS STILL AS THE BLOCK LEFT IT (his 29 Oct rule): a swap, addition or move since would be
+    // undone with it, and work logged against it would lose its row.
+    if (marker.addedLeft && exerciseFingerprint(day.exercises) !== marker.addedLeft) {
+      return { ok: false, refusal: `You've changed that session since the ${marker.label.toLowerCase()} block went on, so I've left it as it is.` }
+    }
+    // Without the names (a caller that only counts), any logged set holds it: the safe side, said truthfully.
+    if (!loggedNames && loggedSets > 0) return { ok: false, refusal: `Sets are logged on that day, so I've left the ${marker.label.toLowerCase()} block on.` }
+    if (loggedNames && marker.addedAfter.some(n => loggedNames.includes(n))) return { ok: false, refusal: `You've logged sets in the ${marker.label.toLowerCase()} block, so it stays.` }
+    const back: WorkoutDay = marker.replaced ? { ...marker.planned, kind_today: marker.replaced } : marker.planned
+    const restoredWeek: MesocycleWeek = { ...week, days: week.days.map(d => (d.day === dayName ? back : d)) }
+    return { ok: true, mesocycle: mesocycle.map(w => (w.week_number === weekNumber ? restoredWeek : w)), restored: marker.planned.focus }
+  }
   if (loggedSets > 0) return { ok: false, refusal: `You've logged sets in today's ${marker.label.toLowerCase()} session, so it stays — ${dayName} is back to normal next week.` }
   const restoredWeek: MesocycleWeek = { ...week, days: week.days.map(d => (d.day === dayName ? marker.planned : d)) }
   return { ok: true, mesocycle: mesocycle.map(w => (w.week_number === weekNumber ? restoredWeek : w)), restored: marker.planned.focus }
@@ -615,22 +710,28 @@ function sessionItem(ex: Exercise): { name: string; dose: string } {
  * in the chat). Every note is a full sentence that starts like one.
  */
 export function buildSessionKindTodayProposal(offer: SessionKindOffer, when: string): { lead: string; items: { name: string; dose: string }[]; lines: string[]; notes: string[] } {
-  const lead = ask(`make ${when} a ${offer.label.toLowerCase()} session instead of ${offer.plannedFocus}`)
+  const lead = offer.added
+    ? ask(`add a ${offer.label.toLowerCase()} block after ${when === 'today' ? "today's" : `${when}'s`} session`)
+    : ask(`make ${when} a ${offer.label.toLowerCase()} session instead of ${offer.plannedFocus}`)
   const items = offer.session.map(sessionItem)
   const lines = items.map(i => `${i.name} — ${i.dose}`)
-  const notes: string[] = []
+  // THE REASONS FIRST (advise, then allow): a rest day, a started session.
+  const notes: string[] = [...offer.advice]
+  const outOn = when === 'today' ? 'today' : `on ${when}`
   for (const a of offer.asked) {
     if (a.included) continue
     if (a.reason) notes.push(a.reason)
   }
   if (offer.droppedMainLift) {
     notes.push(offer.droppedMainLift.backOn
-      ? `${offer.droppedMainLift.name} ${plural(offer.droppedMainLift.name) ? 'are' : 'is'} out today and back ${offer.droppedMainLift.backOn}, as planned. Missing ${plural(offer.droppedMainLift.name) ? 'them' : 'it'} today doesn't change the weight.`
-      : `${offer.droppedMainLift.name} ${plural(offer.droppedMainLift.name) ? 'are' : 'is'} out today. Missing ${plural(offer.droppedMainLift.name) ? 'them' : 'it'} today doesn't change the weight.`)
+      ? `${offer.droppedMainLift.name} ${plural(offer.droppedMainLift.name) ? 'are' : 'is'} out ${outOn} and back ${offer.droppedMainLift.backOn}, as planned. Missing ${plural(offer.droppedMainLift.name) ? 'them' : 'it'} doesn't change the weight.`
+      : `${offer.droppedMainLift.name} ${plural(offer.droppedMainLift.name) ? 'are' : 'is'} out ${outOn}. Missing ${plural(offer.droppedMainLift.name) ? 'them' : 'it'} doesn't change the weight.`)
   }
-  notes.push(offer.overLength
-    ? `About ${offer.minutes} minutes, which is longer than your usual because of what you asked for.`
-    : `About ${offer.minutes} minutes.`)
-  notes.push(SCOPE.today(offer.dayName))
+  notes.push(offer.added
+    ? `About ${offer.minutes} minutes on top of your session.`
+    : offer.overLength
+      ? `About ${offer.minutes} minutes, which is longer than your usual because of what you asked for.`
+      : `About ${offer.minutes} minutes.`)
+  notes.push(when === 'today' || offer.added ? SCOPE.today(offer.dayName) : SCOPE.thisWeek(offer.dayName))
   return { lead, items, lines, notes }
 }

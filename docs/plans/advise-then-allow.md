@@ -64,7 +64,30 @@ earlier ruling of his and wait for his word.
    deload week" and "will not go below the floor": true for a lasting change only. Builder D owns the why-sheet line
    (app-decisions.ts) that still says it is "refused in a deload week". A heavier step past the role ceiling or the session's time is not in
    this item (it moves nothing today and says why).
-8. [ ] **A different kind of session on any day this week**, not only today; a started session takes an added block.
+8. [~] **A different kind of session on any day this week**, not only today; a started session takes an added block.
+   SCREEN DONE 28 Nov 2026; COACH HALF OPEN. A later session day in this week's view offers "A different kind of
+   session on Thursday" from its peek, in that day's name ("Just this week"), saved in the plan week the day is in, with
+   its line and "Put my planned session back" on the peek. A started session (sets logged) is never redrawn: "Add a
+   different kind of block" adds about twenty minutes of the new kind after it (no second warm-up, no second heavy main
+   lift, nothing already on the day), the reason first ("You've started today's session, so it stays as it is ...
+   expect your next session to feel a little heavier"); "Take the added block off" works only while the day is still as
+   the block left it and none of the block is logged. The library also lets a REST day take a different kind with the
+   recovery cost first (the screen's rest-day card does not offer it: "Train anyway" is its road); a planned-activity
+   day is replaced with "This replaces the planned activity on X". CSCS, mine: an added block on top of training done
+   is ~20 min (a conditioning session's floor, the 27 Nov line), never a second heavy main lift. Reviewed
+   independently; its seven findings fixed or named below. `test:session-kind` §15 (22 mutations, all caught after three misses each got a check that binds),
+   `test:workout-scenarios`, `verify:session-kind` §7, §10 (4/4), `verify:workout-scenarios` A6b,
+   `verify:live-run-5` C3 (re-anchored to fix 2). NOT done: the added block skips the settling tail (to leave logged
+   lifts alone), so its lifts get no one-weight check against the rest of the week; the screen cannot prove the save
+   lands in NEXT plan week's row (its harness plan starts on a Monday), only by reading the code.
+   **Coach half: Builder B.** (1) `undoSessionKindToday(meso, week, day, loggedSets, loggedNames)`: pass the names of
+   the exercises with working sets logged that day, or an added block can never come off by chat (pending-action-
+   executor ~1500, ChatAssistant ~9123). (2) The coach's prompt (chat-gemini ~2851) still says the app refuses once a
+   set is logged; it now adds a block: offer it with the reason. (3) The card's other words assume a replacement
+   ("Here's today as a different kind of session", the "Today swapped" receipt, "Monday: Cardio session, N
+   exercises"); `offer.added` says which, and `buildSessionKindTodayProposal` already words both. (4) Confirm a card
+   built with nothing logged after sets ARE logged: rebuild the offer (it would now add a block) rather than replace the
+   started session. (5) `planSessionKindToday` takes `sayDay` for a day other than today.
 9. [ ] **An exercise added to a rest day makes it a training day** (session-edit.ts: "Make it a training day
    first").
 10. [ ] **A past or future day's exercises have the full menu** (swap, remove, move, add), and a swap that cannot

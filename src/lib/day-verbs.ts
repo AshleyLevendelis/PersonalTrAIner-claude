@@ -80,7 +80,11 @@ export function dayVerbs(d: DayVerbInput): DayVerb[] {
     // one in words was two answers; rebuilding had no refusal at all and would have dropped the lift she had
     // just logged from today's card. Shorter and lighter act on what is left, so they stay.
     if (d.canRebuild && !d.partlyLogged) out.push('rebuild')
-    if (d.canKind && !d.partlyLogged) out.push('kind')
+    // ADVISE, THEN ALLOW (fix 8, 28 Nov 2026): a started session is still not redrawn, it takes an ADDED block of the
+    // new kind, so the verb is offered on a part-trained day too.
+    if (d.canKind) out.push('kind')
   }
+  // A LATER DAY THIS WEEK can be a different kind too (fix 8): the same trial and Undo, written to that day's row.
+  if (!d.isPast && !d.isToday && d.canKind && !d.declared.rest && !d.declared.swapped) out.push('kind')
   return out
 }

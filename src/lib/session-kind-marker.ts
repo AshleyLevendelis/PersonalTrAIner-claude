@@ -70,6 +70,16 @@ export interface KindTodayMarker {
   planned: WorkoutDay
   /** The planned main lift this day dropped, if it had one. */
   droppedMainLift: string | null
+  /**
+   * A BLOCK ADDED AFTER A STARTED SESSION (advise, then allow, fix 8, 28 Nov 2026): the names added on the end. The
+   * session he started stays exactly as it was (`planned` is it), so Undo takes off only these, and only while none
+   * of them is logged. Absent on a replaced day.
+   */
+  addedAfter?: string[]
+  /** The marker the day carried before the block was added (a swapped day he then started), put back by Undo. */
+  replaced?: KindTodayMarker
+  /** The day's exercises as the block left them (names and sets); Undo acts only while the day is still this. */
+  addedLeft?: string
 }
 
 export function kindTodayOf(day: WorkoutDay | undefined | null): KindTodayMarker | null {
@@ -102,11 +112,15 @@ export function nextTimeDue(mesocycle: MesocycleWeek[], weekNumber: number, dayN
  * Exercise tab, beside "Put my planned session back". Read off the stored
  * marker and the plan, so it is the same sentence after a reload.
  */
-export function describeKindToday(mesocycle: MesocycleWeek[], weekNumber: number, dayName: string): string | null {
+export function describeKindToday(mesocycle: MesocycleWeek[], weekNumber: number, dayName: string, sayDay = 'Today'): string | null {
   const day = mesocycle.find(w => w.week_number === weekNumber)?.days.find(d => d.day === dayName)
   const marker = kindTodayOf(day)
   if (!marker) return null
-  const lead = `Today is a ${marker.label.toLowerCase()} session instead of ${marker.planned.focus}, just for today.`
+  const isToday = sayDay.toLowerCase() === 'today'
+  if (marker.addedAfter) {
+    return `A ${marker.label.toLowerCase()} block was added after ${isToday ? "today's" : `${sayDay}'s`} session: ${marker.addedAfter.join(', ')}.`
+  }
+  const lead = `${isToday ? 'Today' : sayDay} is a ${marker.label.toLowerCase()} session instead of ${marker.planned.focus}, just ${isToday ? 'for today' : 'this week'}.`
   const main = marker.droppedMainLift
   if (!main) return lead
   const back = nextTimeDue(mesocycle, weekNumber, dayName, main)

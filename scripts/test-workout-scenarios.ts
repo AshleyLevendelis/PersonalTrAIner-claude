@@ -251,7 +251,10 @@ async function main() {
   check('A DAY WITH WORKING SETS ALREADY LOGGED IS NOT OFFERED "missed", "rest" OR "move" (each would be ignored by the strip, which ranks logged work first)',
     !verbs.includes('missed') && !verbs.includes('rest') && !verbs.includes('move'), verbs)
   check('...and still offers the changes that act on what is left (shorten, lighter)', verbs.includes('shorten') && verbs.includes('lighter'), verbs)
-  check('...and never redraws a started session (no rebuild, no different kind)', !verbs.includes('rebuild') && !verbs.includes('kind'), verbs)
+  check('...and never redraws a started session (no rebuild)', !verbs.includes('rebuild'), verbs)
+  // ADVISE, THEN ALLOW (fix 8, 28 Nov 2026): "a different kind" on a started session ADDS a block after it and keeps
+  // every set (test:session-kind §15 holds that it never redraws), so the verb is offered.
+  check('...while a different kind is offered, as a block added after it', verbs.includes('kind'), verbs)
   // Home's "done" and the strip's "done" are one rule: every planned set, not the right NUMBER of sets on the wrong
   // exercises. Nine sets planned; nine logged, but all on the first exercise.
   fresh()

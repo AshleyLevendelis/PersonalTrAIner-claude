@@ -133,18 +133,33 @@ check('7a. one set is logged with the row\'s own tick', ticked === true)
 await wait(800)
 check('7b. the menu opens', (await openSheet()) === 'open')
 const verbs7 = await ev(`[...document.querySelectorAll('[data-testid="what-happened-verbs"] [data-verb]')].map(b => b.getAttribute('data-verb'))`)
-if (verbs7.includes('kind')) {
-  await click('[data-verb="kind"]'); await wait(300)
-  await click('[data-kind="functional"]')
-  const err = await until(() => text('[data-testid="what-happened-error"]'), t => t.length > 0, 30)
-  check('7c. asking for another kind once a set is logged is refused, in words', /already logged sets/.test(err), err)
-} else {
-  check('7c. once a set is logged the verb is not offered at all', !verbs7.includes('kind'), verbs7)
-}
+// ADVISE, THEN ALLOW (his ruling 28 Nov 2026, fix 8): a started session is still never redrawn; it takes a block of
+// the new kind ADDED after it, the reason said first, and the block comes off again while none of it is logged.
+const kindLabel7 = await text('[data-verb="kind"]')
+check('7c. once a set is logged the verb is still offered, as an ADDED block', verbs7.includes('kind') && kindLabel7 === 'Add a different kind of block', { verbs7, kindLabel7 })
+const order7 = await order()
+await click('[data-verb="kind"]'); await wait(300)
+check('7c2. ...it says the started session stays as it is', /started today.s session, so it stays as it is and a block of the new kind goes on the end/.test(await text('[data-testid="kind-what-changes"]')), await text('[data-testid="kind-what-changes"]'))
+await click('[data-kind="functional"]')
+const offer7 = await until(() => text('[data-testid="what-happened-kind-offer"]'), t => t.length > 0, 40)
+const notes7 = await ev(`[...document.querySelectorAll('[data-testid="kind-offer-notes"] p')].map(p => p.innerText.trim())`)
+check('7c3. the offer adds a functional block, the reason first', /add a functional block after today's session/i.test(offer7) && /^You've started today's session, so it stays as it is/.test(notes7?.[0] ?? ''), { offer7: offer7.slice(0, 200), notes7 })
+check('7c4. ...its button says "Add this block"', (await text('[data-testid="kind-confirm"]')) === 'Add this block')
+await shoot('session-kind-added-offer')
+check('7c5. adding it', await click('[data-testid="kind-confirm"]') && (await untilClosed()) === false)
+const order7b = await until(order, o => Array.isArray(o) && o.length > order7.length, 30)
+check('7c6. ...the started session is all still there, in order, with the block after it', Array.isArray(order7b) && JSON.stringify(order7b.slice(0, order7.length)) === JSON.stringify(order7) && order7b.length > order7.length, { order7, order7b })
+const note7 = await until(() => text('[data-testid="kind-today-note"]'), t => /block was added/.test(t), 20)
+check('7c7. ...and the card says so', /^A functional block was added after today's session: /.test(note7), note7)
+check('7c8. the way back reads "Take the added block off"', (await text('[data-testid="kind-today-undo"]')) === 'Take the added block off')
+await shoot('session-kind-added')
+check('7c9. tapping it', await click('[data-testid="kind-today-undo"]'))
+const order7c = await until(order, o => JSON.stringify(o) === JSON.stringify(order7), 30)
+check('7c10. ...takes the block off and leaves the started session exactly', JSON.stringify(order7c) === JSON.stringify(order7), { order7, order7c })
 await escape()
 const undoNow = await click('[data-testid="kind-today-undo"]')
 const undoErr = await until(() => text('[data-testid="kind-today-error"]'), t => t.length > 0, 20)
-check('7d. and the put-back is refused once a set is logged, so the logged set keeps its session', undoNow && /logged sets/.test(undoErr), undoErr)
+check('7d. and the put-back of the cardio session is refused once a set is logged, so the logged set keeps its session', undoNow && /logged sets/.test(undoErr), undoErr)
 await shoot('session-kind-started')
 
 // --- 9. the running button logs the whole cardio session (QA walk, 10 Nov 2026: it stuck on "Elliptical × 1200",
@@ -161,6 +176,43 @@ for (let i = 0; i < 40; i++) {
 }
 await shoot('session-kind-cardio-logged')
 check('9a. the running button logs every block of the cardio day, the steady one included, without stalling', stalled === null && presses >= 3, { presses, stalled })
+
+// --- 10. A LATER DAY THIS WEEK (fix 8) ----------------------------------------------------------------------------
+// The menu opened on a later day's peek offers a different kind of session for THAT day, in its own name, and the
+// peek of that day says so and puts it back.
+await go('&tour=off&load=10', '#/tab/exercise')
+await until(order, o => Array.isArray(o) && o.length >= 4, 40)
+const today10 = await ev(`document.querySelector('[data-strip-date]')?.getAttribute('data-strip-date')`)
+const futures = await ev(`[...document.querySelectorAll('[data-strip-date]')].map(b => b.getAttribute('data-strip-date')).filter(d => d > ${JSON.stringify(today10)})`)
+let peeked = null, before10 = null
+for (const date of futures ?? []) {
+  await clickAt(`document.querySelector('[data-strip-date="${date}"]')`); await wait(900)
+  const rows = await text('[data-testid="peek-plan"]')
+  if (/\b([3-9]|\d\d) exercises\b/.test(rows)) { peeked = date; before10 = rows; break }
+}
+check('10a. a later day with a session is peeked', !!peeked, futures)
+const dayName10 = peeked ? new Date(`${peeked}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long' }) : ''
+check('10b. its menu offers a different kind of session on that day, by name', (await openSheet()) === 'open' && (await text('[data-verb="kind"]')) === `A different kind of session on ${dayName10}`, await text('[data-verb="kind"]'))
+await click('[data-verb="kind"]'); await wait(300)
+check('10c. ...saying it is for that day, this week only', new RegExp(`changes for ${dayName10}, this week only`).test(await text('[data-testid="kind-what-changes"]')), await text('[data-testid="kind-what-changes"]'))
+await click('[data-kind="cardio"]')
+const notes10 = await until(() => ev(`[...document.querySelectorAll('[data-testid="kind-offer-notes"] p')].map(p => p.innerText.trim())`), v => Array.isArray(v) && v.length > 0, 40)
+check('10d. the offer names the day and says "Just this week", never "Just today"', (notes10 ?? []).some(n => /^Just this week/.test(n)) && !(notes10 ?? []).some(n => /^Just today/.test(n)) && new RegExp(`make ${dayName10} a cardio session`, 'i').test(await text('[data-testid="what-happened-kind-offer"]')), notes10)
+await shoot('session-kind-later-offer')
+check('10e. using it', await click('[data-testid="kind-confirm"]') && (await untilClosed()) === false)
+const note10 = await until(() => text('[data-testid="peek-kind-note"]'), t => t.length > 0, 30)
+check('10f. the peek of that day says it, in its name, "just this week"', new RegExp(`^${dayName10} is a cardio session instead of .+, just this week\\.`).test(note10), note10)
+const rows10 = await text('[data-testid="peek-plan"]')
+check('10g. ...and shows the cardio session', JSON.stringify(rows10) !== JSON.stringify(before10), { before10, rows10 })
+await shoot('session-kind-later-applied')
+// SAVED, NOT ONLY DRAWN (fix 8's review): the saved plan row for that day's week carries the cardio session. (The
+// harness keeps no data across a reload, so the saved rows are read directly.)
+const saved10 = await ev(`(() => { const rows = window.__fakeDb?.mesocycle_weeks ?? []; return rows.map(r => (Array.isArray(r.days) ? r.days : []).filter(d => d.kind_today?.kind === 'cardio').map(d => d.day)).flat() })()`)
+check('10g2. the later day was SAVED as the cardio session, in its own row', Array.isArray(saved10) && saved10.includes(dayName10), saved10)
+check('10h. "Put my planned session back" on the peek', await click('[data-testid="peek-kind-undo"]'))
+const back10 = await until(() => text('[data-testid="peek-plan"]'), o => o === before10, 30)
+check('10i. ...puts that day\'s planned session back exactly', back10 === before10, { before10, back10 })
+check('10j. ...and the line is gone', (await until(() => has('[data-testid="peek-kind-note"]'), v => v === false, 12)) === false)
 
 check('8. no uncaught error on the page', (await ev('window.__err ?? null')) === null, await ev('window.__err ?? null'))
 await finish('verify:session-kind PASSED')

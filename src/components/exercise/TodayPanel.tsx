@@ -562,13 +562,15 @@ export function TodayPanel({
     undoText?: string,
     /** Something the change costs, said after those words (ScreenEditRecord.note). */
     undoNote?: string | null,
+    /** The plan week the change is in: a later day can be in the next one (fix 8's review). Defaults to today's. */
+    weekNumber: number = liveWeek,
   ): Promise<string | null> => {
     if (!profileId || !mesocycle) return 'No plan to edit.'
     if (!next.changed) return say(next.refusal ?? "That couldn't be changed.")
     onMesocycleUpdated?.(next.mesocycle)
     try {
       // Kept on the phone and sent later when there is no signal (mesocycle-persistence, 10 Nov 2026).
-      await saveScopedEdit(profileId, next.mesocycle, liveWeek, scope, { keepOffline: true })
+      await saveScopedEdit(profileId, next.mesocycle, weekNumber, scope, { keepOffline: true })
     } catch (err) {
       console.error('[session-edit] save failed', err)
       onMesocycleUpdated?.(mesocycle)
@@ -731,34 +733,52 @@ export function TodayPanel({
    * (session-kind.ts): the trial, the write, the put-back. Scope 'today'.
    */
   const loggedWorkingToday = logs.filter(l => !l.is_warmup).length
+  /** The names with working sets logged today: an added block comes off while none of IT is logged (fix 8). */
+  const loggedNamesToday = [...new Set(logs.filter(l => !l.is_warmup).map(l => l.exercise_name))]
+  /**
+   * THE DAY THE MENU WAS OPENED FOR (advise, then allow, fix 8): today, or a later day this week from its peek. A
+   * later day's reference is read off its own week-strip cell, in its own plan week, so the edit lands in its row.
+   */
+  const kindRefFor = (date: string | null | undefined): SessionRef | null => {
+    if (!date || date === today) return todayRef
+    // NEVER TODAY BY DEFAULT: a day that cannot be found is said, never silently swapped for today's row.
+    const cell = stripWeek.days.find(d => d.date === date) ?? weekTrain.days.find(d => d.date === date)
+    return cell ? sessionRefFromCell(cell, cell.planWeek ?? liveWeek) : null
+  }
   const kindPlan = async (kind: SessionKind, moves: string[]): Promise<SessionKindPlan> => {
     if (!profile || !mesocycle) return { ok: false, refusal: 'No plan to edit.' }
-    const target = editTarget(todayRef)
+    const ref = kindRefFor((whatHappened ?? tourWhatHappened)?.date)
+    if (!ref) return { ok: false, refusal: "I can't see that day just now. Close this and open it again." }
+    const isToday = ref.date === today
+    const target = editTarget(ref)
     if (!target.ok) return { ok: false, refusal: target.refusal }
     const { planSessionKindToday } = await import('@/lib/session-kind')
     const plan = await planSessionKindToday({
-      mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, kind, moves, exclusions, loggedSets: loggedWorkingToday,
+      mesocycle, profile, weekNumber: ref.weekNumber, dayName: target.planDayName, kind, moves, exclusions,
+      loggedSets: isToday ? loggedWorkingToday : 0, sayDay: isToday ? 'today' : ref.sayDay,
     })
-    return plan.ok ? plan : { ok: false, refusal: say(plan.refusal) ?? plan.refusal }
+    return plan.ok ? plan : { ok: false, refusal: sayDayIn(plan.refusal, ref) ?? plan.refusal }
   }
   const kindConfirm = async (offer: SessionKindOffer): Promise<string | null> => {
     if (!mesocycle) return 'No plan to edit.'
     const { confirmSessionKindToday } = await import('@/lib/session-kind')
     const done = confirmSessionKindToday(mesocycle, offer)
     if (!done.ok) return done.refusal
-    return applySessionEdit({ mesocycle: done.mesocycle, changed: true }, 'today')
+    // Saved in the plan week the day is in, which for a later day can be next week's.
+    return applySessionEdit({ mesocycle: done.mesocycle, changed: true }, 'today', undefined, undefined, offer.weekNumber)
   }
   const [kindBusy, setKindBusy] = useState(false)
   const [kindError, setKindError] = useState<string | null>(null)
-  const kindUndo = async () => {
+  const kindUndo = async (ref: SessionRef = todayRef) => {
     if (!mesocycle) return
-    const target = editTarget(todayRef)
+    const target = editTarget(ref)
     if (!target.ok) { setKindError(target.refusal); return }
     const { undoSessionKindToday } = await import('@/lib/session-kind')
-    const back = undoSessionKindToday(mesocycle, liveWeek, target.planDayName, loggedWorkingToday)
-    if (!back.ok) { setKindError(say(back.refusal)); return }
+    const isToday = ref.date === today
+    const back = undoSessionKindToday(mesocycle, ref.weekNumber, target.planDayName, isToday ? loggedWorkingToday : 0, isToday ? loggedNamesToday : [])
+    if (!back.ok) { setKindError(sayDayIn(back.refusal, ref)); return }
     setKindBusy(true); setKindError(null)
-    const failed = await applySessionEdit({ mesocycle: back.mesocycle, changed: true }, 'today')
+    const failed = await applySessionEdit({ mesocycle: back.mesocycle, changed: true }, 'today', undefined, undefined, ref.weekNumber)
     setKindBusy(false)
     if (failed) setKindError(failed)
   }
@@ -1834,6 +1854,16 @@ export function TodayPanel({
                 </span>
               </InsightBanner>
             )}
+            {/* A LATER DAY MADE A DIFFERENT KIND (fix 8): its line and its way back, where the day is looked at. */}
+            {peekRef && kindTodayOf(peekWorkout) && mesocycle && (
+              <div className="space-y-1 rounded-lg border border-border/60 p-3" data-testid="peek-kind-note">
+                <p className="text-xs text-muted-foreground">{describeKindToday(mesocycle, peekRef.weekNumber, peekRef.planDayName, peekRef.date === today ? 'Today' : peekRef.sayDay)}</p>
+                {peekRef.date > today && (
+                  <Button size="sm" variant="outline" className="min-h-11" disabled={kindBusy} onClick={() => void kindUndo(peekRef)} data-testid="peek-kind-undo">Put my planned session back</Button>
+                )}
+                {kindError && <p className="text-xs text-destructive" role="alert" data-testid="peek-kind-error">{kindError}</p>}
+              </div>
+            )}
             {peekDidLogs.length > 0 && <PeekWhatYouDid logs={peekDidLogs} />}
             {peekDidLogs.length > 0 && (
               <p className="px-1 text-[0.65625rem] uppercase tracking-[.2em] text-muted-foreground" data-testid="peek-planned-label">Planned</p>
@@ -2022,7 +2052,7 @@ export function TodayPanel({
           {kindTodayOf(workout) && mesocycle && (
             <div className="space-y-1 rounded-lg border border-border/60 p-3" data-testid="kind-today-note">
               <p className="text-xs text-muted-foreground">{describeKindToday(mesocycle, liveWeek, todayRef.planDayName)}</p>
-              <Button size="sm" variant="outline" className="min-h-11" disabled={kindBusy} onClick={kindUndo} data-testid="kind-today-undo">Put my planned session back</Button>
+              <Button size="sm" variant="outline" className="min-h-11" disabled={kindBusy} onClick={() => void kindUndo()} data-testid="kind-today-undo">{kindTodayOf(workout)?.addedAfter ? 'Take the added block off' : 'Put my planned session back'}</Button>
             </div>
           )}
           {kindError && <p className="text-xs text-destructive" data-testid="kind-today-error">{kindError}</p>}

@@ -150,7 +150,10 @@ const strip = await ev(`[...document.querySelectorAll('[data-strip-day]')].map(n
 await tapExpr(q('[data-testid="strip-today"]')); await wait(900)
 const monLabel = (strip ?? []).find(l => (l ?? '').startsWith(`${R5?.mondayName}: `)) ?? null
 check('C2. Monday is marked trained on the strip (the input this check stands on)', !!monLabel && /: done/.test(monLabel), { monLabel, strip })
-check('C3. A SESSION ALREADY TRAINED THIS WEEK IS NOT OFFERED (Monday\'s)', !labels.some(l => l.startsWith(`${R5?.mondayName} ·`)), labels)
+// RE-ANCHORED 28 Nov 2026 (advise, then allow, fix 2): a session already trained this week IS offered now, as a repeat,
+// last, and said to be done; the sessions still owed come first.
+const monIdx = labels.findIndex(l => l.startsWith(`${R5?.mondayName} ·`))
+check('C3. A SESSION ALREADY TRAINED THIS WEEK IS OFFERED LAST, AS A REPEAT (Monday\'s)', monIdx === labels.length - 1 && /· done, repeat it$/.test(labels[monIdx] ?? ''), labels)
 check('C4. ...while the sessions still owed are (more than one)', labels.length >= 2, labels)
 await shoot('live-run-5-train-anyway')
 const pick = labels[0] ?? ''
