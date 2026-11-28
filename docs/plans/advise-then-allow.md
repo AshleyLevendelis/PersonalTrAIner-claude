@@ -69,8 +69,14 @@ earlier ruling of his and wait for his word.
   **ANSWERED 28 Nov 2026: "Allow, with a warning"** (over cardio only, and over keeping one a day). It REVERSES his
   8 Sep ruling: a day may hold two sessions; the card says the recovery cost first, then lets him. Unblocks fixes 8,
   14, 15 and moves onto a busy day.
-- **Near-copies prescribable** (his 3 Nov "Searchable, log-only"): adding or swapping in a version of an exercise
-  priced from its parent, with advice.
+- [x] **Near-copies prescribable** (his 3 Nov "Searchable, log-only"): adding or swapping in a version of an exercise
+  priced from its parent, with advice. **ANSWERED 28 Nov 2026: "Yes, with a note"** (over keeping log-only): he may add
+  or swap one in, priced from its parent, the card naming the plan's own choice; the generator still never picks one.
+- [x] **The screen's injury stop** (found in fix 4; his 13 Sep "show everything, warn me"). **ANSWERED 28 Nov 2026:
+  "Stop it on the screen too"** (over the warning only): a move his injuries list excludes stays visible in the add
+  and swap searches, greyed with the reason, and cannot be picked, as the coach already refuses.
+- [x] **Shortening when warm-up + main lift alone is over the time** (fix 6). **ANSWERED 28 Nov 2026: "Keep it whole,
+  say the real time"** (over cutting main-lift sets): his 13 Sep "protect the main lift" stands; nothing to build.
 
 ## Kept, not refusals
 

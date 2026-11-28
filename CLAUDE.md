@@ -1926,6 +1926,12 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
 - **A day may hold two sessions: his ruling 28 Nov 2026, "Allow, with a warning"** (over cardio only and over one a
   day): it REVERSES his 8 Sep "a day never holds two sessions". Training on a day that already has a session, moving
   a session onto a busy day and cardio on top are allowed on both surfaces; the card states the recovery cost first.
+- **His three answers of 28 Nov 2026 on advise-then-allow**: (1) **"Stop it on the screen too"**: a move his injuries
+  list excludes is greyed with the reason in the screen's add and swap searches and cannot be picked (narrows his
+  13 Sep "show everything, warn me" for injuries only). (2) **Near-copies "Yes, with a note"**: he may add or swap in
+  a near-copy, priced from its parent, the card naming the plan's own choice; the generator never picks one (narrows
+  his 3 Nov "Searchable, log-only" to the generator). (3) **Shortening: "Keep it whole, say the real time"**: when
+  warm-up and main lift alone exceed the time asked, the main lift keeps every set and the card says the real minutes.
 - **The app does what he asks and advises around it: his ruling 28 Nov 2026** ("The app should be able to do whatever I
   ask it but give reasons or advise around it. Ie make suggestions for changes or recommendations to not train with
   reasons why"): a request the plan advises against is offered with its cost and the better option; only the unsafe is
