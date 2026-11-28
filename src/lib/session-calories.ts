@@ -9,6 +9,7 @@
 // next read until the row holds it.
 // ---------------------------------------------------------------------------
 import { supabase } from './supabase'
+import { watchCardioAt } from './watch-cardio-live'
 import { isMissingColumnError } from './missing-column'
 
 const key = (profileId: string, date: string) => `fitplan_session_kcal_${profileId}_${date}`
@@ -72,7 +73,6 @@ export function subscribeSessionCalories(l: () => void): () => void {
 // (sent to the database at most once a minute), so ending on the phone alone still has them; a cardio workout keeps its
 // latest count, so a walk ended on the phone takes the watch's figure, not an estimate or nothing.
 // ---------------------------------------------------------------------------
-const CARDIO_KEY = 'fitplan_watch_cardio_kcal'
 const SEND_EVERY_MS = 60_000
 let lastSentAt = 0
 
@@ -86,18 +86,17 @@ export async function noteWatchRunningKcal(profileId: string, e: Record<string, 
     listeners.forEach(l => l())
     // The workout's LAST count (the watch marks it, 27 Nov 2026) is saved at once, never held back a minute.
     if (e.final === true || now - lastSentAt >= SEND_EVERY_MS) { lastSentAt = now; if (await send(profileId, e.date, kcal)) keep(profileId, e.date, null) }
-  } else if (e.kind === 'cardio' && typeof e.activity === 'string') {
-    try { localStorage.setItem(CARDIO_KEY, JSON.stringify({ activity: e.activity, startedAt, kcal })) } catch { /* the end event still carries it */ }
   }
+  // A CARDIO workout's running count is kept with its steps (watch-cardio-live.ts), under the same freshness and End
+  // rule (the lead's review, 28 Nov 2026).
 }
 
-/** The watch's count for a workout of this name started within two minutes of `startedAtIso`, or null. */
-export function watchCardioKcalFor(activity: string, startedAtIso: string): number | null {
-  try {
-    const v = JSON.parse(localStorage.getItem(CARDIO_KEY) ?? 'null') as { activity?: string; startedAt?: number; kcal?: number } | null
-    const start = Date.parse(startedAtIso)
-    if (!v || typeof v.startedAt !== 'number' || !Number.isFinite(start)) return null
-    if ((v.activity ?? '').trim().toLowerCase() !== activity.trim().toLowerCase() || Math.abs(v.startedAt - start) >= 120_000) return null
-    return sessionKcal(v.kcal)
-  } catch { return null }
+/**
+ * The watch's calories for this workout as they stood at End: its last count at or before `endedAtIso`, and only if
+ * the watch sent it in the minute before (watch-cardio-live.ts, the same rule as its steps). Null otherwise.
+ */
+export function watchCardioKcalFor(activity: string, startedAtIso: string, endedAtIso: string): number | null {
+  const end = Date.parse(endedAtIso)
+  if (!Number.isFinite(end)) return null
+  return watchCardioAt(activity, startedAtIso, end)?.kcal ?? null
 }

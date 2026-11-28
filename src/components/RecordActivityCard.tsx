@@ -228,7 +228,7 @@ export function RecordActivityCard({ profileId, date, body, noHeartBands, onLogg
   const log = (effort: EffortKey, byZone: number | null = null) => {
     if (!figures) return
     // The watch app's own count for this workout, when it ran it (27 Nov 2026: his walk had no calories).
-    const view = logRecording({ profileId, date, recording: rec, figures, effort, watchKcal: watchCardioKcalFor(rec.activity, rec.startedAt) })
+    const view = logRecording({ profileId, date, recording: rec, figures, effort, watchKcal: rec.endedAt ? watchCardioKcalFor(rec.activity, rec.startedAt, rec.endedAt) : null })
     if (!view) { setError("That didn't save. Try again in a moment."); return }
     setLogged({ view, samples: samples ?? [], start, end, name, zone: byZone })
     onLogged?.(view)

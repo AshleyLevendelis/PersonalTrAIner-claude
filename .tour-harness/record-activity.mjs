@@ -262,4 +262,21 @@ check('E3. ...the STORE\'s distance (3.84 km: the watch kept no GPS route), and 
 await ev(`document.querySelector('[data-record-card]').scrollIntoView({ block: 'start' })`)
 await shoot('record-activity-7-watch-steps-end')
 
+console.log('\n  F. A WALK WITH A REAL GPS ROUTE ON THE WATCH: ITS STEPS AND THE ROUTE\'S LENGTH')
+await openExercise('&clear-storage=1&health=android')
+await openChooser()
+await pick('Walk')
+await clickAt(`document.querySelector('[data-testid="own-cardio-start"]')`)
+await until(card, v => v === 'recording', 30)
+await wait(500)
+await ev(`window.__watchCardio(2138, 1802, { routeM: 1750 })`); await wait(400)
+await ev(`document.querySelector('[data-record-end]').scrollIntoView({ block: 'center' })`)
+await clickAt(`document.querySelector('[data-record-end]')`)
+await until(() => ev(`!!document.querySelector('[data-record-figures] [data-figure="time"]')`), v => v === true, 40)
+check('F1. End: the watch\'s 2,138 steps and the ROUTE\'s 1.75 km (never the watch\'s other 1.80 or the store\'s 3.84), "Steps and distance from your watch."',
+  /^2,138 steps$/i.test((await figure('steps')) ?? '') && /^1\.75 km distance$/i.test((await figure('distance')) ?? '') && (await ev(`document.querySelector('[data-record-steps-watch]')?.textContent.trim() ?? null`)) === 'Steps and distance from your watch.',
+  [await figure('steps'), await figure('distance'), await ev(`document.querySelector('[data-record-steps-watch]')?.textContent ?? null`)])
+await ev(`document.querySelector('[data-record-card]').scrollIntoView({ block: 'start' })`)
+await shoot('record-activity-8-route-end')
+
 await finish('verify:record-activity passed: cardio starts from Exercise, End reads the phone, steps only on foot, one tap logs it.')

@@ -114,8 +114,10 @@ export interface GatheredFigures extends RecordingFigures {
   stepsFromPhoneCounter: boolean
   /** The steps are the watch's own, from the watch app recording this same workout. */
   stepsFromWatch: boolean
-  /** The distance is the watch's own (its GPS route, or the store had none). */
+  /** The distance is the watch's own (its GPS route's length, or the store had none). */
   distanceFromWatch: boolean
+  /** ...and it is the length of the watch's own GPS route (the one distance that beats any other). */
+  distanceFromRoute: boolean
 }
 
 /**
@@ -164,12 +166,13 @@ export async function gatherFigures(r: Recording, body: BodyForEstimate, now: Da
   // recording this same walk was on the wrist the whole time, so its STEPS are the walk's, over the health store's and
   // the phone's own counter, but only its count from the END of the window (watch-cardio-live.ts: a watch that went
   // quiet mid-walk never beats a complete figure, and nothing sent after End is the walk's). Its DISTANCE wins only
-  // with its own GPS route; otherwise it fills in only where the store has none.
-  let stepsFromWatch = false, distanceFromWatch = false
+  // as the length of a real GPS route of its own (`routeM`); its other distance fills in only where the store has none.
+  let stepsFromWatch = false, distanceFromWatch = false, distanceFromRoute = false
   if (tracksSteps(r.activity)) {
     const w = watchCardioAt(r.activity, r.startedAt, end.getTime())
     if (w?.steps != null) { steps = w.steps; stepsFromWatch = true }
-    if (w?.distanceM != null && (w.gps || !(distanceM != null && distanceM >= 10))) { distanceM = w.distanceM; distanceFromWatch = true }
+    if (w?.routeM != null) { distanceM = w.routeM; distanceFromWatch = distanceFromRoute = true }
+    else if (w?.distanceM != null && !(distanceM != null && distanceM >= 10)) { distanceM = w.distanceM; distanceFromWatch = true }
   }
   // THE PHONE'S OWN COUNT when the health store has none yet (a watch that syncs late): what he saw while walking.
   let stepsFromPhoneCounter = false
@@ -177,7 +180,7 @@ export async function gatherFigures(r: Recording, body: BodyForEstimate, now: Da
     const counted = liveStepsFor(r.startedAt)
     if (counted != null) { steps = counted; stepsFromPhoneCounter = true }
   }
-  return { ...recordingFigures({ start, end, steps, distanceM, deviceKcal, heart }, body), phoneRead, heartFromStrap, stepsFromPhoneCounter, stepsFromWatch, distanceFromWatch }
+  return { ...recordingFigures({ start, end, steps, distanceM, deviceKcal, heart }, body), phoneRead, heartFromStrap, stepsFromPhoneCounter, stepsFromWatch, distanceFromWatch, distanceFromRoute }
 }
 
 /** Write the recording down as a cardio log, with the effort he tapped. Null when nothing was saved. */
