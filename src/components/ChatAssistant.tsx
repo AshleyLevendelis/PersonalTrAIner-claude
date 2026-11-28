@@ -91,7 +91,8 @@ import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoo
 import { buildMealSwapProposal, swapDiffFromTrial } from '@/lib/meal-swap-proposal'
 import { bestAmongLogged, logBubble } from '@/lib/log-words'
 import { appAsksFirst } from '@/lib/app-asks-first'
-import { logDayFor, type PastLogDay } from '@/lib/chat-log-date'
+import { logDayFor, refusalToTakeOff, type PastLogDay } from '@/lib/chat-log-date'
+import { planStartDate } from '@/lib/program-calendar'
 import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, weeksOnPlanSentence, turnedDownLine, whenSaid, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, LOG_WORDS, OFFER_UNREACHABLE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine, logOnlyRefusal, coachShortcutLabel } from '@/lib/coach-voice'
 import { layoffStatus, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
 import { restartStillOffered } from '@/lib/plan-restart'
@@ -4677,13 +4678,20 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * a second button counts it as the day's workout, the screen's own "Count it as today's workout". The server
    * only sends minutes, effort and distance she said; nothing here fills a gap.
    */
+  /**
+   * THE CHAT'S ONE RULE FOR WHICH DAY (advise-then-allow fix 20): any day that has happened, from the plan's first day
+   * on. The date is read as the coach SENT it: a string that is not a date is refused here, never read as today (the
+   * 19 Nov defect, where a dropped date wrote onto today).
+   */
+  const chatLogDay = (raw: unknown) => logDayFor(typeof raw === 'string' ? raw : null, activeSession.date, planStartDate(planCreatedAt ?? profile.created_at))
+
   const buildCardioLogProposal = (rawArgs: Record<string, unknown>):
     | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: CardioLogPayload; diff: import('@/lib/pending-actions-store').ProposalDiff }
     | { ok: false; refusal: string } => {
-    const date = typeof rawArgs.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawArgs.date) ? rawArgs.date : activeSession.date
     // ANY DAY THAT HAS HAPPENED (his 28 Nov 2026 ruling, advise-then-allow fix 20): the chat's one rule for which day.
-    const when = logDayFor(date, activeSession.date)
+    const when = chatLogDay(rawArgs.date)
     if (when.kind === 'refused') return { ok: false, refusal: when.say }
+    const date = when.kind === 'past' ? when.date : activeSession.date
     const effort = (['easy', 'steady', 'hard'] as const).find(e => e === rawArgs.effort) as EffortKey | undefined
     if (!effort) return { ok: false, refusal: 'How hard did that feel — easy, steady or hard?' }
     const activityName = typeof rawArgs.activity_name === 'string' ? rawArgs.activity_name.trim().replace(/^\w/, c => c.toUpperCase()) : ''
@@ -4734,9 +4742,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const buildCircuitLogProposal = (rawArgs: Record<string, unknown>):
     | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: CircuitLogPayload; diff: import('@/lib/pending-actions-store').ProposalDiff }
     | { ok: false; refusal: string } => {
-    const date = typeof rawArgs.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawArgs.date) ? rawArgs.date : activeSession.date
-    const when = logDayFor(date, activeSession.date)
+    const when = chatLogDay(rawArgs.date)
     if (when.kind === 'refused') return { ok: false, refusal: when.say }
+    const date = when.kind === 'past' ? when.date : activeSession.date
     const effort = (['easy', 'steady', 'hard'] as const).find(e => e === rawArgs.effort) as EffortKey | undefined
     if (!effort) return { ok: false, refusal: 'How hard did that feel overall — easy, steady or hard?' }
     const raw = Array.isArray(rawArgs.blocks) ? rawArgs.blocks as Record<string, unknown>[] : []
@@ -4759,6 +4767,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       { severity: 'info', text: `Each block goes on your week as ${effortLabel(effort).toLowerCase()} work.` },
     ]
     if (replaces) implications.push({ severity: 'info', text: `It counts as ${dayName}'s workout instead of ${session!.focus}. The session stays on the plan if you still want it.` })
+    // SAID "INSTEAD", AND IT CANNOT COUNT (no session still due that day): said on the card, never dropped quietly.
+    else if (rawArgs.replaced_session === true) implications.push({ severity: 'info', text: `It goes on ${dayName} as extra work: there's no session still due that day for it to count as.` })
     return {
       ok: true,
       scopeKey: `${profile.id}:propose_circuit_log:${date}:${blocks.map(b => `${b.activityName}/${b.shape}`).join('|')}`,
@@ -4804,7 +4814,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * Builds propose_cardio_remove's card — "take today's Walk · 5 min · Easy off your log" (27 Nov 2026, his report:
    * "I accidentally added a walk today. Remove it", and the coach could only search the session's exercises). The
    * log is found on the day by his words (matchLoggedActivity); the card names it before Apply, and Apply removes it
-   * through the same function as the row's Remove on Exercise. The last two weeks only; nothing else changes.
+   * through the same function as the row's Remove on Exercise. Any day that has happened (fix 20); nothing else changes.
    */
   const buildCardioRemoveProposal = async (rawArgs: Record<string, unknown>): Promise<{
     ok: true
@@ -4813,16 +4823,17 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     payload: CardioRemovePayload
     diff: import('@/lib/pending-actions-store').ProposalDiff
   } | { ok: false; reason: string }> => {
-    const date = typeof rawArgs.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawArgs.date) ? rawArgs.date : activeSession.date
-    const when = logDayFor(date, activeSession.date)
-    if (when.kind === 'refused') return { ok: false, reason: when.say.startsWith('That day') ? "That day hasn't happened yet, so there's nothing logged on it to take off." : when.say.replace('nothing was logged', 'nothing was changed') }
+    const when = chatLogDay(rawArgs.date)
+    if (when.kind === 'refused') return { ok: false, reason: refusalToTakeOff(when.say) }
+    const date = when.kind === 'past' ? when.date : activeSession.date
     const delta = when.kind === 'today' ? 0 : -1
     const dayWord = when.kind === 'today' ? 'today' : when.words
     const said = String(rawArgs.activity ?? '').trim()
     let logs: CardioLogView[] = []
     try { if (profile.id) logs = await getCardioLogsForDateMerged(profile.id, date) } catch { /* said below */ }
     const lineOf = (l: CardioLogView) => cardioReadback({ activity: l.activity_name ?? 'Activity', minutes: l.duration_minutes, rpe: l.intensity_rpe, distanceKm: l.distance_km == null ? null : Number(l.distance_km) })
-    if (logs.length === 0) return { ok: false, reason: `There's nothing logged ${delta === 0 ? 'today' : `on ${dayWord}`} to take off.` }
+    // "I can't see", never "there's nothing": off the network the read falls back to the phone's copy, which keeps 60 days.
+    if (logs.length === 0) return { ok: false, reason: `I can't see anything logged ${delta === 0 ? 'today' : `on ${dayWord}`} to take off.` }
     const hits = matchLoggedActivity(said, logs)
     if (hits.length === 0) return { ok: false, reason: `I couldn't find "${said || 'that'}" logged ${delta === 0 ? 'today' : `on ${dayWord}`}. It has: ${logs.map(lineOf).join(', ')}.` }
     if (hits.length > 1) return { ok: false, reason: `${delta === 0 ? 'Today' : dayWord} has ${hits.length} of those: ${hits.map(lineOf).join(' and ')}. Which one?` }
@@ -7379,8 +7390,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         setsPhrase: e.sets_phrase,
       }))
       // WHICH DAY (19 Nov 2026): the date the coach passed used to be dropped here, and "I did squats yesterday" was
-      // written onto today. An earlier day in the last two weeks is written to that day; anything else is refused.
-      const day = logDayFor(result.logWorkout.date, activeSession.date)
+      // written onto today. Any earlier day from the plan's start is written to that day (fix 20, 28 Nov); a day still
+      // to come, one before the plan, or a date that is not a date is refused.
+      const day = chatLogDay(result.logWorkout.date)
       if (day.kind === 'refused') return { text: day.say }
       const logged = resolveAndMaybeLog(entries, result.logWorkout.corrects_previous === true, userSaid, day.kind === 'past' ? day : null)
       return logged.past ? await logToPastDay(logged.past.groups, logged.past.day) : logged
@@ -8324,7 +8336,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       onLogsUpdated?.()
       // THE ONE QUESTION after a run while a knee, ankle or hip is being eased off: asked, never blocking.
       if (receipt.landed.length > 0) {
-        const q = easeOffQuestion(payload.activityName, activeAdaptations, getAppNow(profile.id))
+        // Only an ease-off that had begun by the day of the run: a run three weeks back says nothing about a knee eased off
+        // since (fix 20 opened every past day to this card).
+        const q = easeOffQuestion(payload.activityName, activeAdaptations.filter(a => (planStartDate(a.starts_at) ?? '') <= payload.date), getAppNow(profile.id))
         if (q) followUp = { text: q.text, chips: [q.fine, q.hurtMessage] }
       }
     } else if (row.kind === 'propose_circuit_log') {

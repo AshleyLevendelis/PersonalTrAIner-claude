@@ -158,7 +158,7 @@ const say = async text => {
 }
 const SAID = 'I went for a 40 minute run at lunch, about 6km, pretty hard'
 const loadChat = async () => {
-  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?page=chat&kneeease=1&n=${++loads}` })
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?page=chat&kneeease=1&started=40&n=${++loads}` })
   return until(`!!document.querySelector('textarea')`, 15000)
 }
 // RE-ANCHORED 31 Oct 2026: the offer's ANSWERS. The Listen icon on the coach's bubble (her 31 Oct ruling) reads the
@@ -218,6 +218,8 @@ check('C3b. Apply', await tapExpr(byText('Apply')))
 await until(`(window.__fakeDb?.cardio_logs ?? []).some(r => r.date === ${J(THREE_WEEKS_BACK)})`, 8000)
 const cRows = await db(`(d.cardio_logs ?? []).filter(r => r.date === ${J(THREE_WEEKS_BACK)}).map(r => ({ a: r.activity_name, m: r.duration_minutes }))`)
 check('C4. one run of 30 minutes, on that date', cRows.length === 1 && cRows[0].a === 'Run' && cRows[0].m === 30, cRows)
+await wait(1500)
+check('C5. no knee question: the ease-off began after that run (the same chat asks it after today\'s, B11)', !(await ev('document.body.innerText')).includes(KNEE_Q.slice(0, 30)))
 
 check('no uncaught error on any page', pageErrors.length === 0, pageErrors)
 console.log(`\n${ran} checks ran. ${failures === 0 ? 'Sam\'s run is logged as extra, with its distance, and the knee is asked about.' : `${failures} check(s) FAILED.`}\n`)

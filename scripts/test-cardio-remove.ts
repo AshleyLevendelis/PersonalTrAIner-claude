@@ -63,7 +63,7 @@ check('the card is reversible and says the plan is untouched', /reversible: true
 // Any day that has happened since 28 Nov 2026 (advise-then-allow fix 20), through the chat's one day rule; a day ahead
 // is still refused. test:chat-log-date holds the rule and §5 holds this card to it.
 const removeBlock = chat.slice(chat.indexOf('const buildCardioRemoveProposal'), chat.indexOf('const buildMissedSessionProposal'))
-check('any day that has happened, never a day ahead, by the chat\'s one day rule', /const when = logDayFor\(date, activeSession\.date\)/.test(removeBlock) && /when\.kind === 'refused'/.test(removeBlock) && !/< -(7|14)\b/.test(removeBlock))
+check('any day that has happened, never a day ahead, by the chat\'s one day rule', /const when = chatLogDay\(rawArgs\.date\)/.test(removeBlock) && /when\.kind === 'refused'/.test(removeBlock) && !/< -(7|14)\b/.test(removeBlock))
 
 console.log('\n5. The row offers Remove only once Undo has gone')
 const row = strip(readFileSync('src/components/exercise/CardioSetRow.tsx', 'utf8'))

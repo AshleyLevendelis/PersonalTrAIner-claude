@@ -62,8 +62,17 @@ earlier ruling of his and wait for his word.
     four ask one function (`logDayFor`, chat-log-date.ts); a day a week or more back is named by its date ("Wednesday
     26 Aug", with its year in another year) so a mistyped date shows where it went. `test:chat-log-date` (6/6
     mutations), `verify:chat-log-words` 7 (1/1), `verify:extra-cardio` C (2/2). Needs the `chat-gemini` deploy: no
-    (client only). **For Builder A (screen half, parity):** the screen still stops at 14 days for another day's
-    optional cardio (`LOG_BACK_DAYS`, activity-day.ts); the chat no longer does.
+    (client only). Review follow-up, same day: a written date is read as sent (a bad one is refused, never today);
+    a day before the plan began is refused like the screen's "No session was planned" (it would file under week 1,
+    and it is the floor that keeps a wrong year off the no-Undo session log); the knee question asks only about an
+    ease-off begun by the run's day; "I can't see anything logged" (a failed read falls back to 60 days on the phone);
+    a circuit said "instead" that cannot count says so. `test:chat-log-date` (60, +6/6), `verify:chat-log-words`
+    7f-7h (1/1), `verify:extra-cardio` C5 (1/1).
+    **For Builder A (screen half, parity):** the screen still stops at 14 days for another day's optional cardio
+    (`LOG_BACK_DAYS`, activity-day.ts); the chat no longer does. **Older, now reaching further (not built):** a past
+    cardio log is stamped `completed_at` now (cardio-log-store.ts), so readers sorting by it treat an old run as the
+    newest; a cardio/circuit Undo deletes every same-named log on that day; the missed-session card keeps its own
+    7-day window and a bare weekday.
 21. [ ] **The coach's prompt**: every "do not call it for..." that is a training refusal becomes "offer it with the
     reason"; the "point them at the right screen" fallback is only for what no tool does.
 

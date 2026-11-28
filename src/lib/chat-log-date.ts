@@ -16,9 +16,9 @@
 //     on last month. A day more than a week back is named with its date (and
 //     its year when that is not this year's), so a mistyped date shows on the
 //     line that says where it went;
-//   - a day that has not happened yet, or a date that is not a date, is refused
-//     in a sentence and nothing is written. A day still to come cannot have
-//     been trained.
+//   - a day that has not happened yet, a day before his plan began, or a date
+//     that is not a date, is refused in a sentence and nothing is written. A
+//     day still to come cannot have been trained.
 //
 // The coach's other logging cards (one cardio activity, a circuit, taking a
 // log off) ask the same question through the same function.
@@ -54,7 +54,13 @@ function dayNumber(iso: string): number | null {
   return Math.round(t / 86_400_000)
 }
 
-export function logDayFor(raw: string | null | undefined, today: string): LogDay {
+/**
+ * `earliest` is the first day of his plan (YYYY-MM-DD, local). A day before it is refused, the way the screen's "I did
+ * it, not in the app" says "No session was planned": a set is filed under a plan week and day, and a day before the
+ * plan has neither (the week count clamps it to week 1, so the current plan's week 1 would read as done). It is also
+ * the floor that keeps a wrong year from being written: the session log has no card and no Undo yet.
+ */
+export function logDayFor(raw: string | null | undefined, today: string, earliest: string | null = null): LogDay {
   const said = (raw ?? '').trim()
   if (!said || said === today) return { kind: 'today' }
   const then = dayNumber(said)
@@ -63,9 +69,21 @@ export function logDayFor(raw: string | null | undefined, today: string): LogDay
     return { kind: 'refused', say: "I couldn't tell which day that was, so nothing was logged. Tell me the day and I'll put it there." }
   }
   if (then > now) return { kind: 'refused', say: "That day hasn't happened yet, so nothing was logged. Tell me once it's done and I'll put it in." }
+  const first = earliest ? dayNumber(earliest) : null
+  if (first !== null && then < first) {
+    const f = new Date(first * 86_400_000)
+    return { kind: 'refused', say: `That's before your plan began on ${WEEKDAYS[f.getUTCDay()]} ${f.getUTCDate()} ${MONTHS[f.getUTCMonth()]}, so nothing was logged. If the date's wrong, tell me the right one.` }
+  }
   const when = new Date(then * 86_400_000)
   const dayName = WEEKDAYS[when.getUTCDay()]
   const year = now - then < 7 || when.getUTCFullYear() === Number(today.slice(0, 4)) ? '' : ` ${when.getUTCFullYear()}`
   const label = `${dayName} ${when.getUTCDate()} ${MONTHS[when.getUTCMonth()]}${year}`
   return { kind: 'past', date: said, dayName, label, words: now - then < 7 ? dayName : label }
+}
+
+/** The same refusal said for taking a log OFF a day: nothing was logged becomes nothing was changed, and a bad date asks for the right one. */
+export function refusalToTakeOff(say: string): string {
+  if (/hasn't happened yet/.test(say)) return "That day hasn't happened yet, so there's nothing logged on it to take off."
+  if (/couldn't tell which day/.test(say)) return "I couldn't tell which day that was, so nothing was changed. Tell me the day and I'll look."
+  return say.replace('so nothing was logged', 'so nothing was changed')
 }

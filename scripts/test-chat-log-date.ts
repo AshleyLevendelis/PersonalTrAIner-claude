@@ -10,7 +10,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { logDayFor } from '../src/lib/chat-log-date'
+import { logDayFor, refusalToTakeOff } from '../src/lib/chat-log-date'
 import { LOG_WORDS } from '../src/lib/coach-voice'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -64,11 +64,20 @@ for (const bad of ['yesterday', 'Tuesday', '17/11/2026', '2026-13-01', '2026-02-
 }
 check('no refusal sends him to a screen or blames him', [tomorrow, logDayFor('yesterday', TODAY)].every(r => r.kind === 'refused' && !/tap|open|go to|rephrase|in your own words/i.test(r.say)))
 
+const PLAN = '2026-09-01'
+const before = logDayFor('2026-08-31', TODAY, PLAN)
+check('a day before the plan began is refused, naming the plan\'s first day, nothing logged', before.kind === 'refused' && /before your plan began on Tuesday 1 Sep/.test(before.say) && /nothing was logged/.test(before.say), before)
+check('...the plan\'s first day itself is allowed', logDayFor(PLAN, TODAY, PLAN).kind === 'past')
+check('...and a wrong year (a year back, plan this autumn) is refused, not written', logDayFor('2025-11-17', TODAY, PLAN).kind === 'refused')
+check('taking a log off says nothing was CHANGED, and asks for a day', refusalToTakeOff(before.kind === 'refused' ? before.say : '').includes('nothing was changed') && /nothing logged on it to take off/.test(refusalToTakeOff(tomorrow.kind === 'refused' ? tomorrow.say : '')) && /I'll look/.test(refusalToTakeOff("I couldn't tell which day that was, so nothing was logged.")))
+
 console.log('\n4. The chat obeys it')
 const chat = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 const at = chat.indexOf('if (result.logWorkout) {')
 const branch = chat.slice(at, at + 1200)
-check('the date the coach passed is read, against the app\'s own today', /const day = logDayFor\(result\.logWorkout\.date, activeSession\.date\)/.test(branch), branch.slice(0, 300))
+check('the date the coach passed is read, against the app\'s own today', /const day = chatLogDay\(result\.logWorkout\.date\)/.test(branch), branch.slice(0, 300))
+const helper = chat.slice(chat.indexOf('const chatLogDay ='), chat.indexOf('const chatLogDay =') + 260)
+check('the one rule reads the date AS SENT (no regex fallback to today), today, and the plan\'s first day', /const chatLogDay = \(raw: unknown\) => logDayFor\(typeof raw === 'string' \? raw : null, activeSession\.date, planStartDate\(planCreatedAt \?\? profile\.created_at\)\)/.test(helper), helper)
 check('a refused day returns its sentence before anything is parsed or written', /if \(day\.kind === 'refused'\) return \{ text: day\.say \}/.test(branch) && branch.indexOf("day.kind === 'refused'") < branch.indexOf('resolveAndMaybeLog('))
 check('a past day is handed to the past-day write, and awaited', /resolveAndMaybeLog\(entries, [^)]*, day\.kind === 'past' \? day : null\)/.test(branch) && /return logged\.past \? await logToPastDay\(logged\.past\.groups, logged\.past\.day\) : logged/.test(branch))
 const past = chat.slice(chat.indexOf('const logToPastDay = async'), chat.indexOf('const handleClarificationChoice'))
@@ -88,10 +97,19 @@ const body = (start: string, end: string) => { const a = chat.indexOf(start); co
 const cardio = body('const buildCardioLogProposal', 'const buildCircuitLogProposal')
 const circuit = body('const buildCircuitLogProposal', 'const missedMoveOffer')
 const removal = body('const buildCardioRemoveProposal', 'const buildMissedSessionProposal')
+for (const [name, b] of [['one cardio activity', cardio], ['a circuit', circuit], ['taking a log off', removal]] as const) {
+  check(`${name}: a written date never falls back to today (the 19 Nov defect)`, b.length > 300 && !/rawArgs\.date\) \? rawArgs\.date : activeSession\.date/.test(b) && /const date = when\.kind === 'past' \? when\.date : activeSession\.date/.test(b))
+  check(`${name}: no day window of its own (no -7, -14, LOG_BACK_DAYS or addDays back)`, !/< -(7|14)\b|LOG_BACK_DAYS|addDays\([^)]*-\d+\)/.test(b))
+}
+check('taking a log off decides the day BEFORE it reads the log', removal.indexOf("when.kind === 'refused'") > 0 && removal.indexOf("when.kind === 'refused'") < removal.indexOf('getCardioLogsForDateMerged('))
+check('...and says "I can\'t see", never "there\'s nothing" (a failed read falls back to 60 days on the phone)', /I can't see anything logged/.test(removal) && !/There's nothing logged/.test(removal))
+const confirm = chat.slice(chat.indexOf("row.kind === 'propose_cardio_log'"), chat.indexOf("row.kind === 'propose_circuit_log'", chat.indexOf("row.kind === 'propose_cardio_log'")))
+check('the knee question asks only about an ease-off that had begun by the day of the run', /easeOffQuestion\(payload\.activityName, activeAdaptations\.filter\(a => \(planStartDate\(a\.starts_at\) \?\? ''\) <= payload\.date\)/.test(confirm), confirm.slice(0, 200))
+check('a circuit said to be "instead" that cannot count says so on the card', /else if \(rawArgs\.replaced_session === true\) implications\.push/.test(circuit))
 for (const [name, b, key] of [['one cardio activity', cardio, 'refusal'], ['a circuit', circuit, 'refusal'], ['taking a log off', removal, 'reason']] as const) {
-  check(`${name}: the day is decided by logDayFor against the app's today`, b.length > 300 && /const when = logDayFor\(date, activeSession\.date\)/.test(b), b.slice(0, 200))
+  check(`${name}: the day is decided by the chat's one rule`, b.length > 300 && /const when = chatLogDay\(rawArgs\.date\)/.test(b), b.slice(0, 200))
   check(`${name}: a refused day returns before anything else is read`, new RegExp(`if \\(when\\.kind === 'refused'\\) return \\{ ok: false, ${key}:`).test(b) && b.indexOf("when.kind === 'refused'") < b.indexOf('return {\n      ok: true'))
-  check(`${name}: no window of its own is left (no -7 or -14 day bound)`, !/< -(7|14)\b/.test(b) && !/from the last week|last two weeks/.test(b))
+  check(`${name}: no "last week" or "two weeks" wording left`, !/from the last week|last two weeks/.test(b))
 }
 check('a card further back than a week names the date, not a bare weekday', /when\.kind === 'past' \? when\.words/.test(cardio) && /when\.kind === 'past' \? when\.words/.test(circuit) && /: when\.words/.test(removal))
 

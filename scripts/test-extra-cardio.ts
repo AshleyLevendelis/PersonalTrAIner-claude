@@ -168,7 +168,7 @@ async function main() {
     && /hips and pelvis feel on the skipping/.test(easeOffQuestion('Skipping rope', [{ ...knee, injury_code: 'hips' }], now)?.text ?? ''))
   const both = easeOffQuestion('Football', [{ ...knee, injury_code: 'ankles', expires_at: '2026-10-30T12:00:00' }, knee], now)
   check('two running: ONE question, about the one ending soonest', /knees feel on that session/.test(both?.text ?? ''), both)
-  check('the chat asks it after the log, saved before it is shown, never blocking the write', /if \(receipt\.landed\.length > 0\) \{\s*const q = easeOffQuestion\(payload\.activityName, activeAdaptations, getAppNow\(profile\.id\)\)\s*if \(q\) followUp = \{ text: q\.text, chips: \[q\.fine, q\.hurtMessage\] \}/.test(confirm)
+  check('the chat asks it after the log, saved before it is shown, never blocking the write', /if \(receipt\.landed\.length > 0\) \{[\s\S]{0,300}?const q = easeOffQuestion\(payload\.activityName, activeAdaptations[^,]*, getAppNow\(profile\.id\)\)\s*if \(q\) followUp = \{ text: q\.text, chips: \[q\.fine, q\.hurtMessage\] \}/.test(confirm)
     && /if \(followUp\) \{[\s\S]{0,400}from\('chat_messages'\)[\s\S]{0,200}\.insert\(/.test(chat))
   const row = strip(readFileSync('src/components/exercise/CardioSetRow.tsx', 'utf8'))
   check('the screen asks it after its save from the ease-offs running now', /getActiveAdaptations\(profileId\)[\s\S]{0,120}easeOffQuestion\(loggedName, rows, getAppNow\(profileId\)\)/.test(row))

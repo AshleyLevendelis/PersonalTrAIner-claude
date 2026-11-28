@@ -113,7 +113,8 @@ const DB = `(() => { const d = window.__fakeDb; return {
   sets: (d.exercise_set_logs || []).map(r => [r.exercise_name, r.set_number, r.weight_kg, String(r.completed_at).slice(0, 10)]),
   sessions: (d.workout_sessions || []).map(r => [r.date, !!r.is_completed]),
 } })()`
-await go('&earlier=0')
+// A plan begun 40 days ago, so a day twenty days back is inside it and one sixty back is before it (fix 20).
+await go('&earlier=0&started=40')
 await wait(3500)
 const today = await ev('window.__todayStr')
 const yesterday = shift(today, -1)
@@ -155,7 +156,18 @@ await until(() => ev(DB), v => v.sets.some(r => r[3] === twentyBack))
 await wait(500)
 const old = await ev('document.body.innerText')
 const oldDb = await ev(DB)
-check('7d. twenty days back is logged, and the line names that date (not a bare weekday)', /logged on \w+day \d{1,2} \w{3}\./.test(old) && !/more than two weeks/.test(old), old.slice(-200))
+// Only what came AFTER this message: §5's "logged on <yesterday>" is still on the page above it.
+const reply7 = old.slice(old.lastIndexOf(`on ${twentyBack}`) + `on ${twentyBack}`.length)
+const [ty, tm, td] = twentyBack.split('-').map(Number)
+const twentyDate = new Date(Date.UTC(ty, tm - 1, td))
+const twentyLabel = `${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][twentyDate.getUTCDay()]} ${td} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][tm - 1]}`
+check('7d. twenty days back is logged, and THIS reply names that date', old.lastIndexOf(`on ${twentyBack}`) > 0 && reply7.includes(`logged on ${twentyLabel}.`) && !/more than two weeks/.test(reply7), { want: twentyLabel, got: reply7.slice(0, 200) })
 check('7e. ...three sets, every one on THAT day, none on today', oldDb.sets.filter(r => r[3] === twentyBack).length === 3 && oldDb.sets.length === before7 + 3 && oldDb.sets.every(r => r[3] !== today), oldDb.sets)
+const sixtyBack = shift(today, -60)
+check('7f. the chat sent: sixty days back, before the plan began', await say(`did ${lift5} 3x8 at 50 kg on ${sixtyBack}`))
+await until(() => ev('document.body.innerText'), t => t.lastIndexOf(`on ${sixtyBack}`) > 0 && /before your plan began/.test(t.slice(t.lastIndexOf(`on ${sixtyBack}`))))
+const pre = await ev('document.body.innerText')
+check('7g. a day before the plan is refused, naming the plan\u2019s first day', /That's before your plan began on \w+day \d{1,2} \w{3}, so nothing was logged\./.test(pre.slice(pre.lastIndexOf(`on ${sixtyBack}`))), pre.slice(-200))
+check('7h. ...and wrote no set', (await ev(DB)).sets.length === before7 + 3, (await ev(DB)).sets.length)
 
 await finish()
