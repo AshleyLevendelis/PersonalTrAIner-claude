@@ -111,11 +111,24 @@ console.log('\n2. Nothing that builds or edits a plan can reach one')
   // From the built list, not the lookup, so these checks still run (and fail) if the lookup loses near-copies.
   const paused = copies.find(c => c.name === 'Paused Bench Press')!
   const swapped = await quiet(() => swapExerciseInMesocycle({ mesocycle: meso, profile: p, currentWeekNumber: week.week_number, dayName: day.day, exIndex: 1, newExercise: paused, scope: 'permanent' }))
-  check('a swap to a near-copy changes nothing, on any route (the one writer every swap ends in)', swapped === meso && !JSON.stringify(swapped).includes('Paused Bench Press'))
+  // HIS RULING 28 Nov 2026, "Yes, with a note" (over keeping them log-only): a near-copy he PICKS goes in, priced from
+  // its parent. The swap lands; its weight is what the same swap to the parent gives.
+  const strip0 = (x: string) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const parentEntry = getExerciseEntry(paused.parent!)!
+  const toParent = await quiet(() => swapExerciseInMesocycle({ mesocycle: meso, profile: p, currentWeekNumber: week.week_number, dayName: day.day, exIndex: 1, newExercise: parentEntry, scope: 'permanent' }))
+  const slotIn = (m: typeof meso, name: string) => m.find(w => w.week_number === week.week_number)!.days.find(d => d.day === day.day)!.exercises.find(e => e.name === name)
+  const inSlot = slotIn(swapped, 'Paused Bench Press'), parentSlot = slotIn(toParent, parentEntry.name)
+  check('a swap to a near-copy LANDS (his 28 Nov ruling)', swapped !== meso && !!inSlot, inSlot?.name)
+  check('...priced from its parent: the same weight, sets and reps the same swap to the parent gives', !!inSlot && !!parentSlot && inSlot.suggested_load === parentSlot.suggested_load && inSlot.sets === parentSlot.sets && inSlot.reps === parentSlot.reps, { copy: inSlot && [inSlot.suggested_load, inSlot.sets, inSlot.reps], parent: parentSlot && [parentSlot.suggested_load, parentSlot.sets, parentSlot.reps] })
   const added = addExerciseToSession({ mesocycle: meso, profile: p, weekNumber: week.week_number, dayName: day.day, entry: paused, load: null, scope: 'today' } as never)
-  check('an addition of one is refused, in the app\'s own sentence', !added.changed && added.refusal === logOnlyRefusal(paused), added.refusal)
+  check('an addition of one is MADE', added.changed && !added.refusal, added.refusal)
+  const { nearCopyNote } = await import('../src/lib/exercise-add-candidates')
+  const pickers = ['src/components/exercise/AddExerciseSheet.tsx', 'src/components/exercise/SwapDialog.tsx'].map(f => strip0(readFileSync(f, 'utf8')))
+  check('both pickers search what the logging box searches, near-copies included, and fetch their table when opened', pickers.every(src => /searchExercisesToLog\(searchQuery, 20\)/.test(src) && /ensureNearCopies\(\)\.then/.test(src) && /nearCopyNote\((pending|pendingSwap)\)/.test(src)))
+  check('the card names the plan\'s own choice', nearCopyNote(paused) === `A version of ${paused.parent}, priced like it. Your plan's own choice is ${paused.parent}; this one goes in because you picked it.` && nearCopyNote(parentEntry) === null, nearCopyNote(paused))
   const exec = await quiet(() => executeExerciseSwap(p, meso, { weekNumber: week.week_number, dayName: day.day, exIndex: 1, oldExerciseName: day.exercises[1].name, newExerciseName: 'Paused Bench Press', scope: 'today' }))
-  check('the coach\'s confirmed swap of one lands nothing and says why', exec.mesocycle === meso && exec.receipt.landed.length === 0 && exec.receipt.failed[0]?.error === logOnlyRefusal(paused), exec.receipt)
+  // The coach's half is Builder B's (docs/plans/advise-then-allow.md): until it is built its executor still refuses.
+  check('the coach\'s confirmed swap of one still lands nothing and says why (its half not built yet)', exec.mesocycle === meso && exec.receipt.landed.length === 0 && exec.receipt.failed[0]?.error === logOnlyRefusal(paused), exec.receipt)
   const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   const chat = strip(readFileSync(new URL('../src/components/ChatAssistant.tsx', import.meta.url), 'utf8'))
   const guard = chat.indexOf('if (newEntry.log_only) return { ok: false, reason: logOnlyRefusal(newEntry) }')

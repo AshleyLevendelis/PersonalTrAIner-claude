@@ -228,7 +228,8 @@ console.log('\n6. Found by her words, and swapped, added and confirmed through e
   check('the coach\'s confirmed swap of one is made (only the save, which needs a real profile, is left)', exec.mesocycle !== meso && JSON.stringify(exec.mesocycle).includes('"V-Squat Machine"') && exec.receipt.failed.every(f => f.op === 'save'), exec.receipt)
   const copy = logOnlyExercises().find(c => c.name === 'Paused Bench Press')!
   const still = await quietAsync(() => swapExerciseInMesocycle({ mesocycle: meso, profile: p, currentWeekNumber: week.week_number, dayName: day.day, exIndex: 1, newExercise: copy, scope: 'permanent' }))
-  check('a FREE-WEIGHT near-copy is still refused (her 3 Nov ruling stands for those)', still === meso)
+  // REVERSED by his 28 Nov 2026 "Yes, with a note": a near-copy he picks now goes in too (test:near-copies holds it).
+  check('a free-weight near-copy now lands too (his 28 Nov ruling)', still !== meso && JSON.stringify(still).includes('"Paused Bench Press"'))
 }
 
 console.log('\n7. Every plan reader asks the shared lookup, and the row says what it is')

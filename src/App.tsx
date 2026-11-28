@@ -343,7 +343,10 @@ function App() {
   useEffect(() => { setWriteError(null) }, [activeTab])
   // The near-copy table (log-only names, her ruling "Searchable, log-only") is fetched once the app is open, so a
   // set said to the coach or a history row under one resolves; never part of the first download.
-  useEffect(() => { void ensureNearCopies() }, [])
+  // AND SINCE 28 Nov 2026 a plan can HOLD one (his "Yes, with a note"): until the table arrives its name resolves to
+  // nothing, so the screen draws again once it has, and a near-copy in the plan shows as itself.
+  const [, setNearCopiesLoaded] = useState(false)
+  useEffect(() => { void ensureNearCopies().then(() => setNearCopiesLoaded(true)) }, [])
   /** Which load_suggestions row a Confirm/Decline tap is currently in flight for — disables both buttons on that one banner only. */
   const [loadSuggestionBusy, setLoadSuggestionBusy] = useState<string | null>(null)
   /** When the CURRENT mesocycle was generated — anchors live-week detection (falls back to profile.created_at for legacy profiles without persisted weeks). */

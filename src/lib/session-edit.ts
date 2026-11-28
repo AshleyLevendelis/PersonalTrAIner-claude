@@ -35,7 +35,6 @@ import type { LoadPrescription } from './load-prescription'
 import { settleWeek } from './settle-week'
 import { applyReplacement, type SwapScope } from './mesocycle-edit'
 import { mapTier } from './exercise-plan'
-import { logOnlyRefusal } from './coach-voice'
 import { isMovementPrepRow } from './session-duration'
 
 /**
@@ -214,8 +213,9 @@ export function addExerciseToSession(params: AddExerciseParams): SessionEditResu
   const week = mesocycle.find(w => w.week_number === weekNumber)
   const day = week?.days.find(d => d.day === dayName)
   if (!week || !day) return { mesocycle, changed: false, refusal: "I couldn't find that day on your plan." }
-  // A NEAR-COPY IS NEVER PRESCRIBED (her ruling "Searchable, log-only", 3 Nov 2026): it is logged, never added.
-  if (entry.log_only) return { mesocycle, changed: false, refusal: logOnlyRefusal(entry) }
+  // A NEAR-COPY GOES IN WHEN HE PICKS IT (his ruling 28 Nov 2026, "Yes, with a note"; it reverses 3 Nov's
+  // "Searchable, log-only" for adding and swapping): priced from its parent (its fields are the parent's), the card
+  // naming the plan's own choice (nearCopyNote). The generator never picks one.
   // A REST DAY IS NOT A SESSION TO ADD TO. Silently turning one into a
   // one-exercise workout would change what the week is without being asked.
   if (day.exercises.length === 0) {

@@ -116,7 +116,11 @@ earlier ruling of his and wait for his word.
   14, 15 and moves onto a busy day.
 - [x] **Near-copies prescribable** (his 3 Nov "Searchable, log-only"): adding or swapping in a version of an exercise
   priced from its parent, with advice. **ANSWERED 28 Nov 2026: "Yes, with a note"** (over keeping log-only): he may add
-  or swap one in, priced from its parent, the card naming the plan's own choice; the generator still never picks one.
+  or swap one in, priced from its parent, the card naming the plan's own choice; the generator still never picks one. SCREEN BUILT 28 Nov 2026 (Builder A): both searches find them, `nearCopyNote` on the row and the card, the swap and
+  add writers take one. **Coach half: Builder B**: the coach's swap refuses a near-copy in ChatAssistant
+  (`newEntry.log_only`) and pending-action-executor (`newExercise.log_only`); drop both and show `nearCopyNote(entry)`
+  (exercise-add-candidates.ts) on the card. `resolveAdditionAnywhere` still reads the catalogue only, so the coach's add
+  finds none until it searches `logOnlyExercises()` as well.
 - [x] **The screen's injury stop** (found in fix 4; his 13 Sep "show everything, warn me"). **ANSWERED 28 Nov 2026:
   "Stop it on the screen too"** (over the warning only): a move his injuries list excludes stays visible in the add
   and swap searches, greyed with the reason, and cannot be picked, as the coach already refuses. BUILT 28 Nov 2026 (Builder A):

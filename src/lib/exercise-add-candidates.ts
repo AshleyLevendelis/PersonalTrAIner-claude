@@ -374,6 +374,17 @@ export function hardStopFor(entry: ExerciseEntry, profile: UserProfile): HardSto
   return why ? { kind: 'pregnancy', why } : null
 }
 
+/**
+ * A NEAR-COPY, PICKED BY HIM (his ruling 28 Nov 2026, "Yes, with a note", over keeping them log-only): a version of a
+ * catalogue lift (a paused squat, a wide-grip pulldown) may be added or swapped in, priced from the lift it is a
+ * version of, and the card names the plan's own choice. The generator still never picks one. Null for anything else.
+ */
+export function nearCopyNote(entry: Pick<ExerciseEntry, 'log_only' | 'parent'>): string | null {
+  return entry.log_only && entry.parent
+    ? `A version of ${entry.parent}, priced like it. Your plan's own choice is ${entry.parent}; this one goes in because you picked it.`
+    : null
+}
+
 /** The screen's sentence for a stop, on the greyed row: why it cannot be picked. */
 export function hardStopLine(stop: HardStop): string {
   return stop.kind === 'injury'

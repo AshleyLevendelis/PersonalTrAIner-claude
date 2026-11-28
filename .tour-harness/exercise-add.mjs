@@ -210,6 +210,36 @@ await wait(700)
 check('6g. ...and tapping one picks nothing', (await ev(`!![...document.querySelectorAll('[data-testid="swap-dialog"] button')].find(b => /^Swap to|^Use /.test(b.textContent.trim()))`)) === false && (await stopRows())?.length > 0)
 await shoot('exercise-swap-hard-stop')
 
+// --- 7. A NEAR-COPY HE PICKS GOES IN (his ruling 28 Nov 2026, "Yes, with a note") ---------------------------------------
+// The add search finds a version of a plan lift (a paused bench press), says whose version it is and the plan's own
+// choice, and adding it puts it on the session under its own name.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&load=7#/tab/exercise` })
+await wait(4500)
+const before7 = await until(order, o => Array.isArray(o) && o.length > 0)
+check('7a. the add sheet opens', (await tap('[data-testid="add-exercise"]')) && !!(await until(() => has('[data-testid="add-exercise-sheet"]'), v => v)))
+await typeSearch('[data-testid="add-exercise-search"]', 'paused bench')
+const nc = await until(() => ev(`(() => { const b = [...document.querySelectorAll('[data-add-candidate]')].find(n => /^Paused Bench Press$/.test(n.getAttribute('data-add-candidate'))); return b ? { disabled: b.disabled, text: b.textContent } : null })()`), v => !!v, 30)
+check('7b. the search finds the near-copy, pickable, saying whose version it is and the plan\'s own choice', !!nc && !nc.disabled && /A version of Barbell Bench Press, priced like it\. Your plan's own choice is Barbell Bench Press/.test(nc.text), nc)
+await tap('[data-add-candidate="Paused Bench Press"]')
+const card7 = await until(() => text('[data-testid="near-copy-card-note"]'), v => v.length > 0)
+check('7c. the card says it too, before the tap', /Your plan's own choice is Barbell Bench Press; this one goes in because you picked it\./.test(card7), card7)
+await shoot('exercise-add-near-copy')
+check('7d. "Just today" adds it', await tap('[data-scope="today"]'))
+const after7 = await until(order, o => Array.isArray(o) && o.includes('Paused Bench Press'), 30)
+check('7e. ...and it is on the session under its own name', (after7 ?? []).includes('Paused Bench Press') && after7.length === before7.length + 1, { before7, after7 })
+
+// --- 8. ...AND THE SWAP SEARCH FINDS IT TOO, marked the same way -------------------------------------------------------
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&load=8#/tab/exercise` })
+await wait(4500)
+const ex8 = (await until(order, o => Array.isArray(o) && o.length > 1))?.[1]
+if (!(await has(`[data-exercise-name=${JSON.stringify(ex8)}] button[aria-label="Exercise options"]`))) { await tap(`[data-exercise-name=${JSON.stringify(ex8)}] [role="button"], [data-exercise-name=${JSON.stringify(ex8)}] .cursor-pointer`); await wait(700) }
+await tap(`[data-exercise-name=${JSON.stringify(ex8)}] button[aria-label="Exercise options"]`); await wait(500)
+check('8a. the swap dialog opens', await tap('[data-testid="swap-exercise"]') && !!(await until(() => has('[data-testid="swap-dialog"]'), v => v)), ex8)
+if (await has('[data-testid="reason-skip"]')) { await tap('[data-testid="reason-skip"]'); await wait(600) }
+await typeSearch('[data-testid="swap-dialog"] input[placeholder^="e.g."]', 'paused bench')
+const swapNc = await until(() => ev(`(() => { const b = document.querySelector('[data-swap-candidate="Paused Bench Press"]'); return b ? { disabled: b.disabled, note: b.querySelector('[data-testid="near-copy-note"]')?.textContent ?? '' } : null })()`), v => !!v, 30)
+check('8b. the swap search finds the near-copy, pickable, with the same note', !!swapNc && !swapNc.disabled && /Your plan's own choice is Barbell Bench Press/.test(swapNc.note), swapNc)
+
 console.log(failures === 0 ? '\nAll add checks passed.\n' : `\n${failures} add check(s) failed.\n`)
 ws.close(); chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)

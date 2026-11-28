@@ -9,8 +9,9 @@ import { EditReasonStep, type ReasonAnswer } from './EditReasonStep'
 import { isNothingToChangeMessage } from '@/lib/edit-reason'
 import { tierWords, blockSwapLine, machineVersionLine } from '@/lib/coach-voice'
 import { ArrowRightLeft, ShieldAlert, Zap, Ban } from 'lucide-react'
-import { hardStopFor, hardStopLine } from '@/lib/exercise-add-candidates'
-import { getExerciseEntry, searchExerciseCatalogByWords, type ExerciseEntry } from '@/lib/exercise-db'
+import { hardStopFor, hardStopLine, nearCopyNote } from '@/lib/exercise-add-candidates'
+import { getExerciseEntry, searchExercisesToLog, type ExerciseEntry } from '@/lib/exercise-db'
+import { ensureNearCopies } from '@/lib/near-copies-loader'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
 import { getReplacementCandidates, type SwapScope } from '@/lib/mesocycle-edit'
 import { OUTSIDE_YOUR_STYLE } from '@/lib/coach-voice'
@@ -135,8 +136,17 @@ export function SwapDialog({
   const INITIAL_SHOWN = 4
   const visibleReplacements = showAllReplacements ? replacements : replacements.slice(0, INITIAL_SHOWN)
   const currentEntry = target ? getExerciseEntry(target.exerciseName) : undefined
-  const searchResults = target && searchQuery.trim()
-    ? searchExerciseCatalogByWords(searchQuery, 20).filter(e =>
+  // NEAR-COPIES TOO (his ruling 28 Nov 2026, "Yes, with a note"): the search reaches what the logging box reaches, once
+  // the near-copy table has arrived (it loads after the app opens), each marked as a version of the plan's own lift.
+  const [copiesReady, setCopiesReady] = useState(0)
+  useEffect(() => {
+    if (!target) return
+    let live = true
+    void ensureNearCopies().then(() => { if (live) setCopiesReady(n => n + 1) })
+    return () => { live = false }
+  }, [target])
+  const searchResults = target && searchQuery.trim() && copiesReady >= 0
+    ? searchExercisesToLog(searchQuery, 20).filter(e =>
         e.name.toLowerCase() !== target.exerciseName.toLowerCase() &&
         !replacements.some(r => r.exercise.name === e.name)
       )
@@ -391,6 +401,9 @@ export function SwapDialog({
                             {machineVersionLine(exercise) && (
                               <p data-testid="swap-version-of" className="text-xs leading-[1.45] text-muted-foreground">{machineVersionLine(exercise)}</p>
                             )}
+                            {nearCopyNote(exercise) && (
+                              <p data-testid="near-copy-note" className="text-xs leading-[1.45] text-muted-foreground">{nearCopyNote(exercise)}</p>
+                            )}
                             {stop ? (
                               <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1" data-testid="hard-stop-line">
                                 <Ban className="size-3 mt-0.5 shrink-0" />
@@ -416,6 +429,7 @@ export function SwapDialog({
 
         {pendingSwap && (
           <div className="space-y-2 py-1">
+            {nearCopyNote(pendingSwap) && <p className="text-xs text-muted-foreground" data-testid="near-copy-card-note">{nearCopyNote(pendingSwap)}</p>}
             {profile && getExerciseCompatibilityWarnings(pendingSwap, profile, exclusions).map((w, i) => (
               <p key={i} className="text-xs text-[color:var(--role-warn-text)] flex items-start gap-1.5 rounded-lg bg-[color:var(--role-warn-bg)] p-2">
                 <ShieldAlert className="size-3.5 mt-0.5 shrink-0" />

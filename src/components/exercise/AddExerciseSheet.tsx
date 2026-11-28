@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Plus, ShieldAlert, Zap, Clock, Ban } from 'lucide-react'
-import { searchExerciseCatalogByWords, type ExerciseEntry } from '@/lib/exercise-db'
+import { searchExercisesToLog, type ExerciseEntry } from '@/lib/exercise-db'
+import { ensureNearCopies } from '@/lib/near-copies-loader'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
-import { getAdditionCandidates, hardStopFor, hardStopLine } from '@/lib/exercise-add-candidates'
+import { getAdditionCandidates, hardStopFor, hardStopLine, nearCopyNote } from '@/lib/exercise-add-candidates'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 import type { UserProfile, WorkoutDay } from '@/lib/types'
 import { tierWords, machineVersionLine } from '@/lib/coach-voice'
@@ -94,8 +95,16 @@ export function AddExerciseSheet({
     ? getAdditionCandidates(target.day, profile, exclusions)
     : []
   const present = new Set((target?.day.exercises ?? []).map(e => e.name.toLowerCase()))
-  const searchResults = target && searchQuery.trim()
-    ? searchExerciseCatalogByWords(searchQuery, 20).filter(e =>
+  // NEAR-COPIES TOO (his ruling 28 Nov 2026, "Yes, with a note"), once their table has arrived.
+  const [copiesReady, setCopiesReady] = useState(0)
+  useEffect(() => {
+    if (!target) return
+    let live = true
+    void ensureNearCopies().then(() => { if (live) setCopiesReady(n => n + 1) })
+    return () => { live = false }
+  }, [target])
+  const searchResults = target && searchQuery.trim() && copiesReady >= 0
+    ? searchExercisesToLog(searchQuery, 20).filter(e =>
         !present.has(e.name.toLowerCase()) &&
         !suggestions.some(s => s.exercise.name === e.name)
       )
@@ -226,7 +235,7 @@ export function AddExerciseSheet({
                         shows, from the same helper. */}
                     {searchResults.map(exercise => row(
                       exercise,
-                      exercise.coach_note_swap ?? machineVersionLine(exercise),
+                      nearCopyNote(exercise) ?? exercise.coach_note_swap ?? machineVersionLine(exercise),
                       profile ? getExerciseCompatibilityWarnings(exercise, profile, exclusions) : [],
                     ))}
                   </div>
@@ -238,6 +247,7 @@ export function AddExerciseSheet({
 
         {pending && (
           <div className="space-y-2 py-1">
+            {nearCopyNote(pending) && <p className="text-xs text-muted-foreground" data-testid="near-copy-card-note">{nearCopyNote(pending)}</p>}
             {profile && getExerciseCompatibilityWarnings(pending, profile, exclusions).map((w, i) => (
               <p key={i} className="text-xs text-[color:var(--role-warn-text)] flex items-start gap-1.5 rounded-lg bg-[color:var(--role-warn-bg)] p-2">
                 <ShieldAlert className="size-3.5 mt-0.5 shrink-0" />
