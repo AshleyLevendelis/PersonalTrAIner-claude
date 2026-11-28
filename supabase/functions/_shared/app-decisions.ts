@@ -176,7 +176,7 @@ export const APP_DECISIONS: AppDecision[] = [
 
   // ---- Training -----------------------------------------------------------------------------------------------------
   { area: 'Training', anchor: { file: 'src/lib/volume-adjust.ts', token: 'adjustDayVolumeAdvised' }, also: ['easier', 'lighter', 'deload', 'tired', 'fewer sets'],
-    rule: 'You can make a session lighter in a deload week, a second time, or below the plan\'s usual minimum sets; the app says why first. Below the minimum it takes one set off each exercise, never going under one set, and the weights do not change.',
+    rule: 'You can make a session lighter in a deload week, a second time, or below the plan\'s usual minimum sets; the app says why first. Below the minimum it takes one set off each exercise, never going under one set, and only for that one day, never as a lasting change; the weights do not change.',
     why: 'The minimum sets are what a planned session needs over a block; one lighter session on a bad day is a deliberate dip a coach gives, and easing a deload serves its job, recovery.' },
   { area: 'Training', anchor: { file: 'src/lib/volume-adjust.ts', token: 'adjustDayVolumeAdvised' }, also: ['easier', 'lighter', 'harder', 'warmup', 'warm-up'],
     rule: 'Making a session lighter or heavier never changes its warm-up moves.',
@@ -218,7 +218,7 @@ export const APP_DECISIONS: AppDecision[] = [
     rule: 'The shortest version of a session keeps the main lift whole and at least three exercises, with sets cut to each one\'s minimum, and it counts as a session done.',
     why: 'The main lift plus two more is a real stimulus and keeps progression moving on a bad day.' },
   { area: 'Training', anchor: { file: 'src/lib/lighter-today.ts', token: 'planLighterToday' }, also: ['easier today', 'tired', 'lighter'],
-    rule: '"Make it easier today" cuts sets on that day only, keeps weights and reps, never touches the rest of the week, and is refused in a deload week.',
+    rule: '"Make it easier today" cuts sets on that day only, keeps weights and reps, never touches the rest of the week; in a deload week, or on a day already made lighter, it still goes ahead with the reason first. A lasting change to volume leaves deload weeks alone.',
     why: 'A lighter day for fatigue is a deliberate dip; paying it back on another day would load the days after a tired one.' },
   { area: 'Training', anchor: { file: 'src/lib/session-rebuild.ts', token: 'rebuildDayAroundMainLift' }, also: ['different session', 'rebuild today'],
     rule: 'A different version of today keeps the main lift at its weight and sets and changes the rest; a weighted lift is only replaced by another weighted lift.',
