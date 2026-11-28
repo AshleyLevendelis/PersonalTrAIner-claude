@@ -7,6 +7,8 @@
 // block says what the Exercise screen says about each, in the screen's own words (ownWorkoutSummary, planSummary), so
 // the coach and the card agree.
 //
+// His ruling 28 Nov 2026, "Comment, kindly": the coach comments on one as on any session, never a telling-off.
+//
 // Pure: the stored workouts and plans, today's date and the window in; one block out ('' when there are none).
 // ---------------------------------------------------------------------------
 import { ownWorkoutSummary, hasAnythingSaved, type OwnWorkout } from './own-workout'
@@ -75,5 +77,5 @@ export function buildCoachOwnWorkouts(input: {
 
   return lines.length === 0
     ? ''
-    : `THEIR OWN WORKOUTS (sessions they chose, separate from the plan; a day with one planned is theirs to train, and the sets also appear in the workout history):\n${lines.join('\n')}`
+    : `THEIR OWN WORKOUTS (sessions they chose, separate from the plan; a day with one planned is theirs to train, and the sets also appear in the workout history. Comment on one kindly, as on any session, never as a telling-off for leaving the plan):\n${lines.join('\n')}`
 }

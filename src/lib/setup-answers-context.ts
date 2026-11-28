@@ -16,6 +16,9 @@ import { isPregnant, lateInPregnancy, pregnancyWeeksOn } from './health-conditio
 import { describeMealsElsewhere, readMealsElsewhere } from './meals-elsewhere'
 import type { UserProfile } from './types'
 
+/** His ruling 28 Nov 2026, "Say the week, plainly": the week explains a plan change and nothing medical beyond it. */
+export const PREGNANCY_WEEK_RULE = 'Say the week plainly when it explains a change to her plan; say nothing medical beyond that, and send health questions to her midwife or GP.'
+
 export type SetupAnswersProfile = Pick<UserProfile,
   'recovery_capacity' | 'concurrent_activities' | 'conditioning_preference' | 'cardio_days_per_week' | 'running_goal'
   | 'training_days' | 'cooking_time_preference' | 'meal_variety' | 'macro_split_preset' | 'meals_elsewhere'
@@ -82,9 +85,9 @@ export function buildCoachSetupAnswers(profile: SetupAnswersProfile | null | und
     if (weeks == null) {
       lines.push('Pregnancy: no due date given, so the plan treats her as past 16 weeks (no lying flat on the back, no impact).')
     } else if (lateInPregnancy(profile, today)) {
-      lines.push(`Pregnancy: about week ${weeks} by her due date (${profile.due_date}). From 28 weeks the weights hold, sets stop at effort 7, and there is no face-down work.`)
+      lines.push(`Pregnancy: about week ${weeks} by her due date (${profile.due_date}). From 28 weeks the weights hold, sets stop at effort 7, and there is no face-down work. ${PREGNANCY_WEEK_RULE}`)
     } else {
-      lines.push(`Pregnancy: about week ${weeks} by her due date (${profile.due_date}). The 28-week rules (weights hold, effort 7, no face-down work) have not started.`)
+      lines.push(`Pregnancy: about week ${weeks} by her due date (${profile.due_date}). The 28-week rules (weights hold, effort 7, no face-down work) have not started. ${PREGNANCY_WEEK_RULE}`)
     }
   }
 

@@ -63,7 +63,16 @@ never told where he went).
 
 Each is a pure builder with its test; the context field, the prompt line and the card are Builder B's to wire.
 
-## HIS (questions for Ashley, through the lead; never asked by a builder)
+## HIS (answered 28 Nov 2026, through the lead; recorded in CLAUDE.md)
+
+- **Own workouts: "Comment, kindly"** — like any session, never a telling-off. In the own-workouts block's header.
+- **Pregnancy week: "Say the week, plainly"** — it explains a plan change, nothing medical beyond it, midwife or GP for
+  health. In the setup-answers block's pregnancy line.
+- **Unlogged watch workout: "Mention it once, in its daily message"** — folded into the day's first unprompted message,
+  within his limit, one-tap Log, never its own notification, never twice.
+- Also his: the coach never mentions price.
+
+The questions as asked:
 
 - **Own workouts in the coach's view**: may the coach comment on a workout he did on his own (for example "that was a lot
   of pressing two days before your bench day"), or only note it? The training science says comment; what the coach is

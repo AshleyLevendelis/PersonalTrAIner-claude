@@ -74,6 +74,9 @@ console.log('3. Planned days ahead, and the saved list')
   check('a long saved list is cut, with the rest counted', /and 3 more/.test(buildCoachOwnWorkouts({ workouts: [], plans: many, today: TODAY })))
 }
 
+console.log('4. His ruling, "Comment, kindly", travels with the block')
+check('the block tells the coach to comment kindly, never a telling-off', /Comment on one kindly.*never as a telling-off/.test(buildCoachOwnWorkouts({ workouts: [workout({})], plans: [], today: TODAY })))
+
 console.log(`${ran} checks ran`)
 if (failures > 0) { console.log(`${failures} failed`); process.exit(1) }
 console.log('PASS')

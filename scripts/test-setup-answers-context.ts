@@ -69,6 +69,7 @@ console.log('5. Pregnancy: the week the app acts on, and whether the 28-week rul
   const mid = buildCoachSetupAnswers(p({ health_conditions: ['pregnancy'], due_date: '2027-03-20' }), TODAY)
   const midWeeks = pregnancyWeeksOn('2027-03-20', TODAY)
   check('week 20-27 (where a looser cut-off would bind): still not the late rules', (midWeeks ?? 0) >= 20 && (midWeeks ?? 99) < 28 && /have not started/.test(mid), { mid, midWeeks })
+  check('his "Say the week, plainly" travels with a dated pregnancy line, late and early', [late, mid].every(t => /Say the week plainly .*nothing medical beyond that.*midwife or GP/.test(t)), { late, mid })
   const none = buildCoachSetupAnswers(p({ health_conditions: ['pregnancy'] }), TODAY)
   check('no due date: said, and the plan\'s safe default named', /no due date given/.test(none), none)
   check('a due date without the Pregnant tick says nothing', !/Pregnancy/.test(buildCoachSetupAnswers(p({ due_date: '2027-01-30' }), TODAY)))
