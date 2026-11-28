@@ -59,13 +59,14 @@ Awareness (the coach is told): (a) 1 how each lift felt (`lift-feel-context.ts`)
 (`own-workouts-context.ts`); (a) 3, 5, 6, 10 the setup answers and the pregnancy week (`setup-answers-context.ts`);
 (a) 7 a watch workout waiting, and its once-only daily mention (`watch-workout-context.ts`); (a) 9 what feels tight
 today (`tightness-context.ts`). (a) 8, a recorded walk's steps and calories, is one line in Builder A's
-`daily-tracking.ts` (sent). (a) 4, estimates and freestyle marked in today's meals, is NOT built yet.
+`daily-tracking.ts` (sent). (a) 4 estimates and freestyle marked in today's meals (`meal-markers-context.ts`).
 
 Routes (the coach can change it; one planner both surfaces use): (b) 2 how a lift felt (`coach-routes/lift-effort.ts`),
 (b) 4 meals cooked for him (`coach-routes/meals-elsewhere.ts`), (b) 5 freestyle a day (`coach-routes/freestyle.ts`),
 (b) 6 cardio days a week (`coach-routes/cardio-days.ts`), (b) 9 the macro split (`coach-routes/macro-split.ts`).
 Left: (b) 1 sets/reps/weight (Builder A's advise-then-allow item 12), (b) 3 warm-up and drop sets, (b) 8 show numbers
-and meal variety, (b) 7 the tightness check from the chat.
+and meal variety (next round). (b) 7 the tightness check from the chat stays screen-only: CLAUDE.md records why (it could open a
+session silently; the pain boundary lives on the screen), and reversing it is Ashley's call.
 
 NONE of it reaches the coach until Builder B wires the context fields, tools and cards (exact wiring sent per item),
 and whether the coach uses it is unproven until the exam runs after a `chat-gemini` deploy.

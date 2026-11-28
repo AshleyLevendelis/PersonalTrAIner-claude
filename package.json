@@ -740,6 +740,7 @@
     "test:coach-route-freestyle": "tsx scripts/test-coach-route-freestyle.ts",
     "test:coach-route-cardio-days": "tsx scripts/test-coach-route-cardio-days.ts",
     "test:coach-route-macro-split": "tsx scripts/test-coach-route-macro-split.ts",
+    "test:meal-markers-context": "tsx scripts/test-meal-markers-context.ts",
     "gen:coach-actions": "tsx scripts/coach-actions-doc.ts --write",
     "test:offer-fixes": "tsx scripts/test-offer-fixes.ts",
     "test:chat-extras": "tsx scripts/test-chat-extras.ts",
