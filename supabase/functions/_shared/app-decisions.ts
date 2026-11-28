@@ -485,6 +485,12 @@ export const APP_DECISIONS: AppDecision[] = [
     numbersFrom: [{ file: 'src/lib/circuit.ts', token: 'SESSION_MINUTES' }],
     rule: 'Cardio logged on a day with a lifting session still to do is asked about as a replacement only when it is a timer circuit, or 20 minutes or more at Steady or Hard; an easy walk is kept as extra and the session stays on.',
     why: 'An easy walk is movement, not a substitute for resistance training; a circuit or 20 minutes of steady or hard work is a conditioning session of its own.' },
+  { area: 'Weekly structure', anchor: { file: 'src/lib/train-today.ts', token: 'planTrainToday' }, also: ['rest day', 'train today', 'train anyway', 'extra session', 'add a session', 'lift today'],
+    rule: 'Asked to train on a rest day, the app brings one of the week\'s sessions onto today: one missed earlier this week first, else the one whose own day is furthest away, tomorrow\'s only when nothing else is left (then rest tomorrow instead), and a repeat of the one done longest ago when every session is already trained. Today only; the plan does not change.',
+    why: 'A rest day is where the week\'s training is absorbed. Making up missed work restores the week\'s planned volume rather than adding to it, and keeping the same session off consecutive days protects recovery before the next one.' },
+  { area: 'Exercise order', anchor: { file: 'src/lib/superset-turn.ts', token: 'supersetTurn' }, also: ['superset', 'alternate', 'pair', 'rest between', 'rounds'],
+    rule: 'A superset is done in rounds: one set of each exercise in turn with no rest between, then the rest. An exercise with more sets than its partner finishes alone, resting between its sets.',
+    why: 'Alternating lets one muscle group recover while the other works, which is the time saving a superset is for; straight sets of each would not be a superset.' },
 ]
 
 /** Files that mention a coaching decision but make none of their own; each with the reason. */

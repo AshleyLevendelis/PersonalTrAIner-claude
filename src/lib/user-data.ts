@@ -73,6 +73,8 @@ export const EXPORTED_TABLES: { table: string; column: string }[] = [
   // A tester's recorded activity and reports (tester toolkit, 25 Nov 2026).
   { table: 'tester_events', column: 'profile_id' },
   { table: 'tester_reports', column: 'profile_id' },
+  // The route of a walk, jog or run from the watch's GPS (28 Nov 2026): his own data, so his export carries it.
+  { table: 'workout_routes', column: 'user_id' },
   // His saved workouts ("My workouts", 25 Nov 2026): built ahead, his, and downloaded with everything else.
   { table: 'own_workouts', column: 'user_id' },
 ]

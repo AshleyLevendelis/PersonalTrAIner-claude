@@ -1,5 +1,6 @@
 import { activityFiguresLine } from '@/lib/activity-figures'
-import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
+import { lazyWithReload } from '@/lib/chunk-reload'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Check } from 'lucide-react'
@@ -20,7 +21,7 @@ import { tabHash } from '@/lib/app-route'
 import { plannedRoundsOf } from '@/lib/planned-rounds'
 import { blockShape, roundLogSummary, type RoundConfig } from '@/lib/timer-engine'
 // Loaded only when a walk with a start is on screen: most days have none, and the main download stays small.
-const RouteMap = lazy(() => import('@/components/RouteMap').then(m => ({ default: m.RouteMap })))
+const RouteMap = lazyWithReload(() => import('@/components/RouteMap').then(m => ({ default: m.RouteMap })), { ambient: true })
 
 // ---------------------------------------------------------------------------
 // CARDIO, LOGGED LIKE A LIFTING SET.
