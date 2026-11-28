@@ -175,6 +175,12 @@ export const APP_DECISIONS: AppDecision[] = [
     why: 'It uses your own answers, not a guess from your numbers.' },
 
   // ---- Training -----------------------------------------------------------------------------------------------------
+  { area: 'Training', anchor: { file: 'src/lib/volume-adjust.ts', token: 'adjustDayVolumeAdvised' }, also: ['easier', 'lighter', 'deload', 'tired', 'fewer sets'],
+    rule: 'You can make a session lighter in a deload week, a second time, or below the plan\'s usual minimum sets; the app says why first. Below the minimum it takes one set off each exercise, never going under one set, and the weights do not change.',
+    why: 'The minimum sets are what a planned session needs over a block; one lighter session on a bad day is a deliberate dip a coach gives, and easing a deload serves its job, recovery.' },
+  { area: 'Training', anchor: { file: 'src/lib/volume-adjust.ts', token: 'adjustDayVolumeAdvised' }, also: ['easier', 'lighter', 'harder', 'warmup', 'warm-up'],
+    rule: 'Making a session lighter or heavier never changes its warm-up moves.',
+    why: 'Movement prep is not training volume: a tired day still needs its warm-up, and a harder day does not need a longer one.' },
   { area: 'Training', anchor: { file: 'src/lib/exercise-plan.ts', token: 'isSecondMainLift' }, also: ['main lift', 'two big lifts'],
     rule: 'A session has one main lift, never two.',
     why: 'The second heavy compound would be done already tired, at a worse stimulus, and drag down everything after it.' },
