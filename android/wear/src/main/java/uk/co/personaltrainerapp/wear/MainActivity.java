@@ -196,12 +196,11 @@ public class MainActivity extends Activity {
             text(k.line, 13, MUTED, 4);
             button("Start " + (k.rounds > 0 ? "intervals" : "session"), true, 0, v -> startPlannedCardio(k));
         }
-        if (s == null) {
-            ring.set(0f, MINT);
-            kicker("PERSONAL TRAINER", MINT, 0);
-            text("Open Exercise in the phone app once, and your sessions for the week ahead come to your watch.", 13, MUTED, 6);
-        }
-        kicker("CARDIO", MINT, 18);
+        // NOTHING FROM THE PHONE YET: no words about it (his "we dont need it. Clean it up", 28 Nov 2026). The cardio
+        // list leads, and the day's session appears above it once the phone's Exercise tab has sent it.
+        boolean nothingAbove = s == null || (s.exercises.isEmpty() && s.cardio == null);
+        if (nothingAbove) ring.set(0f, MINT);
+        kicker("CARDIO", MINT, nothingAbove ? 0 : 18);
         tile(R.drawable.ic_walk, "Walk", "Steps · heart rate", v -> startCardio("Walk"));
         tile(R.drawable.ic_run, "Run", "Steps · heart rate", v -> startCardio("Run"));
         tile(R.drawable.ic_bike, "Bike", "Heart rate", v -> startCardio("Bike"));

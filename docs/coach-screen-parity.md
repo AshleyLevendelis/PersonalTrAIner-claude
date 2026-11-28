@@ -42,6 +42,7 @@ it is wrong.
 | `propose_kit_change` | SCREEN | Profile → Equipment → "What you have", the ticks, since 11 Oct 2026 (Ashley's 9 Oct ruling, "Remember what they say"). **By construction, the `meal-refit` pattern**: App builds one kit controller (kit-change.ts `plan` / `apply`) and hands the same object to the ticks and to the coach, so the same change is priced against the same plan and saved by one function on both. Both show what changes on the plan before anything is saved. The coach's card is refused before it is built when the kit is not in her own words (`kitStatementInUserWords`). Distinct from `propose_equipment_adaptation`, which is a trip and reverts on its own; this is the kit she owns. |
 | `propose_exercise_add` | SCREEN | The session's "Add an exercise" row. Both surfaces since 13 Sep 2026. |
 | `propose_exercise_remove` | SCREEN | The exercise row's menu. Both surfaces ask why first since 15 Sep 2026, with the same four answers. |
+| `propose_train_today` | SCREEN | The rest day card's "Train anyway" (borrow another day's session, today only). Both surfaces since 28 Nov 2026, his ruling "the app should be able to do whatever I ask it but give reasons or advise around it": the coach's card borrows through the same store and carries the advice the screen does not. |
 | `propose_cardio_remove` | SCREEN | A logged activity's row (Remove, then an Undo line), on Exercise's Additional work and the rest day card. Since 27 Nov 2026. |
 | `propose_exercise_reorder` | SCREEN | The exercise row's menu. |
 | `propose_exercise_swap` | SCREEN | "Swap exercise" on the row. Both surfaces ask why first since 15 Sep 2026 — a different four, because a swap and a removal have different reasons. |
@@ -89,11 +90,11 @@ it is wrong.
 
 ## Things the screen can do that the coach cannot
 
-**Fourteen screen-only, as of 28 Nov 2026** (deleting a walk's route joined that day; picking up a workout the watch
+**Thirteen screen-only, as of 28 Nov 2026** ("Train anyway" left that day, the coach's `propose_train_today`; deleting a walk's route joined that day; picking up a workout the watch
 recorded on 26 Nov; the macro MODE
 was taken out on 25 Nov, his "Take it out": one method, the split's choices kept) — the pre-session tightness check,
 macro split, logging a build-up set, logging a drop set,
-"Train anyway" on a rest day, saying how a lift felt on a set already
+saying how a lift felt on a set already
 logged, which meals are cooked for him on which days, a freestyle day, "Show
 numbers", "Meal variety", cardio days a week, recording a walk or run, picking up a workout the watch recorded, and
 deleting a walk's route
@@ -154,7 +155,7 @@ header alone. Count what is below before trusting what is here.
   `propose_custom_meal` with `cooked_for_me` makes it that day's estimate.
   And a day he cooks his own is a swap (`propose_meal_swap` on the coach's
   side, "Cooking my own today" on the row).
-- **"Train anyway" on a rest day** — recorded 30 Sep 2026, NOT RULED. The rest-day
+- **"Train anyway" on a rest day** — CLOSED 28 Nov 2026: both surfaces (`propose_train_today`, his ruling that day). Kept for the record: recorded 30 Sep 2026, NOT RULED. The rest-day
   card offers "Borrow another day's session — today only", and the coach cannot
   say the same thing ("train today, just this once"). Found re-checking the
   open list: the screen half existed and was missing from this document, the

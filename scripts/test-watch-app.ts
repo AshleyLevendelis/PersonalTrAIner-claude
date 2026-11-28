@@ -521,6 +521,10 @@ async function main() {
     && /private void hideEdge\(\) \{\s*column\.setClipToPadding\(true\);/.test(mainT))
   check('"Session done" says it in one short line', /text\(movedOn \? "Sets you moved on from stay open on your phone\." : "Every set is on your phone\.", 13, MUTED, 4\);/.test(mainT))
 
+  // HIS "we dont need it. Clean it up" (28 Nov 2026): no words about the phone on the home screen; the cardio list leads.
+  check('the home screen says nothing about opening the phone app', !/Open Exercise in the phone app|PERSONAL TRAINER/.test(mainT))
+  check('...and with nothing from the phone, CARDIO is the first thing on it, at the top', /boolean nothingAbove = s == null \|\| \(s\.exercises\.isEmpty\(\) && s\.cardio == null\);[\s\S]{0,120}kicker\("CARDIO", MINT, nothingAbove \? 0 : 18\);/.test(mainT))
+
   console.log(`\n${ran} checks ran`)
   if (failures > 0) { console.error(`${failures} failure(s)`); process.exit(1) }
   console.log('All watch-app checks passed.')

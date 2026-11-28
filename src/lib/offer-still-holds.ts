@@ -24,6 +24,7 @@ import { addDays, resolveMoveTarget, sessionForDate } from './session-move'
 import { dayHasSession } from './day-verbs'
 import { getSessionMovesInRange, getWeeklyDashboard } from './daily-tracking'
 import { supabase } from './supabase'
+import { readBorrowedDay } from './borrowed-day'
 
 /** A plan week as text that reads the same however it was built (in memory or read back), keys in order. */
 function canonical(value: unknown): string {
@@ -137,6 +138,9 @@ export async function offerStillHolds(kind: string, payload: Record<string, unkn
       return slot(payload.dayName, payload.weekNumber)?.exercises[Number(payload.exIndex)]?.name === payload.exerciseName
     case 'propose_exercise_reorder':
       return slot(payload.dayName, payload.weekNumber)?.exercises[Number(payload.fromIndex)]?.name === payload.exerciseName
+    // A SESSION BORROWED ONTO TODAY (28 Nov 2026): only while it is still that day and nothing was borrowed since.
+    case 'propose_train_today':
+      return payload.date === ctx.today && !readBorrowedDay(ctx.profileId, String(payload.date))
     case 'propose_rest_day':
     case 'propose_missed_session':
     case 'propose_session_activity_swap':

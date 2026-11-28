@@ -779,6 +779,8 @@
     "test:meal-protein-spread": "tsx scripts/test-meal-protein-spread.ts",
     "test:peek-recovery": "tsx scripts/test-peek-recovery.ts",
     "test:cardio-remove": "tsx scripts/test-cardio-remove.ts",
+    "test:train-today": "tsx scripts/test-train-today.ts",
+    "verify:train-today": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/train-today.mjs",
     "verify:cardio-remove": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/cardio-remove.mjs",
     "test:gym-dry-run-fixes": "tsx scripts/test-gym-dry-run-fixes.ts",
     "test:watch-flow": "tsx scripts/test-watch-flow.ts",

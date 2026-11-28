@@ -32,7 +32,7 @@ screen counterpart are in `docs/coach-screen-parity.md`.
 | `propose_exercise_reorder` | yes | an instant save | (no words rule: one day's order; a superset moves together) |
 | `propose_exercise_swap` | yes | a card (`propose_exercise_swap`) | (no words rule: the card offers Just today or Whole block; he picks the scope) |
 
-## One day's session (9)
+## One day's session (10)
 
 | Action | On the screen too | Arrives as | His words must... |
 |---|---|---|---|
@@ -45,6 +45,7 @@ screen counterpart are in `docs/coach-screen-parity.md`.
 | `propose_session_move` | yes | a card (`propose_session_move`) | never when asked "from now on" |
 | `propose_session_rebuild` | yes | a card (`propose_session_rebuild`) | never when asked "from now on" |
 | `propose_session_shorten` | yes | a card (`propose_session_shorten`) | never when asked "from now on" |
+| `propose_train_today` | yes | a card (`propose_train_today`) | never when asked "from now on" |
 
 ## The whole plan (13)
 

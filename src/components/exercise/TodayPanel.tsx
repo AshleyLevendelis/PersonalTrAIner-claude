@@ -26,7 +26,7 @@ import { readCardioLogsForDate } from '@/lib/cardio-log-store'
 import { cardioLine, splitActivity } from '@/lib/cardio-lines'
 import { calibrationCueText } from './CalibrationCue'
 import { planDaysForDate } from '@/lib/plan-week'
-import { readBorrowedDay, writeBorrowedDay, trainAnywayOptions, nextTrainingDayName } from '@/lib/borrowed-day'
+import { readBorrowedDay, writeBorrowedDay, trainAnywayOptions, nextTrainingDayName, subscribeBorrowedDay } from '@/lib/borrowed-day'
 import { TOUR_PRACTICE_STOPS, TOUR_OPENS, setTourPracticeDay, useTourStage } from '@/lib/tour-stage'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId, getExerciseEntry } from '@/lib/exercise-db'
@@ -415,6 +415,8 @@ export function TodayPanel({
     setExpandedWarmup(false)
     setBorrowedDayState(readBorrowedDay(profileId, today))
   }, [todayName, today, profileId])
+  // A borrow the coach made (propose_train_today) reaches this screen at once, by the same store.
+  useEffect(() => subscribeBorrowedDay(() => setBorrowedDayState(readBorrowedDay(profileId, today))), [today, profileId])
 
   const weekTrain = useTrainingWeek(profileId, today, liveWeekPlan, planCreatedAt, logsVersion, mesocycle)
   // THE STRIP'S OWN WINDOW (his ruling 15 Nov 2026, "Next 7 days from today but arrow and swipe to see previous and

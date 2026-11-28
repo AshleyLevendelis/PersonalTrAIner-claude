@@ -1913,6 +1913,14 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   workout is an ongoing activity. `test:watch-app`. Needs a watch rebuild (wear-ongoing's first compile is his)
 
 ### His requests of 28 Nov 2026
+- **The app does what he asks and advises around it: his ruling 28 Nov 2026** ("The app should be able to do whatever I
+  ask it but give reasons or advise around it. Ie make suggestions for changes or recommendations to not train with
+  reasons why"): a request the plan advises against is offered with its cost and the better option; only the unsafe is
+  refused, and "I can't" is never the whole reply. First case: a session on a rest day from the chat
+  (`propose_train_today`, the rest day card's "Train anyway", today only; the session and advice are the app's, CSCS
+  mine: a missed one first, else the furthest from its own day, tomorrow's last, a repeat when all are trained).
+  `test:train-today`, `verify:train-today`. Needs the `chat-gemini` deploy. **And the watch home screen says nothing
+  about the phone** (his "we dont need it"): the cardio list leads. `test:watch-app`
 - **A walk, jog or run's route from the watch's GPS: his ruling "Save the route"** (over showing it once and over
   hiding its ends): GPS on foot only, with his permission; a point every 5 m moved, none after End; kept with the walk,
   his alone, "Delete route" under it (screen only: the coach is never told where he went). **Streets under it: his
