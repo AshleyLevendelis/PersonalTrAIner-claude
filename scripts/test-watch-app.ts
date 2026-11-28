@@ -26,17 +26,21 @@ type Row = Record<string, unknown>
 const db: Record<string, Row[]> = { cardio_logs: [] }
 function fakeFrom(table: string) {
   const filters: ((r: Row) => boolean)[] = []
-  let op: 'select' | 'insert' | 'delete' | 'update' = 'select'
+  let op: 'select' | 'insert' | 'delete' | 'update' | 'upsert' = 'select'
   let payload: Row[] = []
   const exec = () => {
     db[table] ??= []
     if (op === 'insert') { const rows = payload.map(r => ({ id: `r${Math.random()}`, ...r })); db[table].push(...rows); return { data: rows[0] ?? null, error: null } }
+    if (op === 'upsert') { for (const r of payload) { const i = db[table].findIndex(x => x.id === r.id); if (i >= 0) db[table][i] = { ...r }; else db[table].push({ ...r }) } return { data: null, error: null } }
+    if (op === 'delete') { db[table] = db[table].filter(r => !filters.every(f => f(r))); return { data: null, error: null } }
     if (op === 'update') { const hit = db[table].filter(r => filters.every(f => f(r))); for (const r of hit) Object.assign(r, payload[0]); return { data: hit.map(r => ({ ...r })), error: null } }
     return { data: db[table].filter(r => filters.every(f => f(r))).map(r => ({ ...r })), error: null }
   }
   const api: Record<string, unknown> = {
     select: () => api, insert: (r: Row | Row[]) => { op = 'insert'; payload = Array.isArray(r) ? r : [r]; return api },
     update: (r: Row) => { op = 'update'; payload = [r]; return api },
+    upsert: (r: Row | Row[]) => { op = 'upsert'; payload = Array.isArray(r) ? r : [r]; return api },
+    delete: () => { op = 'delete'; return api },
     eq: (c: string, v: unknown) => { filters.push(r => r[c] === v); return api },
     gte: (c: string, v: unknown) => { filters.push(r => String(r[c]) >= String(v)); return api },
     lte: (c: string, v: unknown) => { filters.push(r => String(r[c]) <= String(v)); return api },
@@ -289,7 +293,8 @@ async function main() {
   // ONLY WHERE HE CHANGED THEM: unchanged, the phone saves its own number, the right one even for a session that came
   // days ago with the week ahead.
   check('a watch set carries his reps and his weight ("kg") only where he changed them from the phone\'s next set', /if \(reps != TodayStore\.plannedReps\(x\)\) e\.put\("reps", reps\)/.test(mainSrc) && /if \(x\.kg >= 0 && kg != TodayStore\.plannedKg\(x\)\) e\.put\("kg", kg\)/.test(mainSrc) && !/put\("weight/.test(mainSrc))
-  check('steps and distance only on foot (walk, run, or a planned session the phone calls on foot), as the phone records them', /onFoot = "cardio"\.equals\(kind\) && \("Walk"\.equals\(activity\) \|\| "Run"\.equals\(activity\) \|\| onFootPlanned\)/.test(service))
+  check('steps and distance only on foot (walk, run, or a planned session the phone calls on foot), as the phone records them', /onFoot = "cardio"\.equals\(kind\) && isOnFoot\(activity, onFootPlanned\);/.test(service)
+    && /if \(plannedOnFoot\) return true;/.test(service) && /a\.matches\("\.\*\\\\b\(walk\|run\|jog\|hik\)\.\*"\)/.test(service))
   const main = strip(read(`${W}MainActivity.java`))
   // HIS FLOW, 27 Nov 2026 ("One tap, with options"): the words and the order come from LiftFlow, which
   // test:watch-flow RUNS; these hold that the screens draw what it decides rather than words of their own.
@@ -352,7 +357,7 @@ async function main() {
   const wm = strip(read('android/wear/src/main/AndroidManifest.xml'))
   check('a watch app that needs its phone', /android\.hardware\.type\.watch/.test(wm) && /wearable\.standalone" android:value="false"/.test(wm))
   check('heart rate under BODY_SENSORS to Wear OS 5 and the health permission after', /BODY_SENSORS" android:maxSdkVersion="35"/.test(wm) && /health\.READ_HEART_RATE/.test(wm))
-  check('the workout runs as a health foreground service', /foregroundServiceType="health"/.test(wm) && /FOREGROUND_SERVICE_HEALTH/.test(wm))
+  check('the workout runs as a health foreground service', /foregroundServiceType="health(\|location)?"/.test(wm) && /FOREGROUND_SERVICE_HEALTH/.test(wm))
   check('the watch reads only heart rate among health permissions', (wm.match(/android\.permission\.health\.[A-Z_]+/g) ?? []).every(p => p === 'android.permission.health.READ_HEART_RATE'))
   const pm = strip(read('android/app/src/main/AndroidManifest.xml'))
   const kept = (pm.match(/<uses-permission android:name="android\.permission\.health\.([A-Z_]+)"\s*\/>/g) ?? []).map(l => /health\.([A-Z_]+)/.exec(l)![1]).sort()
@@ -406,6 +411,58 @@ async function main() {
   check('a session finished on the phone ends the watch\'s weights workout', /if \(WorkoutService\.LIVE\.running && "lift"\.equals\(WorkoutService\.LIVE\.kind\) && TodayStore\.finishedToday\(json\)\) WorkoutService\.end\(this\);/.test(listenerSrc)
     && JSON.parse(watchTodayPayload({ date: '2026-11-27', title: 't', estimatedMax: null, rows: [{ id: 'a', name: 'A', sets: 1, reps: '5', suggestedLoad: '', restSeconds: 60, done: 1 }] as never, finished: true }) ?? '{}').finished === true
     && /finished=\{status === 'finished'\}/.test(read('src/components/exercise/TodayPanel.tsx')))
+
+  // THE ROUTE OF A WALK, JOG OR RUN (his request 28 Nov 2026, "map out your journey"; his ruling "Save the route").
+  {
+    const rt = await import('../src/lib/workout-routes')
+    const rStart = Date.parse('2026-11-28T08:00:00')
+    const pts = (from: number, n: number) => Array.from({ length: n }, (_, i) => [rStart + (from + i) * 10_000, 51.5 + (from + i) * 0.0004, -0.12 + (from + i) * 0.0003])
+    await applyWatchEvents([
+      { id: 'rt1', type: 'route', activity: 'Walk', startedAt: rStart, date: '2026-11-28', points: pts(0, 3) },
+      // Sent again (a resend after a lost link) and the next half minute: each point kept once, in time order.
+      { id: 'rt2', type: 'route', activity: 'Walk', startedAt: rStart, date: '2026-11-28', points: [...pts(4, 1), ...pts(3, 1), ...pts(1, 2)] },
+      // Nonsense from the sensor is never kept: off the globe, the 0,0 a lost fix reports, a string.
+      { id: 'rt3', type: 'route', activity: 'Walk', startedAt: rStart, date: '2026-11-28', points: [[rStart + 99_000, 91, 0], [rStart + 98_000, 0, 0], ['x', 1, 2]] },
+    ], ctx)
+    const got = await rt.readRoute('p1', 'Walk', new Date(rStart + 20_000).toISOString())
+    check('a route from the watch is kept with its walk: each point once, in time order, nonsense dropped',
+      got?.points.length === 5 && got.points.every((p, i, a) => i === 0 || p[0] > a[i - 1][0]), got?.points)
+    const row = (db.workout_routes ?? [])[0]
+    check('...saved to his account, under his profile, with the whole route', db.workout_routes?.length === 1 && row?.user_id === 'p1' && (row?.points as unknown[])?.length === 5 && row?.activity === 'Walk', row)
+    store.delete('fitplan_routes_v1')
+    const fromDb = await rt.readRoute('p1', 'Walk', new Date(rStart).toISOString())
+    check('...read back from his account when the phone has no copy', fromDb?.points.length === 5, fromDb)
+    check('...never for another workout (a run, or a walk at another time)', (await rt.readRoute('p1', 'Run', new Date(rStart).toISOString())) === null
+      && (await rt.readRoute('p1', 'Walk', new Date(rStart + 3_600_000).toISOString())) === null)
+    const km = rt.routeKm(got?.points ?? [])
+    check('the route\'s length is measured along it (5 points, about 0.2 km)', km > 0.15 && km < 0.25, km)
+    const drawn = rt.projectRoute([[0, 51.5, -0.1], [1, 51.501, -0.1]], 320, 180)
+    check('the drawing is north up: going north moves up the box', !!drawn && drawn.end[1] < drawn.start[1] && drawn.end[0] === drawn.start[0], drawn)
+    const sq = rt.projectRoute([[0, 60, 0], [1, 60, 0.002], [2, 60.001, 0.002]], 300, 300, 0)
+    // At 60 degrees north 0.002 of longitude is ~111 m and 0.001 of latitude ~111 m: equal on the drawing.
+    check('...and a metre is the same length both ways (longitude shrinks with latitude)', !!sq && Math.abs(Math.abs(sq.end[0] - sq.start[0]) - Math.abs(sq.end[1] - sq.start[1])) < 3, sq)
+    const okDel = await rt.deleteRoute('p1', { activity: 'Walk', startedAt: rStart })
+    check('"Delete route" takes it off the phone and his account', okDel && (db.workout_routes ?? []).length === 0 && (await rt.readRoute('p1', 'Walk', new Date(rStart).toISOString())) === null, db.workout_routes)
+    const cardioRow = strip(read('src/components/exercise/CardioSetRow.tsx'))
+    check('a logged walk with a start draws its route under it', /\{log\.started_at && log\.user_id && <Suspense fallback=\{null\}><RouteMap profileId=\{log\.user_id\} activity=\{log\.activity_name\} startedAt=\{log\.started_at\} \/><\/Suspense>\}/.test(cardioRow))
+    const mapSrc = strip(read('src/components/RouteMap.tsx'))
+    check('...drawn from its own points, no map service asked (no other company sees where he went)', !/https?:\/\/|<img|tile/i.test(mapSrc) && /projectRoute\(/.test(mapSrc))
+    // The watch's half.
+    const man = read('android/wear/src/main/AndroidManifest.xml')
+    const mainP = strip(read('android/wear/src/main/java/uk/co/personaltrainerapp/wear/MainActivity.java'))
+    check('the watch asks for location with heart rate, and may run a location workout', /ACCESS_FINE_LOCATION/.test(man) && /FOREGROUND_SERVICE_LOCATION/.test(man) && /foregroundServiceType="health\|location"/.test(man)
+      && /private void askPermissions\(\) \{[\s\S]{0,600}want\.add\(Manifest\.permission\.ACCESS_FINE_LOCATION\);/.test(mainP))
+    check('...GPS only on foot, only with his permission, and the service says so only then',
+      /gps = "cardio"\.equals\(kind\) && isOnFoot\(activity, onFootPlanned\) && locationAllowed\(\);\s*goForeground\(activity\);/.test(svcHr)
+      && /FOREGROUND_SERVICE_TYPE_HEALTH \| \(gps \? ServiceInfo\.FOREGROUND_SERVICE_TYPE_LOCATION : 0\)/.test(svcHr)
+      && /if \(gps\) want\.add\(DataType\.LOCATION\);/.test(svcHr) && /\.setIsGpsEnabled\(withGps\)/.test(svcHr) && !/setIsGpsEnabled\(true\)/.test(svcHr))
+    check('...a point after End, nonsense, or one under 5 m from the last is not kept',
+      /if \(d == null \|\| LIVE\.endedAt > 0 && at > LIVE\.endedAt\) return;/.test(svcHr) && /metres\(lastKeptLat, lastKeptLng, lat, lng\) < ROUTE_STEP_M\) return;/.test(svcHr)
+      && /ROUTE_STEP_M = 5;/.test(svcHr))
+    const typeFn = svcHr.slice(svcHr.indexOf('private static ExerciseType exerciseTypeFor'), svcHr.indexOf('private static ExerciseType exerciseTypeFor') + 900)
+    check('a bike session named "Sprints" is recorded as a bike, never a run', typeFn.indexOf('ExerciseType.BIKING') > 0 && typeFn.indexOf('ExerciseType.BIKING') < typeFn.indexOf('ExerciseType.RUNNING'), typeFn.slice(0, 200))
+    check('...and the route goes to the phone every half minute and once more at End', /sendRoute\(finishing\);/.test(svcHr) && /sendBatch\(true\);\s*sendRoute\(true\);/.test(svcHr) && /ROUTE_EVERY_MS = 30_000;/.test(svcHr))
+  }
 
   // THE WATCH LEFTOVERS (27 Nov 2026).
   // (1) The cardio tail: a workout ends when End is tapped, and the watch's last readings, held back until then, still

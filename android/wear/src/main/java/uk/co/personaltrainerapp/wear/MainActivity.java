@@ -858,6 +858,9 @@ public class MainActivity extends Activity {
         List<String> want = new ArrayList<>();
         want.add(heartPermission());
         want.add(Manifest.permission.ACTIVITY_RECOGNITION);
+        // Location for the route of a walk, jog or run (his ruling 28 Nov 2026, "Save the route"). Saying no only means
+        // no map: the workout still records.
+        want.add(Manifest.permission.ACCESS_FINE_LOCATION);
         if (Build.VERSION.SDK_INT >= 33) want.add(Manifest.permission.POST_NOTIFICATIONS);
         List<String> missing = new ArrayList<>();
         for (String p : want) if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) missing.add(p);

@@ -169,4 +169,39 @@ await clickAt(`[...document.querySelectorAll('[data-testid="watch-sets-home"] bu
 const saved7 = await until(() => ev(`JSON.parse(localStorage.getItem('fitplan_watch_sets') || '[]').length`), v => v === 0, 40)
 check('7b. "Save them" opens Exercise, which saves it: nothing is left waiting', saved7 === 0 && /#\/tab\/exercise/.test(await ev('location.hash')), { saved7, hash: await ev('location.hash') })
 
+console.log('\n  8. A WALK\'S ROUTE (his request 28 Nov 2026, "map out your journey"; his ruling "Save the route")')
+await go('&session-day=1&health=android')
+await until(() => ev(`!!document.querySelector('[data-testid="home-so-far"]')`), v => v === true, 120)
+await wait(1500)
+if (await ev(`!!(${btn('/^Not now$/')})`)) { await clickAt(btn('/^Not now$/')); await wait(500) }
+// The walk starts at 07:00 on the harness's own day (the date the phone sent the watch in section 1).
+const day8 = last7?.date ?? sent?.date
+const start8 = Date.parse(`${day8}T07:00:00`)
+// A loop of about 1.2 km: north, east, south, back west, a point every 25 m or so.
+const loop = []
+for (let i = 0; i <= 12; i++) loop.push([51.5 + i * 0.00025, -0.12])
+for (let i = 1; i <= 12; i++) loop.push([51.503, -0.12 + i * 0.0004])
+for (let i = 1; i <= 12; i++) loop.push([51.503 - i * 0.00025, -0.1152])
+for (let i = 1; i <= 11; i++) loop.push([51.5, -0.1152 - i * 0.0004])
+const pts8 = loop.map((p, i) => [start8 + i * 15_000, +p[0].toFixed(5), +p[1].toFixed(5)])
+const events8 = [
+  { id: 'r8a', type: 'route', activity: 'Walk', startedAt: start8, date: day8, points: pts8.slice(0, 25) },
+  { id: 'r8b', type: 'route', activity: 'Walk', startedAt: start8, date: day8, points: pts8.slice(25) },
+  { id: 'c8', type: 'cardio-end', activity: 'Walk', startedAt: start8, endedAt: start8 + 12 * 60_000, effort: 'easy', steps: 1600, distanceM: 1200, kcal: 60, avgBpm: 104, maxBpm: 118 },
+]
+await ev(`(() => { window.__watchInbox = ${JSON.stringify(events8)}; window.__watchWake && window.__watchWake() })()`)
+await wait(2000)
+await ev(`location.hash = '#/tab/exercise'`); await wait(2500)
+const map8 = await until(() => ev(`(() => { const m = document.querySelector('[data-testid="route-map"]'); if (!m) return null; m.scrollIntoView({ block: 'center' }); const line = m.querySelector('[data-testid="route-line"]'); return { pts: (line?.getAttribute('points') || '').trim().split(/\\s+/).length, km: m.querySelector('[data-testid="route-km"]')?.textContent, start: !!m.querySelector('[data-testid="route-start"]'), end: !!m.querySelector('[data-testid="route-end"]'), w: m.getBoundingClientRect().width } })()`), v => !!v, 40)
+check('8a. the walk logged from the watch shows its route under it, the whole line, start and finish marked', !!map8 && map8.pts === pts8.length && map8.start && map8.end && map8.w > 200, map8)
+// The loop: 333 m north, 332 m east, 333 m south, 305 m west (longitude shrinks by cos 51.5°): 1.30 km.
+check('8b. ...with its length along the route (1.30 km)', /Route · 1\.30 km/.test(map8?.km ?? ''), map8?.km)
+await wait(400)
+await shoot('watch-sets-route')
+const saved8 = await ev(`(() => { try { return JSON.parse(localStorage.getItem('fitplan_routes_v1') || '[]').length } catch { return -1 } })()`)
+await clickAt(`document.querySelector('[data-testid="route-delete"]')`)
+const gone8 = await until(() => ev(`!document.querySelector('[data-testid="route-map"]')`), v => v === true, 30)
+const walkStill = await ev(`[...document.querySelectorAll('[data-testid="cardio-readback"]')].some(r => /Walk/.test(r.textContent || ''))`)
+check('8c. "Delete route" takes the route away and leaves the walk logged', saved8 === 1 && gone8 === true && walkStill === true, { saved8, gone8, walkStill })
+
 await finish('verify:watch-sets PASSED')

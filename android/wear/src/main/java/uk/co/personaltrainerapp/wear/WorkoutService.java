@@ -37,6 +37,7 @@ import androidx.health.services.client.data.ExerciseConfig;
 import androidx.health.services.client.data.ExerciseLapSummary;
 import androidx.health.services.client.data.ExerciseType;
 import androidx.health.services.client.data.ExerciseUpdate;
+import androidx.health.services.client.data.LocationData;
 import androidx.health.services.client.data.SampleDataPoint;
 
 import com.google.common.util.concurrent.FutureCallback;
@@ -236,8 +237,10 @@ public class WorkoutService extends Service {
             if (LIVE.running) return START_NOT_STICKY; // one at a time
             String kind = intent.getStringExtra(EXTRA_KIND);
             String activity = intent.getStringExtra(EXTRA_ACTIVITY);
-            goForeground(activity);
             onFootPlanned = intent.getBooleanExtra(EXTRA_ON_FOOT, false);
+            // GPS ON FOOT ONLY, and only with his permission (a location service without it is refused by the watch).
+            gps = "cardio".equals(kind) && isOnFoot(activity, onFootPlanned) && locationAllowed();
+            goForeground(activity);
             begin(kind == null ? "cardio" : kind, activity == null ? "Workout" : activity);
             showRunning(); // again, now the workout's start is known: the face's clock counts from it
             if (intent.getIntExtra(EXTRA_MINUTES, 0) > 0) scheduleProgram();
@@ -256,7 +259,8 @@ public class WorkoutService extends Service {
             nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Workout", NotificationManager.IMPORTANCE_LOW));
         }
         Notification n = notification(activity, "Workout running", 0);
-        int type = Build.VERSION.SDK_INT >= 34 ? ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH : 0;
+        int type = Build.VERSION.SDK_INT >= 34
+                ? ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH | (gps ? ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION : 0) : 0;
         ServiceCompat.startForeground(this, NOTIFICATION_ID, n, type);
     }
 
@@ -300,9 +304,10 @@ public class WorkoutService extends Service {
     static int iconFor(String kind, String activity) {
         if ("lift".equals(kind)) return R.drawable.ic_lift;
         String a = activity == null ? "" : activity.toLowerCase(java.util.Locale.UK);
+        // A bike first: "Assault Bike Sprints" is a bike, not a run (28 Nov 2026).
+        if (a.matches(".*\\b(bike|cycl|spin).*")) return R.drawable.ic_bike;
         if (a.matches(".*\\b(run|jog|sprint).*")) return R.drawable.ic_run;
         if (a.matches(".*\\b(walk|hik).*")) return R.drawable.ic_walk;
-        if (a.matches(".*\\b(bike|cycl|spin).*")) return R.drawable.ic_bike;
         return R.drawable.ic_other;
     }
 
@@ -316,7 +321,9 @@ public class WorkoutService extends Service {
         l.running = true; l.kind = kind; l.activity = activity; l.startedAt = System.currentTimeMillis(); l.endedAt = 0;
         l.bpm = 0; l.bpmAt = 0; l.maxBpm = 0; l.sumBpm = 0; l.readings = 0; l.lastZoneAt = 0; l.lastZone = 0;
         java.util.Arrays.fill(l.zoneMs, 0);
-        boolean onFoot = "cardio".equals(kind) && ("Walk".equals(activity) || "Run".equals(activity) || onFootPlanned);
+        boolean onFoot = "cardio".equals(kind) && isOnFoot(activity, onFootPlanned);
+        while (route.length() > 0) route.remove(0);
+        lastRouteAt = 0; lastKeptLat = Double.NaN; lastKeptLng = Double.NaN;
         l.steps = onFoot ? 0 : -1; l.distanceM = onFoot ? 0 : -1; l.kcal = 0;
         estimatedMax = TodayStore.estimatedMax(this);
         changed();
@@ -338,16 +345,19 @@ public class WorkoutService extends Service {
                 want.add(DataType.HEART_RATE_BPM);
                 want.add(DataType.CALORIES_TOTAL);
                 if (onFoot) { want.add(DataType.STEPS_TOTAL); want.add(DataType.DISTANCE_TOTAL); }
+                if (gps) want.add(DataType.LOCATION);
                 // A TYPE THIS WATCH DOES NOT LIST is asked for as a general workout: asking for its capabilities would
                 // throw here, on the main thread, and take the app down (27 Nov 2026 review).
                 ExerciseType use = caps.getSupportedExerciseTypes().contains(type) ? type : ExerciseType.WORKOUT;
                 if (!caps.getSupportedExerciseTypes().contains(use)) { Log.w(TAG, "no supported exercise type"); return; }
                 Set<DataType<?, ?>> supported = caps.getExerciseTypeCapabilities(use).getSupportedDataTypes();
                 want.retainAll(supported);
+                // The watch's GPS, for the route: only when this watch can give a location for this kind of workout.
+                boolean withGps = gps && want.contains(DataType.LOCATION);
                 ExerciseConfig.Builder builder = new ExerciseConfig.Builder(use)
                         .setDataTypes(want)
                         .setIsAutoPauseAndResumeEnabled(false)
-                        .setIsGpsEnabled(false);
+                        .setIsGpsEnabled(withGps);
                 // HEART RATE EVERY FIVE SECONDS WITH THE SCREEN OFF (27 Nov 2026, his first walk: "when the watch screen
                 // is off ... I think that might also be happening"). Left alone, the watch holds its readings back while
                 // the screen is off and hands them over in long batches, so the phone's number went blank between them.
@@ -382,9 +392,10 @@ public class WorkoutService extends Service {
         if ("lift".equals(kind)) return ExerciseType.WEIGHTLIFTING;
         // A planned session is named by the plan ("Easy jog", "Assault Bike Rounds"): read by its words.
         String a = activity == null ? "" : activity.toLowerCase(java.util.Locale.UK);
+        // A bike first: "Assault Bike Sprints" is a bike, not a run (28 Nov 2026).
+        if (a.matches(".*\\b(bike|cycl|spin).*")) return ExerciseType.BIKING;
         if (a.matches(".*\\b(run|jog|sprint).*")) return ExerciseType.RUNNING;
         if (a.matches(".*\\b(walk|hik).*")) return ExerciseType.WALKING;
-        if (a.matches(".*\\b(bike|cycl|spin).*")) return ExerciseType.BIKING;
         return ExerciseType.WORKOUT;
     }
 
@@ -395,6 +406,8 @@ public class WorkoutService extends Service {
             Instant boot = Instant.ofEpochMilli(System.currentTimeMillis() - SystemClock.elapsedRealtime());
             List<SampleDataPoint<Double>> hr = m.getData(DataType.HEART_RATE_BPM);
             for (SampleDataPoint<Double> p : hr) onHeartRate((int) Math.round(p.getValue()), p.getTimeInstant(boot).toEpochMilli());
+            List<SampleDataPoint<LocationData>> where = m.getData(DataType.LOCATION);
+            for (SampleDataPoint<LocationData> p : where) onLocation(p.getValue(), p.getTimeInstant(boot).toEpochMilli());
             CumulativeDataPoint<Long> steps = m.getData(DataType.STEPS_TOTAL);
             if (steps != null && LIVE.steps >= 0) LIVE.steps = steps.getTotal();
             CumulativeDataPoint<Double> distance = m.getData(DataType.DISTANCE_TOTAL);
@@ -402,6 +415,7 @@ public class WorkoutService extends Service {
             CumulativeDataPoint<Double> kcal = m.getData(DataType.CALORIES_TOTAL);
             if (kcal != null) LIVE.kcal = kcal.getTotal();
             sendBatch(finishing);
+            sendRoute(finishing);
             changed();
             // THE WATCH'S LAST READINGS ARRIVE AFTER END (27 Nov 2026, the cardio tail): it hands over what it still
             // held with the ended update, so the service listens until then and sends them, calories included.
@@ -427,6 +441,66 @@ public class WorkoutService extends Service {
         l.lastZone = z; l.lastZoneAt = at;
         l.bpm = bpm; l.bpmAt = at; l.maxBpm = Math.max(l.maxBpm, bpm); l.sumBpm += bpm; l.readings++;
         pending.put(new JSONArray().put(at).put(bpm));
+    }
+
+    // ---------------------------------------------------------------- the route (his ruling 28 Nov 2026, "Save the route")
+
+    /** GPS on for this workout: on foot, with his permission. */
+    private boolean gps;
+    /** Points not yet sent: [ms, lat, lng]. */
+    private final JSONArray route = new JSONArray();
+    private long lastRouteAt;
+    private double lastKeptLat = Double.NaN, lastKeptLng = Double.NaN;
+    /** A point is kept once he has moved this far from the last one kept: GPS jitter standing still is not a route. */
+    static final double ROUTE_STEP_M = 5;
+    /** How often the route goes to the phone: every half minute, and once more at the end. */
+    static final long ROUTE_EVERY_MS = 30_000;
+
+    /** Walk, jog, run and hike are on foot, by name (the watch's own Walk and Run included); a planned session says so itself. */
+    static boolean isOnFoot(String activity, boolean plannedOnFoot) {
+        if (plannedOnFoot) return true;
+        String a = activity == null ? "" : activity.toLowerCase(java.util.Locale.UK);
+        // Never "sprint" alone: "Assault Bike Sprints" is not on foot.
+        return a.matches(".*\\b(walk|run|jog|hik).*");
+    }
+
+    private boolean locationAllowed() {
+        return checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void onLocation(LocationData d, long at) {
+        if (d == null || LIVE.endedAt > 0 && at > LIVE.endedAt) return;
+        double lat = d.getLatitude(), lng = d.getLongitude();
+        if (Math.abs(lat) > 90 || Math.abs(lng) > 180 || (lat == 0 && lng == 0)) return;
+        if (!Double.isNaN(lastKeptLat) && metres(lastKeptLat, lastKeptLng, lat, lng) < ROUTE_STEP_M) return;
+        lastKeptLat = lat; lastKeptLng = lng;
+        try { route.put(new JSONArray().put(at).put(round5(lat)).put(round5(lng))); } catch (Exception ignored) { /* a number that will not go in is skipped */ }
+    }
+
+    static double round5(double v) { return Math.round(v * 100_000d) / 100_000d; }
+
+    /** Metres between two points (haversine): the phone's metresBetween. */
+    static double metres(double lat1, double lng1, double lat2, double lng2) {
+        double r = Math.PI / 180, dLat = (lat2 - lat1) * r, dLng = (lng2 - lng1) * r;
+        double h = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        return 2 * 6_371_000 * Math.asin(Math.min(1, Math.sqrt(h)));
+    }
+
+    /** The route's new points go to the phone every half minute, and all that is left at the end. */
+    private void sendRoute(boolean force) {
+        long now = SystemClock.elapsedRealtime();
+        if (route.length() == 0 || (!force && now - lastRouteAt < ROUTE_EVERY_MS)) return;
+        lastRouteAt = now;
+        try {
+            JSONObject e = new JSONObject();
+            e.put("type", "route");
+            e.put("activity", LIVE.activity);
+            e.put("startedAt", LIVE.startedAt);
+            e.put("date", TodayStore.today());
+            e.put("points", new JSONArray(route.toString()));
+            PhoneLink.send(this, e);
+        } catch (Exception ignored) { /* our own object */ }
+        while (route.length() > 0) route.remove(0);
     }
 
     /** Heart rate goes to the phone every few seconds, as one event. */
@@ -468,6 +542,7 @@ public class WorkoutService extends Service {
         Live l = LIVE;
         if (l.endedAt == 0) l.endedAt = System.currentTimeMillis();
         sendBatch(true);
+        sendRoute(true);
         l.running = false;
         l.restEndsAt = 0;
         for (Runnable r : programBuzzes) main.removeCallbacks(r);

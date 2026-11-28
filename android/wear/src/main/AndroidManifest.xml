@@ -12,6 +12,11 @@
     <!-- A workout keeps running with the screen off, as a foreground service of the health type. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <!-- THE ROUTE OF A WALK, JOG OR RUN (his request 28 Nov 2026, "map out your journey"; his ruling "Save the route"):
+         the watch's GPS while he is on foot only, asked with heart rate when he first starts a workout. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- The buzz when a rest ends. -->
@@ -44,7 +49,7 @@
         <service
             android:name=".WorkoutService"
             android:exported="false"
-            android:foregroundServiceType="health" />
+            android:foregroundServiceType="health|location" />
 
         <!-- Today's session, written by the phone app (path /pt/today). -->
         <service

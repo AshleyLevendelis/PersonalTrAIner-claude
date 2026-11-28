@@ -540,7 +540,9 @@ console.log('\n3. Nothing has crept back up')
   // line) and the watch app's phone half (its Exercise part is its own lazy chunk). MEASURED 1699 before them on a
   // clean copy and 1704 with them; 9 kB over today.
   // MOVED 27 Nov 2026: 1713 -> 1721, the same merge. MEASURED 1712 on the merged tree.
-  const APP_CHUNK_BUDGET_KB = 1721
+  // MOVED 28 Nov 2026: 1721 -> 1725. MEASURED 1721 on main (b4682c62, the gym dry run fixes filled the last kB) and 1721
+  // with the route map, which loads on demand and is not in this chunk.
+  const APP_CHUNK_BUDGET_KB = 1725
   // 23 Nov 2026, main merged on top: MEASURED 1635, under the line, so it did not move.
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
