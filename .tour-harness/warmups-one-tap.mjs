@@ -27,7 +27,8 @@ await clickAt(`document.querySelector('[data-testid="hero-start"]')`); await wai
 // it (broad jumps since the machine pack), so a pinned name stopped the loop before it started.
 let before = 0
 for (let i = 0; i < 8 && !/Squat|Warm-up/.test(await ev(`document.querySelector('[data-next-set-button]')?.textContent ?? 'Squat'`)); i++) {
-  await clickAt(`document.querySelector('[data-next-set-button]')`); await wait(900); before++
+  // 1.2 s apart: the running button ignores a second press inside a second (a thumb bounce, 28 Nov 2026).
+  await clickAt(`document.querySelector('[data-next-set-button]')`); await wait(1200); before++
 }
 console.log(`  (logged ${before} set(s) before the squat)`)
 // The squat's ramp, read off its own rows: what each box would log if ticked blank.

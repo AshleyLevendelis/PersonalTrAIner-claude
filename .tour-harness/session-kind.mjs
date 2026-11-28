@@ -169,6 +169,8 @@ for (let i = 0; i < 40; i++) {
   const before = await ev(`document.querySelector('[data-next-set-button]')?.getAttribute('aria-label') ?? null`)
   if (!before) break
   if (/type the/.test(before)) { stalled = before; break }
+  // A second press inside a second is a thumb bounce and ignored (28 Nov 2026), so a real next press waits.
+  await wait(1100)
   await clickAt(`document.querySelector('[data-next-set-button]')`)
   presses++
   const after = await until(() => ev(`document.querySelector('[data-next-set-button]')?.getAttribute('aria-label') ?? null`), v => v !== before, 20)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { readNextSet, nextSetTick, nextSetLabel, nextSetParts, needsWeight, needsReps, type NextSet } from '@/lib/next-set-label'
 
@@ -12,8 +12,17 @@ import { readNextSet, nextSetTick, nextSetLabel, nextSetParts, needsWeight, need
  * tick does. With no weight to take it opens the box instead: pressing a
  * tick that would refuse would look like a dead button.
  */
+/**
+ * A THUMB BOUNCE IS ONE SET (28 Nov 2026, found tracing verify:next-set-now). On a single lift a second tap within the
+ * bounce landed on the tick just saved, which holds; on a SUPERSET the first tap moves the button to the partner's set
+ * at once (the rounds rule of 27 Nov), so a bounce 300 ms later logged a set of the other exercise that was never done.
+ * CSCS: a real next press follows a set of work, never under a second later, so a press inside this window is ignored.
+ */
+const NEXT_SET_BOUNCE_MS = 1000
+
 export function NextSetButton({ root, bottom }: { root: HTMLElement | null; bottom: string }) {
   const [next, setNext] = useState<NextSet | null>(null)
+  const lastPress = useRef(0)
 
   useEffect(() => {
     if (!root) { setNext(null); return }
@@ -30,6 +39,9 @@ export function NextSetButton({ root, bottom }: { root: HTMLElement | null; bott
   if (!next || !root) return null
 
   const press = () => {
+    const now = Date.now()
+    if (now - lastPress.current < NEXT_SET_BOUNCE_MS) return
+    lastPress.current = now
     const tick = nextSetTick(root)
     if (!tick) return
     if (needsWeight(next) || needsReps(next)) {
