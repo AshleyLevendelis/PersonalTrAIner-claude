@@ -50,7 +50,7 @@ import { swapPoolMeal, setMealPick, getMealPicksForDate, clearMealPick, recordMe
 import { buildCoachEatenSummary, eatenWindow } from '@/lib/coach-eaten'
 import { buildCoachWeekReview, weekReviewDates } from '@/lib/coach-week-review'
 import { changeSinceStart } from '@/lib/weight-trend'
-import { getExerciseEntry } from '@/lib/exercise-db'
+import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, undoWindowEndsAt, pendingWindowPassed, offerSurvivesFailedSave, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { buildWeighInProposal, executeWeighIn, WEIGH_IN_RECEIPT_HOLD_DETAIL, weighInCorrectionReceiptDetail, type WeighInPayload } from '@/lib/weigh-in-proposal'
@@ -144,6 +144,7 @@ import { settleWeek } from '@/lib/settle-week'
 import { shortenOrFloor, SHORTEST_VERSION_MINUTES } from '@/lib/exercise-plan'
 import { resolveAdditionAnywhere } from '@/lib/exercise-add-candidates'
 import { swapPatternAdvice, swapHardStop, swapFitWarnings } from '@/lib/swap-advice'
+import { planOwnWorkoutOffer, applyOwnWorkout, undoOwnWorkout, type OwnWorkoutPayload } from '@/lib/own-workout-offer'
 import { dayLengthParts, formatDayLength } from '@/lib/session-duration'
 import { planDaysForDate } from '@/lib/plan-week'
 import { restoreMesocycle } from '@/lib/mesocycle-persistence'
@@ -3070,6 +3071,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (pendingAction.kind === 'propose_concurrent_activity') return "Here's the week built around it:"
     if (pendingAction.kind === 'propose_rest_day') return 'Want me to mark that as a rest day?'
     if (pendingAction.kind === 'propose_train_today') return 'Want me to put that session on today?'
+    if (pendingAction.kind === 'propose_own_workout') return 'Want me to set it up?'
     if (pendingAction.kind === 'propose_missed_session') return 'Want me to mark that session as missed?'
     if (pendingAction.kind === 'propose_session_activity_swap') return 'Want me to swap that day over?'
     if (pendingAction.kind === 'propose_circuit_log') return 'Want me to log this workout?'
@@ -4497,6 +4499,54 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         implications: [
           ...(paused ? [{ severity: 'info' as const, text: "Your plan is paused: this session is one of your own, nothing else becomes due, and the pause carries on." }] : []),
           ...plan.advice.map(text => ({ severity: 'info' as const, text })),
+        ],
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Builds propose_own_workout's card (advise-then-allow fix 13, 28 Nov 2026): a workout of his own, started now or
+   * saved for a day, through the screen's own workout store (own-workout-offer.ts). Every exercise he named is
+   * resolved and held to the hard stops; a move outside his kit or level goes in with the screen's warning.
+   */
+  const buildOwnWorkoutProposal = (rawArgs: Record<string, unknown>): {
+    ok: true
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: OwnWorkoutPayload
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | { ok: false; reason: string } => {
+    const offer = planOwnWorkoutOffer({
+      mode: rawArgs.mode, name: rawArgs.name, date: rawArgs.date, items: rawArgs.items,
+      today: activeSession.date,
+      // A day more than six ahead is named with its date ("Monday 29 Nov"), so a wrong date shows on the card.
+      dayName: d => daysBetween(activeSession.date, d) <= 6 ? dayNameOf(d)
+        : new Date(`${d}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', ...(d.slice(0, 4) === activeSession.date.slice(0, 4) ? {} : { year: 'numeric' }) }).replace(',', ''),
+      resolve: said => {
+        const r = resolveExerciseName(said, [])
+        if (r.resolution === 'ambiguous') return { ambiguous: r.candidates.map(c => c.name) }
+        return r.resolution === 'resolved' ? getExerciseEntry(r.exerciseName) ?? null : null
+      },
+      profile: poolProfile, exclusions: exerciseExclusions,
+      newId: () => `own-chat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    })
+    if (!offer.ok) return offer
+    const p = offer.payload
+    const todaySession = p.mode === 'start' && (todayResolved.day?.exercises.length ?? 0) > 0 ? todayResolved.day!.focus : null
+    return {
+      ok: true,
+      scopeKey: `${profile.id}:propose_own_workout:${p.mode}:${p.date ?? 'list'}:${p.name}`,
+      preconditions: { mode: p.mode, date: p.date },
+      payload: p,
+      diff: {
+        lead: ask(offer.lead),
+        rows: offer.lines.map(line => { const [field, ...rest] = line.split(' · '); return { field, before: '', after: rest.join(' · ') } }),
+        implications: [
+          ...offer.warnings.map(text => ({ severity: 'warn' as const, text })),
+          ...offer.notes.map(text => ({ severity: 'info' as const, text })),
+          ...(todaySession ? [{ severity: 'info' as const, text: `It's a separate workout: today's ${todaySession} stays on your plan.` }] : []),
+          { severity: 'info', text: p.mode === 'start' ? 'It goes on Exercise with the sets in the boxes; nothing is logged until you tick a set.' : p.date ? 'It shows on that day with a Start, and stays in your workouts.' : 'It stays in your workouts, ready to start on any day.' },
         ],
         reversible: true,
       },
@@ -7167,6 +7217,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         const weighIn = buildWeighInProposal(profile.id, result.proposal.rawArgs, await getWeighInPicture(profile.id))
         if (weighIn) built = { scopeKey: weighIn.scopeKey, preconditions: weighIn.preconditions, payload: weighIn.payload as unknown as Record<string, unknown>, diff: weighIn.diff }
         else refusal = "That weight doesn't look right — could you give it to me in kilograms (e.g. 86.4)?"
+      } else if (result.proposal.kind === 'propose_own_workout') {
+        const ow = buildOwnWorkoutProposal(result.proposal.rawArgs ?? {})
+        if (ow.ok) built = { scopeKey: ow.scopeKey, preconditions: ow.preconditions, payload: ow.payload as unknown as Record<string, unknown>, diff: ow.diff }
+        else refusal = ow.reason
       } else if (result.proposal.kind === 'propose_train_today') {
         const tt = buildTrainTodayProposal(result.proposal.rawArgs ?? {})
         if (tt.ok) built = { scopeKey: tt.scopeKey, preconditions: tt.preconditions, payload: tt.payload as unknown as Record<string, unknown>, diff: tt.diff }
@@ -8722,6 +8776,20 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       title = ok ? RECEIPTS['propose_concurrent_activity'].done : RECEIPTS['propose_concurrent_activity'].failed
       rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_own_workout') {
+      // THE SCREEN'S OWN WORKOUT STORE: started, it is on Exercise at once; saved, it is in his workouts.
+      const payload = row.payload as unknown as OwnWorkoutPayload
+      // A card made before midnight and tapped after it would start a workout dated yesterday: it says so instead.
+      const stale = payload.mode === 'start' && payload.date !== activeSession.date
+      // Its set numbers run on after the day's logged sets AND the plan's own sets of that lift today, so ticking his
+      // own Bench never fills the plan's Bench row (it is a separate workout).
+      const planSets = (id: string) => (todayResolved.day?.exercises ?? []).filter(e => getExerciseId(e.name) === id).flatMap(e => Array.from({ length: Number(e.sets) || 0 }, (_, k) => k + 1))
+      const ok = !stale && applyOwnWorkout(profile.id, payload, getAppNow(profile.id).toISOString(), id => [...activeSession.logs.filter(l => (l.exercise_id ?? getExerciseId(l.exercise_name)) === id).map(l => l.set_number), ...planSets(id)])
+      receipt = ok ? { landed: [payload.mode === 'start' ? `${payload.name}: started, on Exercise` : `${payload.name}: saved${payload.date ? `, on ${payload.date === activeSession.date ? 'today' : dayNameOf(payload.date)}` : ''}`], failed: [] } : { landed: [], failed: [{ op: 'propose_own_workout', error: stale ? 'that was set up for yesterday; ask me again for today' : "it didn't save on this phone" }] }
+      title = ok ? RECEIPTS['propose_own_workout'].done : RECEIPTS['propose_own_workout'].failed
+      rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
+      undoToken = ok ? row.id : undefined
+      if (ok) onLogsUpdated?.()
     } else if (row.kind === 'propose_train_today') {
       // THE REST DAY CARD'S OWN "TRAIN ANYWAY": the same store, so Exercise shows the session at once.
       const payload = row.payload as unknown as TrainTodayPayload
@@ -9253,6 +9321,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             onProfileChanged({ training_style: before as TrainingStyle })
           }
         }
+      } else if (row.kind === 'propose_own_workout') {
+        // A started workout goes only while nothing in it is logged; a saved one is removed everywhere.
+        const back = undoOwnWorkout(profile.id, row.payload as unknown as OwnWorkoutPayload, getAppNow(profile.id).toISOString())
+        if (!back.ok) return back.kept ? { refused: back.kept, keep: false } : { refused: RECEIPTS_UNDONE.failed, keep: true }
+        onLogsUpdated?.()
       } else if (row.kind === 'propose_train_today') {
         // Back to a rest day, only while nothing has been logged on the borrowed session: logged sets stay where they are.
         const payload = row.payload as unknown as TrainTodayPayload
@@ -9950,7 +10023,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                   }
                                   onViewGrocery={msg.receipt.kind === 'grocery_item_added' || msg.receipt.kind === 'grocery_day_added' || msg.receipt.kind === 'grocery_item_removed' ? onOpenGrocery : undefined}
                                   onViewDashboard={msg.receipt.kind === 'water_logged' ? onOpenDashboard : undefined}
-                                  onViewExercise={msg.receipt.kind === 'steps_logged' || msg.receipt.kind === 'propose_train_today' ? onOpenExercise : undefined}
+                                  onViewExercise={msg.receipt.kind === 'steps_logged' || msg.receipt.kind === 'propose_train_today' || (msg.receipt.kind === 'propose_own_workout' && msg.receipt.rows.some(r => /^started/.test(r.detail))) ? onOpenExercise : undefined}
                                   tone={msg.receipt.kind === 'water_logged' ? 'water' : undefined}
                                 />
                               )}

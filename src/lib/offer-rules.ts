@@ -92,6 +92,9 @@ export const COACH_ACTIONS: Record<string, CoachAction> = {
   // app should be able to do whatever I ask it but give reasons or advise around it"): the rest day card's "Train
   // anyway", reached from the chat. Never off "from now on": a regular extra day is a change of training days.
   propose_train_today: { family: 'day', screen: 'screen', card: 'propose_train_today', rule: T },
+  // A WORKOUT OF HIS OWN (advise-then-allow fix 13, 28 Nov 2026): started now or saved for a day, through the screen's
+  // own store. He names every exercise; the card lists them before Apply.
+  propose_own_workout: { family: 'day', screen: 'screen', card: 'propose_own_workout', rule: none('only exercises he named or agreed to (the prompt); the card lists every one, and the day, before Apply') },
   propose_missed_session: { family: 'day', screen: 'screen', card: 'propose_missed_session', rule: none('a past day only; offer-still-holds refuses a trained day') },
   // A LOGGED ACTIVITY TAKEN OFF ITS DAY (27 Nov 2026, his "I accidentally added a walk today. Remove it"): a log
   // already made, named on the card before Apply; the screen's Remove on the same row does the same.

@@ -50,7 +50,25 @@ earlier ruling of his and wait for his word.
 11. [ ] **"Add exercise" on any day**, including a rest or recovery day.
 12. [ ] **Change an exercise's sets, reps or weight** for today or the block, on the row and by the coach. Weight
     stays under the ceilings. Missing on both surfaces.
-13. [ ] **The coach can start, plan or log a workout of his own** (the screen can).
+13. [~] **The coach can start, plan or log a workout of his own** (the screen can). START and PLAN DONE 28 Nov 2026
+    (Builder B): new coach action `propose_own_workout`, mode start (now, today) or plan (saved to "My workouts", on a
+    day if named); the card lists his exercises with his numbers (none given: 3 x 8-10, the screen's default) and says
+    the plan's session stays when today has one; Apply writes through the screen's own store (`saveOwnWorkout`,
+    `saveOwnPlan`, `workoutFromPlan`, set numbers after today's), Undo removes it only while nothing is ticked. Hard stops
+    by `swapHardStop`; kit or level outside his plan is a warning. `test:own-workout-offer` (40, 18/18 mutations over two rounds),
+    `verify:own-workout-chat` (26, 1/1). Review follow-up: a name that fits several is asked about by name; his reps
+    are kept as said ("AMRAP", "45s"), a number that cannot be right is asked, never replaced; a day that is not a
+    date is asked, never dropped; cardio that is a known move (burpees) meets the stops; Undo leaves a saved workout he
+    has changed since; a start card tapped after midnight is refused; set numbers run after the plan's own sets of the
+    lift today; "set me up a workout" with no exercises gets a suggestion in words first. **Decided, mine (CSCS): his
+    own stated weight is not held to the load ceilings** (they bound what the APP prescribes; the screen's own workout
+    takes his number too). **For Builder A (screen, parity):** the screen's own-workout picker lets an injury-,
+    pregnancy- or never-again-excluded move in with a warning (`OwnWorkoutSheet`), and the from-28-weeks list is not
+    checked there; its Start numbers own sets from 1 when the plan's lift is not yet logged, so ticking them fills the
+    plan's row; an open sheet re-saves a workout the chat's Undo removed. Needs the `chat-gemini` deploy. **LOG (after the fact, as its own workout)
+    waits on Builder A:** the screen's past-day save lives in `OwnWorkoutSheet.saveAfter` (a component); lift it into
+    a library function (e.g. `saveOwnWorkoutAfter(profileId, workout, ...)` in own-workout.ts) and the coach will call
+    it. Until then the coach logs what he did on that day with `log_workout` (sets and history, not grouped).
 14. [ ] **A weights session on a future rest day, as part of the plan**, from either surface.
 15. [ ] **Move a session into next week** (session-move.ts keeps a move inside its own week).
 16. [ ] **A cardio session on one day only** (both surfaces write it for every week of the block).

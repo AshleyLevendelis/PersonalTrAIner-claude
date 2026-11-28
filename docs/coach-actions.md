@@ -32,12 +32,13 @@ screen counterpart are in `docs/coach-screen-parity.md`.
 | `propose_exercise_reorder` | yes | an instant save | (no words rule: one day's order; a superset moves together) |
 | `propose_exercise_swap` | yes | a card (`propose_exercise_swap`) | (no words rule: the card offers Just today or Whole block; he picks the scope) |
 
-## One day's session (10)
+## One day's session (11)
 
 | Action | On the screen too | Arrives as | His words must... |
 |---|---|---|---|
 | `propose_cardio_session` | yes | a card (`propose_cardio_session`) | never off a maybe |
 | `propose_missed_session` | yes | a card (`propose_missed_session`) | (no words rule: a past day only; offer-still-holds refuses a trained day) |
+| `propose_own_workout` | yes | a card (`propose_own_workout`) | (no words rule: only exercises he named or agreed to (the prompt); the card lists every one, and the day, before Apply) |
 | `propose_rest_day` | yes | a card (`propose_rest_day`) | never when asked "from now on" |
 | `propose_session_activity_swap` | yes | a card (`propose_session_activity_swap`) | never when asked "from now on"; never off a maybe |
 | `propose_session_kind_today` | yes | a card (`propose_session_kind_today`) | never when asked "from now on" |

@@ -1576,6 +1576,36 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_own_workout",
+    description:
+      "PROPOSES a workout of the user's OWN, outside their plan — this does NOT apply anything, the app shows a card and they tap Apply, with an Undo after. mode 'start': start it NOW, today ('I want to do my own thing today: bench, rows and some curls', 'let's do a quick arms workout now'); it appears on the Exercise tab with the sets in the boxes, and nothing is logged until they tick a set. mode 'plan': save it to their workouts for later, on a day if they named one ('set me up a leg workout for Saturday', 'save this as my hotel workout'). Pass ONLY the exercises they named or agreed to, in their words, with the sets, reps and weight they gave, reps exactly as said ('8', 'AMRAP', '45s'; none given: leave them out, the app uses 3 x 8-10); cardio as cardio with minutes if given. If they named NO exercises ('set me up a hotel workout'), do not invent a card: suggest one in words, or ask what they want in it, and call this once they say yes or name them. The app refuses only a move their injuries rule out, one the pregnancy rules leave out and one on their never-again list; anything else goes in, with a note if it is outside their kit or level. NOT propose_train_today (that puts one of THEIR PLAN'S sessions on today), NOT propose_exercise_add (one exercise INTO a plan session), NOT log_workout (sets they ALREADY DID, on any day).",
+    parameters: {
+      type: "object",
+      properties: {
+        mode: { type: "string", enum: ["start", "plan"], description: "'start' to begin it now (today); 'plan' to save it for later." },
+        name: { type: "string", description: "Its name, ONLY if they gave one ('hotel workout', 'arms day'). Omit otherwise." },
+        date: { type: "string", description: "ISO date (YYYY-MM-DD) for 'plan', ONLY if they named a day. Omit otherwise." },
+        items: {
+          type: "array",
+          description: "What is in it, in the order they said it.",
+          items: {
+            type: "object",
+            properties: {
+              exercise: { type: "string", description: "An exercise, in their words. Omit for cardio." },
+              sets: { type: "number", description: "Sets, ONLY as they said." },
+              reps: { type: "string", description: "Reps, ONLY as they said ('8', '8-12')." },
+              weight_kg: { type: "number", description: "Weight in kg, ONLY as they said (pounds converted)." },
+              cardio: { type: "string", description: "A cardio activity, in their words ('run', 'bike'). Omit for an exercise." },
+              minutes: { type: "number", description: "Cardio minutes, ONLY as they said." },
+            },
+          },
+        },
+        origin_verbatim_quote: { type: "string", description: "The exact substring of the user's CURRENT message asking for the workout. Copied verbatim." },
+      },
+      required: ["mode", "items", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_cardio_remove",
     description:
       "PROPOSES taking a LOGGED activity (a walk, run, ride, swim, class or any cardio already logged) off a day, when they say it was logged by mistake or should not be there ('I accidentally added a walk today, remove it', 'delete the run I logged yesterday'). This does NOT apply anything: the app finds the log on that day, names it on a card and they tap Apply, with an Undo after. It is NEVER propose_exercise_remove: that takes an exercise out of the PLAN's session, and a logged walk is not on the plan.",
@@ -2931,7 +2961,7 @@ A pause holds the plan where it is: nothing is due, nothing counts as missed, no
   - A NEXT STEP with no question at all (§1b-ii, way 3): one or two buttons written as what THEY would say next -> "What changes next week?" | "Show the full session". One button is fine.
   - A CHECK-IN ("how are you feeling today?", "ready for today's session?"): the answers a person would really give, three or four of them -> "Feeling good today" | "Tired today" | "Something hurts today" | "Short on time today". Never a lone "Yes".
   A QUESTION NEVER HAS JUST ONE BUTTON. One button under a question reads as the only answer allowed. Give the two to four real answers, different from each other, and never pad with a button nobody would tap. (A next step with no question may still be one button.)
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_session_rebuild, propose_schedule_change, propose_style_change, propose_goal_change, propose_concurrent_activity, propose_rest_day, propose_train_today, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize, propose_meal_move, propose_meal_day_move, propose_meal_refit, propose_meal_rebalance, propose_meal_top_up, propose_plan_restart, propose_cardio_session) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. TWO exceptions, both asked BEFORE any tool call rather than on the proposal turn, so both get a normal [QUICK_REPLIES] tag: the equipment-clarifying question (§3b), and the "want me to put that in your plan?" turn that MUST come before propose_cardio_session (§3g2) — on that turn the chips ARE the mechanism, because there is no card to tap.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_session_rebuild, propose_schedule_change, propose_style_change, propose_goal_change, propose_concurrent_activity, propose_rest_day, propose_train_today, propose_own_workout, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize, propose_meal_move, propose_meal_day_move, propose_meal_refit, propose_meal_rebalance, propose_meal_top_up, propose_plan_restart, propose_cardio_session) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. TWO exceptions, both asked BEFORE any tool call rather than on the proposal turn, so both get a normal [QUICK_REPLIES] tag: the equipment-clarifying question (§3b), and the "want me to put that in your plan?" turn that MUST come before propose_cardio_session (§3g2) — on that turn the chips ARE the mechanism, because there is no card to tap.
 
 === FEW-SHOT EXAMPLES ===
 (These show the VOICE only: warm, short lines, a why. Their days, times, sessions and numbers are invented: never take the time of day, a session, or whether they have trained from an example, and never a number either. Those come from TEMPORAL AWARENESS and the plan below, every time. Never copy an example's words.)
@@ -3179,6 +3209,7 @@ FUNCTION CALL RULES (CRITICAL):
 - EATING OUT (Ashley, 12 Nov 2026). When they say they are eating out at a meal today or in the next six days ("I'm out for dinner Friday", "we're going out for lunch tomorrow"), call propose_eating_out with that day and meal straight away. The APP asks how big a night it is, with buttons: never ask it yourself and never guess a size. The meal then sits in their plan as an estimate, off the shopping list, and the rest of that day fits around it. If they then say what they will order, estimate that dish with propose_custom_meal (cooked_for_me true, that day and meal). Never call a meal out "on plan", "fine" or "free": a restaurant's food is unknown, and an allergy or restriction on their profile still stands; say the app cannot confirm what is in it.
 - SUGGESTED ORDERS (the owner's 13 Nov 2026 strategy, slice 5). When they name the restaurant, paste or describe its menu, or send a photo of it, suggest 2 or 3 orders from what is actually on it, ONE reason each tied to their day ("the grilled chicken with rice: keeps your protein on track tonight"), then offer to mark the meal out at the matching size. Never suggest a dish that clashes with their restrictions or foods they avoid, and never say a dish is free of an allergen: say the app cannot confirm it and they should ask the restaurant ("can't confirm it's nut-free"). A meal out is logged as a RANGE the app works out ("about 650-850 kcal"), never a precise number from you. The NEXT meal goes back to the plan as normal: never tell them to eat less tomorrow or skip a meal to make up for it, and never suggest earning it with extra exercise.
 - A MEAL COOKED FOR THEM (Ashley, 11 Nov 2026). Their plan can already hold meals somebody else cooks: a day's list then shows "Breakfast cooked for you" or "Lunch cooked for you" at a normal size, marked as assumed, and those meals are never on the shopping list. When they tell you WHAT one of those meals is ("the canteen has chicken curry and rice today", "Thursday's work lunch is a jacket potato with tuna"), call propose_custom_meal with cooked_for_me true, that day's date and that meal: write the dish as its everyday foods at ordinary single portions (they cannot weigh a canteen plate, so here, and only here, you supply the amounts), and say in one short line that it is an estimate. ONE MEAL PER CALL: if they give you several days at once, do the nearest one, and say you will take the others one at a time when they are ready. NEVER say a meal cooked for them fits their diet or is free of anything: you do not know what is in a kitchen's food, and if it clashes with an allergy or restriction on their profile the app will say so itself. WHICH meals are cooked for them on WHICH days is a setting you cannot change: if they tell you that ("breakfast and lunch are cooked for me at work, Monday to Friday"), say plainly that you can't set it from here and that it is on Profile, under Meals & shopping, as "Meals cooked for me". Do not claim to have recorded it.
+- Trigger propose_own_workout when they want a workout of THEIR OWN rather than the plan's: started now ('let's do my own session today: bench, rows, curls') or saved for later ('set me up push-ups, squats and lunges for Saturday'). With no exercises named, suggest them in words first and call it on their yes. It never replaces the plan's session; on a day that has one, it is a second, separate workout (say the recovery cost in one line when the day already has hard work). Pass only what they named.
 - Trigger propose_train_today when today is a rest day and they ASK to train today ("add a weight session just for today", "give me a session today"). Never answer that with "there's no session to swap": a rest day has nothing to swap, and that is not an answer to a request to train.
 - ASKED FOR SOMETHING THE PLAN ADVISES AGAINST, OFFER IT WITH THE REASON (his ruling, 28 Nov 2026: "The app should be able to do whatever I ask it but give reasons or advise around it. Ie make suggestions for changes or recommendations to not train with reasons why"). Training on a rest day, an extra session, heavy legs the day before a hard run: say in one or two lines what it costs and the better option if there is one, then offer it. Only something unsafe is refused (a red-flag symptom, an allergen, a load the app will not prescribe). "I can't" and "there's nothing to change" are never the whole reply to a request; say what you CAN do instead.
 - Trigger propose_rest_day the same way when they tell you they are resting a training day and name nothing in its place. "Rest day today" is a statement of fact about their day, not a question — call the tool. "Should I rest today?" is a question: answer it.
@@ -4132,6 +4163,21 @@ Keep this context in mind to ensure your greetings and questions naturally align
             proposal: {
               kind: "propose_train_today",
               rawArgs: { session: args.session, day: args.day },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_own_workout") {
+        // Proposal, not a write: the app resolves every name, checks the hard stops, lists it on the card and writes
+        // it through the screen's own workout store on Apply.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_own_workout",
+              rawArgs: { mode: args.mode, name: args.name, date: args.date, items: args.items },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
