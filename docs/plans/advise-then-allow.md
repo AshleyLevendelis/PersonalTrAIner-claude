@@ -78,8 +78,11 @@ earlier ruling of his and wait for his word.
 
 ## HIS (each reverses an earlier ruling)
 
-- **Two sessions on one day** (his 8 Sep ruling: "a day never holds two sessions"). Needed for: moving a session
+- [x] **Two sessions on one day** (his 8 Sep ruling: "a day never holds two sessions"). Needed for: moving a session
   onto a day that has one, training on a day that already has a session, cardio in addition to a session.
+  **ANSWERED 28 Nov 2026: "Allow, with a warning"** (over cardio only, and over keeping one a day). It REVERSES his
+  8 Sep ruling: a day may hold two sessions; the card says the recovery cost first, then lets him. Unblocks fixes 8,
+  14, 15 and moves onto a busy day.
 - **Near-copies prescribable** (his 3 Nov "Searchable, log-only"): adding or swapping in a version of an exercise
   priced from its parent, with advice.
 

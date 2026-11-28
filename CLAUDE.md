@@ -1923,6 +1923,9 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   excludes; the load ceilings; the pregnancy exercise rules. A floor or filter that is not one of those four is
   advice, never a block (it REPLACES, for training, the 14 Sep "four tiers" only in that tier 3 is always one tap
   from done). The fix list: `docs/plans/advise-then-allow.md`.
+- **A day may hold two sessions: his ruling 28 Nov 2026, "Allow, with a warning"** (over cardio only and over one a
+  day): it REVERSES his 8 Sep "a day never holds two sessions". Training on a day that already has a session, moving
+  a session onto a busy day and cardio on top are allowed on both surfaces; the card states the recovery cost first.
 - **The app does what he asks and advises around it: his ruling 28 Nov 2026** ("The app should be able to do whatever I
   ask it but give reasons or advise around it. Ie make suggestions for changes or recommendations to not train with
   reasons why"): a request the plan advises against is offered with its cost and the better option; only the unsafe is
