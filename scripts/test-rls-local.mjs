@@ -427,6 +427,22 @@ try {
     check('...nor change or delete his', psql(`SELECT name FROM own_workouts WHERE id = 'plan-a1';`, asA) === 'Push')
   }
 
+  // A WALK'S ROUTE (his ruling 28 Nov 2026, "Save the route"): where he lives and trains, so only he reads it.
+  console.log('\n11b. A recorded route is his alone, and goes with his account')
+  {
+    const asA = { role: 'authenticated', uid: UID_A }
+    const asB = { role: 'authenticated', uid: UID_B }
+    const save = expectRefused(`INSERT INTO workout_routes (id, user_id, activity, started_at, date, points) VALUES ('r-a1', '${PROFILE_A}', 'Walk', '2026-11-28T09:00:00Z', '2026-11-28', '[[1,51.5,-0.1],[2,51.5001,-0.1001]]');`, asA)
+    check('his route saves, signed in as him', save === null, save)
+    check('...he reads it back', psql(`SELECT jsonb_array_length(points) FROM workout_routes WHERE id = 'r-a1';`, asA) === '2')
+    check('somebody else reads none of it', psql(`SELECT count(*) FROM workout_routes;`, asB) === '0')
+    check('...and cannot write one as him', expectRefused(`INSERT INTO workout_routes (id, user_id, activity, started_at, date) VALUES ('r-x', '${PROFILE_A}', 'Walk', now(), '2026-11-28');`, asB) !== null)
+    psql(`DELETE FROM workout_routes WHERE id = 'r-a1';`, asB)
+    check('...nor delete his', psql(`SELECT count(*) FROM workout_routes WHERE id = 'r-a1';`, asA) === '1')
+    psql(`DELETE FROM workout_routes WHERE id = 'r-a1';`, asA)
+    check('he can delete it himself ("Delete route")', psql(`SELECT count(*) FROM workout_routes WHERE id = 'r-a1';`, asA) === '0')
+  }
+
   // HOW LONG TESTER DATA IS KEPT (his ruling 26 Nov 2026, "Activity 90 days, reports 1 year"). Rows either side of
   // each limit, so a wrong interval on either table, or the two swapped, fails here.
   console.log('\n12. Tester data is deleted after its limit, and not before')

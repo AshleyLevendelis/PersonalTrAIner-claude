@@ -1912,6 +1912,13 @@ first, `own_workouts` where phones meet). `test:own-workout`, `verify:own-workou
   marked final and saved at once; heart rate waiting for the phone folds into the last waiting message; a running
   workout is an ongoing activity. `test:watch-app`. Needs a watch rebuild (wear-ongoing's first compile is his)
 
+### His requests of 28 Nov 2026
+- **A walk, jog or run's route from the watch's GPS: his ruling "Save the route"** (over showing it once and over
+  hiding its ends): GPS on foot only, with his permission; a point every 5 m moved, none after End; kept with the walk,
+  his alone, "Delete route" under it (screen only: the coach is never told where he went); drawn from the points with
+  no map service asked. `test:watch-app`, `test:rls-local` §11b, `verify:watch-sets` §8. Needs migration
+  20261128120000 and a phone and watch rebuild
+
 ### His requests of 26 Nov 2026
 - **"Check what your watch shares" on Profile (step 0 of `docs/plans/health-data-next.md`, his "Start the planned
   work")**: on his tap, a plain report of what the phone's health store hands the app, as counts and times only (a

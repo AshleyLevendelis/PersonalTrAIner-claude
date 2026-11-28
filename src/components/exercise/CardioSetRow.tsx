@@ -1,5 +1,5 @@
 import { activityFiguresLine } from '@/lib/activity-figures'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Check } from 'lucide-react'
@@ -19,6 +19,8 @@ import { setChatPrefill } from '@/lib/chat-prefill-store'
 import { tabHash } from '@/lib/app-route'
 import { plannedRoundsOf } from '@/lib/planned-rounds'
 import { blockShape, roundLogSummary, type RoundConfig } from '@/lib/timer-engine'
+// Loaded only when a walk with a start is on screen: most days have none, and the main download stays small.
+const RouteMap = lazy(() => import('@/components/RouteMap').then(m => ({ default: m.RouteMap })))
 
 // ---------------------------------------------------------------------------
 // CARDIO, LOGGED LIKE A LIFTING SET.
@@ -259,6 +261,8 @@ export function CardioReadback({
       </div>
       {figures && <p className="pl-2.5 pt-1 text-[0.75rem] text-muted-foreground tabular-mono" data-testid="cardio-figures">{figures}</p>}
       {heart && <p className="pl-2.5 pt-1 text-[0.75rem] text-muted-foreground tabular-mono" data-testid="cardio-heart">{heart}</p>}
+      {/* THE ROUTE the watch recorded on foot (his ruling 28 Nov 2026, "Save the route"); nothing when there is none. */}
+      {log.started_at && log.user_id && <Suspense fallback={null}><RouteMap profileId={log.user_id} activity={log.activity_name} startedAt={log.started_at} /></Suspense>}
       {error && <p className="text-[0.625rem] text-destructive px-1 mt-0.5">{error}</p>}
     </div>
   )

@@ -89,12 +89,14 @@ it is wrong.
 
 ## Things the screen can do that the coach cannot
 
-**Thirteen screen-only, as of 26 Nov 2026** (picking up a workout the watch recorded joined that day; the macro MODE
+**Fourteen screen-only, as of 28 Nov 2026** (deleting a walk's route joined that day; picking up a workout the watch
+recorded on 26 Nov; the macro MODE
 was taken out on 25 Nov, his "Take it out": one method, the split's choices kept) — the pre-session tightness check,
 macro split, logging a build-up set, logging a drop set,
 "Train anyway" on a rest day, saying how a lift felt on a set already
 logged, which meals are cooked for him on which days, a freestyle day, "Show
-numbers", "Meal variety", cardio days a week, recording a walk or run, and picking up a workout the watch recorded
+numbers", "Meal variety", cardio days a week, recording a walk or run, picking up a workout the watch recorded, and
+deleting a walk's route
 (re-derived from the bullets on 25 Nov 2026: the freestyle three and cardio days
 had been added as bullets without the count moving, the failure the note below
 names, a third time). The calorie target below is a seventh entry but
@@ -126,6 +128,9 @@ header alone. Count what is below before trusting what is here.
   tells it about (its existing extra-cardio logging), and a recorded walk reaches it as an ordinary cardio log. NOT BUILT: the coach is not
   yet told a log's steps and calories burned.
 
+- **Deleting a walk's route.** `screen only`, added 28 Nov 2026 (his "Save the route"): "Delete route" under the
+  logged walk. Deliberately not the coach's: the coach is never told where he went (the points hold where he lives),
+  so it has nothing to name the route by. Deleting the walk itself is both surfaces (`propose_cardio_remove`).
 - **Freestyle a day, and the starter tier's "Show numbers" and "Meal variety" switches.** `screen only`, added
   13 Nov 2026 with the strategy's slice 4 (`docs/plans/flexible-nutrition.md`): Nutrition's "Freestyle this day",
   and two rows on Profile → Meals & shopping. The coach logs what he ate on a freestyle day with its existing food

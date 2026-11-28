@@ -9,6 +9,7 @@
 //  hr            heart rate readings, into the strap's store (strap-live.ts onWatchReadings): every screen that shows
 //                the strap's live number shows the watch's, and a session's figure, graph and zones read them.
 //  cardio-start  a walk, run, ride or other started on the watch: the phone's open workout shows it running.
+//  route         a walk, jog or run's GPS points, every half minute on foot: kept as the workout's route (workout-routes.ts).
 //  cardio-end    ended on the watch with his zone or effort tap: logged as the phone logs a recorded workout, with the
 //                watch's steps, distance and calories (on the wrist the whole time), never twice.
 //  set           a set ticked on the watch: queued for the Exercise tab, which saves it with its own tick.
@@ -104,6 +105,9 @@ export async function applyWatchEvents(events: readonly unknown[], ctx: WatchCon
       } else if (e.type === 'lift-end' && typeof e.date === 'string') {
         // A WEIGHTS SESSION ENDED ON THE WATCH (his request 27 Nov 2026): its calories, kept with the day's session.
         if (await (await import('./session-calories')).saveSessionCalories(ctx.profileId, e.date, e.kcal)) out.logged++
+      } else if (e.type === 'route') {
+        // THE ROUTE OF A WALK, JOG OR RUN (his ruling 28 Nov 2026, "Save the route"): kept with the workout, his alone.
+        await (await import('./workout-routes')).noteWatchRoute(ctx.profileId, e)
       } else if (e.type === 'cardio-end') {
         if (await logWatchCardio(e, ctx)) out.logged++
       } else if ((e.type === 'set' || e.type === 'set-undo') && typeof e.name === 'string' && num(e.setNumber) != null && typeof e.date === 'string') {
