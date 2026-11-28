@@ -1,5 +1,27 @@
 # Advise, then allow: every training change (his ruling, 28 Nov 2026)
 
+> **HANDOVER, Builder B (coach half), end of 28 Nov 2026. Branch `claude/builder-b-coach` is held for merge
+> (merge order: Builder A first, then this branch, which already contains Builder D's at 61a354d and main).** Done
+> here: fixes 20, 17, 21 (first part) and 13 (start and plan); the lead's review; Ashley's "Same hard stop as the
+> plan" for weights typed into his own workout (kit ceilings and the pregnancy 8-rep floor refuse, at the card and at
+> Apply); D's five context blocks; D's lift-effort route; the prompt wording from Builders C and D and his "never
+> mention price". **Left for the next coach builder, all on the coach side:**
+> 1. D's four routes, each once A passes ONE prop from App (list in the update below): meals cooked for me, freestyle a
+>    day, cardio days a week, macro split; and the meal-markers context block (App's `chosenMeals`). Handover detail:
+>    `docs/audits/coach-awareness-wiring-2026-11-28.md`.
+> 2. The watch's once-a-day mention in the day's first message (`watchDailyMention`; his "Mention it once").
+> 3. Near-copies on the coach's swap and add (his "Yes, with a note"), once A lifts the `log_only` guards at
+>    session-edit.ts:218 and mesocycle-edit.ts:767; agree one resolver with A.
+> 4. An Undo on the past-day session line the chat writes (the lead's SHOULD 8): the past-day write must keep what it
+>    wrote.
+> 5. A's fix 7/8 follow-ups: the coach's volume card through `adjustDayVolumeAdvised` (deload, below a floor), and the
+>    added-block Undo on a started session (pass the names, or mark it not reversible).
+> 6. Fix 21's rest, once A's libraries allow them: the session move's "one session a day" and "this week" words (his
+>    two-sessions ruling), the volume floor words, train-today on a training day.
+> 7. Fix 13's log-afterwards, once A lifts `OwnWorkoutSheet.saveAfter` into a library.
+> 8. A lift's effort told about an EARLIER day (today only now).
+> Everything here needs the `chat-gemini` deploy (and `onboarding-chat` for the shared rules) and a coach exam run.
+
 > **UPDATE, Builder B, later 28 Nov 2026:** the lead's review fixed (one hard-stop rule, read at the last day a change
 > reaches); Builder D's five context blocks wired (branch contains D at 61a354d); D's lift-effort route built
 > (`propose_lift_effort`). **D's other four routes need ONE prop each from App (Builder A's file) before the coach can
@@ -81,9 +103,8 @@ earlier ruling of his and wait for his word.
     are kept as said ("AMRAP", "45s"), a number that cannot be right is asked, never replaced; a day that is not a
     date is asked, never dropped; cardio that is a known move (burpees) meets the stops; Undo leaves a saved workout he
     has changed since; a start card tapped after midnight is refused; set numbers run after the plan's own sets of the
-    lift today; "set me up a workout" with no exercises gets a suggestion in words first. **Decided, mine (CSCS): his
-    own stated weight is not held to the load ceilings** (they bound what the APP prescribes; the screen's own workout
-    takes his number too). **For Builder A (screen, parity):** the screen's own-workout picker lets an injury-,
+    lift today; "set me up a workout" with no exercises gets a suggestion in words first. **Ruled by him 28 Nov 2026, "Same hard stop as the plan":** his own
+    stated weight IS held to the kit's load ceilings, and pregnant, to the 8-rep floor (card and Apply). **For Builder A (screen, parity):** the screen's own-workout picker lets an injury-,
     pregnancy- or never-again-excluded move in with a warning (`OwnWorkoutSheet`), and the from-28-weeks list is not
     checked there; its Start numbers own sets from 1 when the plan's lift is not yet logged, so ticking them fills the
     plan's row; an open sheet re-saves a workout the chat's Undo removed. Needs the `chat-gemini` deploy. **LOG (after the fact, as its own workout)

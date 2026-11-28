@@ -22,6 +22,9 @@
 import { getExerciseEntry, type ExerciseEntry } from './exercise-db'
 import type { UserProfile } from './types'
 import { swapHardStop, swapFitWarnings } from './swap-advice'
+import { effectiveLoadingCeilingKg, categorize, isExternallyLoaded } from './load-prescription'
+import { isPregnant } from './health-conditions'
+import { PREGNANCY_REP_FLOOR } from './pregnancy-rules'
 import { saveOwnPlan, deleteOwnPlan, ownPlans, workoutFromPlan, newPlanLift, newPlanCardio, type OwnPlan } from './own-workout-plans'
 import { saveOwnWorkout, removeOwnWorkout, loadOwnWorkouts } from './own-workout'
 
@@ -57,6 +60,26 @@ const MAX_ITEMS = 12
 const DEFAULT_NAME = 'My workout'
 
 const words = (s: string) => s.replace("so I won't swap it in", "so I won't put it in").replace('and I can swap it in', 'and I can put it in')
+
+/**
+ * HIS OWN NUMBERS MEET THE PLAN'S HARD STOPS TOO (his ruling 28 Nov 2026, "Same hard stop as the plan", over
+ * warn-then-allow and over no check): a weight over the kit's ceiling for that lift (the plan's own
+ * effectiveLoadingCeilingKg: the implement's realistic top, or what he told the app his kit goes up to), and, while
+ * pregnant, a rep count under the plan's 8-rep floor, are refused with the reason. A rep count that is not a number
+ * ("AMRAP", "45s") has no floor to read and is kept.
+ */
+function ownLiftNumbersStop(entry: ExerciseEntry, lift: Pick<OwnWorkoutOfferLift, 'reps' | 'weight'>, profile: UserProfile): string | null {
+  const kg = lift.weight ? Number(lift.weight) : null
+  if (kg != null && Number.isFinite(kg) && isExternallyLoaded(entry)) {
+    const ceiling = effectiveLoadingCeilingKg(entry, categorize(entry), profile)
+    if (kg > ceiling) return `${entry.name} at ${kg} kg is over the ${ceiling} kg your plan allows for it with your kit, so I won't put it in. Tell me a weight up to ${ceiling} kg.`
+  }
+  const lowest = /^(\d{1,3})(?:-\d{1,3})?$/.exec(lift.reps.trim())
+  if (isPregnant(profile) && lowest && Number(lowest[1]) < PREGNANCY_REP_FLOOR) {
+    return `While you're pregnant your plan keeps every set at ${PREGNANCY_REP_FLOOR} reps or more, so I won't put ${entry.name} in at ${lift.reps}. Want it at ${PREGNANCY_REP_FLOOR}?`
+  }
+  return null
+}
 
 /** "Bench Press · 3 × 8 at 60 kg", "Run · 20 min". */
 export function ownItemLine(i: OwnWorkoutOfferItem): string {
@@ -141,6 +164,8 @@ export function planOwnWorkoutOffer(input: {
     const kg = r.weight_kg == null ? null : Number(r.weight_kg)
     if (kg != null && (!Number.isFinite(kg) || kg <= 0 || kg > 500)) return { ok: false, reason: `What weight for ${entry.name}, in kg?` }
     const weight = kg == null ? '' : String(Math.round(kg * 4) / 4)
+    const numbersStop = ownLiftNumbersStop(entry, { reps, weight }, input.profile)
+    if (numbersStop) return { ok: false, reason: numbersStop }
     items.push({ kind: 'lift', name: entry.name, sets: setsN, reps, weight })
   }
   if (items.length === 0) return { ok: false, reason: 'What do you want in it? Name the exercises and I\'ll set it up.' }
@@ -181,6 +206,8 @@ export function ownWorkoutStopAtApply(p: OwnWorkoutPayload, profile: UserProfile
     const e = getExerciseEntry(i.kind === 'lift' ? i.name : i.activity)
     const stop = e ? swapHardStop(e, profile, exclusions, onDay) : null
     if (stop) return words(stop)
+    const numbers = e && i.kind === 'lift' ? ownLiftNumbersStop(e, i, profile) : null
+    if (numbers) return numbers
   }
   return null
 }
